@@ -139,7 +139,6 @@ class Config:
             helm_chart_versions=HelmChartVersions(
                 platform=env["NP_HELM_PLATFORM_CHART_VERSION"],
                 obs_csi_driver=env["NP_HELM_OBS_CSI_DRIVER_CHART_VERSION"],
-                openebs=env["NP_HELM_OPENEBS_CHART_VERSION"],
             ),
             platform_url=platform_url,
             platform_auth_url=platform_url,
