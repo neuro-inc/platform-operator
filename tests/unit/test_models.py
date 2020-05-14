@@ -3,6 +3,7 @@ from pathlib import Path
 from yarl import URL
 
 from platform_operator.models import (
+    Cluster,
     Config,
     HelmChartNames,
     HelmChartVersions,
@@ -60,11 +61,11 @@ class TestConfig:
                 url=URL("https://kubernetes-charts.storage.googleapis.com"),
             ),
             helm_release_names=HelmReleaseNames(
-                platform="platform", openebs="openebs", obs_csi_driver="obs-csi-driver"
+                platform="platform", obs_csi_driver="obs-csi-driver"
             ),
             helm_chart_names=HelmChartNames(),
             helm_chart_versions=HelmChartVersions(
-                platform="1.0.0", obs_csi_driver="2.0.0", openebs="3.0.0",
+                platform="1.0.0", obs_csi_driver="2.0.0",
             ),
             helm_service_account="default",
             platform_url=URL("https://dev.neu.ro"),
@@ -117,3 +118,29 @@ class TestConfig:
             platform_namespace="platform",
             platform_jobs_namespace="platform-jobs",
         )
+
+
+class TestCluster:
+    def test_name(self) -> None:
+        cluster = Cluster({"name": "test"})
+
+        assert cluster.name == "test"
+
+    def test_cloud_provider_type(self) -> None:
+        cluster = Cluster({"cloud_provider": {"type": "gcp"}})
+
+        assert cluster.cloud_provider_type == "gcp"
+
+    def test_acme_environment(self) -> None:
+        cluster = Cluster({"lb": {"acme_environment": "staging"}})
+
+        assert cluster.acme_environment == "staging"
+
+        cluster = Cluster({"lb": {"http": {"acme_environment": "staging"}}})
+
+        assert cluster.acme_environment == "staging"
+
+    def test_dns_zone_name(self) -> None:
+        cluster = Cluster({"dns": {"zone_name": "test.org.neu.ro."}})
+
+        assert cluster.dns_zone_name == "test.org.neu.ro."
