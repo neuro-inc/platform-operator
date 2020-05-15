@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Mapping, Optional
+from typing import Any, Dict, Mapping, Optional
 
 from yarl import URL
 
@@ -150,3 +150,23 @@ class Config:
     @classmethod
     def _convert_to_path(cls, value: Optional[str]) -> Optional[Path]:
         return Path(value) if value else None
+
+
+class Cluster(Dict[str, Any]):
+    @property
+    def name(self) -> str:
+        return self["name"]
+
+    @property
+    def cloud_provider_type(self) -> str:
+        return self["cloud_provider"]["type"]
+
+    @property
+    def acme_environment(self) -> str:
+        if "acme_environment" in self["lb"]:
+            return self["lb"]["acme_environment"]
+        return self["lb"]["http"]["acme_environment"]
+
+    @property
+    def dns_zone_name(self) -> str:
+        return self["dns"]["zone_name"]
