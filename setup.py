@@ -6,7 +6,6 @@ install_requires = (
     "aiohttp==3.6.2",
     "pyyaml==5.3.1",
     "idna==2.8",
-    "python-dateutil==2.8.1",
 )
 
 setup(
