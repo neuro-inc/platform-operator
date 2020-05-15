@@ -7,7 +7,6 @@ from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Sequence
 
 import aiohttp
-from dateutil.parser import isoparse
 from yarl import URL
 
 from .models import KubeClientAuthType, KubeConfig
