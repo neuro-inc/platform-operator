@@ -104,30 +104,28 @@ class KubeClient:
         await self._session.close()
         self._session = None
 
+    def _get_namespace_url(self, namespace: str = "") -> URL:
+        base_url = self._config.url / "api/v1/namespaces"
+        return base_url / namespace if namespace else base_url
+
     async def create_namespace(self, name: str) -> None:
         assert self._session
         async with self._session.post(
-            self._config.url / "api/v1/namespaces",
-            json={"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": name}},
+            self._get_namespace_url(), json={"metadata": {"name": name}},
         ) as response:
             response.raise_for_status()
 
     async def delete_namespace(self, name: str) -> None:
         assert self._session
         async with self._session.delete(
-            self._config.url / "api/v1/namespaces" / name,
-            json={
-                "apiVersion": "v1",
-                "kind": "DeleteOptions",
-                "propagationPolicy": "Background",
-            },
+            self._get_namespace_url(name), json={"propagationPolicy": "Background",},
         ) as response:
             response.raise_for_status()
 
     async def get_service(self, namespace: str, name: str) -> Dict[str, Any]:
         assert self._session
         async with self._session.get(
-            self._config.url / "api/v1/namespaces" / namespace / "services" / name
+            self._get_namespace_url(namespace) / "services" / name
         ) as response:
             response.raise_for_status()
             payload = await response.json()
@@ -136,11 +134,7 @@ class KubeClient:
     async def get_service_account(self, namespace: str, name: str) -> Dict[str, Any]:
         assert self._session
         async with self._session.get(
-            self._config.url
-            / "api/v1/namespaces"
-            / namespace
-            / "serviceaccounts"
-            / name
+            self._get_namespace_url(namespace) / "serviceaccounts" / name
         ) as response:
             response.raise_for_status()
             payload = await response.json()
@@ -149,7 +143,7 @@ class KubeClient:
     async def get_secret(self, namespace: str, name: str) -> Dict[str, Any]:
         assert self._session
         async with self._session.get(
-            self._config.url / "api/v1/namespaces" / namespace / "secrets" / name
+            self._get_namespace_url(namespace) / "secrets" / name
         ) as response:
             response.raise_for_status()
             payload = await response.json()
