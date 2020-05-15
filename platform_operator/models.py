@@ -1,8 +1,9 @@
 import os
 from dataclasses import dataclass
 from enum import Enum
+from ipaddress import IPv4Address
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional, Sequence
 
 from yarl import URL
 
@@ -170,3 +171,85 @@ class Cluster(Dict[str, Any]):
     @property
     def dns_zone_name(self) -> str:
         return self["dns"]["zone_name"]
+
+
+@dataclass(frozen=True)
+class GcpConfig:
+    project: str
+    region: str
+    service_account_key_base64: str
+    storage_type: str
+    storage_nfs_server: str = ""
+    storage_nfs_path: str = ""
+    storage_gcs_bucket_name: str = ""
+
+
+@dataclass(frozen=True)
+class AwsConfig:
+    region: str
+    registry_url: URL
+    storage_nfs_server: str
+    storage_nfs_path: str
+    role_ecr_arn: str = ""
+    role_s3_arn: str = ""
+    role_auto_scaling_arn: str = ""
+
+
+@dataclass(frozen=True)
+class AzureConfig:
+    region: str
+    registry_url: URL
+    registry_username: str
+    registry_password: str
+    storage_account_name: str
+    storage_account_key: str
+    storage_share_name: str
+    blob_storage_account_name: str
+    blob_storage_account_key: str
+
+
+@dataclass(frozen=True)
+class OnPremConfig:
+    external_ip: IPv4Address
+    masters_count: int
+    kubelet_port: int
+    http_node_port: int
+    https_node_port: int
+    ssh_auth_node_port: int
+
+
+@dataclass(frozen=True)
+class PlatformConfig:
+    auth_url: URL
+    api_url: URL
+    token: str
+    cluster_name: str
+    cloud_provider: str
+    namespace: str
+    image_pull_secret_name: str
+    standard_storage_class_name: str
+    kubernetes_url: URL
+    dns_zone_id: str
+    dns_zone_name: str
+    dns_zone_name_servers: Sequence[str]
+    ingress_url: URL
+    ingress_registry_url: URL
+    ingress_ssh_auth_server: str
+    ingress_acme_environment: str
+    service_traefik_name: str
+    service_ssh_auth_name: str
+    jobs_namespace: str
+    jobs_label: str
+    jobs_node_pools: Sequence[Dict[str, Any]]
+    jobs_resource_pool_types: Sequence[Dict[str, Any]]
+    jobs_priority_class_name: str
+    jobs_host_template: str
+    jobs_fallback_url: URL
+    jobs_service_account_name: str
+    storage_pvc_name: str
+    helm_repo: HelmRepo
+    docker_registry: DockerRegistry
+    gcp: Optional[GcpConfig] = None
+    aws: Optional[AwsConfig] = None
+    azure: Optional[AzureConfig] = None
+    on_prem: Optional[OnPremConfig] = None
