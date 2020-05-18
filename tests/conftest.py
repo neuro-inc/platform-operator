@@ -182,7 +182,7 @@ def on_prem_platform_config(
         ],
         jobs_resource_pool_types=[resource_pool_type_factory()],
         on_prem=OnPremConfig(
-            external_ip=IPv4Address("192.168.0.1"),
+            external_ip=IPv4Address("192.168.0.3"),
             masters_count=1,
             registry_storage_class_name="registry-standard",
             registry_storage_size="100Gi",

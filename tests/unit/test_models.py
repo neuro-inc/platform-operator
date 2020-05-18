@@ -239,10 +239,10 @@ class TestPlatformConfig:
             "zone_name": on_prem_platform_config.dns_zone_name,
             "name_servers": on_prem_platform_config.dns_zone_name_servers,
             "a_records": [
-                {"name": zone_name, "ips": ["192.168.0.1"]},
-                {"name": f"*.jobs.{zone_name}", "ips": ["192.168.0.1"]},
-                {"name": f"registry.{zone_name}", "ips": ["192.168.0.1"]},
-                {"name": f"ssh-auth.{zone_name}", "ips": ["192.168.0.1"]},
+                {"name": zone_name, "ips": ["192.168.0.3"]},
+                {"name": f"*.jobs.{zone_name}", "ips": ["192.168.0.3"]},
+                {"name": f"registry.{zone_name}", "ips": ["192.168.0.3"]},
+                {"name": f"ssh-auth.{zone_name}", "ips": ["192.168.0.3"]},
             ],
         }
 
