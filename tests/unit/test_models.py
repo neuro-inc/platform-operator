@@ -169,32 +169,6 @@ class TestPlatformConfig:
             "status": {"loadBalancer": {"ingress": [{"ip": "192.168.0.2"}]}},
         }
 
-    @pytest.fixture
-    def aws_traefik_service(self) -> Dict[str, Any]:
-        return {
-            "metadata": {"name", "platform-traefik"},
-            "status": {"loadBalancer": {"ingress": [{"hostname": "traefik"}]}},
-        }
-
-    @pytest.fixture
-    def aws_ssh_auth_service(self) -> Dict[str, Any]:
-        return {
-            "metadata": {"name", "ssh-auth"},
-            "status": {"loadBalancer": {"ingress": [{"hostname": "ssh-auth"}]}},
-        }
-
-    @pytest.fixture
-    def aws_traefik_lb(self) -> Dict[str, Any]:
-        return {
-            "CanonicalHostedZoneNameID": "/hostedzone/traefik",
-        }
-
-    @pytest.fixture
-    def aws_ssh_auth_lb(self) -> Dict[str, Any]:
-        return {
-            "CanonicalHostedZoneNameID": "/hostedzone/ssh-auth",
-        }
-
     def test_create_dns_config(
         self,
         gcp_platform_config: PlatformConfig,
