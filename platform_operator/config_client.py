@@ -73,7 +73,7 @@ class ConfigClient:
         self, cluster_name: str, token: str, payload: Dict[str, Any]
     ) -> None:
         assert self._session
-        logger.info("dns configuration: %s", cluster_name, str(payload))
+        logger.info("cluster '%s' dns configuration: %s", cluster_name, str(payload))
         async with self._session.put(
             self._base_url / "api/v1/clusters" / cluster_name / "dns",
             json=payload,

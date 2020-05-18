@@ -1,5 +1,7 @@
 from pathlib import Path
+from typing import Any, Dict
 
+import pytest
 from yarl import URL
 
 from platform_operator.models import (
@@ -9,9 +11,9 @@ from platform_operator.models import (
     HelmChartVersions,
     HelmReleaseNames,
     HelmRepo,
-    HelmRepoName,
     KubeClientAuthType,
     KubeConfig,
+    PlatformConfig,
 )
 
 
@@ -36,6 +38,7 @@ class TestConfig:
             "NP_HELM_SERVICE_ACCOUNT_NAME": "default",
             "NP_HELM_PLATFORM_CHART_VERSION": "1.0.0",
             "NP_HELM_OBS_CSI_DRIVER_CHART_VERSION": "2.0.0",
+            "NP_HELM_NFS_SERVER_CHART_VERSION": "3.0.0",
             "NP_PLATFORM_NAMESPACE": "platform",
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
         }
@@ -61,11 +64,13 @@ class TestConfig:
                 url=URL("https://kubernetes-charts.storage.googleapis.com"),
             ),
             helm_release_names=HelmReleaseNames(
-                platform="platform", obs_csi_driver="obs-csi-driver"
+                platform="platform",
+                obs_csi_driver="platform-obs-csi-driver",
+                nfs_server="platform-nfs-server",
             ),
             helm_chart_names=HelmChartNames(),
             helm_chart_versions=HelmChartVersions(
-                platform="1.0.0", obs_csi_driver="2.0.0",
+                platform="1.0.0", obs_csi_driver="2.0.0", nfs_server="3.0.0"
             ),
             helm_service_account="default",
             platform_url=URL("https://dev.neu.ro"),
@@ -86,6 +91,7 @@ class TestConfig:
             "NP_HELM_SERVICE_ACCOUNT_NAME": "default",
             "NP_HELM_PLATFORM_CHART_VERSION": "1.0.0",
             "NP_HELM_OBS_CSI_DRIVER_CHART_VERSION": "2.0.0",
+            "NP_HELM_NFS_SERVER_CHART_VERSION": "3.0.0",
             "NP_PLATFORM_NAMESPACE": "platform",
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
         }
@@ -105,11 +111,13 @@ class TestConfig:
                 url=URL("https://kubernetes-charts.storage.googleapis.com"),
             ),
             helm_release_names=HelmReleaseNames(
-                platform="platform", obs_csi_driver="platform-obs-csi-driver"
+                platform="platform",
+                obs_csi_driver="platform-obs-csi-driver",
+                nfs_server="platform-nfs-server",
             ),
             helm_chart_names=HelmChartNames(),
             helm_chart_versions=HelmChartVersions(
-                platform="1.0.0", obs_csi_driver="2.0.0"
+                platform="1.0.0", obs_csi_driver="2.0.0", nfs_server="3.0.0"
             ),
             helm_service_account="default",
             platform_url=URL("https://dev.neu.ro"),
@@ -144,3 +152,42 @@ class TestCluster:
         cluster = Cluster({"dns": {"zone_name": "test.org.neu.ro."}})
 
         assert cluster.dns_zone_name == "test.org.neu.ro."
+
+
+class TestPlatformConfig:
+    @pytest.fixture
+    def traefik_service(self) -> Dict[str, Any]:
+        return {
+            "metadata": {"name", "platform-traefik"},
+            "status": {"loadBalancer": {"ingress": [{"ip": "192.168.0.1"}]}},
+        }
+
+    @pytest.fixture
+    def ssh_auth_service(self) -> Dict[str, Any]:
+        return {
+            "metadata": {"name", "ssh-auth"},
+            "status": {"loadBalancer": {"ingress": [{"ip": "192.168.0.2"}]}},
+        }
+
+    def test_create_dns_config(
+        self,
+        gcp_platform_config: PlatformConfig,
+        traefik_service: Dict[str, Any],
+        ssh_auth_service: Dict[str, Any],
+    ) -> None:
+        result = gcp_platform_config.create_dns_config(
+            traefik_service=traefik_service, ssh_auth_service=ssh_auth_service,
+        )
+        zone_name = gcp_platform_config.dns_zone_name
+
+        assert result == {
+            "zone_id": gcp_platform_config.dns_zone_id,
+            "zone_name": gcp_platform_config.dns_zone_name,
+            "name_servers": gcp_platform_config.dns_zone_name_servers,
+            "a_records": [
+                {"name": zone_name, "ips": ["192.168.0.1"]},
+                {"name": f"*.jobs.{zone_name}", "ips": ["192.168.0.1"]},
+                {"name": f"registry.{zone_name}", "ips": ["192.168.0.1"]},
+                {"name": f"ssh-auth.{zone_name}", "ips": ["192.168.0.2"]},
+            ],
+        }
