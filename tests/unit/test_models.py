@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Dict
+from unittest import mock
 
 import pytest
 from yarl import URL
@@ -169,6 +170,36 @@ class TestPlatformConfig:
             "status": {"loadBalancer": {"ingress": [{"ip": "192.168.0.2"}]}},
         }
 
+    @pytest.fixture
+    def aws_traefik_service(self) -> Dict[str, Any]:
+        return {
+            "metadata": {"name", "platform-traefik"},
+            "status": {"loadBalancer": {"ingress": [{"hostname": "traefik"}]}},
+        }
+
+    @pytest.fixture
+    def aws_ssh_auth_service(self) -> Dict[str, Any]:
+        return {
+            "metadata": {"name", "ssh-auth"},
+            "status": {"loadBalancer": {"ingress": [{"hostname": "ssh-auth"}]}},
+        }
+
+    @pytest.fixture
+    def aws_traefik_lb(self) -> Dict[str, Any]:
+        return {
+            "CanonicalHostedZoneNameID": "/hostedzone/traefik",
+        }
+
+    @pytest.fixture
+    def aws_ssh_auth_lb(self) -> Dict[str, Any]:
+        return {
+            "CanonicalHostedZoneNameID": "/hostedzone/ssh-auth",
+        }
+
+    @pytest.fixture
+    def service_account_secret(self) -> Dict[str, Any]:
+        return {"data": {"ca.crt": "cert-authority-data", "token": "token"}}
+
     def test_create_dns_config(
         self,
         gcp_platform_config: PlatformConfig,
@@ -189,5 +220,72 @@ class TestPlatformConfig:
                 {"name": f"*.jobs.{zone_name}", "ips": ["192.168.0.1"]},
                 {"name": f"registry.{zone_name}", "ips": ["192.168.0.1"]},
                 {"name": f"ssh-auth.{zone_name}", "ips": ["192.168.0.2"]},
+            ],
+        }
+
+    def test_create_on_prem_dns_config(
+        self,
+        on_prem_platform_config: PlatformConfig,
+        traefik_service: Dict[str, Any],
+        ssh_auth_service: Dict[str, Any],
+    ) -> None:
+        result = on_prem_platform_config.create_dns_config(
+            traefik_service=traefik_service, ssh_auth_service=ssh_auth_service,
+        )
+        zone_name = on_prem_platform_config.dns_zone_name
+
+        assert result == {
+            "zone_id": on_prem_platform_config.dns_zone_id,
+            "zone_name": on_prem_platform_config.dns_zone_name,
+            "name_servers": on_prem_platform_config.dns_zone_name_servers,
+            "a_records": [
+                {"name": zone_name, "ips": ["192.168.0.1"]},
+                {"name": f"*.jobs.{zone_name}", "ips": ["192.168.0.1"]},
+                {"name": f"registry.{zone_name}", "ips": ["192.168.0.1"]},
+                {"name": f"ssh-auth.{zone_name}", "ips": ["192.168.0.1"]},
+            ],
+        }
+
+    def test_create_aws_dns_config(
+        self,
+        aws_platform_config: PlatformConfig,
+        aws_traefik_service: Dict[str, Any],
+        aws_ssh_auth_service: Dict[str, Any],
+        aws_traefik_lb: Dict[str, Any],
+        aws_ssh_auth_lb: Dict[str, Any],
+    ) -> None:
+        result = aws_platform_config.create_dns_config(
+            traefik_service=aws_traefik_service,
+            ssh_auth_service=aws_ssh_auth_service,
+            aws_traefik_lb=aws_traefik_lb,
+            aws_ssh_auth_lb=aws_ssh_auth_lb,
+        )
+        zone_name = aws_platform_config.dns_zone_name
+
+        assert result == {
+            "zone_id": aws_platform_config.dns_zone_id,
+            "zone_name": aws_platform_config.dns_zone_name,
+            "name_servers": aws_platform_config.dns_zone_name_servers,
+            "a_records": [
+                {
+                    "name": zone_name,
+                    "dns_name": "traefik",
+                    "zone_id": "/hostedzone/traefik",
+                },
+                {
+                    "name": f"*.jobs.{zone_name}",
+                    "dns_name": "traefik",
+                    "zone_id": "/hostedzone/traefik",
+                },
+                {
+                    "name": f"registry.{zone_name}",
+                    "dns_name": "traefik",
+                    "zone_id": "/hostedzone/traefik",
+                },
+                {
+                    "name": f"ssh-auth.{zone_name}",
+                    "dns_name": "ssh-auth",
+                    "zone_id": "/hostedzone/ssh-auth",
+                },
             ],
         }

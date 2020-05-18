@@ -1,14 +1,19 @@
 import uuid
+from dataclasses import replace
+from ipaddress import IPv4Address
 from typing import Any, Callable, Dict
 
 import pytest
 from yarl import URL
 
 from platform_operator.models import (
+    AwsConfig,
+    AzureConfig,
     DockerRegistry,
     GcpConfig,
     HelmRepo,
     HelmRepoName,
+    OnPremConfig,
     PlatformConfig,
 )
 
@@ -96,5 +101,96 @@ def gcp_platform_config(
             storage_type="nfs",
             storage_nfs_server="192.168.0.3",
             storage_nfs_path="/",
+        ),
+    )
+
+
+@pytest.fixture
+def aws_platform_config(
+    gcp_platform_config: PlatformConfig,
+    resource_pool_type_factory: Callable[[], Dict[str, Any]],
+) -> PlatformConfig:
+    return replace(
+        gcp_platform_config,
+        gcp=None,
+        cloud_provider="aws",
+        jobs_node_pools=[
+            {
+                "name": "p2-xlarge-1xk80-non-preemptible",
+                "idleSize": 0,
+                "cpu": 1.0,
+                "gpu": 1,
+            }
+        ],
+        jobs_resource_pool_types=[resource_pool_type_factory()],
+        aws=AwsConfig(
+            region="us-east-1",
+            registry_url=URL("https://platform.dkr.ecr.us-east-1.amazonaws.com"),
+            storage_nfs_server="192.168.0.3",
+            storage_nfs_path="/",
+        ),
+    )
+
+
+@pytest.fixture
+def azure_platform_config(
+    gcp_platform_config: PlatformConfig,
+    resource_pool_type_factory: Callable[[], Dict[str, Any]],
+) -> PlatformConfig:
+    return replace(
+        gcp_platform_config,
+        gcp=None,
+        cloud_provider="azure",
+        jobs_node_pools=[
+            {
+                "name": "Standard_NC6-1xk80-non-preemptible",
+                "idleSize": 0,
+                "cpu": 1.0,
+                "gpu": 1,
+            }
+        ],
+        jobs_resource_pool_types=[resource_pool_type_factory()],
+        azure=AzureConfig(
+            region="westus",
+            registry_url=URL("https://platform.azurecr.io"),
+            registry_username="admin",
+            registry_password="admin-password",
+            storage_account_name="accountName1",
+            storage_account_key="accountKey1",
+            storage_share_name="share",
+            blob_storage_account_name="accountName2",
+            blob_storage_account_key="accountKey2",
+        ),
+    )
+
+
+@pytest.fixture
+def on_prem_platform_config(
+    gcp_platform_config: PlatformConfig,
+    resource_pool_type_factory: Callable[[], Dict[str, Any]],
+) -> PlatformConfig:
+    return replace(
+        gcp_platform_config,
+        gcp=None,
+        standard_storage_class_name="standard",
+        cloud_provider="on_prem",
+        ingress_ssh_auth_server=(
+            f"ssh-auth.{gcp_platform_config.cluster_name}.org.neu.ro:30022"
+        ),
+        jobs_node_pools=[
+            {"name": "gpu-1xk80-non-preemptible", "idleSize": 0, "cpu": 1.0, "gpu": 1}
+        ],
+        jobs_resource_pool_types=[resource_pool_type_factory()],
+        on_prem=OnPremConfig(
+            external_ip=IPv4Address("192.168.0.1"),
+            masters_count=1,
+            registry_storage_class_name="registry-standard",
+            registry_storage_size="100Gi",
+            storage_class_name="storage-standard",
+            storage_size="1000Gi",
+            kubelet_port=10250,
+            http_node_port=30080,
+            https_node_port=30443,
+            ssh_auth_node_port=30022,
         ),
     )
