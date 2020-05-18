@@ -52,6 +52,7 @@ class HelmRepo:
 class HelmReleaseNames:
     platform: str
     obs_csi_driver: str
+    nfs_server: str
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,7 @@ class HelmChartNames:
 class HelmChartVersions:
     platform: str
     obs_csi_driver: str
+    nfs_server: str
 
 
 @dataclass(frozen=True)
@@ -135,11 +137,13 @@ class Config:
             helm_release_names=HelmReleaseNames(
                 platform=env["NP_PLATFORM_NAMESPACE"],
                 obs_csi_driver=env["NP_PLATFORM_NAMESPACE"] + "-obs-csi-driver",
+                nfs_server=env["NP_PLATFORM_NAMESPACE"] + "-nfs-server",
             ),
             helm_chart_names=HelmChartNames(),
             helm_chart_versions=HelmChartVersions(
                 platform=env["NP_HELM_PLATFORM_CHART_VERSION"],
                 obs_csi_driver=env["NP_HELM_OBS_CSI_DRIVER_CHART_VERSION"],
+                nfs_server=env["NP_HELM_NFS_SERVER_CHART_VERSION"],
             ),
             platform_url=platform_url,
             platform_auth_url=platform_url,
@@ -212,6 +216,10 @@ class AzureConfig:
 class OnPremConfig:
     external_ip: IPv4Address
     masters_count: int
+    registry_storage_class_name: str
+    registry_storage_size: str
+    storage_class_name: str
+    storage_size: str
     kubelet_port: int
     http_node_port: int
     https_node_port: int
@@ -253,3 +261,69 @@ class PlatformConfig:
     aws: Optional[AwsConfig] = None
     azure: Optional[AzureConfig] = None
     on_prem: Optional[OnPremConfig] = None
+
+    def create_dns_config(
+        self,
+        traefik_service: Dict[str, Any],
+        ssh_auth_service: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        traefik_zone_id = ""
+        ssh_auth_zone_id = ""
+        if self.aws:
+            # TODO: add dns config for AWS
+            pass
+        elif self.on_prem:
+            # TODO: add dns config for OnPrem
+            pass
+        else:
+            traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0]["ip"]
+            ssh_auth_host = ssh_auth_service["status"]["loadBalancer"]["ingress"][0][
+                "ip"
+            ]
+        result: Dict[str, Any] = {
+            "zone_id": self.dns_zone_id,
+            "zone_name": self.dns_zone_name,
+            "name_servers": self.dns_zone_name_servers,
+            "a_records": [],
+        }
+        if traefik_zone_id:
+            result["a_records"].extend(
+                (
+                    {
+                        "name": self.dns_zone_name,
+                        "dns_name": traefik_host,
+                        "zone_id": traefik_zone_id,
+                    },
+                    {
+                        "name": f"*.jobs.{self.dns_zone_name}",
+                        "dns_name": traefik_host,
+                        "zone_id": traefik_zone_id,
+                    },
+                    {
+                        "name": f"registry.{self.dns_zone_name}",
+                        "dns_name": traefik_host,
+                        "zone_id": traefik_zone_id,
+                    },
+                )
+            )
+        else:
+            result["a_records"].extend(
+                (
+                    {"name": self.dns_zone_name, "ips": [traefik_host]},
+                    {"name": f"*.jobs.{self.dns_zone_name}", "ips": [traefik_host]},
+                    {"name": f"registry.{self.dns_zone_name}", "ips": [traefik_host]},
+                )
+            )
+        if ssh_auth_zone_id:
+            result["a_records"].append(
+                {
+                    "name": f"ssh-auth.{self.dns_zone_name}",
+                    "dns_name": ssh_auth_host,
+                    "zone_id": ssh_auth_zone_id,
+                }
+            )
+        else:
+            result["a_records"].append(
+                {"name": f"ssh-auth.{self.dns_zone_name}", "ips": [ssh_auth_host]}
+            )
+        return result
