@@ -1,10 +1,8 @@
-import asyncio
-import json
 import logging
 import ssl
 from base64 import b64decode
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, Optional
 
 import aiohttp
 from yarl import URL
@@ -117,7 +115,7 @@ class KubeClient:
     async def delete_namespace(self, name: str) -> None:
         assert self._session
         async with self._session.delete(
-            self._get_namespace_url(name), json={"propagationPolicy": "Background",},
+            self._get_namespace_url(name), json={"propagationPolicy": "Background"},
         ) as response:
             response.raise_for_status()
 

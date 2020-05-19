@@ -1,6 +1,5 @@
 from pathlib import Path
 from typing import Any, Dict
-from unittest import mock
 
 import pytest
 from yarl import URL
