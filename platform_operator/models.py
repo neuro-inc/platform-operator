@@ -266,15 +266,25 @@ class PlatformConfig:
         self,
         traefik_service: Dict[str, Any],
         ssh_auth_service: Dict[str, Any],
+        aws_traefik_lb: Optional[Dict[str, Any]] = None,
+        aws_ssh_auth_lb: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         traefik_zone_id = ""
         ssh_auth_zone_id = ""
         if self.aws:
-            # TODO: add dns config for AWS
-            pass
+            traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0][
+                "hostname"
+            ]
+            ssh_auth_host = ssh_auth_service["status"]["loadBalancer"]["ingress"][0][
+                "hostname"
+            ]
+            assert aws_traefik_lb
+            assert aws_ssh_auth_lb
+            traefik_zone_id = aws_traefik_lb["CanonicalHostedZoneNameID"]
+            ssh_auth_zone_id = aws_ssh_auth_lb["CanonicalHostedZoneNameID"]
         elif self.on_prem:
-            # TODO: add dns config for OnPrem
-            pass
+            traefik_host = str(self.on_prem.external_ip)
+            ssh_auth_host = str(self.on_prem.external_ip)
         else:
             traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0]["ip"]
             ssh_auth_host = ssh_auth_service["status"]["loadBalancer"]["ingress"][0][
