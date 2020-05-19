@@ -337,3 +337,38 @@ class PlatformConfig:
                 {"name": f"ssh-auth.{self.dns_zone_name}", "ips": [ssh_auth_host]}
             )
         return result
+
+    def create_cluster_config(
+        self, service_account_secret: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        result = {
+            "name": self.cluster_name,
+            "storage": {
+                "url": str(self.ingress_url / "api/v1/storage"),
+                "pvc": {"name": self.storage_pvc_name},
+            },
+            "registry": {
+                "url": str(self.ingress_registry_url),
+                "email": f"{self.cluster_name}@neuromation.io",
+            },
+            "orchestrator": {
+                "kubernetes": {
+                    "url": str(self.kubernetes_url),
+                    "ca_data": service_account_secret["data"]["ca.crt"],
+                    "auth_type": "token",
+                    "token": service_account_secret["data"]["token"],
+                    "namespace": self.jobs_namespace,
+                    "node_label_gpu": "cloud.google.com/gke-accelerator",
+                    "node_label_preemptible": "cloud.google.com/gke-preemptible",
+                    "node_label_job": self.jobs_label,
+                    "job_pod_priority_class_name": self.jobs_priority_class_name,
+                },
+                "is_http_ingress_secure": True,
+                "job_hostname_template": self.jobs_host_template,
+                "job_fallback_hostname": str(self.jobs_fallback_url),
+                "resource_pool_types": self.jobs_resource_pool_types,
+            },
+            "ssh": {"server": self.ingress_ssh_auth_server},
+            "monitoring": {"url": str(self.ingress_url / "api/v1/jobs")},
+        }
+        return result
