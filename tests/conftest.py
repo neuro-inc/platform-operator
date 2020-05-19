@@ -56,7 +56,7 @@ def gcp_platform_config(
         namespace="platform",
         image_pull_secret_name="platform-docker-config",
         standard_storage_class_name="platform-standard-topology-aware",
-        kubernetes_url=URL("https://kubernetes.default"),
+        kubernetes_public_url=URL("https://kubernetes.default"),
         dns_zone_id="/hostedzone/id",
         dns_zone_name=f"{cluster_name}.org.neu.ro.",
         dns_zone_name_servers=["192.168.0.2"],
@@ -182,7 +182,7 @@ def on_prem_platform_config(
         ],
         jobs_resource_pool_types=[resource_pool_type_factory()],
         on_prem=OnPremConfig(
-            external_ip=IPv4Address("192.168.0.3"),
+            kubernetes_public_ip=IPv4Address("192.168.0.3"),
             masters_count=1,
             registry_storage_class_name="registry-standard",
             registry_storage_size="100Gi",

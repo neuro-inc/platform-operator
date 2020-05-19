@@ -214,7 +214,7 @@ class AzureConfig:
 
 @dataclass(frozen=True)
 class OnPremConfig:
-    external_ip: IPv4Address
+    kubernetes_public_ip: IPv4Address
     masters_count: int
     registry_storage_class_name: str
     registry_storage_size: str
@@ -236,7 +236,7 @@ class PlatformConfig:
     namespace: str
     image_pull_secret_name: str
     standard_storage_class_name: str
-    kubernetes_url: URL
+    kubernetes_public_url: URL
     dns_zone_id: str
     dns_zone_name: str
     dns_zone_name_servers: Sequence[str]
@@ -283,8 +283,8 @@ class PlatformConfig:
             traefik_zone_id = aws_traefik_lb["CanonicalHostedZoneNameID"]
             ssh_auth_zone_id = aws_ssh_auth_lb["CanonicalHostedZoneNameID"]
         elif self.on_prem:
-            traefik_host = str(self.on_prem.external_ip)
-            ssh_auth_host = str(self.on_prem.external_ip)
+            traefik_host = str(self.on_prem.kubernetes_public_ip)
+            ssh_auth_host = str(self.on_prem.kubernetes_public_ip)
         else:
             traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0]["ip"]
             ssh_auth_host = ssh_auth_service["status"]["loadBalancer"]["ingress"][0][
@@ -353,7 +353,7 @@ class PlatformConfig:
             },
             "orchestrator": {
                 "kubernetes": {
-                    "url": str(self.kubernetes_url),
+                    "url": str(self.kubernetes_public_url),
                     "ca_data": service_account_secret["data"]["ca.crt"],
                     "auth_type": "token",
                     "token": service_account_secret["data"]["token"],
