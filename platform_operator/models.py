@@ -252,7 +252,7 @@ class PlatformConfig:
     jobs_resource_pool_types: Sequence[Dict[str, Any]]
     jobs_priority_class_name: str
     jobs_host_template: str
-    jobs_fallback_url: URL
+    jobs_fallback_host: str
     jobs_service_account_name: str
     storage_pvc_name: str
     helm_repo: HelmRepo
@@ -365,7 +365,7 @@ class PlatformConfig:
                 },
                 "is_http_ingress_secure": True,
                 "job_hostname_template": self.jobs_host_template,
-                "job_fallback_hostname": str(self.jobs_fallback_url),
+                "job_fallback_hostname": str(self.jobs_fallback_host),
                 "resource_pool_types": self.jobs_resource_pool_types,
             },
             "ssh": {"server": self.ingress_ssh_auth_server},

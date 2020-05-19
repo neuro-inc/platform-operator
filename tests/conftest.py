@@ -71,7 +71,7 @@ def gcp_platform_config(
             }
         ],
         jobs_resource_pool_types=[resource_pool_type_factory("192.168.0.0/16")],
-        jobs_fallback_url=URL("default.jobs-dev.neu.ro"),
+        jobs_fallback_host="default.jobs-dev.neu.ro",
         jobs_host_template=f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
         jobs_priority_class_name="platform-job",
         jobs_service_account_name="platform-jobs",
