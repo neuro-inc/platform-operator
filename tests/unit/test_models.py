@@ -1,6 +1,6 @@
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Callable, Dict
 
 import pytest
 from kopf.structs import bodies
@@ -296,8 +296,8 @@ class TestPlatformConfig:
         self,
         cluster_name: str,
         gcp_platform_config: PlatformConfig,
-        gcp_cluster: Cluster,
         service_account_secret: Dict[str, Any],
+        resource_pool_type_factory: Callable[[str], Dict[str, Any]],
     ) -> None:
         result = gcp_platform_config.create_cluster_config(service_account_secret)
 
@@ -326,9 +326,7 @@ class TestPlatformConfig:
                 "is_http_ingress_secure": True,
                 "job_hostname_template": f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
                 "job_fallback_hostname": "default.jobs-dev.neu.ro",
-                "resource_pool_types": gcp_cluster["orchestrator"][
-                    "resource_pool_types"
-                ],
+                "resource_pool_types": [resource_pool_type_factory("192.168.0.0/16")],
             },
             "ssh": {"server": f"ssh-auth.{cluster_name}.org.neu.ro"},
             "monitoring": {"url": f"https://{cluster_name}.org.neu.ro/api/v1/jobs"},
@@ -340,7 +338,19 @@ class TestPlatformConfigFactory:
     def factory(self, config: Config) -> PlatformConfigFactory:
         return PlatformConfigFactory(config)
 
-    def test_platform_config(
+    def test_platform_config_without_kubernetes_public_url__fails(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        del gcp_platform_body["spec"]["kubernetes"]["publicUrl"]
+
+        with pytest.raises(KeyError):
+            factory.create(gcp_platform_body, gcp_cluster)
+
+    def test_gcp_platform_config(
         self,
         factory: PlatformConfigFactory,
         gcp_platform_body: bodies.Body,
@@ -349,4 +359,90 @@ class TestPlatformConfigFactory:
     ) -> None:
         result = factory.create(gcp_platform_body, gcp_cluster)
 
-        assert result == replace(gcp_platform_config, gcp=None, jobs_node_pools=[])
+        assert result == gcp_platform_config
+
+    def test_gcp_platform_config_without_tpu(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+        resource_pool_type_factory: Callable[[], Dict[str, Any]],
+    ) -> None:
+        del gcp_platform_body["spec"]["kubernetes"]["tpuIPv4CIDR"]
+        gcp_cluster["orchestrator"]["resource_pool_types"] = [
+            resource_pool_type_factory()
+        ]
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result == replace(
+            gcp_platform_config,
+            jobs_resource_pool_types=[resource_pool_type_factory()],
+        )
+
+    def test_gcp_platform_config_without_service_account_key_in_spec(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        del gcp_platform_body["spec"]["iam"]["gcp"]["serviceAccountKeyBase64"]
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result == replace(
+            gcp_platform_config,
+            gcp=replace(
+                gcp_platform_config.gcp,
+                service_account_key_base64=(
+                    "eyJjbGllbnRfZW1haWwiOiAidGVzdC1hY2NAdGV"
+                    "zdC1wcm9qZWN0LmlhbS5nc2VydmljZWFjY291bnQuY29tIn0="
+                ),
+            ),
+        )
+
+    def test_gcp_platform_config_without_service_account_key___fails(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        del gcp_platform_body["spec"]["iam"]["gcp"]["serviceAccountKeyBase64"]
+        del gcp_cluster["cloud_provider"]["credentials"]
+
+        with pytest.raises(KeyError):
+            factory.create(gcp_platform_body, gcp_cluster)
+
+    def test_gcp_platform_config_with_gcs_storage(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        gcp_platform_body["spec"]["storage"] = {"gcs": {"bucket": "platform-storage"}}
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result == replace(
+            gcp_platform_config,
+            gcp=replace(
+                gcp_platform_config.gcp,
+                storage_type="gcs",
+                storage_gcs_bucket_name="platform-storage",
+                storage_nfs_server="",
+                storage_nfs_path="/",
+            ),
+        )
+
+    def test_gcp_platform_config_without_storage___fails(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        gcp_platform_body["spec"]["storage"] = {}
+
+        with pytest.raises(AssertionError):
+            factory.create(gcp_platform_body, gcp_cluster)

@@ -175,6 +175,7 @@ def gcp_cluster(
         "node_pools": [node_pool_factory("n1-highmem-8")],
         "storage": {"tier": "PREMIUM", "capacity_tb": 5, "backend": "filestore"},
     }
+    cluster["orchestrator"]["resource_pool_types"][0]["tpu"] = {}
     return cluster
 
 
@@ -186,7 +187,10 @@ def gcp_platform_body(cluster_name: str) -> bodies.Body:
         "metadata": {"name": cluster_name},
         "spec": {
             "token": "token",
-            "kubernetes": {"publicUrl": "https://kubernetes.default"},
+            "kubernetes": {
+                "publicUrl": "https://kubernetes.default",
+                "tpuIPv4CIDR": "192.168.0.0/16",
+            },
             "iam": {"gcp": {"serviceAccountKeyBase64": "e30="}},
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
         },
@@ -196,7 +200,7 @@ def gcp_platform_body(cluster_name: str) -> bodies.Body:
 
 @pytest.fixture
 def gcp_platform_config(
-    cluster_name: str, resource_pool_type_factory: Callable[[], Dict[str, Any]]
+    cluster_name: str, resource_pool_type_factory: Callable[[str], Dict[str, Any]]
 ) -> PlatformConfig:
     return PlatformConfig(
         auth_url=URL("https://dev.neu.ro"),
@@ -214,14 +218,9 @@ def gcp_platform_config(
         jobs_namespace="platform-jobs",
         jobs_label="platform.neuromation.io/job",
         jobs_node_pools=[
-            {
-                "name": "n1-highmem-8-1xk80-non-preemptible",
-                "idleSize": 0,
-                "cpu": 1.0,
-                "gpu": 1,
-            }
+            # TODO: add node pools config
         ],
-        jobs_resource_pool_types=[resource_pool_type_factory()],
+        jobs_resource_pool_types=[resource_pool_type_factory("192.168.0.0/16")],
         jobs_fallback_host="default.jobs-dev.neu.ro",
         jobs_host_template=f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
         jobs_priority_class_name="platform-job",

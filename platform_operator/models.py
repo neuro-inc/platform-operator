@@ -1,7 +1,10 @@
+import copy
+import json
 import os
+from base64 import b64encode
 from dataclasses import dataclass
 from enum import Enum
-from ipaddress import IPv4Address
+from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence
 
@@ -386,6 +389,13 @@ class PlatformConfigFactory:
             f"{self._config.platform_namespace}-standard-topology-aware"
         )
         kubernetes_spec = platform_body["spec"]["kubernetes"]
+        tpu_network = None
+        if cluster.cloud_provider_type == "gcp":
+            tpu_network = (
+                IPv4Network(kubernetes_spec["tpuIPv4CIDR"])
+                if "tpuIPv4CIDR" in kubernetes_spec
+                else None
+            )
         return PlatformConfig(
             auth_url=self._config.platform_auth_url,
             api_url=self._config.platform_api_url,
@@ -410,8 +420,8 @@ class PlatformConfigFactory:
             jobs_node_pools=[
                 # TODO: add node pools config
             ],
-            jobs_resource_pool_types=cluster["orchestrator"].get(
-                "resource_pool_types", ()
+            jobs_resource_pool_types=self._update_tpu_network(
+                cluster["orchestrator"].get("resource_pool_types", ()), tpu_network,
             ),
             jobs_priority_class_name=f"{self._config.platform_namespace}-job",
             jobs_host_template=f"{{job_id}}.jobs.{ingress_host}",
@@ -420,7 +430,11 @@ class PlatformConfigFactory:
             storage_pvc_name=f"{self._config.platform_namespace}-storage",
             helm_repo=self._create_helm_repo(cluster),
             docker_registry=self._create_docker_registry(cluster),
-            # TODO: add cloud provider specific configs
+            gcp=(
+                self._create_gcp(platform_body["spec"], cluster)
+                if cluster.cloud_provider_type == "gcp"
+                else None
+            ),
         )
 
     @classmethod
@@ -442,3 +456,38 @@ class PlatformConfigFactory:
             username=neuro_registry["username"],
             password=neuro_registry["password"],
         )
+
+    @classmethod
+    def _create_gcp(cls, spec: bodies.Spec, cluster: Cluster) -> GcpConfig:
+        cloud_provider = cluster["cloud_provider"]
+        iam_gcp_spec = spec.get("iam", {}).get("gcp")
+        service_account_key_base64 = iam_gcp_spec.get(
+            "serviceAccountKeyBase64"
+        ) or cls._base64_encode(json.dumps(cloud_provider["credentials"]))
+        storage_spec = spec["storage"]
+        assert "gcs" in storage_spec or "nfs" in storage_spec
+        return GcpConfig(
+            project=cloud_provider["project"],
+            region=cloud_provider["region"],
+            service_account_key_base64=service_account_key_base64,
+            storage_type="gcs" if "gcs" in storage_spec else "nfs",
+            storage_nfs_server=storage_spec.get("nfs", {}).get("server", ""),
+            storage_nfs_path=storage_spec.get("nfs", {}).get("path", "/"),
+            storage_gcs_bucket_name=storage_spec.get("gcs", {}).get("bucket", ""),
+        )
+
+    @classmethod
+    def _base64_encode(cls, value: str) -> str:
+        return b64encode(value.encode("utf-8")).decode("utf-8")
+
+    @classmethod
+    def _update_tpu_network(
+        cls,
+        resource_pools_types: Sequence[Dict[str, Any]],
+        tpu_network: Optional[IPv4Network],
+    ) -> Sequence[Dict[str, Any]]:
+        resource_pools_types = copy.deepcopy(resource_pools_types)
+        for rpt in resource_pools_types:
+            if "tpu" in rpt and tpu_network:
+                rpt["tpu"]["ipv4_cidr_block"] = str(tpu_network)
+        return resource_pools_types
