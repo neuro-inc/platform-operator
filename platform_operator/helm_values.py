@@ -4,6 +4,38 @@ from .models import PlatformConfig
 
 
 class HelmValuesFactory:
+    def create_cluster_autoscaler_values(
+        self, platform: PlatformConfig
+    ) -> Dict[str, Any]:
+        assert platform.aws
+        result = {
+            "cloudProvider": "aws",
+            "awsRegion": platform.aws.region,
+            "image": {"tag": "v1.13.9"},
+            "rbac": {"create": True},
+            "autoDiscovery": {"clusterName": platform.cluster_name},
+            "extraArgs": {
+                # least-waste will expand the ASG that will waste
+                # the least amount of CPU/MEM resources
+                "expander": "least-waste",
+                # If true cluster autoscaler will never delete nodes with pods
+                # with local storage, e.g. EmptyDir or HostPath
+                "skip-nodes-with-local-storage": False,
+                # If true cluster autoscaler will never delete nodes with pods
+                # from kube-system (except for DaemonSet or mirror pods)
+                "skip-nodes-with-system-pods": False,
+                # Detect similar node groups and balance the number of nodes
+                # between them. This option is required for balancing nodepool
+                # nodes between multiple availability zones.
+                "balance-similar-node-groups": True,
+            },
+        }
+        if platform.aws.role_auto_scaling_arn:
+            result["podAnnotations"] = {
+                "iam.amazonaws.com/role": platform.aws.role_auto_scaling_arn
+            }
+        return result
+
     def create_platform_storage_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
