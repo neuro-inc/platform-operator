@@ -1,4 +1,5 @@
 from dataclasses import replace
+from ipaddress import AddressValueError, IPv4Address
 from pathlib import Path
 from typing import Any, Callable, Dict
 
@@ -556,3 +557,72 @@ class TestPlatformConfigFactory:
 
         with pytest.raises(KeyError):
             factory.create(azure_platform_body, azure_cluster)
+
+    def test_on_prem_platform_config(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: bodies.Body,
+        on_prem_cluster: Cluster,
+        on_prem_platform_config: PlatformConfig,
+    ) -> None:
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result == on_prem_platform_config
+
+    def test_on_prem_platform_config_with_public_ip_from_kubernetes_public_url(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: bodies.Body,
+        on_prem_cluster: Cluster,
+    ) -> None:
+        del on_prem_platform_body["spec"]["kubernetes"]["publicIP"]
+        on_prem_platform_body["spec"]["kubernetes"][
+            "publicUrl"
+        ] = "https://192.168.0.1:6443"
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result.on_prem
+        assert result.on_prem.kubernetes_public_ip == IPv4Address("192.168.0.1")
+
+    def test_on_prem_platform_config_without_public_ip__fails(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: bodies.Body,
+        on_prem_cluster: Cluster,
+    ) -> None:
+        del on_prem_platform_body["spec"]["kubernetes"]["publicIP"]
+        on_prem_platform_body["spec"]["kubernetes"][
+            "publicUrl"
+        ] = "https://kubernetes:6443"
+
+        with pytest.raises(AddressValueError):
+            factory.create(on_prem_platform_body, on_prem_cluster)
+
+    def test_on_prem_platform_config_with_default_persistence_sizes(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: bodies.Body,
+        on_prem_cluster: Cluster,
+    ) -> None:
+        del on_prem_platform_body["spec"]["registry"]["kubernetes"]["persistence"][
+            "size"
+        ]
+        del on_prem_platform_body["spec"]["storage"]["kubernetes"]["persistence"][
+            "size"
+        ]
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result.on_prem
+        assert result.on_prem.registry_storage_size == "10Gi"
+
+    def test_on_prem_platform_config_without_node_ports__fails(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: bodies.Body,
+        on_prem_cluster: Cluster,
+        on_prem_platform_config: PlatformConfig,
+    ) -> None:
+        del on_prem_platform_body["spec"]["kubernetes"]["nodePorts"]
+
+        with pytest.raises(KeyError):
+            factory.create(on_prem_platform_body, on_prem_cluster)

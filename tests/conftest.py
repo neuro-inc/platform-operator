@@ -232,6 +232,22 @@ def azure_cluster(
 
 
 @pytest.fixture
+def on_prem_cluster(
+    cluster_name: str,
+    cluster_factory: Callable[[str], Cluster],
+    node_pool_factory: Callable[[str], Dict[str, Any]],
+) -> Cluster:
+    cluster = cluster_factory(cluster_name)
+    cluster["cloud_provider"] = {
+        "type": "on_prem",
+        "kubernetes_url": "https://192.168.0.2",
+        "credentials": {"token": "kubernetes-token", "ca_data": "kubernetes-ca-data"},
+        "node_pools": [node_pool_factory("gpu")],
+    }
+    return cluster
+
+
+@pytest.fixture
 def gcp_platform_body(cluster_name: str) -> bodies.Body:
     payload = {
         "apiVersion": "v1",
@@ -293,6 +309,47 @@ def azure_platform_body(cluster_name: str) -> bodies.Body:
                 "azure": {
                     "storageAccountName": "accountName2",
                     "storageAccountKey": "accountKey2",
+                },
+            },
+        },
+    }
+    return bodies.Body(payload)
+
+
+@pytest.fixture
+def on_prem_platform_body(cluster_name: str) -> bodies.Body:
+    payload = {
+        "apiVersion": "v1",
+        "kind": "Platform",
+        "metadata": {"name": cluster_name},
+        "spec": {
+            "token": "token",
+            "kubernetes": {
+                "publicUrl": "https://kubernetes.default",
+                "publicIP": "192.168.0.3",
+                "mastersCount": 1,
+                "standardStorageClassName": "standard",
+                "nodePorts": {
+                    "kubelet": 10250,
+                    "http": 30080,
+                    "https": 30443,
+                    "sshAuth": 30022,
+                },
+            },
+            "registry": {
+                "kubernetes": {
+                    "persistence": {
+                        "storageClassName": "registry-standard",
+                        "size": "100Gi",
+                    }
+                }
+            },
+            "storage": {
+                "kubernetes": {
+                    "persistence": {
+                        "storageClassName": "storage-standard",
+                        "size": "1000Gi",
+                    }
                 }
             },
         },
@@ -420,7 +477,7 @@ def on_prem_platform_config(
             f"ssh-auth.{gcp_platform_config.cluster_name}.org.neu.ro:30022"
         ),
         jobs_node_pools=[
-            {"name": "gpu-1xk80-non-preemptible", "idleSize": 0, "cpu": 1.0, "gpu": 1}
+            # TODO: add node pools config
         ],
         jobs_resource_pool_types=[resource_pool_type_factory()],
         on_prem=OnPremConfig(
