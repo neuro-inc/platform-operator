@@ -509,3 +509,50 @@ class TestPlatformConfigFactory:
 
         with pytest.raises(KeyError):
             factory.create(aws_platform_body, aws_cluster)
+
+    def test_azure_platform_config(
+        self,
+        factory: PlatformConfigFactory,
+        azure_platform_body: bodies.Body,
+        azure_cluster: Cluster,
+        azure_platform_config: PlatformConfig,
+    ) -> None:
+        result = factory.create(azure_platform_body, azure_cluster)
+
+        assert result == azure_platform_config
+
+    def test_azure_platform_config_without_registry__fails(
+        self,
+        factory: PlatformConfigFactory,
+        azure_platform_body: bodies.Body,
+        azure_cluster: Cluster,
+        azure_platform_config: PlatformConfig,
+    ) -> None:
+        azure_platform_body["spec"]["registry"] = {}
+
+        with pytest.raises(KeyError):
+            factory.create(azure_platform_body, azure_cluster)
+
+    def test_azure_platform_config_without_storage__fails(
+        self,
+        factory: PlatformConfigFactory,
+        azure_platform_body: bodies.Body,
+        azure_cluster: Cluster,
+        azure_platform_config: PlatformConfig,
+    ) -> None:
+        azure_platform_body["spec"]["storage"] = {}
+
+        with pytest.raises(KeyError):
+            factory.create(azure_platform_body, azure_cluster)
+
+    def test_azure_platform_config_without_blob_storage__fails(
+        self,
+        factory: PlatformConfigFactory,
+        azure_platform_body: bodies.Body,
+        azure_cluster: Cluster,
+        azure_platform_config: PlatformConfig,
+    ) -> None:
+        azure_platform_body["spec"]["blobStorage"] = {}
+
+        with pytest.raises(KeyError):
+            factory.create(azure_platform_body, azure_cluster)

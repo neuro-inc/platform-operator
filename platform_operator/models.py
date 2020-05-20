@@ -440,6 +440,11 @@ class PlatformConfigFactory:
                 if cluster.cloud_provider_type == "aws"
                 else None
             ),
+            azure=(
+                self._create_azure(platform_body["spec"], cluster)
+                if cluster.cloud_provider_type == "azure"
+                else None
+            ),
         )
 
     @classmethod
@@ -495,6 +500,25 @@ class PlatformConfigFactory:
             registry_url=registry_url,
             storage_nfs_server=spec["storage"]["nfs"]["server"],
             storage_nfs_path=spec["storage"]["nfs"].get("path", "/"),
+        )
+
+    @classmethod
+    def _create_azure(cls, spec: bodies.Spec, cluster: Cluster) -> AzureConfig:
+        registry_url = URL(spec["registry"]["azure"]["url"])
+        if not registry_url.scheme:
+            registry_url = URL(f"https://{registry_url!s}")
+        return AzureConfig(
+            region=cluster["cloud_provider"]["region"],
+            registry_url=registry_url,
+            registry_username=spec["registry"]["azure"]["username"],
+            registry_password=spec["registry"]["azure"]["password"],
+            storage_account_name=spec["storage"]["azureFile"]["storageAccountName"],
+            storage_account_key=spec["storage"]["azureFile"]["storageAccountKey"],
+            storage_share_name=spec["storage"]["azureFile"]["shareName"],
+            blob_storage_account_name=spec["blobStorage"]["azure"][
+                "storageAccountName"
+            ],
+            blob_storage_account_key=spec["blobStorage"]["azure"]["storageAccountKey"],
         )
 
     @classmethod
