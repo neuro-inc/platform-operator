@@ -396,6 +396,9 @@ class PlatformConfigFactory:
                 if "tpuIPv4CIDR" in kubernetes_spec
                 else None
             )
+        if cluster.cloud_provider_type == "on_prem":
+            standard_storage_class_name = kubernetes_spec["standardStorageClassName"]
+            ingress_ssh_auth_server += f":{kubernetes_spec['nodePorts']['sshAuth']}"
         return PlatformConfig(
             auth_url=self._config.platform_auth_url,
             api_url=self._config.platform_api_url,
@@ -443,6 +446,11 @@ class PlatformConfigFactory:
             azure=(
                 self._create_azure(platform_body["spec"], cluster)
                 if cluster.cloud_provider_type == "azure"
+                else None
+            ),
+            on_prem=(
+                self._create_on_prem(platform_body["spec"])
+                if cluster.cloud_provider_type == "on_prem"
                 else None
             ),
         )
@@ -519,6 +527,28 @@ class PlatformConfigFactory:
                 "storageAccountName"
             ],
             blob_storage_account_key=spec["blobStorage"]["azure"]["storageAccountKey"],
+        )
+
+    @classmethod
+    def _create_on_prem(cls, spec: bodies.Spec) -> OnPremConfig:
+        kubernetes_spec = spec["kubernetes"]
+        if "publicIP" in kubernetes_spec:
+            public_ip = IPv4Address(kubernetes_spec["publicIP"])
+        else:
+            public_ip = IPv4Address(URL(kubernetes_spec["publicUrl"]).host)
+        registry_volume_claim = spec["registry"]["kubernetes"]["persistence"]
+        storage_volume_claim = spec["storage"]["kubernetes"]["persistence"]
+        return OnPremConfig(
+            kubernetes_public_ip=public_ip,
+            masters_count=int(kubernetes_spec.get("mastersCount", "1")),
+            registry_storage_class_name=registry_volume_claim["storageClassName"],
+            registry_storage_size=registry_volume_claim.get("size") or "10Gi",
+            storage_class_name=storage_volume_claim["storageClassName"],
+            storage_size=storage_volume_claim.get("size") or "10Gi",
+            kubelet_port=int(kubernetes_spec["nodePorts"]["kubelet"]),
+            http_node_port=int(kubernetes_spec["nodePorts"]["http"]),
+            https_node_port=int(kubernetes_spec["nodePorts"]["https"]),
+            ssh_auth_node_port=int(kubernetes_spec["nodePorts"]["sshAuth"]),
         )
 
     @classmethod
