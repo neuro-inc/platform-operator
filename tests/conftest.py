@@ -205,6 +205,33 @@ def aws_cluster(
 
 
 @pytest.fixture
+def azure_cluster(
+    cluster_name: str,
+    cluster_factory: Callable[[str], Cluster],
+    node_pool_factory: Callable[[str], Dict[str, Any]],
+) -> Cluster:
+    cluster = cluster_factory(cluster_name)
+    cluster["cloud_provider"] = {
+        "type": "azure",
+        "region": "westus",
+        "resource_group": "platform-resource-group",
+        "credentials": {
+            "subscription_id": "client_subscription_id",
+            "tenant_id": "client_tenant_id",
+            "client_id": "client_client_id",
+            "client_secret": "client_client_secret",
+        },
+        "node_pools": [node_pool_factory("Standard_NC6")],
+        "storage": {
+            "tier": "Premium",
+            "replication_type": "LRS",
+            "file_share_size_gib": 100,
+        },
+    }
+    return cluster
+
+
+@pytest.fixture
 def gcp_platform_body(cluster_name: str) -> bodies.Body:
     payload = {
         "apiVersion": "v1",
@@ -234,6 +261,40 @@ def aws_platform_body(cluster_name: str) -> bodies.Body:
             "kubernetes": {"publicUrl": "https://kubernetes.default"},
             "registry": {"aws": {"url": "platform.dkr.ecr.us-east-1.amazonaws.com"}},
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
+        },
+    }
+    return bodies.Body(payload)
+
+
+@pytest.fixture
+def azure_platform_body(cluster_name: str) -> bodies.Body:
+    payload = {
+        "apiVersion": "v1",
+        "kind": "Platform",
+        "metadata": {"name": cluster_name},
+        "spec": {
+            "token": "token",
+            "kubernetes": {"publicUrl": "https://kubernetes.default"},
+            "registry": {
+                "azure": {
+                    "url": "platform.azurecr.io",
+                    "username": "admin",
+                    "password": "admin-password",
+                }
+            },
+            "storage": {
+                "azureFile": {
+                    "storageAccountName": "accountName1",
+                    "storageAccountKey": "accountKey1",
+                    "shareName": "share",
+                }
+            },
+            "blobStorage": {
+                "azure": {
+                    "storageAccountName": "accountName2",
+                    "storageAccountKey": "accountKey2",
+                }
+            },
         },
     }
     return bodies.Body(payload)
@@ -328,12 +389,7 @@ def azure_platform_config(
         gcp=None,
         cloud_provider="azure",
         jobs_node_pools=[
-            {
-                "name": "Standard_NC6-1xk80-non-preemptible",
-                "idleSize": 0,
-                "cpu": 1.0,
-                "gpu": 1,
-            }
+            # TODO: add node pools config
         ],
         jobs_resource_pool_types=[resource_pool_type_factory()],
         azure=AzureConfig(
