@@ -214,7 +214,7 @@ class AzureConfig:
 
 @dataclass(frozen=True)
 class OnPremConfig:
-    external_ip: IPv4Address
+    kubernetes_public_ip: IPv4Address
     masters_count: int
     registry_storage_class_name: str
     registry_storage_size: str
@@ -236,7 +236,7 @@ class PlatformConfig:
     namespace: str
     image_pull_secret_name: str
     standard_storage_class_name: str
-    kubernetes_url: URL
+    kubernetes_public_url: URL
     dns_zone_id: str
     dns_zone_name: str
     dns_zone_name_servers: Sequence[str]
@@ -252,7 +252,7 @@ class PlatformConfig:
     jobs_resource_pool_types: Sequence[Dict[str, Any]]
     jobs_priority_class_name: str
     jobs_host_template: str
-    jobs_fallback_url: URL
+    jobs_fallback_host: str
     jobs_service_account_name: str
     storage_pvc_name: str
     helm_repo: HelmRepo
@@ -283,8 +283,8 @@ class PlatformConfig:
             traefik_zone_id = aws_traefik_lb["CanonicalHostedZoneNameID"]
             ssh_auth_zone_id = aws_ssh_auth_lb["CanonicalHostedZoneNameID"]
         elif self.on_prem:
-            traefik_host = str(self.on_prem.external_ip)
-            ssh_auth_host = str(self.on_prem.external_ip)
+            traefik_host = str(self.on_prem.kubernetes_public_ip)
+            ssh_auth_host = str(self.on_prem.kubernetes_public_ip)
         else:
             traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0]["ip"]
             ssh_auth_host = ssh_auth_service["status"]["loadBalancer"]["ingress"][0][
@@ -336,4 +336,39 @@ class PlatformConfig:
             result["a_records"].append(
                 {"name": f"ssh-auth.{self.dns_zone_name}", "ips": [ssh_auth_host]}
             )
+        return result
+
+    def create_cluster_config(
+        self, service_account_secret: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        result = {
+            "name": self.cluster_name,
+            "storage": {
+                "url": str(self.ingress_url / "api/v1/storage"),
+                "pvc": {"name": self.storage_pvc_name},
+            },
+            "registry": {
+                "url": str(self.ingress_registry_url),
+                "email": f"{self.cluster_name}@neuromation.io",
+            },
+            "orchestrator": {
+                "kubernetes": {
+                    "url": str(self.kubernetes_public_url),
+                    "ca_data": service_account_secret["data"]["ca.crt"],
+                    "auth_type": "token",
+                    "token": service_account_secret["data"]["token"],
+                    "namespace": self.jobs_namespace,
+                    "node_label_gpu": "cloud.google.com/gke-accelerator",
+                    "node_label_preemptible": "cloud.google.com/gke-preemptible",
+                    "node_label_job": self.jobs_label,
+                    "job_pod_priority_class_name": self.jobs_priority_class_name,
+                },
+                "is_http_ingress_secure": True,
+                "job_hostname_template": self.jobs_host_template,
+                "job_fallback_hostname": str(self.jobs_fallback_host),
+                "resource_pool_types": self.jobs_resource_pool_types,
+            },
+            "ssh": {"server": self.ingress_ssh_auth_server},
+            "monitoring": {"url": str(self.ingress_url / "api/v1/jobs")},
+        }
         return result

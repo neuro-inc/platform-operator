@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Callable, Dict
 
 import pytest
 from yarl import URL
@@ -287,4 +287,44 @@ class TestPlatformConfig:
                     "zone_id": "/hostedzone/ssh-auth",
                 },
             ],
+        }
+
+    def test_create_cluster_config(
+        self,
+        cluster_name: str,
+        gcp_platform_config: PlatformConfig,
+        service_account_secret: Dict[str, Any],
+        resource_pool_type_factory: Callable[[str], Dict[str, Any]],
+    ) -> None:
+        result = gcp_platform_config.create_cluster_config(service_account_secret)
+
+        assert result == {
+            "name": cluster_name,
+            "storage": {
+                "url": f"https://{cluster_name}.org.neu.ro/api/v1/storage",
+                "pvc": {"name": "platform-storage"},
+            },
+            "registry": {
+                "url": f"https://registry.{cluster_name}.org.neu.ro",
+                "email": f"{cluster_name}@neuromation.io",
+            },
+            "orchestrator": {
+                "kubernetes": {
+                    "url": "https://kubernetes.default",
+                    "ca_data": "cert-authority-data",
+                    "auth_type": "token",
+                    "token": "token",
+                    "namespace": "platform-jobs",
+                    "node_label_gpu": "cloud.google.com/gke-accelerator",
+                    "node_label_preemptible": "cloud.google.com/gke-preemptible",
+                    "node_label_job": "platform.neuromation.io/job",
+                    "job_pod_priority_class_name": "platform-job",
+                },
+                "is_http_ingress_secure": True,
+                "job_hostname_template": f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
+                "job_fallback_hostname": "default.jobs-dev.neu.ro",
+                "resource_pool_types": [resource_pool_type_factory("192.168.0.0/16")],
+            },
+            "ssh": {"server": f"ssh-auth.{cluster_name}.org.neu.ro"},
+            "monitoring": {"url": f"https://{cluster_name}.org.neu.ro/api/v1/jobs"},
         }
