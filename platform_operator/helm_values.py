@@ -4,6 +4,42 @@ from .models import PlatformConfig
 
 
 class HelmValuesFactory:
+    def create_platform_storage_values(
+        self, platform: PlatformConfig
+    ) -> Dict[str, Any]:
+        return {
+            "NP_CLUSTER_NAME": platform.cluster_name,
+            "NP_STORAGE_AUTH_URL": str(platform.auth_url),
+            "NP_STORAGE_PVC_CLAIM_NAME": (f"{platform.namespace}-storage"),
+            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
+        }
+
+    def create_platform_object_storage_values(
+        self, platform: PlatformConfig
+    ) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "NP_CLUSTER_NAME": platform.cluster_name,
+            "NP_OBSTORAGE_PROVIDER": platform.cloud_provider,
+            "NP_OBSTORAGE_AUTH_URL": str(platform.auth_url),
+            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
+        }
+        secret_name = f"{platform.namespace}-blob-storage-key"
+        if platform.gcp:
+            result["NP_OBSTORAGE_LOCATION"] = platform.gcp.region
+            result["NP_OBSTORAGE_GCP_PROJECT_ID"] = platform.gcp.project
+            result["NP_OBSTORAGE_GCP_KEY_SECRET"] = secret_name
+        if platform.aws:
+            result["NP_OBSTORAGE_LOCATION"] = platform.aws.region
+            result["NP_OBSTORAGE_AWS_SECRET"] = secret_name
+            if platform.aws.role_s3_arn:
+                result["annotations"] = {
+                    "iam.amazonaws.com/role": platform.aws.role_s3_arn
+                }
+        if platform.azure:
+            result["NP_OBSTORAGE_LOCATION"] = platform.azure.region
+            result["NP_OBSTORAGE_AZURE_SECRET"] = secret_name
+        return result
+
     def create_platform_registry_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:

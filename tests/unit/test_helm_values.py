@@ -11,6 +11,73 @@ class TestHelmValuesFactory:
     def factory(self) -> HelmValuesFactory:
         return HelmValuesFactory()
 
+    def test_create_platform_storage_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_storage_values(gcp_platform_config)
+
+        assert result == {
+            "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
+            "NP_STORAGE_AUTH_URL": "https://dev.neu.ro",
+            "NP_STORAGE_PVC_CLAIM_NAME": "platform-storage",
+            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+        }
+
+    def test_create_gcp_platform_object_storage_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_object_storage_values(gcp_platform_config)
+
+        assert result == {
+            "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
+            "NP_OBSTORAGE_PROVIDER": "gcp",
+            "NP_OBSTORAGE_AUTH_URL": "https://dev.neu.ro",
+            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+            "NP_OBSTORAGE_LOCATION": "us-central1",
+            "NP_OBSTORAGE_GCP_PROJECT_ID": "project",
+            "NP_OBSTORAGE_GCP_KEY_SECRET": "platform-blob-storage-key",
+        }
+
+    def test_create_aws_platform_object_storage_values(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_object_storage_values(aws_platform_config)
+
+        assert result == {
+            "NP_CLUSTER_NAME": aws_platform_config.cluster_name,
+            "NP_OBSTORAGE_PROVIDER": "aws",
+            "NP_OBSTORAGE_AUTH_URL": "https://dev.neu.ro",
+            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+            "NP_OBSTORAGE_LOCATION": "us-east-1",
+            "NP_OBSTORAGE_AWS_SECRET": "platform-blob-storage-key",
+        }
+
+    def test_create_aws_platform_object_storage_values_with_role(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_object_storage_values(
+            replace(
+                aws_platform_config,
+                aws=replace(aws_platform_config.aws, role_s3_arn="s3_role"),
+            )
+        )
+
+        assert result["annotations"] == {"iam.amazonaws.com/role": "s3_role"}
+
+    def test_create_azure_platform_object_storage_values(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_object_storage_values(azure_platform_config)
+
+        assert result == {
+            "NP_CLUSTER_NAME": azure_platform_config.cluster_name,
+            "NP_OBSTORAGE_PROVIDER": "azure",
+            "NP_OBSTORAGE_AUTH_URL": "https://dev.neu.ro",
+            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+            "NP_OBSTORAGE_LOCATION": "westus",
+            "NP_OBSTORAGE_AZURE_SECRET": "platform-blob-storage-key",
+        }
+
     def test_create_gcp_platform_registry_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
