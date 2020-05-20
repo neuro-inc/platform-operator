@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platformOperator.fullname" . }}-controller
+  labels:
+{{ include "platformOperator.labels.standard" . | indent 4 }}
+    component: controller
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ include "platformOperator.name" . }}
+      release: {{ .Release.Name }}
+      component: controller
+  template:
+    metadata:
+      labels:
+        app: {{ include "platformOperator.name" . }}
+        release: {{ .Release.Name }}
+        component: controller
+    spec:
+      serviceAccountName: {{ include "platformOperator.fullname" . }}
+      automountServiceAccountToken: true
+      containers:
+      - name: controller
+        image: neuro-docker-local-anonymous.jfrog.io/platform-operator-controller:{{ .Chart.Version }}
+        env:
+        - name: NP_CONTROLLER_LOG_LEVEL
+          value: {{ .Values.logLevel | default "INFO" }}
+        - name: NP_CONTROLLER_RETRIES
+          value: {{ .Values.controller.retries | quote }}
+        - name: NP_CONTROLLER_BACKOFF
+          value: {{ .Values.controller.backoff | quote }}
+        - name: NP_KUBE_URL
+          value: https://kubernetes.default.svc
+        - name: NP_KUBE_CERT_AUTHORITY_PATH
+          value: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        - name: NP_KUBE_AUTH_TYPE
+          value: token
+        - name: NP_KUBE_AUTH_TOKEN_PATH
+          value: /var/run/secrets/kubernetes.io/serviceaccount/token
+        - name: NP_HELM_STABLE_REPO_URL
+          value: https://kubernetes-charts.storage.googleapis.com
+        - name: NP_HELM_SERVICE_ACCOUNT_NAME
+          value: {{ include "platformOperator.fullname" . }}
+        - name: NP_HELM_PLATFORM_CHART_VERSION
+          value: "2.1.5"
+        - name: NP_HELM_OBS_CSI_DRIVER_CHART_VERSION
+          value: "1.0.5"
+        - name: NP_HELM_NFS_SERVER_CHART_VERSION
+          value: "1.0.0"
+        - name: NP_PLATFORM_URL
+          value: {{ .Values.platform.url }}
+        - name: NP_PLATFORM_NAMESPACE
+          value: {{ .Release.Namespace }}
+        ports:
+        - name: liveness-port
+          containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: liveness-port
+          initialDelaySeconds: 10
+          periodSeconds: 3

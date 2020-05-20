@@ -1,0 +1,7 @@
+controller:
+  retries: 3
+  backoff: 60
+  logLevel: INFO
+
+platform:
+  url: https://staging.neu.ro
