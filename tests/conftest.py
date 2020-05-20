@@ -180,6 +180,31 @@ def gcp_cluster(
 
 
 @pytest.fixture
+def aws_cluster(
+    cluster_name: str,
+    cluster_factory: Callable[[str], Cluster],
+    node_pool_factory: Callable[[str], Dict[str, Any]],
+) -> Cluster:
+    cluster = cluster_factory(cluster_name)
+    cluster["cloud_provider"] = {
+        "type": "aws",
+        "region": "us-east-1",
+        "zones": ["us-east-1a", "us-east-1b"],
+        "vpc_id": "test-vpc",
+        "credentials": {
+            "access_key_id": "access_key_id",
+            "secret_access_key": "secret_access_key",
+        },
+        "node_pools": [node_pool_factory("p2.xlarge")],
+        "storage": {
+            "performance_mode": "generalPurpose",
+            "throughput_mode": "bursting",
+        },
+    }
+    return cluster
+
+
+@pytest.fixture
 def gcp_platform_body(cluster_name: str) -> bodies.Body:
     payload = {
         "apiVersion": "v1",
@@ -192,6 +217,22 @@ def gcp_platform_body(cluster_name: str) -> bodies.Body:
                 "tpuIPv4CIDR": "192.168.0.0/16",
             },
             "iam": {"gcp": {"serviceAccountKeyBase64": "e30="}},
+            "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
+        },
+    }
+    return bodies.Body(payload)
+
+
+@pytest.fixture
+def aws_platform_body(cluster_name: str) -> bodies.Body:
+    payload = {
+        "apiVersion": "v1",
+        "kind": "Platform",
+        "metadata": {"name": cluster_name},
+        "spec": {
+            "token": "token",
+            "kubernetes": {"publicUrl": "https://kubernetes.default"},
+            "registry": {"aws": {"url": "platform.dkr.ecr.us-east-1.amazonaws.com"}},
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
         },
     }
@@ -265,12 +306,7 @@ def aws_platform_config(
         gcp=None,
         cloud_provider="aws",
         jobs_node_pools=[
-            {
-                "name": "p2-xlarge-1xk80-non-preemptible",
-                "idleSize": 0,
-                "cpu": 1.0,
-                "gpu": 1,
-            }
+            # TODO: add node pools config
         ],
         jobs_resource_pool_types=[resource_pool_type_factory()],
         aws=AwsConfig(

@@ -446,3 +446,66 @@ class TestPlatformConfigFactory:
 
         with pytest.raises(AssertionError):
             factory.create(gcp_platform_body, gcp_cluster)
+
+    def test_aws_platform_config(
+        self,
+        factory: PlatformConfigFactory,
+        aws_platform_body: bodies.Body,
+        aws_cluster: Cluster,
+        aws_platform_config: PlatformConfig,
+    ) -> None:
+        result = factory.create(aws_platform_body, aws_cluster)
+
+        assert result == aws_platform_config
+
+    def test_aws_platform_config_with_roles(
+        self,
+        factory: PlatformConfigFactory,
+        aws_platform_body: bodies.Body,
+        aws_cluster: Cluster,
+        aws_platform_config: PlatformConfig,
+    ) -> None:
+        aws_platform_body["spec"]["iam"] = {
+            "aws": {
+                "roles": {
+                    "ecrRoleArn": "ecr_role_arn",
+                    "s3RoleArn": "s3_role_arn",
+                    "autoScalingRoleArn": "auto_scaling_role_arn",
+                }
+            }
+        }
+        result = factory.create(aws_platform_body, aws_cluster)
+
+        assert result == replace(
+            aws_platform_config,
+            aws=replace(
+                aws_platform_config.aws,
+                role_ecr_arn="ecr_role_arn",
+                role_s3_arn="s3_role_arn",
+                role_auto_scaling_arn="auto_scaling_role_arn",
+            ),
+        )
+
+    def test_aws_platform_config_without_registry__fails(
+        self,
+        factory: PlatformConfigFactory,
+        aws_platform_body: bodies.Body,
+        aws_cluster: Cluster,
+        aws_platform_config: PlatformConfig,
+    ) -> None:
+        del aws_platform_body["spec"]["registry"]
+
+        with pytest.raises(KeyError):
+            factory.create(aws_platform_body, aws_cluster)
+
+    def test_aws_platform_config_without_storage__fails(
+        self,
+        factory: PlatformConfigFactory,
+        aws_platform_body: bodies.Body,
+        aws_cluster: Cluster,
+        aws_platform_config: PlatformConfig,
+    ) -> None:
+        aws_platform_body["spec"]["storage"] = {}
+
+        with pytest.raises(KeyError):
+            factory.create(aws_platform_body, aws_cluster)
