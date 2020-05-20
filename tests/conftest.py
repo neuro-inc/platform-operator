@@ -4,23 +4,79 @@ from ipaddress import IPv4Address
 from typing import Any, Callable, Dict
 
 import pytest
+from kopf.structs import bodies
 from yarl import URL
 
 from platform_operator.models import (
     AwsConfig,
     AzureConfig,
+    Cluster,
+    Config,
     DockerRegistry,
     GcpConfig,
+    HelmChartNames,
+    HelmChartVersions,
+    HelmReleaseNames,
     HelmRepo,
     HelmRepoName,
+    KubeClientAuthType,
+    KubeConfig,
     OnPremConfig,
     PlatformConfig,
 )
 
 
 @pytest.fixture
+def config() -> Config:
+    return Config(
+        log_level="DEBUG",
+        retries=3,
+        backoff=60,
+        kube_config=KubeConfig(
+            url=URL("https://kubernetes.default"), auth_type=KubeClientAuthType.NONE,
+        ),
+        helm_stable_repo=HelmRepo(
+            name="stable", url=URL("https://kubernetes-charts.storage.googleapis.com"),
+        ),
+        helm_release_names=HelmReleaseNames(
+            platform="platform",
+            obs_csi_driver="platform-obs-csi-driver",
+            nfs_server="platform-nfs-server",
+        ),
+        helm_chart_names=HelmChartNames(),
+        helm_chart_versions=HelmChartVersions(
+            platform="1.0.0", obs_csi_driver="2.0.0", nfs_server="3.0.0"
+        ),
+        helm_service_account="default",
+        platform_url=URL("https://dev.neu.ro"),
+        platform_auth_url=URL("https://dev.neu.ro"),
+        platform_api_url=URL("https://dev.neu.ro/api/v1"),
+        platform_namespace="platform",
+        platform_jobs_namespace="platform-jobs",
+    )
+
+
+@pytest.fixture
 def cluster_name() -> str:
     return str(uuid.uuid4())
+
+
+@pytest.fixture
+def node_pool_factory() -> Callable[[str], Dict[str, Any]]:
+    def _factory(machine_type: str) -> Dict[str, Any]:
+        return {
+            "machine_type": machine_type,
+            "min_size": 0,
+            "max_size": 1,
+            "cpu": 1.0,
+            "available_cpu": 1.0,
+            "memory_mb": 1024,
+            "available_memory_mb": 1024,
+            "gpu": 1,
+            "gpu_model": "nvidia-tesla-k80",
+        }
+
+    return _factory
 
 
 @pytest.fixture
@@ -44,8 +100,103 @@ def resource_pool_type_factory() -> Callable[[], Dict[str, Any]]:
 
 
 @pytest.fixture
+def cluster_factory(
+    resource_pool_type_factory: Callable[[], Dict[str, Any]]
+) -> Callable[[str], Cluster]:
+    def _factory(name: str) -> Cluster:
+        payload = {
+            "name": name,
+            "storage": {
+                "url": f"https://{name}.org.neu.ro/api/v1/storage",
+                "pvc": {"name": "platform-storage"},
+            },
+            "registry": {
+                "url": f"https://registry.{name}.org.neu.ro",
+                "email": f"{name}@neuromation.io",
+            },
+            "orchestrator": {
+                "job_hostname_template": f"{{job_id}}.jobs.{name}.org.neu.ro",
+                "is_http_ingress_secure": True,
+                "resource_pool_types": [resource_pool_type_factory()],
+                "kubernetes": {},
+                "job_fallback_hostname": "default.jobs-dev.neu.ro",
+            },
+            "ssh": {"server": f"ssh-auth.{name}.org.neu.ro"},
+            "monitoring": {"url": f"https://{name}.org.neu.ro/api/v1/jobs"},
+            "credentials": {
+                "neuro_registry": {
+                    "username": name,
+                    "password": "password",
+                    "url": "https://neuro-docker-local-public.jfrog.io",
+                    "email": f"{name}@neuromation.io",
+                },
+                "neuro_helm": {
+                    "username": name,
+                    "password": "password",
+                    "url": "https://neuro.jfrog.io/neuro/helm-virtual-public",
+                },
+                "neuro": {
+                    "registry_token": "token",
+                    "storage_token": "token",
+                    "compute_token": "token",
+                    "cluster_token": "token",
+                    "url": "https://dev.neu.ro",
+                },
+            },
+            "dns": {
+                "zone_id": "/hostedzone/id",
+                "zone_name": f"{name}.org.neu.ro.",
+                "name_servers": ["192.168.0.2"],
+            },
+            "lb": {"acme_environment": "staging"},
+        }
+        return Cluster(payload)
+
+    return _factory
+
+
+@pytest.fixture
+def gcp_cluster(
+    cluster_name: str,
+    cluster_factory: Callable[[str], Cluster],
+    node_pool_factory: Callable[[str], Dict[str, Any]],
+) -> Cluster:
+    cluster = cluster_factory(cluster_name)
+    cluster["cloud_provider"] = {
+        "type": "gcp",
+        "location_type": "zonal",
+        "region": "us-central1",
+        "zone": "us-central1-a",
+        "project": "project",
+        "credentials": {
+            # XXX: Add other stab credentials as needed
+            "client_email": "test-acc@test-project.iam.gserviceaccount.com"
+        },
+        "node_pools": [node_pool_factory("n1-highmem-8")],
+        "storage": {"tier": "PREMIUM", "capacity_tb": 5, "backend": "filestore"},
+    }
+    return cluster
+
+
+@pytest.fixture
+def gcp_platform_body(cluster_name: str) -> bodies.Body:
+    payload = {
+        "apiVersion": "v1",
+        "kind": "Platform",
+        "metadata": {"name": cluster_name},
+        "spec": {
+            "token": "token",
+            "kubernetes": {"publicUrl": "https://kubernetes.default"},
+            "iam": {"gcp": {"serviceAccountKeyBase64": "e30="}},
+            "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
+        },
+    }
+    return bodies.Body(payload)
+
+
+@pytest.fixture
 def gcp_platform_config(
-    cluster_name: str, resource_pool_type_factory: Callable[[str], Dict[str, Any]]
+    cluster_name: str, resource_pool_type_factory: Callable[[], Dict[str, Any]]
 ) -> PlatformConfig:
     return PlatformConfig(
         auth_url=URL("https://dev.neu.ro"),
@@ -70,7 +221,7 @@ def gcp_platform_config(
                 "gpu": 1,
             }
         ],
-        jobs_resource_pool_types=[resource_pool_type_factory("192.168.0.0/16")],
+        jobs_resource_pool_types=[resource_pool_type_factory()],
         jobs_fallback_host="default.jobs-dev.neu.ro",
         jobs_host_template=f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
         jobs_priority_class_name="platform-job",

@@ -5,6 +5,7 @@ from ipaddress import IPv4Address
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence
 
+from kopf.structs import bodies
 from yarl import URL
 
 
@@ -372,3 +373,72 @@ class PlatformConfig:
             "monitoring": {"url": str(self.ingress_url / "api/v1/jobs")},
         }
         return result
+
+
+class PlatformConfigFactory:
+    def __init__(self, config: Config) -> None:
+        self._config = config
+
+    def create(self, platform_body: bodies.Body, cluster: Cluster) -> "PlatformConfig":
+        ingress_host = cluster["dns"]["zone_name"].strip(".")
+        ingress_ssh_auth_server = f"ssh-auth.{ingress_host}"
+        standard_storage_class_name = (
+            f"{self._config.platform_namespace}-standard-topology-aware"
+        )
+        kubernetes_spec = platform_body["spec"]["kubernetes"]
+        return PlatformConfig(
+            auth_url=self._config.platform_auth_url,
+            api_url=self._config.platform_api_url,
+            token=platform_body["spec"]["token"],
+            cluster_name=platform_body["metadata"]["name"],
+            cloud_provider=cluster.cloud_provider_type,
+            namespace=self._config.platform_namespace,
+            image_pull_secret_name=f"{self._config.platform_namespace}-docker-config",
+            standard_storage_class_name=standard_storage_class_name,
+            kubernetes_public_url=URL(kubernetes_spec["publicUrl"]),
+            dns_zone_id=cluster["dns"]["zone_id"],
+            dns_zone_name=cluster["dns"]["zone_name"],
+            dns_zone_name_servers=cluster["dns"]["name_servers"],
+            ingress_url=URL(f"https://{ingress_host}"),
+            ingress_registry_url=URL(f"https://registry.{ingress_host}"),
+            ingress_ssh_auth_server=ingress_ssh_auth_server,
+            ingress_acme_environment=cluster.acme_environment,
+            service_traefik_name=f"{self._config.platform_namespace}-traefik",
+            service_ssh_auth_name="ssh-auth",
+            jobs_namespace=self._config.platform_jobs_namespace,
+            jobs_label="platform.neuromation.io/job",
+            jobs_node_pools=[
+                # TODO: add node pools config
+            ],
+            jobs_resource_pool_types=cluster["orchestrator"].get(
+                "resource_pool_types", ()
+            ),
+            jobs_priority_class_name=f"{self._config.platform_namespace}-job",
+            jobs_host_template=f"{{job_id}}.jobs.{ingress_host}",
+            jobs_fallback_host=cluster["orchestrator"]["job_fallback_hostname"],
+            jobs_service_account_name=f"{self._config.platform_namespace}-jobs",
+            storage_pvc_name=f"{self._config.platform_namespace}-storage",
+            helm_repo=self._create_helm_repo(cluster),
+            docker_registry=self._create_docker_registry(cluster),
+            # TODO: add cloud provider specific configs
+        )
+
+    @classmethod
+    def _create_helm_repo(cls, cluster: Cluster) -> HelmRepo:
+        neuro_helm = cluster["credentials"]["neuro_helm"]
+        return HelmRepo(
+            name=HelmRepoName.NEURO,
+            url=URL(neuro_helm["url"]),
+            username=neuro_helm["username"],
+            password=neuro_helm["password"],
+        )
+
+    @classmethod
+    def _create_docker_registry(cls, cluster: Cluster) -> DockerRegistry:
+        neuro_registry = cluster["credentials"]["neuro_registry"]
+        return DockerRegistry(
+            url=URL(neuro_registry["url"]),
+            email=neuro_registry["email"],
+            username=neuro_registry["username"],
+            password=neuro_registry["password"],
+        )
