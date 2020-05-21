@@ -1,7 +1,10 @@
+import copy
+import json
 import os
+from base64 import b64encode
 from dataclasses import dataclass
 from enum import Enum
-from ipaddress import IPv4Address
+from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence
 
@@ -386,6 +389,16 @@ class PlatformConfigFactory:
             f"{self._config.platform_namespace}-standard-topology-aware"
         )
         kubernetes_spec = platform_body["spec"]["kubernetes"]
+        tpu_network = None
+        if cluster.cloud_provider_type == "gcp":
+            tpu_network = (
+                IPv4Network(kubernetes_spec["tpuIPv4CIDR"])
+                if "tpuIPv4CIDR" in kubernetes_spec
+                else None
+            )
+        if cluster.cloud_provider_type == "on_prem":
+            standard_storage_class_name = kubernetes_spec["standardStorageClassName"]
+            ingress_ssh_auth_server += f":{kubernetes_spec['nodePorts']['sshAuth']}"
         return PlatformConfig(
             auth_url=self._config.platform_auth_url,
             api_url=self._config.platform_api_url,
@@ -410,8 +423,8 @@ class PlatformConfigFactory:
             jobs_node_pools=[
                 # TODO: add node pools config
             ],
-            jobs_resource_pool_types=cluster["orchestrator"].get(
-                "resource_pool_types", ()
+            jobs_resource_pool_types=self._update_tpu_network(
+                cluster["orchestrator"].get("resource_pool_types", ()), tpu_network,
             ),
             jobs_priority_class_name=f"{self._config.platform_namespace}-job",
             jobs_host_template=f"{{job_id}}.jobs.{ingress_host}",
@@ -420,7 +433,26 @@ class PlatformConfigFactory:
             storage_pvc_name=f"{self._config.platform_namespace}-storage",
             helm_repo=self._create_helm_repo(cluster),
             docker_registry=self._create_docker_registry(cluster),
-            # TODO: add cloud provider specific configs
+            gcp=(
+                self._create_gcp(platform_body["spec"], cluster)
+                if cluster.cloud_provider_type == "gcp"
+                else None
+            ),
+            aws=(
+                self._create_aws(platform_body["spec"], cluster)
+                if cluster.cloud_provider_type == "aws"
+                else None
+            ),
+            azure=(
+                self._create_azure(platform_body["spec"], cluster)
+                if cluster.cloud_provider_type == "azure"
+                else None
+            ),
+            on_prem=(
+                self._create_on_prem(platform_body["spec"])
+                if cluster.cloud_provider_type == "on_prem"
+                else None
+            ),
         )
 
     @classmethod
@@ -442,3 +474,95 @@ class PlatformConfigFactory:
             username=neuro_registry["username"],
             password=neuro_registry["password"],
         )
+
+    @classmethod
+    def _create_gcp(cls, spec: bodies.Spec, cluster: Cluster) -> GcpConfig:
+        cloud_provider = cluster["cloud_provider"]
+        iam_gcp_spec = spec.get("iam", {}).get("gcp")
+        service_account_key_base64 = iam_gcp_spec.get(
+            "serviceAccountKeyBase64"
+        ) or cls._base64_encode(json.dumps(cloud_provider["credentials"]))
+        storage_spec = spec["storage"]
+        assert "gcs" in storage_spec or "nfs" in storage_spec
+        return GcpConfig(
+            project=cloud_provider["project"],
+            region=cloud_provider["region"],
+            service_account_key_base64=service_account_key_base64,
+            storage_type="gcs" if "gcs" in storage_spec else "nfs",
+            storage_nfs_server=storage_spec.get("nfs", {}).get("server", ""),
+            storage_nfs_path=storage_spec.get("nfs", {}).get("path", "/"),
+            storage_gcs_bucket_name=storage_spec.get("gcs", {}).get("bucket", ""),
+        )
+
+    @classmethod
+    def _create_aws(cls, spec: bodies.Spec, cluster: Cluster) -> "AwsConfig":
+        iam_roles = spec.get("iam", {}).get("aws", {}).get("roles", {})
+        registry_url = URL(spec["registry"]["aws"]["url"])
+        if not registry_url.scheme:
+            registry_url = URL(f"https://{registry_url!s}")
+        return AwsConfig(
+            region=cluster["cloud_provider"]["region"],
+            role_ecr_arn=iam_roles.get("ecrRoleArn", ""),
+            role_auto_scaling_arn=iam_roles.get("autoScalingRoleArn", ""),
+            role_s3_arn=iam_roles.get("s3RoleArn", ""),
+            registry_url=registry_url,
+            storage_nfs_server=spec["storage"]["nfs"]["server"],
+            storage_nfs_path=spec["storage"]["nfs"].get("path", "/"),
+        )
+
+    @classmethod
+    def _create_azure(cls, spec: bodies.Spec, cluster: Cluster) -> AzureConfig:
+        registry_url = URL(spec["registry"]["azure"]["url"])
+        if not registry_url.scheme:
+            registry_url = URL(f"https://{registry_url!s}")
+        return AzureConfig(
+            region=cluster["cloud_provider"]["region"],
+            registry_url=registry_url,
+            registry_username=spec["registry"]["azure"]["username"],
+            registry_password=spec["registry"]["azure"]["password"],
+            storage_account_name=spec["storage"]["azureFile"]["storageAccountName"],
+            storage_account_key=spec["storage"]["azureFile"]["storageAccountKey"],
+            storage_share_name=spec["storage"]["azureFile"]["shareName"],
+            blob_storage_account_name=spec["blobStorage"]["azure"][
+                "storageAccountName"
+            ],
+            blob_storage_account_key=spec["blobStorage"]["azure"]["storageAccountKey"],
+        )
+
+    @classmethod
+    def _create_on_prem(cls, spec: bodies.Spec) -> OnPremConfig:
+        kubernetes_spec = spec["kubernetes"]
+        if "publicIP" in kubernetes_spec:
+            public_ip = IPv4Address(kubernetes_spec["publicIP"])
+        else:
+            public_ip = IPv4Address(URL(kubernetes_spec["publicUrl"]).host)
+        registry_volume_claim = spec["registry"]["kubernetes"]["persistence"]
+        storage_volume_claim = spec["storage"]["kubernetes"]["persistence"]
+        return OnPremConfig(
+            kubernetes_public_ip=public_ip,
+            masters_count=int(kubernetes_spec.get("mastersCount", "1")),
+            registry_storage_class_name=registry_volume_claim["storageClassName"],
+            registry_storage_size=registry_volume_claim.get("size") or "10Gi",
+            storage_class_name=storage_volume_claim["storageClassName"],
+            storage_size=storage_volume_claim.get("size") or "10Gi",
+            kubelet_port=int(kubernetes_spec["nodePorts"]["kubelet"]),
+            http_node_port=int(kubernetes_spec["nodePorts"]["http"]),
+            https_node_port=int(kubernetes_spec["nodePorts"]["https"]),
+            ssh_auth_node_port=int(kubernetes_spec["nodePorts"]["sshAuth"]),
+        )
+
+    @classmethod
+    def _base64_encode(cls, value: str) -> str:
+        return b64encode(value.encode("utf-8")).decode("utf-8")
+
+    @classmethod
+    def _update_tpu_network(
+        cls,
+        resource_pools_types: Sequence[Dict[str, Any]],
+        tpu_network: Optional[IPv4Network],
+    ) -> Sequence[Dict[str, Any]]:
+        resource_pools_types = copy.deepcopy(resource_pools_types)
+        for rpt in resource_pools_types:
+            if "tpu" in rpt and tpu_network:
+                rpt["tpu"]["ipv4_cidr_block"] = str(tpu_network)
+        return resource_pools_types

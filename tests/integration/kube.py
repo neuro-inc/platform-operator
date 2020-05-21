@@ -12,6 +12,11 @@ from platform_operator.models import KubeClientAuthType, KubeConfig
 
 
 @pytest.fixture(scope="session")
+def kube_context() -> str:
+    return "minikube"
+
+
+@pytest.fixture(scope="session")
 def _kube_config_payload() -> Dict[str, Any]:
     kube_config_path = os.path.expanduser("~/.kube/config")
     with open(kube_config_path, "r") as kube_config:

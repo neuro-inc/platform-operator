@@ -175,6 +175,75 @@ def gcp_cluster(
         "node_pools": [node_pool_factory("n1-highmem-8")],
         "storage": {"tier": "PREMIUM", "capacity_tb": 5, "backend": "filestore"},
     }
+    cluster["orchestrator"]["resource_pool_types"][0]["tpu"] = {}
+    return cluster
+
+
+@pytest.fixture
+def aws_cluster(
+    cluster_name: str,
+    cluster_factory: Callable[[str], Cluster],
+    node_pool_factory: Callable[[str], Dict[str, Any]],
+) -> Cluster:
+    cluster = cluster_factory(cluster_name)
+    cluster["cloud_provider"] = {
+        "type": "aws",
+        "region": "us-east-1",
+        "zones": ["us-east-1a", "us-east-1b"],
+        "vpc_id": "test-vpc",
+        "credentials": {
+            "access_key_id": "access_key_id",
+            "secret_access_key": "secret_access_key",
+        },
+        "node_pools": [node_pool_factory("p2.xlarge")],
+        "storage": {
+            "performance_mode": "generalPurpose",
+            "throughput_mode": "bursting",
+        },
+    }
+    return cluster
+
+
+@pytest.fixture
+def azure_cluster(
+    cluster_name: str,
+    cluster_factory: Callable[[str], Cluster],
+    node_pool_factory: Callable[[str], Dict[str, Any]],
+) -> Cluster:
+    cluster = cluster_factory(cluster_name)
+    cluster["cloud_provider"] = {
+        "type": "azure",
+        "region": "westus",
+        "resource_group": "platform-resource-group",
+        "credentials": {
+            "subscription_id": "client_subscription_id",
+            "tenant_id": "client_tenant_id",
+            "client_id": "client_client_id",
+            "client_secret": "client_client_secret",
+        },
+        "node_pools": [node_pool_factory("Standard_NC6")],
+        "storage": {
+            "tier": "Premium",
+            "replication_type": "LRS",
+            "file_share_size_gib": 100,
+        },
+    }
+    return cluster
+
+
+@pytest.fixture
+def on_prem_cluster(
+    cluster_name: str,
+    cluster_factory: Callable[[str], Cluster],
+    node_pool_factory: Callable[[str], Dict[str, Any]],
+) -> Cluster:
+    cluster = cluster_factory(cluster_name)
+    cluster["cloud_provider"] = {
+        "type": "on_prem",
+        "kubernetes_url": "https://192.168.0.2",
+        "credentials": {"token": "kubernetes-token", "ca_data": "kubernetes-ca-data"},
+        "node_pools": [node_pool_factory("gpu")],
+    }
     return cluster
 
 
@@ -186,7 +255,10 @@ def gcp_platform_body(cluster_name: str) -> bodies.Body:
         "metadata": {"name": cluster_name},
         "spec": {
             "token": "token",
-            "kubernetes": {"publicUrl": "https://kubernetes.default"},
+            "kubernetes": {
+                "publicUrl": "https://kubernetes.default",
+                "tpuIPv4CIDR": "192.168.0.0/16",
+            },
             "iam": {"gcp": {"serviceAccountKeyBase64": "e30="}},
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
         },
@@ -195,8 +267,99 @@ def gcp_platform_body(cluster_name: str) -> bodies.Body:
 
 
 @pytest.fixture
+def aws_platform_body(cluster_name: str) -> bodies.Body:
+    payload = {
+        "apiVersion": "v1",
+        "kind": "Platform",
+        "metadata": {"name": cluster_name},
+        "spec": {
+            "token": "token",
+            "kubernetes": {"publicUrl": "https://kubernetes.default"},
+            "registry": {"aws": {"url": "platform.dkr.ecr.us-east-1.amazonaws.com"}},
+            "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
+        },
+    }
+    return bodies.Body(payload)
+
+
+@pytest.fixture
+def azure_platform_body(cluster_name: str) -> bodies.Body:
+    payload = {
+        "apiVersion": "v1",
+        "kind": "Platform",
+        "metadata": {"name": cluster_name},
+        "spec": {
+            "token": "token",
+            "kubernetes": {"publicUrl": "https://kubernetes.default"},
+            "registry": {
+                "azure": {
+                    "url": "platform.azurecr.io",
+                    "username": "admin",
+                    "password": "admin-password",
+                }
+            },
+            "storage": {
+                "azureFile": {
+                    "storageAccountName": "accountName1",
+                    "storageAccountKey": "accountKey1",
+                    "shareName": "share",
+                }
+            },
+            "blobStorage": {
+                "azure": {
+                    "storageAccountName": "accountName2",
+                    "storageAccountKey": "accountKey2",
+                },
+            },
+        },
+    }
+    return bodies.Body(payload)
+
+
+@pytest.fixture
+def on_prem_platform_body(cluster_name: str) -> bodies.Body:
+    payload = {
+        "apiVersion": "v1",
+        "kind": "Platform",
+        "metadata": {"name": cluster_name},
+        "spec": {
+            "token": "token",
+            "kubernetes": {
+                "publicUrl": "https://kubernetes.default",
+                "publicIP": "192.168.0.3",
+                "mastersCount": 1,
+                "standardStorageClassName": "standard",
+                "nodePorts": {
+                    "kubelet": 10250,
+                    "http": 30080,
+                    "https": 30443,
+                    "sshAuth": 30022,
+                },
+            },
+            "registry": {
+                "kubernetes": {
+                    "persistence": {
+                        "storageClassName": "registry-standard",
+                        "size": "100Gi",
+                    }
+                }
+            },
+            "storage": {
+                "kubernetes": {
+                    "persistence": {
+                        "storageClassName": "storage-standard",
+                        "size": "1000Gi",
+                    }
+                }
+            },
+        },
+    }
+    return bodies.Body(payload)
+
+
+@pytest.fixture
 def gcp_platform_config(
-    cluster_name: str, resource_pool_type_factory: Callable[[], Dict[str, Any]]
+    cluster_name: str, resource_pool_type_factory: Callable[[str], Dict[str, Any]]
 ) -> PlatformConfig:
     return PlatformConfig(
         auth_url=URL("https://dev.neu.ro"),
@@ -214,14 +377,9 @@ def gcp_platform_config(
         jobs_namespace="platform-jobs",
         jobs_label="platform.neuromation.io/job",
         jobs_node_pools=[
-            {
-                "name": "n1-highmem-8-1xk80-non-preemptible",
-                "idleSize": 0,
-                "cpu": 1.0,
-                "gpu": 1,
-            }
+            # TODO: add node pools config
         ],
-        jobs_resource_pool_types=[resource_pool_type_factory()],
+        jobs_resource_pool_types=[resource_pool_type_factory("192.168.0.0/16")],
         jobs_fallback_host="default.jobs-dev.neu.ro",
         jobs_host_template=f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
         jobs_priority_class_name="platform-job",
@@ -266,12 +424,7 @@ def aws_platform_config(
         gcp=None,
         cloud_provider="aws",
         jobs_node_pools=[
-            {
-                "name": "p2-xlarge-1xk80-non-preemptible",
-                "idleSize": 0,
-                "cpu": 1.0,
-                "gpu": 1,
-            }
+            # TODO: add node pools config
         ],
         jobs_resource_pool_types=[resource_pool_type_factory()],
         aws=AwsConfig(
@@ -293,12 +446,7 @@ def azure_platform_config(
         gcp=None,
         cloud_provider="azure",
         jobs_node_pools=[
-            {
-                "name": "Standard_NC6-1xk80-non-preemptible",
-                "idleSize": 0,
-                "cpu": 1.0,
-                "gpu": 1,
-            }
+            # TODO: add node pools config
         ],
         jobs_resource_pool_types=[resource_pool_type_factory()],
         azure=AzureConfig(
@@ -329,7 +477,7 @@ def on_prem_platform_config(
             f"ssh-auth.{gcp_platform_config.cluster_name}.org.neu.ro:30022"
         ),
         jobs_node_pools=[
-            {"name": "gpu-1xk80-non-preemptible", "idleSize": 0, "cpu": 1.0, "gpu": 1}
+            # TODO: add node pools config
         ],
         jobs_resource_pool_types=[resource_pool_type_factory()],
         on_prem=OnPremConfig(
