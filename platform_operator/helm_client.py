@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import shlex
 from asyncio import subprocess
 from typing import Any, Dict, List, Optional
 
@@ -25,7 +26,7 @@ class HelmOptions:
                 if value:
                     options.append(option_name)
             elif value is not None:
-                options.extend((option_name, f'"{value!s}"'))
+                options.extend((option_name, shlex.quote(value)))
         self._options_dict = dict(**kwargs)
         self._options_str = " ".join(options)
         self._options_str_masked = " ".join(options)
