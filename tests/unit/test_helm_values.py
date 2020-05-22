@@ -11,6 +11,82 @@ class TestHelmValuesFactory:
     def factory(self) -> HelmValuesFactory:
         return HelmValuesFactory()
 
+    def test_create_docker_registry_values(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_docker_registry_values(on_prem_platform_config)
+
+        assert result == {
+            "ingress": {"enabled": False},
+            "persistence": {
+                "enabled": True,
+                "storageClass": "registry-standard",
+                "size": "100Gi",
+            },
+            "secrets": {
+                "haSharedSecret": (
+                    f"{on_prem_platform_config.docker_registry.username}:"
+                    f"{on_prem_platform_config.docker_registry.password}"
+                )
+            },
+        }
+
+    def test_create_nfs_server_values(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_nfs_server_values(on_prem_platform_config)
+
+        assert result == {
+            "rbac": {"create": True},
+            "persistence": {
+                "enabled": True,
+                "storageClass": "storage-standard",
+                "size": "1000Gi",
+            },
+        }
+
+    def test_create_obs_csi_driver_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_obs_csi_driver_values(gcp_platform_config)
+
+        assert result == {
+            "driverName": "obs.csi.neu.ro",
+            "credentialsSecret": {
+                "create": True,
+                "gcpServiceAccountKeyBase64": "e30=",
+            },
+            "imagePullSecret": {
+                "create": True,
+                "credentials": {
+                    "url": "https://neuro-docker-local-public.jfrog.io",
+                    "email": f"{gcp_platform_config.cluster_name}@neuromation.io",
+                    "username": gcp_platform_config.cluster_name,
+                    "password": "password",
+                },
+            },
+        }
+
+    def test_create_consul_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_consul_values(gcp_platform_config)
+
+        assert result == {
+            "Replicas": 3,
+            "StorageClass": "platform-standard-topology-aware",
+        }
+
+    def test_create_on_prem_consul_values(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_consul_values(on_prem_platform_config)
+
+        assert result == {
+            "Replicas": 1,
+            "StorageClass": "standard",
+        }
+
     def test_create_traefik_values(
         self,
         cluster_name: str,
