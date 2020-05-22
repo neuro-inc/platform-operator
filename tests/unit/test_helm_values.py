@@ -11,6 +11,41 @@ class TestHelmValuesFactory:
     def factory(self) -> HelmValuesFactory:
         return HelmValuesFactory()
 
+    def test_create_cluster_autoscaler_values(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_cluster_autoscaler_values(aws_platform_config)
+
+        assert result == {
+            "cloudProvider": "aws",
+            "awsRegion": "us-east-1",
+            "image": {"tag": "v1.13.9"},
+            "rbac": {"create": True},
+            "autoDiscovery": {"clusterName": aws_platform_config.cluster_name},
+            "extraArgs": {
+                "expander": "least-waste",
+                "skip-nodes-with-local-storage": False,
+                "skip-nodes-with-system-pods": False,
+                "balance-similar-node-groups": True,
+            },
+        }
+
+    def test_create_cluster_autoscaler_values_with_role(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_cluster_autoscaler_values(
+            replace(
+                aws_platform_config,
+                aws=replace(
+                    aws_platform_config.aws, role_auto_scaling_arn="auto_scaling_role"
+                ),
+            )
+        )
+
+        assert result["podAnnotations"] == {
+            "iam.amazonaws.com/role": "auto_scaling_role"
+        }
+
     def test_create_platform_storage_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
