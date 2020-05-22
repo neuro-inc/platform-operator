@@ -215,6 +215,54 @@ class TestHelmValuesFactory:
             "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
         }
 
+    def test_create_elasticsearch_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_elasticsearch_values(gcp_platform_config)
+
+        assert result == {
+            "cluster": {"enabled": False},
+            "data": {
+                "replicas": 1,
+                "persistence": {
+                    "enabled": True,
+                    "storageClass": "platform-standard-topology-aware",
+                    "size": "10Gi",
+                },
+            },
+        }
+
+    def test_create_elasticsearch_curator_values(
+        self, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_elasticsearch_curator_values()
+
+        assert result == {
+            "rbac": {"enabled": True},
+            "cronjob": {"schedule": "0 1 * * *"},
+        }
+
+    def test_create_fluent_bit_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_fluent_bit_values(gcp_platform_config)
+
+        assert result == {
+            "nodeSelector": {"platform.neuromation.io/job": "true"},
+            "tolerations": [{"effect": "NoSchedule", "operator": "Exists"}],
+            "backend": {
+                "type": "es",
+                "es": {
+                    "host": "platform-elasticsearch-client.platform.svc.cluster.local",
+                    "port": 9200,
+                },
+            },
+            "resources": {
+                "requests": {"cpu": "10m", "memory": "32Mi"},
+                "limits": {"cpu": "100m", "memory": "128Mi"},
+            },
+        }
+
     def test_create_cluster_autoscaler_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:

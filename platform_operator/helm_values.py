@@ -177,6 +177,45 @@ class HelmValuesFactory:
             }
         return result
 
+    def create_elasticsearch_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+        return {
+            "cluster": {"enabled": False},
+            "data": {
+                "replicas": 1,
+                "persistence": {
+                    "enabled": True,
+                    "storageClass": platform.standard_storage_class_name,
+                    "size": "10Gi",
+                },
+            },
+        }
+
+    def create_elasticsearch_curator_values(self) -> Dict[str, Any]:
+        return {
+            "rbac": {"enabled": True},
+            "cronjob": {"schedule": "0 1 * * *"},  # At 01:00 every day
+        }
+
+    def create_fluent_bit_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+        return {
+            "tolerations": [{"effect": "NoSchedule", "operator": "Exists"}],
+            "nodeSelector": {platform.jobs_label: "true"},
+            "backend": {
+                "type": "es",
+                "es": {
+                    "host": (
+                        f"{platform.namespace}-elasticsearch-client"
+                        f".{platform.namespace}.svc.cluster.local"
+                    ),
+                    "port": 9200,
+                },
+            },
+            "resources": {
+                "requests": {"cpu": "10m", "memory": "32Mi"},
+                "limits": {"cpu": "100m", "memory": "128Mi"},
+            },
+        }
+
     def create_cluster_autoscaler_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
