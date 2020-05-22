@@ -4,6 +4,123 @@ from .models import PlatformConfig
 
 
 class HelmValuesFactory:
+    def create_traefik_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "replicas": 4,
+            "imageTag": "1.7.20-alpine",
+            "logLevel": "debug",
+            "serviceType": "LoadBalancer",
+            "externalTrafficPolicy": "Cluster",
+            "ssl": {
+                "enabled": True,
+                "enforced": True,
+                "defaultCert": "",
+                "defaultKey": "",
+            },
+            "acme": {
+                "enabled": True,
+                "onHostRule": False,
+                "staging": platform.ingress_acme_environment == "staging",
+                "persistence": {"enabled": False},
+                "keyType": "RSA4096",
+                "challengeType": "dns-01",
+                "dnsProvider": {
+                    "name": "exec",
+                    "exec": {"EXEC_PATH": "/dns-01/resolve_dns_challenge.sh"},
+                },
+                "logging": True,
+                "email": f"{platform.cluster_name}@neuromation.io",
+                "domains": {
+                    "enabled": True,
+                    "domainsList": [
+                        {"main": platform.ingress_url.host},
+                        {
+                            "sans": [
+                                f"*.{platform.ingress_url.host}",
+                                f"*.jobs.{platform.ingress_url.host}",
+                            ]
+                        },
+                    ],
+                },
+            },
+            "kvprovider": {
+                "consul": {
+                    "watch": True,
+                    "endpoint": f"{platform.namespace}-consul:8500",
+                    "prefix": "traefik",
+                },
+                "storeAcme": True,
+                "acmeStorageLocation": "traefik/acme/account",
+            },
+            "kubernetes": {
+                "ingressClass": "traefik",
+                "namespaces": [platform.namespace, platform.jobs_namespace],
+            },
+            "rbac": {"enabled": True},
+            "deployment": {
+                "labels": {"platform.neuromation.io/app": "ingress"},
+                "podLabels": {"platform.neuromation.io/app": "ingress"},
+            },
+            "extraVolumes": [
+                {
+                    "name": "resolve-dns-challenge-script",
+                    "configMap": {
+                        "name": (f"{platform.namespace}-resolve-dns-challenge-script"),
+                        "defaultMode": 0o777,
+                        "items": [
+                            {
+                                "key": "resolve_dns_challenge.sh",
+                                "path": "resolve_dns_challenge.sh",
+                            }
+                        ],
+                    },
+                }
+            ],
+            "extraVolumeMounts": [
+                {"name": "resolve-dns-challenge-script", "mountPath": "/dns-01"}
+            ],
+            "env": [
+                {"name": "NP_PLATFORM_API_URL", "value": str(platform.api_url)},
+                {"name": "NP_CLUSTER_NAME", "value": platform.cluster_name},
+                {
+                    "name": "NP_CLUSTER_TOKEN",
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platformservices-secret",
+                            "key": "cluster_token",
+                        }
+                    },
+                },
+            ],
+        }
+        if platform.aws:
+            result["service"] = {
+                "annotations": {
+                    (
+                        "service.beta.kubernetes.io/"
+                        "aws-load-balancer-connection-idle-timeout"
+                    ): "3600"
+                }
+            }
+        if platform.on_prem:
+            result["replicas"] = platform.on_prem.masters_count
+            result["serviceType"] = "NodePort"
+            result["service"] = {
+                "nodePorts": {
+                    "http": platform.on_prem.http_node_port,
+                    "https": platform.on_prem.https_node_port,
+                }
+            }
+            result["deployment"]["hostPort"] = {
+                "httpEnabled": True,
+                "httpsEnabled": True,
+            }
+            result["deploymentStrategy"] = {
+                "type": "RollingUpdate",
+                "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
+            }
+        return result
+
     def create_cluster_autoscaler_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:

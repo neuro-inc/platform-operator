@@ -11,6 +11,134 @@ class TestHelmValuesFactory:
     def factory(self) -> HelmValuesFactory:
         return HelmValuesFactory()
 
+    def test_create_traefik_values(
+        self,
+        cluster_name: str,
+        gcp_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_traefik_values(gcp_platform_config)
+
+        assert result == {
+            "replicas": 4,
+            "imageTag": "1.7.20-alpine",
+            "logLevel": "debug",
+            "serviceType": "LoadBalancer",
+            "externalTrafficPolicy": "Cluster",
+            "ssl": {
+                "enabled": True,
+                "enforced": True,
+                "defaultCert": "",
+                "defaultKey": "",
+            },
+            "acme": {
+                "enabled": True,
+                "onHostRule": False,
+                "staging": True,
+                "persistence": {"enabled": False},
+                "keyType": "RSA4096",
+                "challengeType": "dns-01",
+                "dnsProvider": {
+                    "name": "exec",
+                    "exec": {"EXEC_PATH": "/dns-01/resolve_dns_challenge.sh"},
+                },
+                "logging": True,
+                "email": f"{cluster_name}@neuromation.io",
+                "domains": {
+                    "enabled": True,
+                    "domainsList": [
+                        {"main": f"{cluster_name}.org.neu.ro"},
+                        {
+                            "sans": [
+                                f"*.{cluster_name}.org.neu.ro",
+                                f"*.jobs.{cluster_name}.org.neu.ro",
+                            ]
+                        },
+                    ],
+                },
+            },
+            "kvprovider": {
+                "consul": {
+                    "watch": True,
+                    "endpoint": "platform-consul:8500",
+                    "prefix": "traefik",
+                },
+                "storeAcme": True,
+                "acmeStorageLocation": "traefik/acme/account",
+            },
+            "kubernetes": {
+                "ingressClass": "traefik",
+                "namespaces": ["platform", "platform-jobs"],
+            },
+            "rbac": {"enabled": True},
+            "deployment": {
+                "labels": {"platform.neuromation.io/app": "ingress"},
+                "podLabels": {"platform.neuromation.io/app": "ingress"},
+            },
+            "extraVolumes": [
+                {
+                    "name": "resolve-dns-challenge-script",
+                    "configMap": {
+                        "name": "platform-resolve-dns-challenge-script",
+                        "defaultMode": 511,
+                        "items": [
+                            {
+                                "key": "resolve_dns_challenge.sh",
+                                "path": "resolve_dns_challenge.sh",
+                            }
+                        ],
+                    },
+                }
+            ],
+            "extraVolumeMounts": [
+                {"name": "resolve-dns-challenge-script", "mountPath": "/dns-01"}
+            ],
+            "env": [
+                {"name": "NP_PLATFORM_API_URL", "value": "https://dev.neu.ro/api/v1"},
+                {"name": "NP_CLUSTER_NAME", "value": cluster_name},
+                {
+                    "name": "NP_CLUSTER_TOKEN",
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platformservices-secret",
+                            "key": "cluster_token",
+                        }
+                    },
+                },
+            ],
+        }
+
+    def test_create_aws_traefik_values(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_traefik_values(aws_platform_config)
+
+        assert result["service"] == {
+            "annotations": {
+                (
+                    "service.beta.kubernetes.io/"
+                    "aws-load-balancer-connection-idle-timeout"
+                ): "3600"
+            }
+        }
+
+    def test_create_on_prem_traefik_values(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_traefik_values(on_prem_platform_config)
+
+        assert result["replicas"] == 1
+        assert result["serviceType"] == "NodePort"
+        assert result["service"] == {"nodePorts": {"http": 30080, "https": 30443}}
+        assert result["deployment"]["hostPort"] == {
+            "httpEnabled": True,
+            "httpsEnabled": True,
+        }
+        assert result["deploymentStrategy"] == {
+            "type": "RollingUpdate",
+            "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
+        }
+
     def test_create_cluster_autoscaler_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
