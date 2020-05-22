@@ -4,6 +4,62 @@ from .models import PlatformConfig
 
 
 class HelmValuesFactory:
+    def create_obs_csi_driver_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+        assert platform.gcp
+        return {
+            "driverName": "obs.csi.neu.ro",
+            "credentialsSecret": {
+                "create": True,
+                "gcpServiceAccountKeyBase64": platform.gcp.service_account_key_base64,
+            },
+            "imagePullSecret": {
+                "create": True,
+                "credentials": {
+                    "url": str(platform.docker_registry.url),
+                    "email": platform.docker_registry.email,
+                    "username": platform.docker_registry.username,
+                    "password": platform.docker_registry.password,
+                },
+            },
+        }
+
+    def create_nfs_server_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+        assert platform.on_prem
+        return {
+            "rbac": {"create": True},
+            "persistence": {
+                "enabled": True,
+                "storageClass": platform.on_prem.storage_class_name,
+                "size": platform.on_prem.storage_size,
+            },
+        }
+
+    def create_docker_registry_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+        assert platform.on_prem
+        docker_registry = platform.docker_registry
+        return {
+            "ingress": {"enabled": False},
+            "persistence": {
+                "enabled": True,
+                "storageClass": platform.on_prem.registry_storage_class_name,
+                "size": platform.on_prem.registry_storage_size,
+            },
+            "secrets": {
+                "haSharedSecret": (
+                    f"{docker_registry.username}:{docker_registry.password}"
+                )
+            },
+        }
+
+    def create_consul_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+        result = {
+            "StorageClass": platform.standard_storage_class_name,
+            "Replicas": 3,
+        }
+        if platform.on_prem:
+            result["Replicas"] = platform.on_prem.masters_count
+        return result
+
     def create_traefik_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         result: Dict[str, Any] = {
             "replicas": 4,
