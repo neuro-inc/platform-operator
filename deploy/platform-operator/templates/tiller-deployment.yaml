@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tiller-deploy
+  labels:
+    app: helm
+    name: tiller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helm
+      name: tiller
+  template:
+    metadata:
+      labels:
+        app: helm
+        name: tiller
+    spec:
+      serviceAccountName: {{ include "platformOperator.fullname" . }}
+      automountServiceAccountToken: true
+      containers:
+      - name: tiller
+        image: gcr.io/kubernetes-helm/tiller:v2.16.7
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: TILLER_NAMESPACE
+          value: {{ .Release.Namespace }}
+        - name: TILLER_HISTORY_MAX
+          value: "0"
+        ports:
+        - containerPort: 44134
+          name: tiller
+        - containerPort: 44135
+          name: http
+        livenessProbe:
+          httpGet:
+            path: /liveness
+            port: 44135
+          initialDelaySeconds: 1
+          timeoutSeconds: 1
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: 44135
+          initialDelaySeconds: 1
+          timeoutSeconds: 1

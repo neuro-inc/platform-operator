@@ -30,5 +30,10 @@ jobs:
           sudo install minikube-linux-amd64 /usr/local/bin/minikube
           sudo minikube start --kubernetes-version="1.14.10" --driver="none"
           sudo chown -R $USER $HOME/.kube $HOME/.minikube
+      - name: Install helm
+        run: |
+          sudo apt -y install socat
+          curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v v2.16.7
+          helm init --wait
       - name: Run integration tests
         run: make test_integration
