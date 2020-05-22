@@ -20,6 +20,10 @@ spec:
         app: {{ include "platformOperator.name" . }}
         release: {{ .Release.Name }}
         component: controller
+{{- if .Values.controller.annotations }}
+    annotations:
+{{ toYaml .Values.controller.annotations | indent 6 }}
+{{- end }}
     spec:
       serviceAccountName: {{ include "platformOperator.fullname" . }}
       automountServiceAccountToken: true
