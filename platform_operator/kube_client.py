@@ -268,10 +268,17 @@ class KubeClient:
 
 
 class PlatformStatusManager:
-    def __init__(self, kube_client: KubeClient, namespace: str, name: str) -> None:
+    def __init__(
+        self,
+        kube_client: KubeClient,
+        namespace: str,
+        name: str,
+        logger: Optional[logging.Logger] = None,
+    ) -> None:
         self._kube_client = kube_client
         self._namespace = namespace
         self._name = name
+        self._logger = logger or logging.getLogger(PlatformStatusManager.__name__)
         self._status: Optional[SimpleNamespace] = None
 
     async def _load(self) -> None:
@@ -296,8 +303,8 @@ class PlatformStatusManager:
     def is_condition_satisfied(self, type: PlatformConditionType) -> bool:
         assert self._status
         for condition in self._status.conditions:
-            if condition["type"] == type:
-                return condition.status == PlatformConditionStatus.TRUE.value
+            if condition["type"] == type.value:
+                return condition["status"] == PlatformConditionStatus.TRUE.value
         return False
 
     async def start_deployment(self, retry: int = 0) -> None:
@@ -310,17 +317,20 @@ class PlatformStatusManager:
         await self._save()
 
     async def complete_deployment(self) -> None:
+        await self._load()
         assert self._status
         self._status.phase = PlatformPhase.DEPLOYED.value
         await self._save()
 
     async def fail_deployment(self) -> None:
+        await self._load()
         assert self._status
         self._status.phase = PlatformPhase.FAILED.value
         if self._status.conditions:
             condition = self._status.conditions[-1]
-            condition["status"] = PlatformConditionStatus.UNKNOWN.value
-            condition["last_transition_time"] = self._now()
+            if condition["status"] == PlatformConditionStatus.FALSE.value:
+                condition["status"] = PlatformConditionStatus.UNKNOWN.value
+                condition["last_transition_time"] = self._now()
         await self._save()
 
     async def start_deletion(self) -> None:
