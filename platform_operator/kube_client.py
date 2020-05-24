@@ -13,10 +13,6 @@ from .models import KubeClientAuthType, KubeConfig
 
 logger = logging.getLogger(__name__)
 
-PLATFORM_GROUP = "neuromation.io"
-PLATFORM_API_VERSION = "v1"
-PLATFORM_PLURAL = "platforms"
-
 
 class KubeClient:
     def __init__(self, config: KubeConfig) -> None:
