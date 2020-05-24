@@ -19,6 +19,7 @@ test_unit:
 	pytest -vv tests/unit
 
 test_integration:
+	kubectl --context minikube apply -f deploy/platform-operator/templates/crd.yaml
 	pytest -vv --log-level=INFO tests/integration
 
 docker_build:

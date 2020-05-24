@@ -1,9 +1,13 @@
 import asyncio
+import json
 import logging
 import ssl
 from base64 import b64decode
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from enum import Enum
 from types import SimpleNamespace
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, AsyncIterator, Dict, Optional, Sequence
 
 import aiohttp
 from yarl import URL
@@ -12,6 +16,34 @@ from .models import KubeClientAuthType, KubeConfig
 
 
 logger = logging.getLogger(__name__)
+
+PLATFORM_GROUP = "neuromation.io"
+PLATFORM_API_VERSION = "v1"
+PLATFORM_PLURAL = "platforms"
+
+
+class PlatformPhase(str, Enum):
+    DEPLOYING = "Deploying"
+    DELETING = "Deleting"
+    DEPLOYED = "Deployed"
+    FAILED = "Failed"
+
+
+class PlatformConditionType(str, Enum):
+    OBS_CSI_DRIVER_DEPLOYED = "ObsCsiDriverDeployed"
+    NFS_SERVER_DEPLOYED = "NfsServerDeployed"
+    PLATFORM_DEPLOYED = "PlatformDeployed"
+    SSL_CERT_CREATED = "SslCertificateCreated"
+    DNS_CONFIGURED = "DnsConfigured"
+    CLUSTER_CONFIGURED = "ClusterConfigured"
+
+
+class PlatformConditionStatus(str, Enum):
+    TRUE = "True"
+    FALSE = "False"
+    # The state is unknown, platform deployment might have succeeded
+    # or failed but we don't know because timeout have occurred
+    UNKNOWN = "Unknown"
 
 
 class KubeClient:
@@ -186,3 +218,128 @@ class KubeClient:
             if not payload:
                 break
             await asyncio.sleep(interval_secs)
+
+    def _get_platform_url(self, namespace: str, name: str = "") -> URL:
+        base_url = (
+            self._config.url
+            / f"apis/{PLATFORM_GROUP}/{PLATFORM_API_VERSION}/namespaces"
+            / f"{namespace}/{PLATFORM_PLURAL}"
+        )
+        return base_url / name if name else base_url
+
+    async def create_platform(self, namespace: str, payload: Dict[str, Any]) -> None:
+        assert self._session
+        async with self._session.post(
+            self._get_platform_url(namespace=namespace), json=payload
+        ) as response:
+            response.raise_for_status()
+
+    async def delete_platform(self, namespace: str, name: str) -> None:
+        assert self._session
+        async with self._session.delete(
+            self._get_platform_url(namespace=namespace, name=name)
+        ) as response:
+            response.raise_for_status()
+
+    async def get_platform_status(
+        self, namespace: str, name: str
+    ) -> Optional[Dict[str, Any]]:
+        assert self._session
+        async with self._session.get(
+            self._get_platform_url(namespace=namespace, name=name) / "status"
+        ) as response:
+            response.raise_for_status()
+            payload = await response.json()
+            if "status" not in payload:
+                return None
+            status_payload = payload["status"]
+            return status_payload
+
+    async def update_platform_status(
+        self, namespace: str, name: str, payload: Dict[str, Any]
+    ) -> None:
+        assert self._session
+        async with self._session.patch(
+            self._get_platform_url(namespace=namespace, name=name) / "status",
+            headers={"Content-Type": "application/merge-patch+json"},
+            data=json.dumps({"status": payload}),
+        ) as response:
+            response.raise_for_status()
+
+
+class PlatformStatusManager:
+    def __init__(self, kube_client: KubeClient, namespace: str, name: str) -> None:
+        self._kube_client = kube_client
+        self._namespace = namespace
+        self._name = name
+        self._status: Optional[SimpleNamespace] = None
+
+    async def _load(self) -> None:
+        if self._status:
+            return
+        payload = await self._kube_client.get_platform_status(
+            namespace=self._namespace, name=self._name
+        )
+        logger.info(payload)
+        payload = payload or {"conditions": []}
+        self._status = SimpleNamespace(**payload)
+
+    async def _save(self) -> None:
+        assert self._status
+        await self._kube_client.update_platform_status(
+            namespace=self._namespace, name=self._name, payload=vars(self._status)
+        )
+
+    def _now(self) -> str:
+        return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+    def is_condition_satisfied(self, type: PlatformConditionType) -> bool:
+        assert self._status
+        for condition in self._status.conditions:
+            if condition["type"] == type:
+                return condition.status == PlatformConditionStatus.TRUE.value
+        return False
+
+    async def start_deployment(self, retry: int = 0) -> None:
+        await self._load()
+        assert self._status
+        self._status.phase = PlatformPhase.DEPLOYING.value
+        self._status.retries = retry
+        if retry == 0:
+            self._status.conditions = []
+        await self._save()
+
+    async def complete_deployment(self) -> None:
+        assert self._status
+        self._status.phase = PlatformPhase.DEPLOYED.value
+        await self._save()
+
+    async def fail_deployment(self) -> None:
+        assert self._status
+        self._status.phase = PlatformPhase.FAILED.value
+        if self._status.conditions:
+            condition = self._status.conditions[-1]
+            condition["status"] = PlatformConditionStatus.UNKNOWN.value
+            condition["last_transition_time"] = self._now()
+        await self._save()
+
+    async def start_deletion(self) -> None:
+        await self._load()
+        assert self._status
+        self._status.phase = PlatformPhase.DELETING.value
+        await self._save()
+
+    @asynccontextmanager
+    async def transition(self, type: PlatformConditionType) -> AsyncIterator[None]:
+        assert self._status
+        assert all(c["type"] != type for c in self._status.conditions)
+        logger.info("Started transition to %s condition", type.value)
+        self._status.conditions.append({"type": type.value})
+        self._status.conditions[-1]["status"] = PlatformConditionStatus.FALSE.value
+        self._status.conditions[-1]["last_transition_time"] = self._now()
+        await self._save()
+        yield
+        self._status.conditions[-1]["status"] = PlatformConditionStatus.TRUE.value
+        self._status.conditions[-1]["last_transition_time"] = self._now()
+        await self._save()
+        logger.info("Transition to %s succeeded", type.value)

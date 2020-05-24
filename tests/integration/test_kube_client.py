@@ -1,12 +1,28 @@
 import asyncio
+from typing import Any, AsyncIterator, Dict
 
 import aiohttp
 import pytest
+from kopf.structs import bodies
 
 from platform_operator.kube_client import KubeClient
 
 
 class TestKubeClient:
+    @pytest.fixture
+    async def platform(
+        self,
+        kube_client: KubeClient,
+        kube_namespace: str,
+        gcp_platform_body: bodies.Body,
+    ) -> AsyncIterator[Dict[str, Any]]:
+        payload = dict(**gcp_platform_body)
+        await kube_client.create_platform(kube_namespace, payload)
+        yield payload
+        await kube_client.delete_platform(
+            namespace=kube_namespace, name=payload["metadata"]["name"]
+        )
+
     @pytest.mark.asyncio
     async def test_get_service(self, kube_client: KubeClient) -> None:
         service = await kube_client.get_service(namespace="default", name="kubernetes")
@@ -85,3 +101,23 @@ class TestKubeClient:
                 ),
                 2,
             )
+
+    @pytest.mark.asyncio
+    async def test_platform_status(
+        self, kube_client: KubeClient, kube_namespace: str, platform: Dict[str, Any],
+    ) -> None:
+        name = platform["metadata"]["name"]
+        result = await kube_client.get_platform_status(
+            namespace=kube_namespace, name=name
+        )
+
+        assert result is None
+
+        await kube_client.update_platform_status(
+            namespace=kube_namespace, name=name, payload={"phase": "Deployed"}
+        )
+        result = await kube_client.get_platform_status(
+            namespace=kube_namespace, name=name
+        )
+
+        assert result == {"phase": "Deployed"}
