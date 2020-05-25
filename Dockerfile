@@ -1,4 +1,4 @@
-FROM python:3.7.5-stretch
+FROM python:3.8.3
 
 RUN curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v v2.16.7
 

@@ -250,7 +250,7 @@ def on_prem_cluster(
 @pytest.fixture
 def gcp_platform_body(cluster_name: str) -> bodies.Body:
     payload = {
-        "apiVersion": "v1",
+        "apiVersion": "neuromation.io/v1",
         "kind": "Platform",
         "metadata": {"name": cluster_name},
         "spec": {
@@ -269,7 +269,7 @@ def gcp_platform_body(cluster_name: str) -> bodies.Body:
 @pytest.fixture
 def aws_platform_body(cluster_name: str) -> bodies.Body:
     payload = {
-        "apiVersion": "v1",
+        "apiVersion": "neuromation.io/v1",
         "kind": "Platform",
         "metadata": {"name": cluster_name},
         "spec": {
@@ -285,7 +285,7 @@ def aws_platform_body(cluster_name: str) -> bodies.Body:
 @pytest.fixture
 def azure_platform_body(cluster_name: str) -> bodies.Body:
     payload = {
-        "apiVersion": "v1",
+        "apiVersion": "neuromation.io/v1",
         "kind": "Platform",
         "metadata": {"name": cluster_name},
         "spec": {
@@ -319,7 +319,7 @@ def azure_platform_body(cluster_name: str) -> bodies.Body:
 @pytest.fixture
 def on_prem_platform_body(cluster_name: str) -> bodies.Body:
     payload = {
-        "apiVersion": "v1",
+        "apiVersion": "neuromation.io/v1",
         "kind": "Platform",
         "metadata": {"name": cluster_name},
         "spec": {
