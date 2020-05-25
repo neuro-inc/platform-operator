@@ -1,15 +1,137 @@
 from dataclasses import replace
+from unittest import mock
 
 import pytest
 
 from platform_operator.helm_values import HelmValuesFactory
-from platform_operator.models import PlatformConfig
+from platform_operator.models import Config, PlatformConfig
 
 
 class TestHelmValuesFactory:
     @pytest.fixture
-    def factory(self) -> HelmValuesFactory:
-        return HelmValuesFactory()
+    def factory(self, config: Config) -> HelmValuesFactory:
+        return HelmValuesFactory(config.helm_release_names, config.helm_chart_names)
+
+    def test_create_gcp_platform_values_with_nfs_storage(
+        self,
+        cluster_name: str,
+        gcp_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_platform_values(gcp_platform_config)
+
+        assert result == {
+            "tags": {"gcp": True},
+            "serviceToken": "token",
+            "kubernetes": {
+                "nodePools": [
+                    # TODO: add node pools config
+                ],
+                "imagesPrepull": {
+                    "refreshInterval": "1h",
+                    "images": [
+                        {"image": "neuromation/base"},
+                        {"image": "neuromation/web-shell"},
+                    ],
+                },
+            },
+            "gcp": {"serviceAccountKeyBase64": "e30="},
+            "standardStorageClass": {
+                "create": True,
+                "name": "platform-standard-topology-aware",
+            },
+            "imagePullSecret": {
+                "create": True,
+                "name": "platform-docker-config",
+                "credentials": {
+                    "url": "https://neuro-docker-local-public.jfrog.io",
+                    "email": f"{cluster_name}@neuromation.io",
+                    "username": cluster_name,
+                    "password": "password",
+                },
+            },
+            "ingress": {
+                "host": f"{cluster_name}.org.neu.ro",
+                "jobFallbackHost": "default.jobs-dev.neu.ro",
+                "registryHost": f"registry.{cluster_name}.org.neu.ro",
+            },
+            "jobs": {
+                "namespace": {"create": True, "name": "platform-jobs"},
+                "label": "platform.neuromation.io/job",
+            },
+            "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
+            "consul": mock.ANY,
+            "traefik": mock.ANY,
+            "elasticsearch": mock.ANY,
+            "elasticsearch-curator": mock.ANY,
+            "fluent-bit": mock.ANY,
+            "platform-storage": mock.ANY,
+            "platform-registry": mock.ANY,
+            "ssh-auth": mock.ANY,
+            "platform-monitoring": mock.ANY,
+            "platform-object-storage": mock.ANY,
+        }
+
+    def test_create_gcp_platform_values_with_gcs_storage(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(
+                gcp_platform_config,
+                gcp=replace(
+                    gcp_platform_config.gcp,
+                    storage_type="gcs",
+                    storage_gcs_bucket_name="platform-storage",
+                ),
+            )
+        )
+
+        assert result["storage"] == {"gcs": {"bucketName": "platform-storage"}}
+
+    def test_create_aws_platform_values(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_platform_values(aws_platform_config)
+
+        assert "cluster-autoscaler" in result
+
+    def test_create_azure_platform_values(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_platform_values(azure_platform_config)
+
+        assert result["registry"] == {
+            "username": "admin",
+            "password": "admin-password",
+        }
+        assert result["storage"] == {
+            "azureFile": {
+                "storageAccountName": "accountName1",
+                "storageAccountKey": "accountKey1",
+                "shareName": "share",
+            }
+        }
+        assert result["blobStorage"] == {
+            "azure": {
+                "storageAccountName": "accountName2",
+                "storageAccountKey": "accountKey2",
+            }
+        }
+
+    def test_create_on_prem_platform_values(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_platform_values(on_prem_platform_config)
+
+        assert result["standardStorageClass"] == {"create": False, "name": "standard"}
+        assert result["storage"] == {
+            "nfs": {
+                "server": "platform-nfs-server.platform.svc.cluster.local",
+                "path": "/",
+            }
+        }
+        assert "docker-registry" in result
+        assert "platform-object-storage" not in result
 
     def test_create_docker_registry_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory

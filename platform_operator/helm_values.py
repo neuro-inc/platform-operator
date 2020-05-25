@@ -1,9 +1,139 @@
 from typing import Any, Dict
 
-from .models import PlatformConfig
+from .models import HelmChartNames, HelmReleaseNames, PlatformConfig
 
 
 class HelmValuesFactory:
+    def __init__(
+        self, helm_release_names: HelmReleaseNames, helm_chart_names: HelmChartNames
+    ) -> None:
+        self._release_names = helm_release_names
+        self._chart_names = helm_chart_names
+
+    def create_platform_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "tags": {platform.cloud_provider: True},
+            "serviceToken": platform.token,
+            "kubernetes": {
+                "nodePools": platform.jobs_node_pools,
+                # NOTE: should images prepulling be configured in config service?
+                "imagesPrepull": {
+                    "refreshInterval": "1h",
+                    "images": [
+                        {"image": "neuromation/base"},
+                        {"image": "neuromation/web-shell"},
+                    ],
+                },
+            },
+            "standardStorageClass": {
+                "create": not platform.on_prem,
+                "name": platform.standard_storage_class_name,
+            },
+            "imagePullSecret": {
+                "create": True,
+                "name": platform.image_pull_secret_name,
+                "credentials": {
+                    "url": str(platform.docker_registry.url),
+                    "email": platform.docker_registry.email,
+                    "username": platform.docker_registry.username,
+                    "password": platform.docker_registry.password,
+                },
+            },
+            "ingress": {
+                "host": platform.ingress_url.host,
+                "jobFallbackHost": str(platform.jobs_fallback_host),
+                "registryHost": platform.ingress_registry_url.host,
+            },
+            "jobs": {
+                "namespace": {"create": True, "name": platform.jobs_namespace},
+                "label": platform.jobs_label,
+            },
+            self._chart_names.consul: self.create_consul_values(platform),
+            self._chart_names.traefik: self.create_traefik_values(platform),
+            self._chart_names.elasticsearch: self.create_elasticsearch_values(platform),
+            self._chart_names.elasticsearch_curator: (
+                self.create_elasticsearch_curator_values()
+            ),
+            self._chart_names.fluent_bit: self.create_fluent_bit_values(platform),
+            self._chart_names.platform_storage: self.create_platform_storage_values(
+                platform
+            ),
+            self._chart_names.platform_registry: self.create_platform_registry_values(
+                platform
+            ),
+            self._chart_names.platform_ssh_auth: self.create_platform_ssh_auth_values(
+                platform
+            ),
+            self._chart_names.platform_monitoring: (
+                self.create_platform_monitoring_values(platform)
+            ),
+        }
+        if not platform.on_prem:
+            result[
+                self._chart_names.platform_object_storage
+            ] = self.create_platform_object_storage_values(platform)
+        if platform.gcp:
+            result["gcp"] = {
+                "serviceAccountKeyBase64": platform.gcp.service_account_key_base64
+            }
+            if platform.gcp.storage_type == "nfs":
+                result["storage"] = {
+                    "nfs": {
+                        "server": platform.gcp.storage_nfs_server,
+                        "path": platform.gcp.storage_nfs_path,
+                    }
+                }
+            if platform.gcp.storage_type == "gcs":
+                result["storage"] = {
+                    "gcs": {"bucketName": platform.gcp.storage_gcs_bucket_name}
+                }
+        if platform.aws:
+            result["storage"] = {
+                "nfs": {
+                    "server": platform.aws.storage_nfs_server,
+                    "path": platform.aws.storage_nfs_path,
+                }
+            }
+            result[
+                self._chart_names.cluster_autoscaler
+            ] = self.create_cluster_autoscaler_values(platform)
+        if platform.azure:
+            result["registry"] = {
+                "username": platform.azure.registry_username,
+                "password": platform.azure.registry_password,
+            }
+            result["storage"] = {
+                "azureFile": {
+                    "storageAccountName": platform.azure.storage_account_name,
+                    "storageAccountKey": platform.azure.storage_account_key,
+                    "shareName": platform.azure.storage_share_name,
+                }
+            }
+            result["blobStorage"] = {
+                "azure": {
+                    "storageAccountName": platform.azure.blob_storage_account_name,
+                    "storageAccountKey": platform.azure.blob_storage_account_key,
+                }
+            }
+        if platform.on_prem:
+            result["registry"] = {
+                "username": platform.docker_registry.username,
+                "password": platform.docker_registry.password,
+            }
+            result["storage"] = {
+                "nfs": {
+                    "server": (
+                        f"{self._release_names.nfs_server}"
+                        f".{platform.namespace}.svc.cluster.local"
+                    ),
+                    "path": "/",
+                }
+            }
+            result[
+                self._chart_names.docker_registry
+            ] = self.create_docker_registry_values(platform)
+        return result
+
     def create_obs_csi_driver_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         assert platform.gcp
         return {
