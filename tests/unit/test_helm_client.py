@@ -4,10 +4,14 @@ from platform_operator.helm_client import HelmOptions
 class TestHelmOptions:
     def test_str(self) -> None:
         options = HelmOptions(
-            client_only=True, wait=False, tiller_namespace="default", namespace=None
+            client_only=True,
+            wait=False,
+            tiller_namespace="default",
+            namespace=None,
+            timeout=600,
         )
 
-        assert str(options) == "--client-only --tiller-namespace default"
+        assert str(options) == "--client-only --tiller-namespace default --timeout 600"
 
     def test_str_empty(self) -> None:
         assert str(HelmOptions()) == ""

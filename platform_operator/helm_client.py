@@ -26,7 +26,7 @@ class HelmOptions:
                 if value:
                     options.append(option_name)
             elif value is not None:
-                options.extend((option_name, shlex.quote(value)))
+                options.extend((option_name, shlex.quote(str(value))))
         self._options_dict = dict(**kwargs)
         self._options_str = " ".join(options)
         self._options_str_masked = " ".join(options)
