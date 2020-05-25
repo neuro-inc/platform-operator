@@ -10,26 +10,28 @@ from platform_operator.models import Config, PlatformConfig
 
 
 @pytest.fixture
-def setup_config(config: Config) -> Iterator[None]:
+def setup_app(
+    config: Config, kube_client: KubeClient, config_client: ConfigClient
+) -> Iterator[None]:
     with mock.patch.object(Config, "load_from_env") as method:
         method.return_value = config
-        yield
+
+        from platform_operator.handlers import App
+
+        with mock.patch("platform_operator.handlers.app", spec=App) as app:
+            app.kube_client = kube_client
+            app.config_client = config_client
+            yield
 
 
 @pytest.fixture
-def kube_client() -> Iterator[mock.Mock]:
-    with mock.patch(
-        "platform_operator.handlers.kube_client", spec=KubeClient
-    ) as client:
-        yield client
+def kube_client() -> mock.AsyncMock:
+    return mock.AsyncMock(KubeClient)
 
 
 @pytest.fixture
-def config_client() -> Iterator[mock.Mock]:
-    with mock.patch(
-        "platform_operator.handlers.config_client", spec=ConfigClient
-    ) as client:
-        yield client
+def config_client() -> mock.Mock:
+    return mock.AsyncMock(ConfigClient)
 
 
 @pytest.fixture
@@ -96,7 +98,7 @@ def service_account_secret() -> Dict[str, Any]:
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_config")
+@pytest.mark.usefixtures("setup_app")
 async def test_configure_dns(
     kube_client: mock.Mock,
     config_client: mock.Mock,
@@ -126,7 +128,7 @@ async def test_configure_dns(
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_config")
+@pytest.mark.usefixtures("setup_app")
 async def test_configure_aws_dns(
     kube_client: mock.Mock,
     config_client: mock.Mock,
@@ -169,7 +171,7 @@ async def test_configure_aws_dns(
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_config")
+@pytest.mark.usefixtures("setup_app")
 async def test_configure_cluster(
     gcp_platform_config: PlatformConfig,
     kube_client: mock.Mock,
