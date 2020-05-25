@@ -161,9 +161,11 @@ spec:
                       type: string
                 aws:
                   type: object
+                  required:
+                  - url
                   properties:
                     url:
-                      type: str
+                      type: string
                 kubernetes:
                   type: object
                   required:

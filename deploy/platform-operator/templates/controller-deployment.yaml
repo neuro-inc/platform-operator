@@ -21,8 +21,8 @@ spec:
         release: {{ .Release.Name }}
         component: controller
 {{- if .Values.controller.annotations }}
-    annotations:
-{{ toYaml .Values.controller.annotations | indent 6 }}
+      annotations:
+{{ toYaml .Values.controller.annotations | indent 8 }}
 {{- end }}
     spec:
       serviceAccountName: {{ include "platformOperator.fullname" . }}
