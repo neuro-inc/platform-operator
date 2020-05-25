@@ -1,8 +1,9 @@
+import asyncio
 import logging
 import ssl
 from base64 import b64decode
 from types import SimpleNamespace
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Sequence
 
 import aiohttp
 from yarl import URL
@@ -153,3 +154,35 @@ class KubeClient:
             decoded_data[key] = b64decode(value.encode("utf-8")).decode("utf-8")
         secret["data"] = decoded_data
         return secret
+
+    async def get_pods(
+        self,
+        namespace: str,
+        label_selector: Optional[Dict[str, str]] = None,
+        limit: int = 100,
+    ) -> Sequence[Dict[str, Any]]:
+        assert limit
+        query = {"limit": str(limit)}
+        if label_selector:
+            query["labelSelector"] = ",".join(
+                f"{key}={value}" for key, value in label_selector.items()
+            )
+        assert self._session
+        async with self._session.get(
+            (self._get_namespace_url(namespace) / "pods").with_query(**query)
+        ) as response:
+            response.raise_for_status()
+            payload = await response.json()
+            return payload["items"]
+
+    async def wait_till_pods_deleted(
+        self,
+        namespace: str,
+        label_selector: Optional[Dict[str, str]] = None,
+        interval_secs: int = 5,
+    ) -> None:
+        while True:
+            payload = await self.get_pods(namespace, label_selector, 1)
+            if not payload:
+                break
+            await asyncio.sleep(interval_secs)
