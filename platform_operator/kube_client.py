@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from enum import Enum
 from types import SimpleNamespace
-from typing import Any, AsyncIterator, Dict, Optional, Sequence
+from typing import Any, AsyncIterator, Dict, List, Optional, Sequence
 
 import aiohttp
 from yarl import URL
@@ -267,6 +267,64 @@ class KubeClient:
             response.raise_for_status()
 
 
+class PlatformCondition(Dict[str, Any]):
+    def __init__(self, payload: Dict[str, Any]) -> None:
+        super().__init__(payload)
+
+    @property
+    def type(self) -> str:
+        return self["type"]
+
+    @type.setter
+    def type(self, value: str) -> None:
+        self["type"] = value
+
+    @property
+    def status(self) -> str:
+        return self["status"]
+
+    @status.setter
+    def status(self, value: str) -> None:
+        self["status"] = value
+
+    @property
+    def last_transition_time(self) -> str:
+        return self["last_transition_time"]
+
+    @last_transition_time.setter
+    def last_transition_time(self, value: str) -> None:
+        self["last_transition_time"] = value
+
+
+class PlatformStatus(Dict[str, Any]):
+    def __init__(self, payload: Dict[str, Any]) -> None:
+        super().__init__(payload)
+
+    @property
+    def phase(self) -> str:
+        return self["phase"]
+
+    @phase.setter
+    def phase(self, value: str) -> None:
+        self["phase"] = value
+
+    @property
+    def retries(self) -> int:
+        return self["retries"]
+
+    @retries.setter
+    def retries(self, value: int) -> None:
+        self["retries"] = value
+
+    @property
+    def conditions(self) -> List[PlatformCondition]:
+        return self["conditions"]
+
+    @conditions.setter
+    def conditions(self, value: List[PlatformCondition]) -> None:
+        self["conditions"] = value
+
+
 class PlatformStatusManager:
     def __init__(
         self,
@@ -278,8 +336,8 @@ class PlatformStatusManager:
         self._kube_client = kube_client
         self._namespace = namespace
         self._name = name
-        self._logger = logger or logging.getLogger(PlatformStatusManager.__name__)
-        self._status: Optional[SimpleNamespace] = None
+        self._logger = logger or logging.getLogger(__name__)
+        self._status: Optional[PlatformStatus] = None
 
     async def _load(self) -> None:
         if self._status:
@@ -287,14 +345,13 @@ class PlatformStatusManager:
         payload = await self._kube_client.get_platform_status(
             namespace=self._namespace, name=self._name
         )
-        logger.info(payload)
         payload = payload or {"conditions": []}
-        self._status = SimpleNamespace(**payload)
+        self._status = PlatformStatus(payload)
 
     async def _save(self) -> None:
         assert self._status
         await self._kube_client.update_platform_status(
-            namespace=self._namespace, name=self._name, payload=vars(self._status)
+            namespace=self._namespace, name=self._name, payload=self._status
         )
 
     def _now(self) -> str:
@@ -344,12 +401,13 @@ class PlatformStatusManager:
         assert self._status
         assert all(c["type"] != type for c in self._status.conditions)
         logger.info("Started transition to %s condition", type.value)
-        self._status.conditions.append({"type": type.value})
-        self._status.conditions[-1]["status"] = PlatformConditionStatus.FALSE.value
-        self._status.conditions[-1]["last_transition_time"] = self._now()
+        self._status.conditions.append(PlatformCondition({}))
+        self._status.conditions[-1].type = type.value
+        self._status.conditions[-1].status = PlatformConditionStatus.FALSE.value
+        self._status.conditions[-1].last_transition_time = self._now()
         await self._save()
         yield
-        self._status.conditions[-1]["status"] = PlatformConditionStatus.TRUE.value
-        self._status.conditions[-1]["last_transition_time"] = self._now()
+        self._status.conditions[-1].status = PlatformConditionStatus.TRUE.value
+        self._status.conditions[-1].last_transition_time = self._now()
         await self._save()
         logger.info("Transition to %s succeeded", type.value)
