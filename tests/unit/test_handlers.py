@@ -317,6 +317,79 @@ async def test_deploy(
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("setup_app")
+async def test_deploy_gcp_with_gcs_storage(
+    status_manager: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    wait_till_ssl_cert_created: mock.AsyncMock,
+    logger: logging.Logger,
+    gcp_cluster: Cluster,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import deploy
+
+    status_manager.is_condition_satisfied.return_value = False
+    config_client.get_cluster.return_value = gcp_cluster
+    gcp_platform_body["spec"]["storage"] = {"gcs": {"bucket": "storage"}}
+
+    await deploy(
+        name=gcp_platform_config.cluster_name,
+        body=gcp_platform_body,
+        logger=logger,
+        retry=0,
+    )
+
+    helm_client.upgrade.assert_any_await(
+        "platform-obs-csi-driver",
+        f"neuro/obs-csi-driver",
+        values=mock.ANY,
+        version="2.0.0",
+        namespace="platform",
+        install=True,
+        wait=True,
+        timeout=600,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("setup_app")
+async def test_deploy_on_prem(
+    status_manager: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    wait_till_ssl_cert_created: mock.AsyncMock,
+    logger: logging.Logger,
+    on_prem_cluster: Cluster,
+    on_prem_platform_body: bodies.Body,
+    on_prem_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import deploy
+
+    status_manager.is_condition_satisfied.return_value = False
+    config_client.get_cluster.return_value = on_prem_cluster
+
+    await deploy(
+        name=on_prem_platform_config.cluster_name,
+        body=on_prem_platform_body,
+        logger=logger,
+        retry=0,
+    )
+
+    helm_client.upgrade.assert_any_await(
+        "platform-nfs-server",
+        f"neuro/nfs-server",
+        values=mock.ANY,
+        version="3.0.0",
+        namespace="platform",
+        install=True,
+        wait=True,
+        timeout=600,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("setup_app")
 async def test_deploy_with_all_components_deployed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -367,21 +440,12 @@ async def test_deploy_with_all_components_deployed(
 @pytest.mark.usefixtures("setup_app")
 async def test_deploy_with_retries_exceeded(
     status_manager: mock.AsyncMock,
-    config_client: mock.AsyncMock,
-    helm_client: mock.AsyncMock,
-    wait_till_ssl_cert_created: mock.AsyncMock,
-    configure_dns: mock.AsyncMock,
-    configure_cluster: mock.AsyncMock,
     logger: logging.Logger,
     config: Config,
-    gcp_cluster: Cluster,
     gcp_platform_body: bodies.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import deploy
-
-    status_manager.is_condition_satisfied.return_value = True
-    config_client.get_cluster.return_value = gcp_cluster
 
     with pytest.raises(kopf.HandlerRetriesError):
         await deploy(
@@ -389,6 +453,30 @@ async def test_deploy_with_retries_exceeded(
             body=gcp_platform_body,
             logger=logger,
             retry=config.retries + 1,
+        )
+
+    status_manager.fail_deployment.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("setup_app")
+async def test_deploy_with_invalid_spec(
+    status_manager: mock.AsyncMock,
+    logger: logging.Logger,
+    config: Config,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import deploy
+
+    del gcp_platform_body["spec"]["storage"]
+
+    with pytest.raises(kopf.PermanentError, match="Invalid platform configuration"):
+        await deploy(
+            name=gcp_platform_config.cluster_name,
+            body=gcp_platform_body,
+            logger=logger,
+            retry=0,
         )
 
     status_manager.fail_deployment.assert_awaited_once()
