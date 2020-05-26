@@ -1,17 +1,33 @@
+import logging
 from typing import Any, Dict, Iterator
 from unittest import mock
 
+import kopf
 import pytest
+from kopf.structs import bodies
 
 from platform_operator.aws_client import AwsElbClient
 from platform_operator.config_client import ConfigClient
-from platform_operator.kube_client import KubeClient
-from platform_operator.models import Config, PlatformConfig
+from platform_operator.helm_client import HelmClient
+from platform_operator.kube_client import (
+    KubeClient,
+    PlatformConditionType,
+    PlatformStatusManager,
+)
+from platform_operator.models import (
+    Cluster,
+    Config,
+    PlatformConfig,
+    PlatformConfigFactory,
+)
 
 
 @pytest.fixture
 def setup_app(
-    config: Config, kube_client: KubeClient, config_client: ConfigClient
+    config: Config,
+    kube_client: KubeClient,
+    config_client: ConfigClient,
+    helm_client: HelmClient,
 ) -> Iterator[None]:
     with mock.patch.object(Config, "load_from_env") as method:
         method.return_value = config
@@ -21,6 +37,8 @@ def setup_app(
         with mock.patch("platform_operator.handlers.app", spec=App) as app:
             app.kube_client = kube_client
             app.config_client = config_client
+            app.helm_client = helm_client
+            app.platform_config_factory = PlatformConfigFactory(config)
             yield
 
 
@@ -32,6 +50,46 @@ def kube_client() -> mock.AsyncMock:
 @pytest.fixture
 def config_client() -> mock.Mock:
     return mock.AsyncMock(ConfigClient)
+
+
+@pytest.fixture
+def helm_client() -> mock.Mock:
+    return mock.AsyncMock(HelmClient)
+
+
+@pytest.fixture
+def logger() -> logging.Logger:
+    return logging.getLogger("controller")
+
+
+@pytest.fixture
+def wait_till_ssl_cert_created() -> Iterator[mock.Mock]:
+    with mock.patch(
+        "platform_operator.handlers.wait_till_ssl_cert_created"
+    ) as wait_till_ssl_cert_created:
+        yield wait_till_ssl_cert_created
+
+
+@pytest.fixture
+def configure_dns() -> Iterator[mock.Mock]:
+    with mock.patch("platform_operator.handlers.configure_dns") as configure_dns:
+        yield configure_dns
+
+
+@pytest.fixture
+def configure_cluster() -> Iterator[mock.Mock]:
+    with mock.patch(
+        "platform_operator.handlers.configure_cluster"
+    ) as configure_cluster:
+        yield configure_cluster
+
+
+@pytest.fixture
+def status_manager() -> Iterator[mock.Mock]:
+    with mock.patch(
+        "platform_operator.handlers.PlatformStatusManager", spec=PlatformStatusManager
+    ) as manager_class:
+        yield manager_class.return_value
 
 
 @pytest.fixture
@@ -195,3 +253,142 @@ async def test_configure_cluster(
         token=gcp_platform_config.token,
         payload=gcp_platform_config.create_cluster_config(service_account_secret),
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("setup_app")
+async def test_deploy(
+    status_manager: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    wait_till_ssl_cert_created: mock.AsyncMock,
+    configure_dns: mock.AsyncMock,
+    configure_cluster: mock.AsyncMock,
+    logger: logging.Logger,
+    config: Config,
+    gcp_cluster: Cluster,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import deploy
+
+    status_manager.is_condition_satisfied.return_value = False
+    config_client.get_cluster.return_value = gcp_cluster
+
+    await deploy(
+        name=gcp_platform_config.cluster_name,
+        body=gcp_platform_body,
+        logger=logger,
+        retry=0,
+    )
+
+    config_client.get_cluster.assert_awaited_once_with(
+        cluster_name=gcp_platform_config.cluster_name,
+        token=gcp_platform_body["spec"]["token"],
+    )
+
+    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
+    helm_client.add_repo.assert_has_awaits(
+        [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
+    )
+    helm_client.update_repo.assert_awaited_once()
+    helm_client.upgrade.assert_awaited_once_with(
+        "platform",
+        f"neuro/platform",
+        values=mock.ANY,
+        version="1.0.0",
+        namespace="platform",
+        install=True,
+        wait=True,
+        timeout=600,
+    )
+
+    wait_till_ssl_cert_created.assert_awaited_once()
+    configure_dns.assert_awaited_once_with(gcp_platform_config)
+    configure_cluster.assert_awaited_once_with(gcp_platform_config)
+
+    status_manager.start_deployment.assert_awaited_once_with(0)
+    status_manager.transition.assert_any_call(PlatformConditionType.PLATFORM_DEPLOYED)
+    status_manager.transition.assert_any_call(PlatformConditionType.SSL_CERT_CREATED)
+    status_manager.transition.assert_any_call(PlatformConditionType.DNS_CONFIGURED)
+    status_manager.transition.assert_any_call(PlatformConditionType.CLUSTER_CONFIGURED)
+    status_manager.complete_deployment.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("setup_app")
+async def test_deploy_with_all_components_deployed(
+    status_manager: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    wait_till_ssl_cert_created: mock.AsyncMock,
+    configure_dns: mock.AsyncMock,
+    configure_cluster: mock.AsyncMock,
+    logger: logging.Logger,
+    config: Config,
+    gcp_cluster: Cluster,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import deploy
+
+    status_manager.is_condition_satisfied.return_value = True
+    config_client.get_cluster.return_value = gcp_cluster
+
+    await deploy(
+        name=gcp_platform_config.cluster_name,
+        body=gcp_platform_body,
+        logger=logger,
+        retry=0,
+    )
+
+    config_client.get_cluster.assert_awaited_once_with(
+        cluster_name=gcp_platform_config.cluster_name,
+        token=gcp_platform_body["spec"]["token"],
+    )
+
+    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
+    helm_client.add_repo.assert_has_awaits(
+        [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
+    )
+    helm_client.update_repo.assert_awaited_once()
+    helm_client.upgrade.assert_not_awaited()
+
+    wait_till_ssl_cert_created.upgrade.assert_not_awaited()
+    configure_dns.assert_not_awaited()
+    configure_cluster.assert_not_awaited()
+
+    status_manager.start_deployment.assert_awaited_once_with(0)
+    status_manager.complete_deployment.assert_awaited_once()
+    status_manager.transition.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("setup_app")
+async def test_deploy_with_retries_exceeded(
+    status_manager: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    wait_till_ssl_cert_created: mock.AsyncMock,
+    configure_dns: mock.AsyncMock,
+    configure_cluster: mock.AsyncMock,
+    logger: logging.Logger,
+    config: Config,
+    gcp_cluster: Cluster,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import deploy
+
+    status_manager.is_condition_satisfied.return_value = True
+    config_client.get_cluster.return_value = gcp_cluster
+
+    with pytest.raises(kopf.HandlerRetriesError):
+        await deploy(
+            name=gcp_platform_config.cluster_name,
+            body=gcp_platform_body,
+            logger=logger,
+            retry=config.retries + 1,
+        )
+
+    status_manager.fail_deployment.assert_awaited_once()
