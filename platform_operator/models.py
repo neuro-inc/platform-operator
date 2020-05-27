@@ -420,9 +420,9 @@ class PlatformConfigFactory:
             service_ssh_auth_name="ssh-auth",
             jobs_namespace=self._config.platform_jobs_namespace,
             jobs_label="platform.neuromation.io/job",
-            jobs_node_pools=[
-                # TODO: add node pools config
-            ],
+            jobs_node_pools=self._create_node_pools(
+                cluster["cloud_provider"]["node_pools"]
+            ),
             jobs_resource_pool_types=self._update_tpu_network(
                 cluster["orchestrator"].get("resource_pool_types", ()), tpu_network,
             ),
@@ -566,3 +566,18 @@ class PlatformConfigFactory:
             if "tpu" in rpt and tpu_network:
                 rpt["tpu"]["ipv4_cidr_block"] = str(tpu_network)
         return resource_pools_types
+
+    @classmethod
+    def _create_node_pools(
+        cls, node_pools: Sequence[Mapping[str, Any]]
+    ) -> Sequence[Dict[str, Any]]:
+        return [cls._create_node_pool(np) for np in node_pools]
+
+    @classmethod
+    def _create_node_pool(cls, node_pool: Mapping[str, Any]) -> Dict[str, Any]:
+        return {
+            "name": node_pool["name"],
+            "idleSize": node_pool.get("idle_size", 0),
+            "cpu": node_pool["available_cpu"],
+            "gpu": node_pool.get("gpu", 0),
+        }
