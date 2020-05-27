@@ -65,6 +65,7 @@ def cluster_name() -> str:
 def node_pool_factory() -> Callable[[str], Dict[str, Any]]:
     def _factory(machine_type: str) -> Dict[str, Any]:
         return {
+            "name": machine_type + "-name",
             "machine_type": machine_type,
             "min_size": 0,
             "max_size": 1,
@@ -377,7 +378,7 @@ def gcp_platform_config(
         jobs_namespace="platform-jobs",
         jobs_label="platform.neuromation.io/job",
         jobs_node_pools=[
-            # TODO: add node pools config
+            {"name": "n1-highmem-8-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}
         ],
         jobs_resource_pool_types=[resource_pool_type_factory("192.168.0.0/16")],
         jobs_fallback_host="default.jobs-dev.neu.ro",
@@ -424,7 +425,7 @@ def aws_platform_config(
         gcp=None,
         cloud_provider="aws",
         jobs_node_pools=[
-            # TODO: add node pools config
+            {"name": "p2.xlarge-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}
         ],
         jobs_resource_pool_types=[resource_pool_type_factory()],
         aws=AwsConfig(
@@ -446,7 +447,7 @@ def azure_platform_config(
         gcp=None,
         cloud_provider="azure",
         jobs_node_pools=[
-            # TODO: add node pools config
+            {"name": "Standard_NC6-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}
         ],
         jobs_resource_pool_types=[resource_pool_type_factory()],
         azure=AzureConfig(
@@ -476,9 +477,7 @@ def on_prem_platform_config(
         ingress_ssh_auth_server=(
             f"ssh-auth.{gcp_platform_config.cluster_name}.org.neu.ro:30022"
         ),
-        jobs_node_pools=[
-            # TODO: add node pools config
-        ],
+        jobs_node_pools=[{"name": "gpu-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}],
         jobs_resource_pool_types=[resource_pool_type_factory()],
         on_prem=OnPremConfig(
             kubernetes_public_ip=IPv4Address("192.168.0.3"),

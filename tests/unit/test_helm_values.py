@@ -25,7 +25,7 @@ class TestHelmValuesFactory:
             "serviceToken": "token",
             "kubernetes": {
                 "nodePools": [
-                    # TODO: add node pools config
+                    {"name": "n1-highmem-8-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}
                 ],
                 "imagesPrepull": {
                     "refreshInterval": "1h",

@@ -232,7 +232,7 @@ class HelmValuesFactory:
             "kvprovider": {
                 "consul": {
                     "watch": True,
-                    "endpoint": f"{platform.namespace}-consul:8500",
+                    "endpoint": f"{self._release_names.platform}-consul:8500",
                     "prefix": "traefik",
                 },
                 "storeAcme": True,
@@ -251,7 +251,10 @@ class HelmValuesFactory:
                 {
                     "name": "resolve-dns-challenge-script",
                     "configMap": {
-                        "name": (f"{platform.namespace}-resolve-dns-challenge-script"),
+                        "name": (
+                            f"{self._release_names.platform}"
+                            "-resolve-dns-challenge-script"
+                        ),
                         "defaultMode": 0o777,
                         "items": [
                             {
@@ -334,7 +337,7 @@ class HelmValuesFactory:
                 "type": "es",
                 "es": {
                     "host": (
-                        f"{platform.namespace}-elasticsearch-client"
+                        f"{self._release_names.platform}-elasticsearch-client"
                         f".{platform.namespace}.svc.cluster.local"
                     ),
                     "port": 9200,
@@ -384,7 +387,7 @@ class HelmValuesFactory:
         return {
             "NP_CLUSTER_NAME": platform.cluster_name,
             "NP_STORAGE_AUTH_URL": str(platform.auth_url),
-            "NP_STORAGE_PVC_CLAIM_NAME": (f"{platform.namespace}-storage"),
+            "NP_STORAGE_PVC_CLAIM_NAME": (f"{self._release_names.platform}-storage"),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
         }
 
@@ -397,7 +400,7 @@ class HelmValuesFactory:
             "NP_OBSTORAGE_AUTH_URL": str(platform.auth_url),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
         }
-        secret_name = f"{platform.namespace}-blob-storage-key"
+        secret_name = f"{self._release_names.platform}-blob-storage-key"
         if platform.gcp:
             result["NP_OBSTORAGE_LOCATION"] = platform.gcp.region
             result["NP_OBSTORAGE_GCP_PROJECT_ID"] = platform.gcp.project
@@ -452,7 +455,7 @@ class HelmValuesFactory:
             result["NP_REGISTRY_UPSTREAM_TYPE"] = "basic"
             result[
                 "NP_REGISTRY_UPSTREAM_URL"
-            ] = f"http://{platform.namespace}-docker-registry:5000"
+            ] = f"http://{self._release_names.platform}-docker-registry:5000"
             result["NP_REGISTRY_UPSTREAM_PROJECT"] = "neuro"
         return result
 
@@ -464,7 +467,9 @@ class HelmValuesFactory:
             "NP_MONITORING_K8S_NS": platform.jobs_namespace,
             "NP_MONITORING_PLATFORM_API_URL": str(platform.api_url),
             "NP_MONITORING_PLATFORM_AUTH_URL": str(platform.auth_url),
-            "NP_MONITORING_ES_HOSTS": f"{platform.namespace}-elasticsearch-client:9200",
+            "NP_MONITORING_ES_HOSTS": (
+                f"{self._release_names.platform}-elasticsearch-client:9200"
+            ),
             "NP_MONITORING_REGISTRY_URL": str(platform.ingress_registry_url),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
         }
