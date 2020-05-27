@@ -289,11 +289,11 @@ class PlatformCondition(Dict[str, Any]):
 
     @property
     def last_transition_time(self) -> str:
-        return self["last_transition_time"]
+        return self["lastTransitionTime"]
 
     @last_transition_time.setter
     def last_transition_time(self, value: str) -> None:
-        self["last_transition_time"] = value
+        self["lastTransitionTime"] = value
 
 
 class PlatformStatus(Dict[str, Any]):
@@ -387,7 +387,7 @@ class PlatformStatusManager:
             condition = self._status.conditions[-1]
             if condition["status"] == PlatformConditionStatus.FALSE.value:
                 condition["status"] = PlatformConditionStatus.UNKNOWN.value
-                condition["last_transition_time"] = self._now()
+                condition["lastTransitionTime"] = self._now()
         await self._save()
 
     async def start_deletion(self) -> None:

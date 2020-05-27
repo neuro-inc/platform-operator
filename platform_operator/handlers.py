@@ -174,6 +174,77 @@ async def deploy(
     logger.info("Platform deployment succeeded")
 
 
+@kopf.on.delete(
+    PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
+)
+async def delete(
+    name: str, body: bodies.Body, logger: Logger, retry: int, **_: Any,
+) -> None:
+    status_manager = PlatformStatusManager(
+        app.kube_client, namespace=config.platform_namespace, name=name,
+    )
+    if retry == 0:
+        await status_manager.start_deletion()
+
+    platform_token = body["spec"]["token"]
+    cluster = await app.config_client.get_cluster(name, platform_token)
+
+    try:
+        platform = app.platform_config_factory.create(body, cluster)
+    except Exception:
+        # If platform has invalid configuration than there was no deployment
+        # and no resources to delete. Platform resource can be safely deleted.
+        return
+
+    await app.helm_client.init(client_only=True, skip_refresh=True)
+
+    logger.info("Deleting platform helm chart")
+    await app.helm_client.delete(
+        config.helm_release_names.platform, purge=True,
+    )
+    logger.info("platform helm chart deleted")
+
+    try:
+        # We need to delete all pods that use storage first.
+        # Otherwise they can stuck in Termnating state because kubernetes
+        # will fail to unmount volumes from pods.
+        logger.info("Waiting for job pods to be deleted")
+        await asyncio.wait_for(
+            app.kube_client.wait_till_pods_deleted(namespace=platform.jobs_namespace),
+            600,
+        )
+        logger.info("Job pods deleted")
+
+        logger.info("Waiting for platform storage pods to be deleted")
+        await asyncio.wait_for(
+            app.kube_client.wait_till_pods_deleted(
+                namespace=platform.namespace,
+                label_selector={"service": "platformstorageapi"},
+            ),
+            600,
+        )
+        logger.info("Platform storage pods deleted")
+    except asyncio.TimeoutError:
+        message = "Timeout error while wating for pods to be deleted"
+        logger.error(message)
+        raise kopf.TemporaryError(message)
+
+    is_gcp_gcs_platform = platform.gcp and platform.gcp.storage_type == "gcs"
+    if is_gcp_gcs_platform:
+        logger.info("Deleting obs-csi-driver helm chart")
+        await app.helm_client.delete(
+            config.helm_release_names.obs_csi_driver, purge=True,
+        )
+        logger.info("obs-csi-driver helm chart deleted")
+
+    if platform.on_prem:
+        logger.info("Deleting nfs-server helm chart")
+        await app.helm_client.delete(
+            config.helm_release_names.nfs_server, purge=True,
+        )
+        logger.info("nfs-server helm chart deleted")
+
+
 async def wait_till_ssl_cert_created() -> None:
     # TODO: implement something smarter than just delay
     await asyncio.sleep(300)

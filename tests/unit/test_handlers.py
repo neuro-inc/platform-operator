@@ -480,3 +480,125 @@ async def test_deploy_with_invalid_spec(
         )
 
     status_manager.fail_deployment.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("setup_app")
+async def test_delete(
+    status_manager: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    kube_client: mock.AsyncMock,
+    logger: logging.Logger,
+    gcp_cluster: Cluster,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import delete
+
+    config_client.get_cluster.return_value = gcp_cluster
+
+    await delete(
+        name=gcp_platform_config.cluster_name,
+        body=gcp_platform_body,
+        logger=logger,
+        retry=0,
+    )
+
+    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
+    helm_client.delete.assert_awaited_once_with("platform", purge=True)
+
+    kube_client.wait_till_pods_deleted.assert_has_awaits(
+        [
+            mock.call(namespace="platform-jobs"),
+            mock.call(
+                namespace="platform", label_selector={"service": "platformstorageapi"}
+            ),
+        ]
+    )
+
+    status_manager.start_deletion.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("setup_app")
+async def test_delete_gcp_with_gcs_storage(
+    status_manager: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    logger: logging.Logger,
+    gcp_cluster: Cluster,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import delete
+
+    config_client.get_cluster.return_value = gcp_cluster
+    gcp_platform_body["spec"]["storage"] = {"gcs": {"bucket": "storage"}}
+
+    await delete(
+        name=gcp_platform_config.cluster_name,
+        body=gcp_platform_body,
+        logger=logger,
+        retry=0,
+    )
+
+    helm_client.delete.assert_has_awaits(
+        [
+            mock.call("platform", purge=True),
+            mock.call("platform-obs-csi-driver", purge=True),
+        ]
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("setup_app")
+async def test_delete_on_prem(
+    status_manager: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    logger: logging.Logger,
+    on_prem_cluster: Cluster,
+    on_prem_platform_body: bodies.Body,
+    on_prem_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import delete
+
+    config_client.get_cluster.return_value = on_prem_cluster
+
+    await delete(
+        name=on_prem_platform_config.cluster_name,
+        body=on_prem_platform_body,
+        logger=logger,
+        retry=0,
+    )
+
+    helm_client.delete.assert_has_awaits(
+        [
+            mock.call("platform", purge=True),
+            mock.call("platform-nfs-server", purge=True),
+        ]
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("setup_app")
+async def test_delete_with_invalid_configuration(
+    status_manager: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import delete
+
+    del gcp_platform_body["spec"]["storage"]
+
+    await delete(
+        name=gcp_platform_config.cluster_name,
+        body=gcp_platform_body,
+        logger=logger,
+        retry=0,
+    )
+
+    status_manager.start_deletion.assert_awaited_once()
+    helm_client.init.assert_not_awaited()
