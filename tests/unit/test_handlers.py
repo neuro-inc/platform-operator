@@ -585,6 +585,7 @@ async def test_delete_on_prem(
 @pytest.mark.usefixtures("setup_app")
 async def test_delete_with_invalid_configuration(
     status_manager: mock.AsyncMock,
+    logger: logging.Logger,
     helm_client: mock.AsyncMock,
     gcp_platform_body: bodies.Body,
     gcp_platform_config: PlatformConfig,

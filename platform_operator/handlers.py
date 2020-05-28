@@ -194,6 +194,9 @@ async def delete(
     except Exception:
         # If platform has invalid configuration than there was no deployment
         # and no resources to delete. Platform resource can be safely deleted.
+        logger.warning(
+            "Platform has invalid configuration, delete handler cannot proceed"
+        )
         return
 
     await app.helm_client.init(client_only=True, skip_refresh=True)
