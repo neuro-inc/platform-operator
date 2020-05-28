@@ -29,7 +29,7 @@ class TestPlatformStatusManager:
                 {
                     "type": "PlatformDeployed",
                     "status": "True",
-                    "last_transition_time": "2020-05-24T22:13:39",
+                    "lastTransitionTime": "2020-05-24T22:13:39",
                 }
             ],
         }
@@ -123,7 +123,7 @@ class TestPlatformStatusManager:
                 {
                     "type": "PlatformDeployed",
                     "status": "False",
-                    "last_transition_time": mock.ANY,
+                    "lastTransitionTime": mock.ANY,
                 }
             )
             kube_client.update_platform_status.assert_awaited_with(
@@ -191,7 +191,7 @@ class TestPlatformStatusManager:
 
         status["phase"] = "Failed"
         status["conditions"][-1]["status"] = "Unknown"
-        status["conditions"][-1]["last_transition_time"] = mock.ANY
+        status["conditions"][-1]["lastTransitionTime"] = mock.ANY
         kube_client.update_platform_status.assert_awaited_with(
             namespace="default", name="neuro", payload=status,
         )
