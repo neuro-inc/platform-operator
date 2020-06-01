@@ -7,6 +7,7 @@ import pytest
 from kopf.structs import bodies
 
 from platform_operator.aws_client import AwsElbClient
+from platform_operator.certificate_store import CertificateStore
 from platform_operator.config_client import ConfigClient
 from platform_operator.helm_client import HelmClient
 from platform_operator.kube_client import (
@@ -28,6 +29,7 @@ def setup_app(
     kube_client: KubeClient,
     config_client: ConfigClient,
     helm_client: HelmClient,
+    certificate_store: CertificateStore,
 ) -> Iterator[None]:
     with mock.patch.object(Config, "load_from_env") as method:
         method.return_value = config
@@ -38,6 +40,7 @@ def setup_app(
             app.kube_client = kube_client
             app.config_client = config_client
             app.helm_client = helm_client
+            app.certificate_store = certificate_store
             app.platform_config_factory = PlatformConfigFactory(config)
             yield
 
@@ -63,11 +66,8 @@ def logger() -> logging.Logger:
 
 
 @pytest.fixture
-def wait_till_ssl_cert_created() -> Iterator[mock.Mock]:
-    with mock.patch(
-        "platform_operator.handlers.wait_till_ssl_cert_created"
-    ) as wait_till_ssl_cert_created:
-        yield wait_till_ssl_cert_created
+def certificate_store() -> mock.Mock:
+    return mock.AsyncMock(CertificateStore)
 
 
 @pytest.fixture
@@ -261,7 +261,7 @@ async def test_deploy(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    wait_till_ssl_cert_created: mock.AsyncMock,
+    certificate_store: mock.AsyncMock,
     configure_dns: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     logger: logging.Logger,
@@ -303,13 +303,13 @@ async def test_deploy(
         timeout=600,
     )
 
-    wait_till_ssl_cert_created.assert_awaited_once()
+    certificate_store.wait_till_certificate_created.assert_awaited_once()
     configure_dns.assert_awaited_once_with(gcp_platform_config)
     configure_cluster.assert_awaited_once_with(gcp_platform_config)
 
     status_manager.start_deployment.assert_awaited_once_with(0)
     status_manager.transition.assert_any_call(PlatformConditionType.PLATFORM_DEPLOYED)
-    status_manager.transition.assert_any_call(PlatformConditionType.SSL_CERT_CREATED)
+    status_manager.transition.assert_any_call(PlatformConditionType.CERTIFICATE_CREATED)
     status_manager.transition.assert_any_call(PlatformConditionType.DNS_CONFIGURED)
     status_manager.transition.assert_any_call(PlatformConditionType.CLUSTER_CONFIGURED)
     status_manager.complete_deployment.assert_awaited_once()
@@ -321,7 +321,6 @@ async def test_deploy_gcp_with_gcs_storage(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    wait_till_ssl_cert_created: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
     gcp_platform_body: bodies.Body,
@@ -358,7 +357,6 @@ async def test_deploy_on_prem(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    wait_till_ssl_cert_created: mock.AsyncMock,
     logger: logging.Logger,
     on_prem_cluster: Cluster,
     on_prem_platform_body: bodies.Body,
@@ -394,7 +392,7 @@ async def test_deploy_with_all_components_deployed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    wait_till_ssl_cert_created: mock.AsyncMock,
+    certificate_store: mock.AsyncMock,
     configure_dns: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     logger: logging.Logger,
@@ -427,7 +425,7 @@ async def test_deploy_with_all_components_deployed(
     helm_client.update_repo.assert_awaited_once()
     helm_client.upgrade.assert_not_awaited()
 
-    wait_till_ssl_cert_created.upgrade.assert_not_awaited()
+    certificate_store.wait_till_certificate_created.assert_not_awaited()
     configure_dns.assert_not_awaited()
     configure_cluster.assert_not_awaited()
 

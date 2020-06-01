@@ -33,7 +33,7 @@ class PlatformConditionType(str, Enum):
     OBS_CSI_DRIVER_DEPLOYED = "ObsCsiDriverDeployed"
     NFS_SERVER_DEPLOYED = "NfsServerDeployed"
     PLATFORM_DEPLOYED = "PlatformDeployed"
-    SSL_CERT_CREATED = "SslCertificateCreated"
+    CERTIFICATE_CREATED = "CertificateCreated"
     DNS_CONFIGURED = "DnsConfigured"
     CLUSTER_CONFIGURED = "ClusterConfigured"
 
@@ -399,7 +399,6 @@ class PlatformStatusManager:
     @asynccontextmanager
     async def transition(self, type: PlatformConditionType) -> AsyncIterator[None]:
         assert self._status
-        assert all(c["type"] != type for c in self._status.conditions)
         logger.info("Started transition to %s condition", type.value)
         self._status.conditions.append(PlatformCondition({}))
         self._status.conditions[-1].type = type.value

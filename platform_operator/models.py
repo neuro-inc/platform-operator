@@ -12,6 +12,12 @@ from kopf.structs import bodies
 from yarl import URL
 
 
+@dataclass(frozen=True)
+class Certificate:
+    private_key: str
+    certificate: str
+
+
 class KubeClientAuthType(str, Enum):
     NONE = "none"
     TOKEN = "token"
@@ -109,11 +115,13 @@ class Config:
     platform_api_url: URL
     platform_namespace: str
     platform_jobs_namespace: str
+    platform_consul_url: URL
 
     @classmethod
     def load_from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Config":
         env = env or os.environ
         platform_url = URL(env["NP_PLATFORM_URL"])
+        platform_release_name = env["NP_PLATFORM_NAMESPACE"]
         return cls(
             log_level=(env.get("NP_CONTROLLER_LOG_LEVEL") or "INFO").upper(),
             retries=int(env.get("NP_CONTROLLER_RETRIES") or "3"),
@@ -139,7 +147,7 @@ class Config:
             ),
             helm_service_account=env["NP_HELM_SERVICE_ACCOUNT_NAME"],
             helm_release_names=HelmReleaseNames(
-                platform=env["NP_PLATFORM_NAMESPACE"],
+                platform=platform_release_name,
                 obs_csi_driver=env["NP_PLATFORM_NAMESPACE"] + "-obs-csi-driver",
                 nfs_server=env["NP_PLATFORM_NAMESPACE"] + "-nfs-server",
             ),
@@ -154,6 +162,9 @@ class Config:
             platform_api_url=platform_url / "api/v1",
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
             platform_jobs_namespace=env["NP_PLATFORM_NAMESPACE"] + "-jobs",
+            platform_consul_url=URL.build(
+                scheme="http", host=platform_release_name + "-consul", port=8500
+            ),
         )
 
     @classmethod
