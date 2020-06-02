@@ -9,6 +9,7 @@ import kopf
 from kopf.structs import bodies
 
 from .aws_client import AwsElbClient
+from .certificate_store import CertificateStore
 from .config_client import ConfigClient
 from .helm_client import HelmClient
 from .helm_values import HelmValuesFactory
@@ -30,6 +31,7 @@ class App:
     helm_client: HelmClient = None  # type: ignore
     kube_client: KubeClient = None  # type: ignore
     config_client: ConfigClient = None  # type: ignore
+    certificate_store: CertificateStore = None  # type: ignore
     exit_stack: AsyncExitStack = field(default_factory=AsyncExitStack)
 
     async def close(self) -> None:
@@ -52,6 +54,9 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
     )
     app.config_client = await app.exit_stack.enter_async_context(
         ConfigClient(config.platform_url)
+    )
+    app.certificate_store = await app.exit_stack.enter_async_context(
+        CertificateStore(config.platform_consul_url)
     )
 
     settings.posting.level = logging.getLevelName(config.log_level)
@@ -155,10 +160,12 @@ async def deploy(
             )
 
     if not status_manager.is_condition_satisfied(
-        PlatformConditionType.SSL_CERT_CREATED
+        PlatformConditionType.CERTIFICATE_CREATED
     ):
-        async with status_manager.transition(PlatformConditionType.SSL_CERT_CREATED):
-            await wait_till_ssl_cert_created()
+        async with status_manager.transition(PlatformConditionType.CERTIFICATE_CREATED):
+            await asyncio.wait_for(
+                app.certificate_store.wait_till_certificate_created(), 300
+            )
 
     if not status_manager.is_condition_satisfied(PlatformConditionType.DNS_CONFIGURED):
         async with status_manager.transition(PlatformConditionType.DNS_CONFIGURED):
@@ -208,7 +215,7 @@ async def delete(
     logger.info("platform helm chart deleted")
 
     try:
-        # We need to delete all pods that use storage first.
+        # We need first to delete all pods that use storage.
         # Otherwise they can stuck in Termnating state because kubernetes
         # will fail to unmount volumes from pods.
         logger.info("Waiting for job pods to be deleted")
@@ -246,11 +253,6 @@ async def delete(
             config.helm_release_names.nfs_server, purge=True,
         )
         logger.info("nfs-server helm chart deleted")
-
-
-async def wait_till_ssl_cert_created() -> None:
-    # TODO: implement something smarter than just delay
-    await asyncio.sleep(300)
 
 
 async def configure_dns(platform: PlatformConfig) -> None:

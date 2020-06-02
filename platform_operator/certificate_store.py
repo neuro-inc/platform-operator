@@ -1,19 +1,24 @@
+import asyncio
+import gzip
+import json
 import logging
+from base64 import b64decode
 from types import SimpleNamespace
 from typing import Any, Dict, Optional
 
 import aiohttp
+from aiohttp.web import HTTPNotFound
 from yarl import URL
 
-from .models import Cluster
+from .models import Certificate
 
 
 logger = logging.getLogger(__name__)
 
 
-class ConfigClient:
-    def __init__(self, url: URL) -> None:
-        self._base_url = url
+class CertificateStore:
+    def __init__(self, consul_url: URL) -> None:
+        self._consul_url = consul_url / "v1/kv"
         self._session: Optional[aiohttp.ClientSession] = None
 
     async def _on_request_start(
@@ -43,7 +48,7 @@ class ConfigClient:
                 "Received %s %s %s", params.method, params.response.status, params.url,
             )
 
-    async def __aenter__(self) -> "ConfigClient":
+    async def __aenter__(self) -> "CertificateStore":
         trace_config = aiohttp.TraceConfig()
         trace_config.on_request_start.append(self._on_request_start)  # type: ignore
         trace_config.on_request_end.append(self._on_request_end)  # type: ignore
@@ -57,37 +62,39 @@ class ConfigClient:
         assert self._session
         await self._session.close()
 
-    async def get_cluster(self, cluster_name: str, token: str) -> Cluster:
+    async def _get_acme_account(self) -> Optional[Dict[str, Any]]:
         assert self._session
         async with self._session.get(
-            (self._base_url / "api/v1/clusters" / cluster_name).with_query(
-                include="all"
-            ),
-            headers={"Authorization": f"Bearer {token}"},
+            self._consul_url / "traefik/acme/account/object",
         ) as response:
+            if response.status == HTTPNotFound.status_code:
+                return None
             response.raise_for_status()
             payload = await response.json()
-            return Cluster(payload)
+            value = payload[0]["Value"]
+            value_decompressed = gzip.decompress(b64decode(value.encode()))
+            return json.loads(value_decompressed.decode())
 
-    async def configure_dns(
-        self, cluster_name: str, token: str, payload: Dict[str, Any]
-    ) -> None:
-        assert self._session
-        logger.info("cluster '%s' dns configuration: %s", cluster_name, str(payload))
-        async with self._session.put(
-            self._base_url / "api/v1/clusters" / cluster_name / "dns",
-            json=payload,
-            headers={"Authorization": f"Bearer {token}"},
-        ) as response:
-            response.raise_for_status()
+    async def get_certificate(self) -> Optional[Certificate]:
+        account = await self._get_acme_account()
+        if not account:
+            return None
 
-    async def configure_cluster(
-        self, cluster_name: str, token: str, payload: Dict[str, Any]
-    ) -> None:
-        assert self._session
-        async with self._session.put(
-            self._base_url / "api/v1/clusters" / cluster_name,
-            json=payload,
-            headers={"Authorization": f"Bearer {token}"},
-        ) as response:
-            response.raise_for_status()
+        certs = account.get("DomainsCertificate", {}).get("Certs")
+        if not certs:
+            return None
+        cert = certs[0].get("Certificate")
+        if not cert:
+            return None
+
+        return Certificate(
+            private_key=b64decode(cert["PrivateKey"].encode()).decode(),
+            certificate=b64decode(cert["Certificate"].encode()).decode(),
+        )
+
+    async def wait_till_certificate_created(self, interval_secs: int = 5) -> None:
+        while True:
+            cert = await self.get_certificate()
+            if cert:
+                break
+            await asyncio.sleep(interval_secs)

@@ -65,8 +65,8 @@ class HelmClient:
         process = await asyncio.create_subprocess_shell(
             cmd,
             stdin=subprocess.PIPE if input_bytes else None,
-            stdout=subprocess.PIPE if capture_stdout else None,
-            stderr=subprocess.PIPE if capture_stderr else None,
+            stdout=subprocess.PIPE if capture_stdout else subprocess.DEVNULL,
+            stderr=subprocess.PIPE if capture_stderr else subprocess.DEVNULL,
         )
         stdout, stderr = await process.communicate(input_bytes or None)
         stdout_text = (stdout or b"").decode("utf-8")

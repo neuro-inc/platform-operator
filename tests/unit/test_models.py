@@ -82,6 +82,7 @@ class TestConfig:
             platform_api_url=URL("https://dev.neu.ro/api/v1"),
             platform_namespace="platform",
             platform_jobs_namespace="platform-jobs",
+            platform_consul_url=URL("http://platform-consul:8500"),
         )
 
     def test_config_defaults(self) -> None:
@@ -129,6 +130,7 @@ class TestConfig:
             platform_api_url=URL("https://dev.neu.ro/api/v1"),
             platform_namespace="platform",
             platform_jobs_namespace="platform-jobs",
+            platform_consul_url=URL("http://platform-consul:8500"),
         )
 
 
