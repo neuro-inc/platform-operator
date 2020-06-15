@@ -452,7 +452,9 @@ class HelmValuesFactory:
                 "persistence": {
                     "type": "gcp",
                     "gcp": {
-                        "serviceAccountKeyBase64": platform.gcp.service_account_key_base64,
+                        "serviceAccountKeyBase64": (
+                            platform.gcp.service_account_key_base64
+                        ),
                         "project": platform.gcp.project,
                         "region": platform.gcp.region,
                         "bucket": platform.monitoring_logs_bucket_name,

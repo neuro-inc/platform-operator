@@ -586,6 +586,23 @@ class TestHelmValuesFactory:
             },
         }
 
+    def test_create_aws_platform_monitoring_values_with_roles(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_monitoring_values(
+            replace(
+                aws_platform_config,
+                aws=replace(aws_platform_config.aws, role_s3_arn="s3_role"),
+            )
+        )
+
+        assert result["monitoring"] == {
+            "podAnnotations": {"iam.amazonaws.com/role": "s3_role"}
+        }
+        assert result["fluentd"]["podAnnotations"] == {
+            "iam.amazonaws.com/role": "s3_role"
+        }
+
     def test_create_azure_platform_monitoring_values(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
