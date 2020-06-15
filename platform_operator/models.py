@@ -70,11 +70,9 @@ class HelmChartNames:
     obs_csi_driver: str = "obs-csi-driver"
     docker_registry: str = "docker-registry"
     nfs_server: str = "nfs-server"
+    minio: str = "minio"
     consul: str = "consul"
     traefik: str = "traefik"
-    elasticsearch: str = "elasticsearch"
-    elasticsearch_curator: str = "elasticsearch-curator"
-    fluent_bit: str = "fluent-bit"
     cluster_autoscaler: str = "cluster-autoscaler"
     platform: str = "platform"
     platform_storage: str = "platform-storage"
@@ -235,6 +233,11 @@ class OnPremConfig:
     registry_storage_size: str
     storage_class_name: str
     storage_size: str
+    blob_storage_region: str
+    blob_storage_access_key: str
+    blob_storage_secret_key: str
+    blob_storage_class_name: str
+    blob_storage_size: str
     kubelet_port: int
     http_node_port: int
     https_node_port: int
@@ -269,6 +272,7 @@ class PlatformConfig:
     jobs_host_template: str
     jobs_fallback_host: str
     jobs_service_account_name: str
+    monitoring_logs_bucket_name: str
     storage_pvc_name: str
     helm_repo: HelmRepo
     docker_registry: DockerRegistry
@@ -441,6 +445,9 @@ class PlatformConfigFactory:
             jobs_host_template=f"{{job_id}}.jobs.{ingress_host}",
             jobs_fallback_host=cluster["orchestrator"]["job_fallback_hostname"],
             jobs_service_account_name=f"{self._config.platform_namespace}-jobs",
+            monitoring_logs_bucket_name=platform_body["spec"]["monitoring"]["logs"][
+                "bucket"
+            ],
             storage_pvc_name=f"{self._config.platform_namespace}-storage",
             helm_repo=self._create_helm_repo(cluster),
             docker_registry=self._create_docker_registry(cluster),
@@ -547,15 +554,21 @@ class PlatformConfigFactory:
             public_ip = IPv4Address(kubernetes_spec["publicIP"])
         else:
             public_ip = IPv4Address(URL(kubernetes_spec["publicUrl"]).host)
-        registry_volume_claim = spec["registry"]["kubernetes"]["persistence"]
-        storage_volume_claim = spec["storage"]["kubernetes"]["persistence"]
+        registry_persistence = spec["registry"]["kubernetes"]["persistence"]
+        storage_persistence = spec["storage"]["kubernetes"]["persistence"]
+        blob_storage_persistence = spec["blobStorage"]["kubernetes"]["persistence"]
         return OnPremConfig(
             kubernetes_public_ip=public_ip,
             masters_count=int(kubernetes_spec.get("mastersCount", "1")),
-            registry_storage_class_name=registry_volume_claim["storageClassName"],
-            registry_storage_size=registry_volume_claim.get("size") or "10Gi",
-            storage_class_name=storage_volume_claim["storageClassName"],
-            storage_size=storage_volume_claim.get("size") or "10Gi",
+            registry_storage_class_name=registry_persistence["storageClassName"],
+            registry_storage_size=registry_persistence.get("size") or "10Gi",
+            storage_class_name=storage_persistence["storageClassName"],
+            storage_size=storage_persistence.get("size") or "10Gi",
+            blob_storage_region="minio",
+            blob_storage_access_key="minio_access_key",
+            blob_storage_secret_key="minio_secret_key",
+            blob_storage_class_name=blob_storage_persistence["storageClassName"],
+            blob_storage_size=blob_storage_persistence.get("size") or "10Gi",
             kubelet_port=int(kubernetes_spec["nodePorts"]["kubelet"]),
             http_node_port=int(kubernetes_spec["nodePorts"]["http"]),
             https_node_port=int(kubernetes_spec["nodePorts"]["https"]),

@@ -62,9 +62,6 @@ class TestHelmValuesFactory:
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
             "consul": mock.ANY,
             "traefik": mock.ANY,
-            "elasticsearch": mock.ANY,
-            "elasticsearch-curator": mock.ANY,
-            "fluent-bit": mock.ANY,
             "platform-storage": mock.ANY,
             "platform-registry": mock.ANY,
             "ssh-auth": mock.ANY,
@@ -131,6 +128,7 @@ class TestHelmValuesFactory:
             }
         }
         assert "docker-registry" in result
+        assert "minio" in result
         assert "platform-object-storage" not in result
 
     def test_create_docker_registry_values(
@@ -165,6 +163,23 @@ class TestHelmValuesFactory:
                 "storageClass": "storage-standard",
                 "size": "1000Gi",
             },
+        }
+
+    def test_create_minio_values(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_minio_values(on_prem_platform_config)
+
+        assert result == {
+            "mode": "standalone",
+            "persistence": {
+                "enabled": True,
+                "storageClass": "blob-storage-standard",
+                "size": "10Gi",
+            },
+            "accessKey": "minio_access_key",
+            "secretKey": "minio_secret_key",
+            "environment": {"MINIO_REGION_NAME": "minio"},
         }
 
     def test_create_obs_csi_driver_values(
@@ -335,54 +350,6 @@ class TestHelmValuesFactory:
         assert result["deploymentStrategy"] == {
             "type": "RollingUpdate",
             "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
-        }
-
-    def test_create_elasticsearch_values(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_elasticsearch_values(gcp_platform_config)
-
-        assert result == {
-            "cluster": {"enabled": False},
-            "data": {
-                "replicas": 1,
-                "persistence": {
-                    "enabled": True,
-                    "storageClass": "platform-standard-topology-aware",
-                    "size": "10Gi",
-                },
-            },
-        }
-
-    def test_create_elasticsearch_curator_values(
-        self, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_elasticsearch_curator_values()
-
-        assert result == {
-            "rbac": {"enabled": True},
-            "cronjob": {"schedule": "0 1 * * *"},
-        }
-
-    def test_create_fluent_bit_values(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_fluent_bit_values(gcp_platform_config)
-
-        assert result == {
-            "nodeSelector": {"platform.neuromation.io/job": "true"},
-            "tolerations": [{"effect": "NoSchedule", "operator": "Exists"}],
-            "backend": {
-                "type": "es",
-                "es": {
-                    "host": "platform-elasticsearch-client.platform.svc.cluster.local",
-                    "port": 9200,
-                },
-            },
-            "resources": {
-                "requests": {"cpu": "10m", "memory": "32Mi"},
-                "limits": {"cpu": "100m", "memory": "128Mi"},
-            },
         }
 
     def test_create_cluster_autoscaler_values(
@@ -574,7 +541,7 @@ class TestHelmValuesFactory:
             "NP_REGISTRY_UPSTREAM_PROJECT": "neuro",
         }
 
-    def test_create_platform_monitoring_values(
+    def test_create_gcp_platform_monitoring_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_monitoring_values(gcp_platform_config)
@@ -584,11 +551,56 @@ class TestHelmValuesFactory:
             "NP_MONITORING_K8S_NS": "platform-jobs",
             "NP_MONITORING_PLATFORM_API_URL": "https://dev.neu.ro/api/v1",
             "NP_MONITORING_PLATFORM_AUTH_URL": "https://dev.neu.ro",
-            "NP_MONITORING_ES_HOSTS": "platform-elasticsearch-client:9200",
             "NP_MONITORING_REGISTRY_URL": (
                 f"https://registry.{gcp_platform_config.cluster_name}.org.neu.ro"
             ),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+            "fluentd": {
+                "persistence": {
+                    "enabled": True,
+                    "storageClassName": "platform-standard-topology-aware",
+                }
+            },
+            "logs": {
+                "persistence": {
+                    "type": "gcp",
+                    "gcp": {
+                        "bucket": "job-logs",
+                        "project": "project",
+                        "region": "us-central1",
+                        "serviceAccountKeyBase64": "e30=",
+                    },
+                }
+            },
+        }
+
+    def test_create_aws_platform_monitoring_values(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_monitoring_values(aws_platform_config)
+
+        assert result["logs"] == {
+            "persistence": {
+                "type": "aws",
+                "aws": {"bucket": "job-logs", "region": "us-east-1"},
+            },
+        }
+
+    def test_create_azure_platform_monitoring_values(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_monitoring_values(azure_platform_config)
+
+        assert result["logs"] == {
+            "persistence": {
+                "type": "azure",
+                "azure": {
+                    "bucket": "job-logs",
+                    "region": "westus",
+                    "storageAccountKey": "accountKey2",
+                    "storageAccountName": "accountName2",
+                },
+            },
         }
 
     def test_create_on_prem_platform_monitoring_values(
@@ -597,6 +609,18 @@ class TestHelmValuesFactory:
         result = factory.create_platform_monitoring_values(on_prem_platform_config)
 
         assert result["NP_MONITORING_K8S_KUBELET_PORT"] == 10250
+        assert result["logs"] == {
+            "persistence": {
+                "type": "minio",
+                "minio": {
+                    "url": "http://platform-minio:9000",
+                    "accessKey": "minio_access_key",
+                    "secretKey": "minio_secret_key",
+                    "region": "minio",
+                    "bucket": "job-logs",
+                },
+            },
+        }
 
     def test_create_on_prem_platform_monitoring_values_for_megafon_public(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
