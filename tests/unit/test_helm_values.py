@@ -554,6 +554,9 @@ class TestHelmValuesFactory:
             "NP_MONITORING_REGISTRY_URL": (
                 f"https://registry.{gcp_platform_config.cluster_name}.org.neu.ro"
             ),
+            "NP_CORS_ORIGINS": (
+                "https://release--neuro-web.netlify.app,https://app.neu.ro"
+            ),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
             "fluentd": {
                 "persistence": {
@@ -639,7 +642,7 @@ class TestHelmValuesFactory:
             },
         }
 
-    def test_create_on_prem_platform_monitoring_values_for_megafon_public(
+    def test_create_platform_monitoring_values_for_megafon_public(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_monitoring_values(
@@ -654,7 +657,7 @@ class TestHelmValuesFactory:
             ",https://app.ml.megafon.ru"
         )
 
-    def test_create_on_prem_platform_monitoring_values_for_megafon_poc(
+    def test_create_platform_monitoring_values_for_megafon_poc(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_monitoring_values(
