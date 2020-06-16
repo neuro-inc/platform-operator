@@ -50,11 +50,6 @@ class HelmValuesFactory:
             },
             self._chart_names.consul: self.create_consul_values(platform),
             self._chart_names.traefik: self.create_traefik_values(platform),
-            self._chart_names.elasticsearch: self.create_elasticsearch_values(platform),
-            self._chart_names.elasticsearch_curator: (
-                self.create_elasticsearch_curator_values()
-            ),
-            self._chart_names.fluent_bit: self.create_fluent_bit_values(platform),
             self._chart_names.platform_storage: self.create_platform_storage_values(
                 platform
             ),
@@ -132,6 +127,7 @@ class HelmValuesFactory:
             result[
                 self._chart_names.docker_registry
             ] = self.create_docker_registry_values(platform)
+            result[self._chart_names.minio] = self.create_minio_values(platform)
         return result
 
     def create_obs_csi_driver_values(self, platform: PlatformConfig) -> Dict[str, Any]:
@@ -179,6 +175,20 @@ class HelmValuesFactory:
                     f"{docker_registry.username}:{docker_registry.password}"
                 )
             },
+        }
+
+    def create_minio_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+        assert platform.on_prem
+        return {
+            "mode": "standalone",
+            "persistence": {
+                "enabled": True,
+                "storageClass": platform.on_prem.blob_storage_class_name,
+                "size": platform.on_prem.blob_storage_size,
+            },
+            "accessKey": platform.on_prem.blob_storage_access_key,
+            "secretKey": platform.on_prem.blob_storage_secret_key,
+            "environment": {"MINIO_REGION_NAME": platform.on_prem.blob_storage_region},
         }
 
     def create_consul_values(self, platform: PlatformConfig) -> Dict[str, Any]:
@@ -310,45 +320,6 @@ class HelmValuesFactory:
             }
         return result
 
-    def create_elasticsearch_values(self, platform: PlatformConfig) -> Dict[str, Any]:
-        return {
-            "cluster": {"enabled": False},
-            "data": {
-                "replicas": 1,
-                "persistence": {
-                    "enabled": True,
-                    "storageClass": platform.standard_storage_class_name,
-                    "size": "10Gi",
-                },
-            },
-        }
-
-    def create_elasticsearch_curator_values(self) -> Dict[str, Any]:
-        return {
-            "rbac": {"enabled": True},
-            "cronjob": {"schedule": "0 1 * * *"},  # At 01:00 every day
-        }
-
-    def create_fluent_bit_values(self, platform: PlatformConfig) -> Dict[str, Any]:
-        return {
-            "tolerations": [{"effect": "NoSchedule", "operator": "Exists"}],
-            "nodeSelector": {platform.jobs_label: "true"},
-            "backend": {
-                "type": "es",
-                "es": {
-                    "host": (
-                        f"{self._release_names.platform}-elasticsearch-client"
-                        f".{platform.namespace}.svc.cluster.local"
-                    ),
-                    "port": 9200,
-                },
-            },
-            "resources": {
-                "requests": {"cpu": "10m", "memory": "32Mi"},
-                "limits": {"cpu": "100m", "memory": "128Mi"},
-            },
-        }
-
     def create_cluster_autoscaler_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
@@ -467,13 +438,73 @@ class HelmValuesFactory:
             "NP_MONITORING_K8S_NS": platform.jobs_namespace,
             "NP_MONITORING_PLATFORM_API_URL": str(platform.api_url),
             "NP_MONITORING_PLATFORM_AUTH_URL": str(platform.auth_url),
-            "NP_MONITORING_ES_HOSTS": (
-                f"{self._release_names.platform}-elasticsearch-client:9200"
-            ),
             "NP_MONITORING_REGISTRY_URL": str(platform.ingress_registry_url),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
+            "fluentd": {
+                "persistence": {
+                    "enabled": True,
+                    "storageClassName": platform.standard_storage_class_name,
+                }
+            },
         }
+        if platform.gcp:
+            result["logs"] = {
+                "persistence": {
+                    "type": "gcp",
+                    "gcp": {
+                        "serviceAccountKeyBase64": (
+                            platform.gcp.service_account_key_base64
+                        ),
+                        "project": platform.gcp.project,
+                        "region": platform.gcp.region,
+                        "bucket": platform.monitoring_logs_bucket_name,
+                    },
+                }
+            }
+        if platform.aws:
+            if platform.aws.role_s3_arn:
+                result["monitoring"] = {
+                    "podAnnotations": {
+                        "iam.amazonaws.com/role": platform.aws.role_s3_arn
+                    }
+                }
+                result["fluentd"]["podAnnotations"] = {
+                    "iam.amazonaws.com/role": platform.aws.role_s3_arn
+                }
+            result["logs"] = {
+                "persistence": {
+                    "type": "aws",
+                    "aws": {
+                        "region": platform.aws.region,
+                        "bucket": platform.monitoring_logs_bucket_name,
+                    },
+                }
+            }
+        if platform.azure:
+            result["logs"] = {
+                "persistence": {
+                    "type": "azure",
+                    "azure": {
+                        "storageAccountName": platform.azure.blob_storage_account_name,
+                        "storageAccountKey": platform.azure.blob_storage_account_key,
+                        "region": platform.azure.region,
+                        "bucket": platform.monitoring_logs_bucket_name,
+                    },
+                }
+            }
         if platform.on_prem:
+            result["logs"] = {
+                "persistence": {
+                    "type": "minio",
+                    "minio": {
+                        "url": f"http://{self._release_names.platform}-minio:9000",
+                        "accessKey": platform.on_prem.blob_storage_access_key,
+                        "secretKey": platform.on_prem.blob_storage_secret_key,
+                        "region": platform.on_prem.blob_storage_region,
+                        "bucket": platform.monitoring_logs_bucket_name,
+                    },
+                }
+            }
             result["NP_MONITORING_K8S_KUBELET_PORT"] = platform.on_prem.kubelet_port
 
         # TODO: get cors configuration from config service
