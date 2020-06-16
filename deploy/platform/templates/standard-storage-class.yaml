@@ -1,0 +1,34 @@
+{{- if include "platform.isSelfContained" . }}
+{{- if .Values.standardStorageClass.create }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+{{- if .Values.standardStorageClass.name }}
+  name: {{ .Values.standardStorageClass.name }}
+{{- else }}
+  name: {{ printf "%s-standard-topology-aware" .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- end }}
+  labels:
+{{ include "platform.labels.standard" . | indent 4 }}
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+{{- if .Values.tags.gcp }}
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-standard
+  replication-type: none
+{{- else if .Values.tags.aws }}
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp2
+  fsType: xfs
+  encrypted: "true"
+{{- else if .Values.tags.azure }}
+provisioner: kubernetes.io/azure-disk
+parameters:
+  kind: Managed
+  storageaccounttype: Standard_LRS
+  cachingmode: ReadOnly
+{{- end }}
+{{- end }}
+{{- end }}

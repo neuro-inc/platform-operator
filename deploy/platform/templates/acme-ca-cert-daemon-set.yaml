@@ -1,0 +1,49 @@
+{{- if include "platform.isSelfContained" . }}
+{{- if (default false .Values.traefik.acme.staging) }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Release.Name }}-acme-ca-cert
+  labels:
+{{ include "platform.labels.standard" . | indent 4 }}
+    component: acme-ca-cert
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "platform.name" . }}
+      release: {{ .Release.Name }}
+      component: acme-ca-cert
+  template:
+    metadata:
+      labels:
+        app: {{ include "platform.name" . }}
+        release: {{ .Release.Name }}
+        component: acme-ca-cert
+    spec:
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      - operator: Exists
+        effect: NoExecute
+      initContainers:
+      - name: acme-ca-cert
+        image: alpine
+        command:
+        - sh
+        - -c
+        - |
+          mkdir -p /etc/docker/certs.d/{{ .Values.ingress.registryHost }}
+          wget -O /etc/docker/certs.d/{{ .Values.ingress.registryHost }}/ca.crt https://letsencrypt.org/certs/fakelerootx1.pem
+          echo "Letsencrypt staging certificate installed"
+        volumeMounts:
+        - mountPath: /etc/docker/certs.d
+          name: certs
+      containers:
+      - name: pause
+        image: gcr.io/google_containers/pause:3.0
+      volumes:
+      - name: certs
+        hostPath:
+          path: /etc/docker/certs.d
+{{- end }}
+{{- end }}

@@ -1,0 +1,19 @@
+{{- if include "platform.isSelfContained" . }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-egress-to-ingress
+  namespace: {{ include "platform.jobs.namespace.name" . }}
+  labels:
+{{ include "platform.labels.standard" . | indent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+{{ toYaml .Values.traefik.deployment.podLabels | indent 10 }}
+{{- end }}

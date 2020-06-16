@@ -1,0 +1,56 @@
+serviceToken: ""
+
+kubernetes:
+  nodePools: []
+  # imagesPrepull:
+  #   refreshInterval: 1h
+  #   images: []
+
+imagePullSecret:
+  create: false
+  name: ""
+  # credentials:
+  #   url: https://gcr.io
+  #   email: username@email.com
+  #   username: username
+  #   password: password
+
+standardStorageClass:
+  create: true
+  name: ""
+
+# gcp:
+#   serviceAccountKeyBase64: ""
+
+ingress: {}
+  # host: default.org.neu.ro
+  # jobFallbackHost: default.jobs-dev.neu.ro
+  # registryHost: registry.default.org.neu.ro
+
+jobs:
+  namespace:
+    create: true
+    name: ""
+  label: platform.neuromation.io/job
+
+storage:
+  size: 10Gi
+  # azureFile:
+  #   storageAccountName: storage-account-name
+  #   storageAccountKey: storage-account-key
+  #   shareName: share
+  # nfs:
+  #   server: nfs-server
+  #   path: /
+  # gcs:
+  #   bucketName: bucket
+
+registry:
+  username: ""
+  password: ""
+
+tags:
+  gcp: false
+  aws: false
+  azure: false
+  on_prem: false

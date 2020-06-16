@@ -1,0 +1,104 @@
+{{- if include "platform.isSelfContained" . }}
+{{- $standardLabels := include "platform.labels.standard" . }}
+{{- $appName := include "platform.name" . }}
+{{- $releaseName := .Release.Name }}
+{{- $priorityClassName := include "platform.idleJobs.priorityClass.name" . }}
+{{- $jobsNamespace := include "platform.jobs.namespace.name" . }}
+{{- $jobsLabel := .Values.jobs.label }}
+{{- range .Values.kubernetes.nodePools }}
+{{- if gt (.idleSize | int) 0 }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $releaseName }}-idle-jobs-{{ .name | replace "_" "-" }}
+  labels:
+{{ $standardLabels | indent 4 }}
+    component: idle-jobs
+spec:
+  replicas: {{ .idleSize }}
+  selector:
+    matchLabels:
+      app: {{ $appName }}
+      release: {{ $releaseName }}
+      component: idle-jobs
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: {{ .idleSize }}
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: {{ $appName }}
+        release: {{ $releaseName }}
+        component: idle-jobs
+    spec:
+      containers:
+      - name: pause
+        image: gcr.io/google_containers/pause:3.0
+        resources:
+          requests:
+{{- if gt (.gpu | int) 0 }}
+            cpu: "1"
+            memory: 1Gi
+            nvidia.com/gpu: {{ .gpu }}
+{{- else }}
+            cpu: {{ .cpu | quote }}
+            memory: 1Gi
+{{- end }}
+          limits:
+{{- if gt (.gpu | int) 0 }}
+            cpu: "1"
+            memory: 1Gi
+            nvidia.com/gpu: {{ .gpu }}
+{{- else }}
+            cpu: {{ .cpu | quote }}
+            memory: 1Gi
+{{- end }}
+      priorityClassName: {{ $priorityClassName }}
+      tolerations:
+      - key: ""
+        operator: Exists
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: platform.neuromation.io/nodepool
+                operator: In
+                values:
+                - {{ .name }}
+            - matchExpressions:
+              - key: cloud.google.com/gke-nodepool
+                operator: In
+                values:
+                - {{ .name }}
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: {{ $jobsLabel }}
+                operator: Exists
+            topologyKey: kubernetes.io/hostname
+            namespaces:
+            - {{ $jobsNamespace }}
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - {{ $appName }}
+              - key: release
+                operator: In
+                values:
+                - {{ $releaseName }}
+              - key: component
+                operator: In
+                values:
+                - idle-jobs
+            topologyKey: kubernetes.io/hostname
+---
+{{- end }}
+{{- end }}
+{{- end }}

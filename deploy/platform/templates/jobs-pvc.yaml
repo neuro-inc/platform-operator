@@ -1,0 +1,18 @@
+{{- if include "platform.isSelfContained" . }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-storage
+  namespace: {{ include "platform.jobs.namespace.name" . }}
+  labels:
+{{ include "platform.labels.standard" . | indent 4 }}
+spec:
+  accessModes:
+  - ReadWriteMany
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: {{ .Values.storage.size }}
+  storageClassName: ""
+  volumeName: {{ include "platform.storage.jobsPvName" . }}
+{{- end }}

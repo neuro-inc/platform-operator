@@ -41,7 +41,11 @@ endif
 ifeq ($(ARTIFACTORY_PASSWORD),)
 	$(error Artifactory password is not specified)
 endif
-	helm repo add neuro-local-anonymous \
+	@helm repo add neuro-local-public \
+		https://neuro.jfrog.io/artifactory/helm-local-public \
+		--username ${ARTIFACTORY_USERNAME} \
+		--password ${ARTIFACTORY_PASSWORD}
+	@helm repo add neuro-local-anonymous \
 		https://neuro.jfrog.io/artifactory/helm-local-anonymous \
 		--username ${ARTIFACTORY_USERNAME} \
 		--password ${ARTIFACTORY_PASSWORD}
@@ -50,6 +54,10 @@ helm_push:
 ifeq ($(TAG),latest)
 	$(error Helm package tag is not specified)
 endif
+	helm dependency update deploy/platform
+	helm package --app-version=$(TAG) --version=$(TAG) deploy/platform/
+	helm push-artifactory platform-$(TAG).tgz neuro-local-public
+	rm platform-$(TAG).tgz
 	helm package --app-version=$(TAG) --version=$(TAG) deploy/platform-operator
 	helm push-artifactory platform-operator-$(TAG).tgz neuro-local-anonymous
 	rm platform-operator-$(TAG).tgz

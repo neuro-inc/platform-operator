@@ -50,7 +50,7 @@ spec:
         - name: NP_HELM_SERVICE_ACCOUNT_NAME
           value: {{ include "platformOperator.fullname" . }}
         - name: NP_HELM_PLATFORM_CHART_VERSION
-          value: "2.1.5"
+          value: {{ .Chart.Version | quote }}
         - name: NP_HELM_OBS_CSI_DRIVER_CHART_VERSION
           value: "1.0.5"
         - name: NP_HELM_NFS_SERVER_CHART_VERSION
