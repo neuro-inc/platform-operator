@@ -1,4 +1,3 @@
-{{- if include "platform.isSelfContained" . }}
 {{- $imagesPrepull := .Values.kubernetes.imagesPrepull }}
 {{- if .Values.kubernetes.imagesPrepull }}
 {{- if gt (len .Values.kubernetes.imagesPrepull.images) 0 }}
@@ -54,6 +53,5 @@ spec:
           operator: Exists
       nodeSelector:
         {{ .Values.jobs.label }}: "true"
-{{- end }}
 {{- end }}
 {{- end }}

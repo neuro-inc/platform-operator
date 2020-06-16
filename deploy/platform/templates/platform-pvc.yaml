@@ -1,4 +1,3 @@
-{{- if include "platform.isSelfContained" . }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -14,4 +13,3 @@ spec:
       storage: {{ .Values.storage.size }}
   storageClassName: ""
   volumeName: {{ include "platform.storage.platformPvName" . }}
-{{- end }}

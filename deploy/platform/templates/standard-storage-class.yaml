@@ -1,4 +1,3 @@
-{{- if include "platform.isSelfContained" . }}
 {{- if .Values.standardStorageClass.create }}
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -29,6 +28,5 @@ parameters:
   kind: Managed
   storageaccounttype: Standard_LRS
   cachingmode: ReadOnly
-{{- end }}
 {{- end }}
 {{- end }}

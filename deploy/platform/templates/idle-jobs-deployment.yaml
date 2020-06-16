@@ -1,4 +1,3 @@
-{{- if include "platform.isSelfContained" . }}
 {{- $standardLabels := include "platform.labels.standard" . }}
 {{- $appName := include "platform.name" . }}
 {{- $releaseName := .Release.Name }}
@@ -99,6 +98,5 @@ spec:
                 - idle-jobs
             topologyKey: kubernetes.io/hostname
 ---
-{{- end }}
 {{- end }}
 {{- end }}

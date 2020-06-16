@@ -62,9 +62,3 @@ release: {{ .Release.Name | quote }}
   }
 }
 {{- end -}}
-
-{{- define "platform.isSelfContained" -}}
-{{- if has true (values .Values.tags) -}}
-true
-{{- end -}}
-{{- end -}}
