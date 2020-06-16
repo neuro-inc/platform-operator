@@ -1,4 +1,3 @@
-{{- if include "platform.isSelfContained" . }}
 {{- if (default false .Values.traefik.acme.staging) }}
 apiVersion: apps/v1
 kind: DaemonSet
@@ -45,5 +44,4 @@ spec:
       - name: certs
         hostPath:
           path: /etc/docker/certs.d
-{{- end }}
 {{- end }}

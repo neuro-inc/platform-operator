@@ -1,4 +1,3 @@
-{{- if include "platform.isSelfContained" . }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -16,4 +15,3 @@ spec:
       podSelector:
         matchLabels:
           service: ssh-auth
-{{- end }}
