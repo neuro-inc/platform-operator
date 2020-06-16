@@ -439,6 +439,9 @@ class HelmValuesFactory:
             "NP_MONITORING_PLATFORM_API_URL": str(platform.api_url),
             "NP_MONITORING_PLATFORM_AUTH_URL": str(platform.auth_url),
             "NP_MONITORING_REGISTRY_URL": str(platform.ingress_registry_url),
+            "NP_CORS_ORIGINS": (
+                "https://release--neuro-web.netlify.app,https://app.neu.ro"
+            ),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
             "fluentd": {
                 "persistence": {
