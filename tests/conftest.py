@@ -263,6 +263,7 @@ def gcp_platform_body(cluster_name: str) -> bodies.Body:
             },
             "iam": {"gcp": {"serviceAccountKeyBase64": "e30="}},
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
+            "monitoring": {"logs": {"bucket": "job-logs"}},
         },
     }
     return bodies.Body(payload)
@@ -279,6 +280,7 @@ def aws_platform_body(cluster_name: str) -> bodies.Body:
             "kubernetes": {"publicUrl": "https://kubernetes.default"},
             "registry": {"aws": {"url": "platform.dkr.ecr.us-east-1.amazonaws.com"}},
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
+            "monitoring": {"logs": {"bucket": "job-logs"}},
         },
     }
     return bodies.Body(payload)
@@ -313,6 +315,7 @@ def azure_platform_body(cluster_name: str) -> bodies.Body:
                     "storageAccountKey": "accountKey2",
                 },
             },
+            "monitoring": {"logs": {"bucket": "job-logs"}},
         },
     }
     return bodies.Body(payload)
@@ -354,6 +357,15 @@ def on_prem_platform_body(cluster_name: str) -> bodies.Body:
                     }
                 }
             },
+            "blobStorage": {
+                "kubernetes": {
+                    "persistence": {
+                        "storageClassName": "blob-storage-standard",
+                        "size": "10Gi",
+                    }
+                }
+            },
+            "monitoring": {"logs": {"bucket": "job-logs"}},
         },
     }
     return bodies.Body(payload)
@@ -392,6 +404,7 @@ def gcp_platform_config(
         ingress_acme_environment="staging",
         service_traefik_name="platform-traefik",
         service_ssh_auth_name="ssh-auth",
+        monitoring_logs_bucket_name="job-logs",
         storage_pvc_name="platform-storage",
         helm_repo=HelmRepo(
             name=HelmRepoName.NEURO,
@@ -487,6 +500,11 @@ def on_prem_platform_config(
             registry_storage_size="100Gi",
             storage_class_name="storage-standard",
             storage_size="1000Gi",
+            blob_storage_region="minio",
+            blob_storage_access_key="minio_access_key",
+            blob_storage_secret_key="minio_secret_key",
+            blob_storage_class_name="blob-storage-standard",
+            blob_storage_size="10Gi",
             kubelet_port=10250,
             http_node_port=30080,
             https_node_port=30443,
