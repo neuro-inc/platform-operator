@@ -79,6 +79,8 @@ spec:
           type: object
           required:
           - token
+          - storage
+          - monitoring
           properties:
             token:
               type: string
@@ -269,8 +271,38 @@ spec:
                       type: string
                     storageAccountKey:
                       type: string
+                kubernetes:
+                  type: object
+                  required:
+                  - persistence
+                  properties:
+                    persistence:
+                      type: object
+                      required:
+                      - storageClassName
+                      properties:
+                        storageClassName:
+                          type: string
+                        size:
+                          type: string
               oneOf:
               - properties:
                   azure: {}
                 required:
                 - azure
+              - properties:
+                  kubernetes: {}
+                required:
+                - kubernetes
+            monitoring:
+              type: object
+              required:
+              - logs
+              properties:
+                logs:
+                  type: object
+                  required:
+                  - bucket
+                  properties:
+                    bucket:
+                      type: string

@@ -54,6 +54,7 @@ helm_push:
 ifeq ($(TAG),latest)
 	$(error Helm package tag is not specified)
 endif
+	rm -rf deploy/platform/charts
 	helm dependency update deploy/platform
 	helm package --app-version=$(TAG) --version=$(TAG) deploy/platform/
 	helm push-artifactory platform-$(TAG).tgz neuro-local-public
