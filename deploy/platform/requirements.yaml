@@ -1,0 +1,115 @@
+dependencies:
+  - name: consul
+    version: "3.5.0"
+    repository: "@neuro"
+    tags:
+    - gcp
+    - aws
+    - azure
+    - on_prem
+  - name: traefik
+    version: "1.85.1"
+    repository: "@stable"
+    tags:
+    - gcp
+    - aws
+    - azure
+    - on_prem
+  - name: elasticsearch
+    version: "1.33.1"
+    repository: "@neuro"
+    tags:
+    - gcp
+    - aws
+    - azure
+    - on_prem
+  - name: elasticsearch-curator
+    version: "2.1.3"
+    repository: "@neuro"
+    tags:
+    - gcp
+    - aws
+    - azure
+    - on_prem
+  - name: fluent-bit
+    version: "2.8.14"
+    repository: "@stable"
+    alias: fluent-bit
+    tags:
+    - gcp
+    - aws
+    - azure
+    - on_prem
+  - name: cluster-autoscaler
+    version: "6.2.0"
+    repository: "@stable"
+    tags:
+    - aws
+  - name: adjust-inotify
+    version: "0.2.0"
+    repository: "@neuro"
+    tags:
+    - gcp
+    - aws
+    - azure
+    - on_prem
+  - name: nvidia-gpu-driver-gcp
+    version: "1.0.0"
+    repository: "@neuro"
+    tags:
+    - gcp
+  - name: nvidia-gpu-driver
+    version: "1.0.0"
+    repository: "@neuro"
+    tags:
+    - aws
+    - azure
+    - on_prem
+  - name: docker-registry
+    version: "1.9.2"
+    repository: "@stable"
+    tags:
+    - on_prem
+  - name: ssh-auth
+    version: "1.0.6"
+    repository: "@neuro"
+    tags:
+    - gcp
+    - aws
+    - azure
+    - on_prem
+  - name: platformstorageapi
+    version: "1.0.6"
+    repository: "@neuro"
+    alias: platform-storage
+    tags:
+    - gcp
+    - aws
+    - azure
+    - on_prem
+  - name: platformregistryapi
+    version: "1.0.9"
+    repository: "@neuro"
+    alias: platform-registry
+    tags:
+    - gcp
+    - aws
+    - azure
+    - on_prem
+  - name: platformmonitoringapi
+    version: "1.0.9"
+    repository: "@neuro"
+    alias: platform-monitoring
+    tags:
+    - gcp
+    - aws
+    - azure
+    - on_prem
+  - name: platformobjectstorage
+    version: "1.0.3"
+    repository: "@neuro"
+    alias: platform-object-storage
+    tags:
+    - gcp
+    - aws
+    - azure

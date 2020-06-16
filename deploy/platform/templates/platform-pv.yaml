@@ -1,0 +1,35 @@
+{{- if include "platform.isSelfContained" . }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "platform.storage.platformPvName" . }}
+  labels:
+{{ include "platform.labels.standard" . | indent 4 }}
+spec:
+  capacity:
+    storage: {{ .Values.storage.size }}
+  accessModes:
+  - ReadWriteMany
+  volumeMode: Filesystem
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+{{- if hasKey .Values.storage "nfs" }}
+  nfs:
+    server: {{ .Values.storage.nfs.server }}
+    path: {{ .Values.storage.nfs.path }}
+    readOnly: false
+{{- else if hasKey .Values.storage "azureFile" }}
+  azureFile:
+    secretName: {{ include "platform.azure.storageAccount.secretName" . }}
+    shareName: {{ .Values.storage.azureFile.shareName }}
+    readOnly: false
+{{- else if hasKey .Values.storage "gcs" }}
+  csi:
+    driver: obs.csi.neu.ro
+    volumeHandle: {{ .Values.storage.gcs.bucketName }}
+    volumeAttributes:
+      bucket: {{ .Values.storage.gcs.bucketName }}
+      key_file: /accounts/key.json
+      additional_args: --limit-ops-per-sec 0
+{{- end }}
+{{- end }}
