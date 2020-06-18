@@ -67,6 +67,7 @@ class TestHelmValuesFactory:
             "ssh-auth": mock.ANY,
             "platform-monitoring": mock.ANY,
             "platform-object-storage": mock.ANY,
+            "platform-secrets": mock.ANY,
         }
 
     def test_create_gcp_platform_values_with_gcs_storage(
@@ -704,3 +705,14 @@ class TestHelmValuesFactory:
         result = factory.create_platform_ssh_auth_values(on_prem_platform_config)
 
         assert result["NODEPORT"] == 30022
+
+    def test_create_platform_secrets_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_secrets_values(gcp_platform_config)
+
+        assert result == {
+            "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
+            "NP_SECRETS_K8S_NS": "platform-jobs",
+            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+        }
