@@ -33,7 +33,7 @@ jobs:
       - name: Install helm
         run: |
           sudo apt -y install socat
-          curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v v2.16.7
+          make helm_install
           helm init --wait
       - name: Run integration tests
         run: make test_integration
