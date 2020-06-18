@@ -36,6 +36,9 @@ ifeq ($(TAG),latest)
 endif
 	docker push $(IMAGE)
 
+helm_install:
+	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s --
+
 helm_plugin_install:
 	helm plugin install https://github.com/belitre/helm-push-artifactory-plugin
 
