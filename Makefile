@@ -38,6 +38,7 @@ endif
 
 helm_install:
 	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s --
+	helm init --client-only
 
 helm_plugin_install:
 	helm plugin install https://github.com/belitre/helm-push-artifactory-plugin
@@ -49,7 +50,6 @@ endif
 ifeq ($(ARTIFACTORY_PASSWORD),)
 	$(error Artifactory password is not specified)
 endif
-	helm init --client-only
 	@helm repo add neuro-local-public \
 		https://neuro.jfrog.io/artifactory/helm-local-public \
 		--username ${ARTIFACTORY_USERNAME} \
