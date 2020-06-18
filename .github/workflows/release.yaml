@@ -27,6 +27,6 @@ jobs:
       - name: Push helm packages
         run: |
           make helm_install
-          make helm_plugin_install
           make helm_repo_add
+          make helm_plugin_install
           make helm_push
