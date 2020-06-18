@@ -2,8 +2,8 @@ name: Continuous Integration
 
 on:
   push:
-    tags-ignore:
-      - v*.*.*
+    branches:
+      - "**"
 
 jobs:
   test:
