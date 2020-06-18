@@ -1,0 +1,31 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+    tags:
+      - v*.*.*
+
+jobs:
+  test:
+    name: Publish platform-operator
+    runs-on: ubuntu-latest
+
+    env:
+      ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+      ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v2
+      - name: Set env
+        run: echo ::set-env name=TAG::${GITHUB_REF#refs/tags/v}
+      - name: Push docker image
+        run: |
+          make docker_login
+          make docker_push
+      - name: Push helm packages
+        run: |
+          make helm_plugin_install
+          make helm_repo_add
+          make helm_push

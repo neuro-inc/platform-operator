@@ -25,6 +25,11 @@ test_integration:
 docker_build:
 	docker build -t $(IMAGE) .
 
+docker_login:
+	@docker login neuro-docker-local-anonymous.jfrog.io \
+		--username=$(ARTIFACTORY_USERNAME) \
+		--password=$(ARTIFACTORY_PASSWORD)
+
 docker_push: docker_build
 ifeq ($(TAG),latest)
 	$(error Docker image tag is not specified)
@@ -41,6 +46,7 @@ endif
 ifeq ($(ARTIFACTORY_PASSWORD),)
 	$(error Artifactory password is not specified)
 endif
+	helm init --client-only
 	@helm repo add neuro-local-public \
 		https://neuro.jfrog.io/artifactory/helm-local-public \
 		--username ${ARTIFACTORY_USERNAME} \
