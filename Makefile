@@ -50,6 +50,10 @@ endif
 ifeq ($(ARTIFACTORY_PASSWORD),)
 	$(error Artifactory password is not specified)
 endif
+	@helm repo add neuro \
+		https://neuro.jfrog.io/artifactory/helm-virtual-public \
+		--username ${ARTIFACTORY_USERNAME} \
+		--password ${ARTIFACTORY_PASSWORD}
 	@helm repo add neuro-local-public \
 		https://neuro.jfrog.io/artifactory/helm-local-public \
 		--username ${ARTIFACTORY_USERNAME} \
