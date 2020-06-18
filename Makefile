@@ -26,7 +26,7 @@ docker_build:
 	docker build -t $(IMAGE) .
 
 docker_login:
-	@docker login neuro-docker-local-anonymous.jfrog.io \
+	@docker login $(DOCKER_REPO) \
 		--username=$(ARTIFACTORY_USERNAME) \
 		--password=$(ARTIFACTORY_PASSWORD)
 
