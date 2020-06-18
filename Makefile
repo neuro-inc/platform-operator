@@ -25,11 +25,20 @@ test_integration:
 docker_build:
 	docker build -t $(IMAGE) .
 
+docker_login:
+	@docker login $(DOCKER_REPO) \
+		--username=$(ARTIFACTORY_USERNAME) \
+		--password=$(ARTIFACTORY_PASSWORD)
+
 docker_push: docker_build
 ifeq ($(TAG),latest)
 	$(error Docker image tag is not specified)
 endif
 	docker push $(IMAGE)
+
+helm_install:
+	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get \
+		| bash -s -- -v v2.16.7
 
 helm_plugin_install:
 	helm plugin install https://github.com/belitre/helm-push-artifactory-plugin
@@ -41,6 +50,10 @@ endif
 ifeq ($(ARTIFACTORY_PASSWORD),)
 	$(error Artifactory password is not specified)
 endif
+	@helm repo add neuro \
+		https://neuro.jfrog.io/artifactory/helm-virtual-public \
+		--username ${ARTIFACTORY_USERNAME} \
+		--password ${ARTIFACTORY_PASSWORD}
 	@helm repo add neuro-local-public \
 		https://neuro.jfrog.io/artifactory/helm-local-public \
 		--username ${ARTIFACTORY_USERNAME} \
