@@ -62,6 +62,9 @@ class HelmValuesFactory:
             self._chart_names.platform_monitoring: (
                 self.create_platform_monitoring_values(platform)
             ),
+            self._chart_names.platform_secrets: (
+                self.create_platform_secrets_values(platform)
+            ),
         }
         if not platform.on_prem:
             result[
@@ -541,4 +544,14 @@ class HelmValuesFactory:
             }
         if platform.on_prem:
             result["NODEPORT"] = platform.on_prem.ssh_auth_node_port
+        return result
+
+    def create_platform_secrets_values(
+        self, platform: PlatformConfig
+    ) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "NP_CLUSTER_NAME": str(platform.cluster_name),
+            "NP_SECRETS_K8S_NS": platform.jobs_namespace,
+            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
+        }
         return result
