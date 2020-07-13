@@ -39,19 +39,19 @@ dependencies:
     version: "1.0.6"
     repository: "@neuro"
   - name: platformstorageapi
-    version: "1.0.6"
+    version: "1.0.7"
     repository: "@neuro"
     alias: platform-storage
   - name: platformregistryapi
-    version: "1.0.9"
+    version: "1.0.10"
     repository: "@neuro"
     alias: platform-registry
   - name: platformmonitoringapi
-    version: "1.1.0"
+    version: "1.1.1"
     repository: "@neuro"
     alias: platform-monitoring
   - name: platformobjectstorage
-    version: "1.0.3"
+    version: "1.0.4"
     repository: "@neuro"
     alias: platform-object-storage
     tags:
@@ -59,6 +59,6 @@ dependencies:
     - aws
     - azure
   - name: platformsecrets
-    version: "20200610"
+    version: "20200625"
     repository: "@neuro"
     alias: platform-secrets

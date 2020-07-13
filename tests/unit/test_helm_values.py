@@ -671,6 +671,7 @@ class TestHelmValuesFactory:
             ",https://release--neuro-web.netlify.app"
             ",https://app.neu.ro"
             ",https://app.ml.megafon.ru"
+            ",https://master--megafon-neuro.netlify.app"
         )
 
     def test_create_ssh_auth_values(
