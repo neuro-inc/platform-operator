@@ -390,6 +390,7 @@ class PlatformConfig:
             },
             "ssh": {"server": self.ingress_ssh_auth_server},
             "monitoring": {"url": str(self.ingress_url / "api/v1/jobs")},
+            "secrets": {"url": str(self.ingress_url / "api/v1/secrets")},
         }
         return result
 
