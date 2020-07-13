@@ -522,6 +522,8 @@ class HelmValuesFactory:
                 ",https://app.neu.ro"
                 ",https://app.ml.megafon.ru"
             )
+        if platform.cluster_name == "megafon-poc":
+            result["NP_CORS_ORIGINS"] += ",https://master--megafon-neuro.netlify.app"
         return result
 
     def create_platform_ssh_auth_values(
