@@ -333,6 +333,7 @@ class TestPlatformConfig:
             },
             "ssh": {"server": f"ssh-auth.{cluster_name}.org.neu.ro"},
             "monitoring": {"url": f"https://{cluster_name}.org.neu.ro/api/v1/jobs"},
+            "secrets": {"url": f"https://{cluster_name}.org.neu.ro/api/v1/secrets"},
         }
 
 
