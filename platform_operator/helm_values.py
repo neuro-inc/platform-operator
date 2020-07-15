@@ -552,8 +552,9 @@ class HelmValuesFactory:
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
         result: Dict[str, Any] = {
-            "NP_CLUSTER_NAME": str(platform.cluster_name),
+            "NP_CLUSTER_NAME": platform.cluster_name,
             "NP_SECRETS_K8S_NS": platform.jobs_namespace,
+            "NP_SECRETS_PLATFORM_AUTH_URL": str(platform.auth_url),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
         }
         return result

@@ -715,5 +715,6 @@ class TestHelmValuesFactory:
         assert result == {
             "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
             "NP_SECRETS_K8S_NS": "platform-jobs",
+            "NP_SECRETS_PLATFORM_AUTH_URL": "https://dev.neu.ro",
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
         }
