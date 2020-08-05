@@ -224,6 +224,7 @@ class TestPlatformConfig:
                 {"name": zone_name, "ips": ["192.168.0.1"]},
                 {"name": f"*.jobs.{zone_name}", "ips": ["192.168.0.1"]},
                 {"name": f"registry.{zone_name}", "ips": ["192.168.0.1"]},
+                {"name": f"metrics.{zone_name}", "ips": ["192.168.0.1"]},
                 {"name": f"ssh-auth.{zone_name}", "ips": ["192.168.0.2"]},
             ],
         }
@@ -247,6 +248,7 @@ class TestPlatformConfig:
                 {"name": zone_name, "ips": ["192.168.0.3"]},
                 {"name": f"*.jobs.{zone_name}", "ips": ["192.168.0.3"]},
                 {"name": f"registry.{zone_name}", "ips": ["192.168.0.3"]},
+                {"name": f"metrics.{zone_name}", "ips": ["192.168.0.3"]},
                 {"name": f"ssh-auth.{zone_name}", "ips": ["192.168.0.3"]},
             ],
         }
@@ -288,6 +290,11 @@ class TestPlatformConfig:
                     "zone_id": "/hostedzone/traefik",
                 },
                 {
+                    "name": f"metrics.{zone_name}",
+                    "dns_name": "traefik",
+                    "zone_id": "/hostedzone/traefik",
+                },
+                {
                     "name": f"ssh-auth.{zone_name}",
                     "dns_name": "ssh-auth",
                     "zone_id": "/hostedzone/ssh-auth",
@@ -312,7 +319,7 @@ class TestPlatformConfig:
             },
             "registry": {
                 "url": f"https://registry.{cluster_name}.org.neu.ro",
-                "email": f"{cluster_name}@neuromation.io",
+                "email": f"{cluster_name}@neu.ro",
             },
             "orchestrator": {
                 "kubernetes": {
@@ -334,6 +341,7 @@ class TestPlatformConfig:
             "ssh": {"server": f"ssh-auth.{cluster_name}.org.neu.ro"},
             "monitoring": {"url": f"https://{cluster_name}.org.neu.ro/api/v1/jobs"},
             "secrets": {"url": f"https://{cluster_name}.org.neu.ro/api/v1/secrets"},
+            "metrics": {"url": f"https://metrics.{cluster_name}.org.neu.ro"},
         }
 
 

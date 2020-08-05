@@ -718,3 +718,112 @@ class TestHelmValuesFactory:
             "NP_SECRETS_PLATFORM_AUTH_URL": "https://dev.neu.ro",
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
         }
+
+    def test_create_gcp_platform_reports_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_reports_values(gcp_platform_config)
+
+        assert result == {
+            "image": {"pullSecretName": "platform-docker-config"},
+            "platform": {
+                "clusterName": gcp_platform_config.cluster_name,
+                "authUrl": "https://dev.neu.ro",
+                "apiUrl": "https://dev.neu.ro/api/v1",
+            },
+            "prometheus-operator": {
+                "prometheus": {
+                    "prometheusSpec": {
+                        "storageSpec": "platform-standard-topology-aware"
+                    }
+                },
+                "prometheusOperator": {"kubeletService": {"namespace": "platform"}},
+                "kubelet": {"namespace": "platform"},
+                "grafana": {"adminPassword": mock.ANY},
+            },
+            "thanos": {
+                "store": {
+                    "persistentVolumeClaim": {
+                        "spec": {"storageClassName": "platform-standard-topology-aware"}
+                    }
+                },
+                "compact": {
+                    "persistentVolumeClaim": {
+                        "spec": {"storageClassName": "platform-standard-topology-aware"}
+                    }
+                },
+                "objstore": {
+                    "type": "GCS",
+                    "config": {"bucket": "job-metrics", "service_account": "{}"},
+                },
+            },
+        }
+
+    def test_create_aws_platform_reports_values(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_reports_values(aws_platform_config)
+
+        assert result["thanos"]["objstore"] == {
+            "type": "S3",
+            "config": {
+                "bucket": "job-metrics",
+                "endpoint": "s3.us-east-1.amazonaws.com",
+            },
+        }
+
+    def test_create_aws_platform_reports_values_with_roles(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_reports_values(
+            replace(
+                aws_platform_config,
+                aws=replace(aws_platform_config.aws, role_s3_arn="s3_role"),
+            )
+        )
+
+        assert result["prometheus-operator"]["prometheus"]["prometheusSpec"][
+            "podMetadata"
+        ] == {"annotations": {"iam.amazonaws.com/role": "s3_role"}}
+
+        assert result["thanos"]["store"]["annotations"] == {
+            "iam.amazonaws.com/role": "s3_role"
+        }
+        assert result["thanos"]["bucket"]["annotations"] == {
+            "iam.amazonaws.com/role": "s3_role"
+        }
+        assert result["thanos"]["compact"]["annotations"] == {
+            "iam.amazonaws.com/role": "s3_role"
+        }
+        assert result["thanos"]["objstore"] == {
+            "type": "S3",
+            "config": {
+                "bucket": "job-metrics",
+                "endpoint": "s3.us-east-1.amazonaws.com",
+            },
+        }
+
+    def test_create_azure_platform_reports_values(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_reports_values(azure_platform_config)
+
+        assert result["thanos"]["objstore"] == {
+            "type": "AZURE",
+            "config": {
+                "container": "job-metrics",
+                "storage_account": "accountName2",
+                "storage_account_key": "accountKey2",
+            },
+        }
+
+    def test_create_on_prem_platform_reports_values(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_reports_values(on_prem_platform_config)
+
+        assert result["objectStoreSupported"] is False
+        assert result["prometheusProxy"] == {
+            "prometheus": {"host": "prometheus-prometheus", "port": 9090}
+        }
+        assert "thanos" not in result
