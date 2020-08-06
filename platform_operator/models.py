@@ -81,6 +81,7 @@ class HelmChartNames:
     platform_monitoring: str = "platform-monitoring"
     platform_ssh_auth: str = "ssh-auth"
     platform_secrets: str = "platform-secrets"
+    platform_reports: str = "platform-reports"
 
 
 @dataclass(frozen=True)

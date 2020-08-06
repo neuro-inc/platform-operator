@@ -68,6 +68,9 @@ class HelmValuesFactory:
             self._chart_names.platform_secrets: (
                 self.create_platform_secrets_values(platform)
             ),
+            self._chart_names.platform_reports: (
+                self.create_platform_reports_values(platform)
+            ),
         }
         if not platform.on_prem:
             result[

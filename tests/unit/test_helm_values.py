@@ -68,6 +68,7 @@ class TestHelmValuesFactory:
             "platform-monitoring": mock.ANY,
             "platform-object-storage": mock.ANY,
             "platform-secrets": mock.ANY,
+            "platform-reports": mock.ANY,
         }
 
     def test_create_gcp_platform_values_with_gcs_storage(
