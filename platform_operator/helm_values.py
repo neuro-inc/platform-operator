@@ -615,7 +615,7 @@ class HelmValuesFactory:
                 "config": {
                     "bucket": platform.monitoring_metrics_bucket_name,
                     "service_account": b64decode(
-                        platform.gcp.service_account_key_base64.encode()
+                        platform.gcp.service_account_key_base64
                     ).decode(),
                 },
             }
