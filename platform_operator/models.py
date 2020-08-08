@@ -81,6 +81,7 @@ class HelmChartNames:
     platform_monitoring: str = "platform-monitoring"
     platform_ssh_auth: str = "ssh-auth"
     platform_secrets: str = "platform-secrets"
+    platform_reports: str = "platform-reports"
 
 
 @dataclass(frozen=True)
@@ -261,6 +262,7 @@ class PlatformConfig:
     dns_zone_name_servers: Sequence[str]
     ingress_url: URL
     ingress_registry_url: URL
+    ingress_metrics_url: URL
     ingress_ssh_auth_server: str
     ingress_acme_environment: str
     service_traefik_name: str
@@ -274,6 +276,7 @@ class PlatformConfig:
     jobs_fallback_host: str
     jobs_service_account_name: str
     monitoring_logs_bucket_name: str
+    monitoring_metrics_bucket_name: str
     storage_pvc_name: str
     helm_repo: HelmRepo
     docker_registry: DockerRegistry
@@ -334,6 +337,11 @@ class PlatformConfig:
                         "dns_name": traefik_host,
                         "zone_id": traefik_zone_id,
                     },
+                    {
+                        "name": f"metrics.{self.dns_zone_name}",
+                        "dns_name": traefik_host,
+                        "zone_id": traefik_zone_id,
+                    },
                 )
             )
         else:
@@ -342,6 +350,7 @@ class PlatformConfig:
                     {"name": self.dns_zone_name, "ips": [traefik_host]},
                     {"name": f"*.jobs.{self.dns_zone_name}", "ips": [traefik_host]},
                     {"name": f"registry.{self.dns_zone_name}", "ips": [traefik_host]},
+                    {"name": f"metrics.{self.dns_zone_name}", "ips": [traefik_host]},
                 )
             )
         if ssh_auth_zone_id:
@@ -369,7 +378,7 @@ class PlatformConfig:
             },
             "registry": {
                 "url": str(self.ingress_registry_url),
-                "email": f"{self.cluster_name}@neuromation.io",
+                "email": f"{self.cluster_name}@neu.ro",
             },
             "orchestrator": {
                 "kubernetes": {
@@ -391,6 +400,7 @@ class PlatformConfig:
             "ssh": {"server": self.ingress_ssh_auth_server},
             "monitoring": {"url": str(self.ingress_url / "api/v1/jobs")},
             "secrets": {"url": str(self.ingress_url / "api/v1/secrets")},
+            "metrics": {"url": str(self.ingress_metrics_url)},
         }
         return result
 
@@ -416,6 +426,7 @@ class PlatformConfigFactory:
         if cluster.cloud_provider_type == "on_prem":
             standard_storage_class_name = kubernetes_spec["standardStorageClassName"]
             ingress_ssh_auth_server += f":{kubernetes_spec['nodePorts']['sshAuth']}"
+        monitoring_spec = platform_body["spec"]["monitoring"]
         return PlatformConfig(
             auth_url=self._config.platform_auth_url,
             api_url=self._config.platform_api_url,
@@ -431,6 +442,7 @@ class PlatformConfigFactory:
             dns_zone_name_servers=cluster["dns"]["name_servers"],
             ingress_url=URL(f"https://{ingress_host}"),
             ingress_registry_url=URL(f"https://registry.{ingress_host}"),
+            ingress_metrics_url=URL(f"https://metrics.{ingress_host}"),
             ingress_ssh_auth_server=ingress_ssh_auth_server,
             ingress_acme_environment=cluster.acme_environment,
             service_traefik_name=f"{self._config.platform_namespace}-traefik",
@@ -447,9 +459,10 @@ class PlatformConfigFactory:
             jobs_host_template=f"{{job_id}}.jobs.{ingress_host}",
             jobs_fallback_host=cluster["orchestrator"]["job_fallback_hostname"],
             jobs_service_account_name=f"{self._config.platform_namespace}-jobs",
-            monitoring_logs_bucket_name=platform_body["spec"]["monitoring"]["logs"][
-                "bucket"
-            ],
+            monitoring_logs_bucket_name=monitoring_spec["logs"]["bucket"],
+            monitoring_metrics_bucket_name=monitoring_spec.get("metrics", {}).get(
+                "bucket", ""
+            ),
             storage_pvc_name=f"{self._config.platform_namespace}-storage",
             helm_repo=self._create_helm_repo(cluster),
             docker_registry=self._create_docker_registry(cluster),

@@ -294,7 +294,7 @@ async def test_deploy(
     helm_client.update_repo.assert_awaited_once()
     helm_client.upgrade.assert_awaited_once_with(
         "platform",
-        f"neuro/platform",
+        "neuro/platform",
         values=mock.ANY,
         version="1.0.0",
         namespace="platform",
@@ -341,7 +341,7 @@ async def test_deploy_gcp_with_gcs_storage(
 
     helm_client.upgrade.assert_any_await(
         "platform-obs-csi-driver",
-        f"neuro/obs-csi-driver",
+        "neuro/obs-csi-driver",
         values=mock.ANY,
         version="2.0.0",
         namespace="platform",
@@ -376,7 +376,7 @@ async def test_deploy_on_prem(
 
     helm_client.upgrade.assert_any_await(
         "platform-nfs-server",
-        f"neuro/nfs-server",
+        "neuro/nfs-server",
         values=mock.ANY,
         version="3.0.0",
         namespace="platform",

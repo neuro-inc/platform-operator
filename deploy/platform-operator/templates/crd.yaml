@@ -306,3 +306,10 @@ spec:
                   properties:
                     bucket:
                       type: string
+                metrics:
+                  type: object
+                  required:
+                  - bucket
+                  properties:
+                    bucket:
+                      type: string

@@ -1,3 +1,6 @@
+import secrets
+import string
+from base64 import b64decode
 from typing import Any, Dict
 
 from .models import HelmChartNames, HelmReleaseNames, PlatformConfig
@@ -64,6 +67,9 @@ class HelmValuesFactory:
             ),
             self._chart_names.platform_secrets: (
                 self.create_platform_secrets_values(platform)
+            ),
+            self._chart_names.platform_reports: (
+                self.create_platform_reports_values(platform)
             ),
         }
         if not platform.on_prem:
@@ -557,4 +563,98 @@ class HelmValuesFactory:
             "NP_SECRETS_PLATFORM_AUTH_URL": str(platform.auth_url),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
         }
+        return result
+
+    def create_platform_reports_values(
+        self, platform: PlatformConfig
+    ) -> Dict[str, Any]:
+        alphabet = string.ascii_letters + string.digits
+        result: Dict[str, Any] = {
+            "image": {"pullSecretName": platform.image_pull_secret_name},
+            "platform": {
+                "clusterName": platform.cluster_name,
+                "authUrl": str(platform.auth_url),
+                "apiUrl": str(platform.api_url),
+            },
+            "prometheus-operator": {
+                "prometheus": {
+                    "prometheusSpec": {
+                        "storageSpec": platform.standard_storage_class_name
+                    }
+                },
+                "prometheusOperator": {
+                    "kubeletService": {"namespace": platform.namespace}
+                },
+                "kubelet": {"namespace": platform.namespace},
+                "grafana": {
+                    "adminPassword": "".join(
+                        secrets.choice(alphabet) for i in range(16)
+                    )
+                },
+            },
+            "thanos": {
+                "store": {
+                    "persistentVolumeClaim": {
+                        "spec": {
+                            "storageClassName": platform.standard_storage_class_name,
+                        },
+                    },
+                },
+                "compact": {
+                    "persistentVolumeClaim": {
+                        "spec": {
+                            "storageClassName": platform.standard_storage_class_name,
+                        },
+                    },
+                },
+            },
+        }
+        if platform.gcp:
+            result["thanos"]["objstore"] = {
+                "type": "GCS",
+                "config": {
+                    "bucket": platform.monitoring_metrics_bucket_name,
+                    "service_account": b64decode(
+                        platform.gcp.service_account_key_base64
+                    ).decode(),
+                },
+            }
+        if platform.aws:
+            if platform.aws.role_s3_arn:
+                result["prometheus-operator"]["prometheus"]["prometheusSpec"][
+                    "podMetadata"
+                ] = {
+                    "annotations": {"iam.amazonaws.com/role": platform.aws.role_s3_arn}
+                }
+                result["thanos"]["store"]["annotations"] = {
+                    "iam.amazonaws.com/role": platform.aws.role_s3_arn
+                }
+                result["thanos"]["bucket"] = {
+                    "annotations": {"iam.amazonaws.com/role": platform.aws.role_s3_arn}
+                }
+                result["thanos"]["compact"]["annotations"] = {
+                    "iam.amazonaws.com/role": platform.aws.role_s3_arn
+                }
+            result["thanos"]["objstore"] = {
+                "type": "S3",
+                "config": {
+                    "bucket": platform.monitoring_metrics_bucket_name,
+                    "endpoint": f"s3.{platform.aws.region}.amazonaws.com",
+                },
+            }
+        if platform.azure:
+            result["thanos"]["objstore"] = {
+                "type": "AZURE",
+                "config": {
+                    "container": platform.monitoring_metrics_bucket_name,
+                    "storage_account": platform.azure.blob_storage_account_name,
+                    "storage_account_key": platform.azure.blob_storage_account_key,
+                },
+            }
+        if platform.on_prem:
+            result["objectStoreSupported"] = False
+            result["prometheusProxy"] = {
+                "prometheus": {"host": "prometheus-prometheus", "port": 9090}
+            }
+            del result["thanos"]
         return result

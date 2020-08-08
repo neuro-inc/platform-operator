@@ -263,7 +263,10 @@ def gcp_platform_body(cluster_name: str) -> bodies.Body:
             },
             "iam": {"gcp": {"serviceAccountKeyBase64": "e30="}},
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
-            "monitoring": {"logs": {"bucket": "job-logs"}},
+            "monitoring": {
+                "logs": {"bucket": "job-logs"},
+                "metrics": {"bucket": "job-metrics"},
+            },
         },
     }
     return bodies.Body(payload)
@@ -280,7 +283,10 @@ def aws_platform_body(cluster_name: str) -> bodies.Body:
             "kubernetes": {"publicUrl": "https://kubernetes.default"},
             "registry": {"aws": {"url": "platform.dkr.ecr.us-east-1.amazonaws.com"}},
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
-            "monitoring": {"logs": {"bucket": "job-logs"}},
+            "monitoring": {
+                "logs": {"bucket": "job-logs"},
+                "metrics": {"bucket": "job-metrics"},
+            },
         },
     }
     return bodies.Body(payload)
@@ -315,7 +321,10 @@ def azure_platform_body(cluster_name: str) -> bodies.Body:
                     "storageAccountKey": "accountKey2",
                 },
             },
-            "monitoring": {"logs": {"bucket": "job-logs"}},
+            "monitoring": {
+                "logs": {"bucket": "job-logs"},
+                "metrics": {"bucket": "job-metrics"},
+            },
         },
     }
     return bodies.Body(payload)
@@ -400,11 +409,13 @@ def gcp_platform_config(
         jobs_service_account_name="platform-jobs",
         ingress_url=URL(f"https://{cluster_name}.org.neu.ro"),
         ingress_registry_url=URL(f"https://registry.{cluster_name}.org.neu.ro"),
+        ingress_metrics_url=URL(f"https://metrics.{cluster_name}.org.neu.ro"),
         ingress_ssh_auth_server=f"ssh-auth.{cluster_name}.org.neu.ro",
         ingress_acme_environment="staging",
         service_traefik_name="platform-traefik",
         service_ssh_auth_name="ssh-auth",
         monitoring_logs_bucket_name="job-logs",
+        monitoring_metrics_bucket_name="job-metrics",
         storage_pvc_name="platform-storage",
         helm_repo=HelmRepo(
             name=HelmRepoName.NEURO,
@@ -493,6 +504,7 @@ def on_prem_platform_config(
         ),
         jobs_node_pools=[{"name": "gpu-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}],
         jobs_resource_pool_types=[resource_pool_type_factory()],
+        monitoring_metrics_bucket_name="",
         on_prem=OnPremConfig(
             kubernetes_public_ip=IPv4Address("192.168.0.3"),
             masters_count=1,
