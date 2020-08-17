@@ -580,7 +580,15 @@ class HelmValuesFactory:
             "prometheus-operator": {
                 "prometheus": {
                     "prometheusSpec": {
-                        "storageSpec": platform.standard_storage_class_name
+                        "storageSpec": {
+                            "volumeClaimTemplate": {
+                                "spec": {
+                                    "storageClassName": (
+                                        platform.standard_storage_class_name
+                                    )
+                                },
+                            }
+                        }
                     }
                 },
                 "prometheusOperator": {

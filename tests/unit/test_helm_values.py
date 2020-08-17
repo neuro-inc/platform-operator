@@ -740,7 +740,15 @@ class TestHelmValuesFactory:
             "prometheus-operator": {
                 "prometheus": {
                     "prometheusSpec": {
-                        "storageSpec": "platform-standard-topology-aware"
+                        "storageSpec": {
+                            "volumeClaimTemplate": {
+                                "spec": {
+                                    "storageClassName": (
+                                        "platform-standard-topology-aware"
+                                    )
+                                }
+                            }
+                        }
                     }
                 },
                 "prometheusOperator": {"kubeletService": {"namespace": "platform"}},
