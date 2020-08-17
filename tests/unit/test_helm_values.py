@@ -2,7 +2,6 @@ from dataclasses import replace
 from unittest import mock
 
 import pytest
-from yarl import URL
 
 from platform_operator.helm_values import HelmValuesFactory
 from platform_operator.models import Config, PlatformConfig
@@ -735,7 +734,7 @@ class TestHelmValuesFactory:
             },
             "grafanaProxy": {
                 "ingress": {
-                    "host": URL(
+                    "host": (
                         f"https://metrics.{gcp_platform_config.cluster_name}.org.neu.ro"
                     )
                 }
