@@ -63,5 +63,5 @@ dependencies:
     repository: "@neuro"
     alias: platform-secrets
   - name: platform-reports
-    version: "20200807"
+    version: "20200817"
     repository: "@neuro"
