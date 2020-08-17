@@ -734,9 +734,7 @@ class TestHelmValuesFactory:
             },
             "grafanaProxy": {
                 "ingress": {
-                    "host": (
-                        f"https://metrics.{gcp_platform_config.cluster_name}.org.neu.ro"
-                    )
+                    "host": f"metrics.{gcp_platform_config.cluster_name}.org.neu.ro"
                 }
             },
             "prometheus-operator": {
