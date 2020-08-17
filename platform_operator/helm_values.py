@@ -576,6 +576,7 @@ class HelmValuesFactory:
                 "authUrl": str(platform.auth_url),
                 "apiUrl": str(platform.api_url),
             },
+            "grafanaProxy": {"ingress": {"host": platform.ingress_metrics_url}},
             "prometheus-operator": {
                 "prometheus": {
                     "prometheusSpec": {
