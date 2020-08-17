@@ -443,7 +443,7 @@ class HelmValuesFactory:
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
         result: Dict[str, Any] = {
-            "NP_CLUSTER_NAME": platform.cluster_name,
+            "NP_MONITORING_CLUSTER_NAME": platform.cluster_name,
             "NP_MONITORING_K8S_NS": platform.jobs_namespace,
             "NP_MONITORING_PLATFORM_API_URL": str(platform.api_url),
             "NP_MONITORING_PLATFORM_AUTH_URL": str(platform.auth_url),

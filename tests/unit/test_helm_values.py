@@ -549,10 +549,11 @@ class TestHelmValuesFactory:
         result = factory.create_platform_monitoring_values(gcp_platform_config)
 
         assert result == {
-            "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
+            "NP_MONITORING_CLUSTER_NAME": gcp_platform_config.cluster_name,
             "NP_MONITORING_K8S_NS": "platform-jobs",
             "NP_MONITORING_PLATFORM_API_URL": "https://dev.neu.ro/api/v1",
             "NP_MONITORING_PLATFORM_AUTH_URL": "https://dev.neu.ro",
+            "NP_MONITORING_PLATFORM_CONFIG_URL": "https://dev.neu.ro/api/v1",
             "NP_MONITORING_REGISTRY_URL": (
                 f"https://registry.{gcp_platform_config.cluster_name}.org.neu.ro"
             ),
