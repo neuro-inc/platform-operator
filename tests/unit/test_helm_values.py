@@ -2,6 +2,7 @@ from dataclasses import replace
 from unittest import mock
 
 import pytest
+from yarl import URL
 
 from platform_operator.helm_values import HelmValuesFactory
 from platform_operator.models import Config, PlatformConfig
@@ -731,6 +732,13 @@ class TestHelmValuesFactory:
                 "clusterName": gcp_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
                 "apiUrl": "https://dev.neu.ro/api/v1",
+            },
+            "grafanaProxy": {
+                "ingress": {
+                    "host": URL(
+                        f"https://metrics.{gcp_platform_config.cluster_name}.org.neu.ro"
+                    )
+                }
             },
             "prometheus-operator": {
                 "prometheus": {
