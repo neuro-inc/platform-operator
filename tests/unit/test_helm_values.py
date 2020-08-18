@@ -727,7 +727,10 @@ class TestHelmValuesFactory:
         result = factory.create_platform_reports_values(gcp_platform_config)
 
         assert result == {
-            "objectStore": {"configMapName": "thanos-object-storage-config"},
+            "objectStore": {
+                "supported": True,
+                "configMapName": "thanos-object-storage-config",
+            },
             "image": {"pullSecretName": "platform-docker-config"},
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,

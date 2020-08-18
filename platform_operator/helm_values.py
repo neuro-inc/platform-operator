@@ -572,7 +572,10 @@ class HelmValuesFactory:
         alphabet = string.ascii_letters + string.digits
         object_store_config_map_name = "thanos-object-storage-config"
         result: Dict[str, Any] = {
-            "objectStore": {"configMapName": object_store_config_map_name},
+            "objectStore": {
+                "supported": True,
+                "configMapName": object_store_config_map_name,
+            },
             "image": {"pullSecretName": platform.image_pull_secret_name},
             "platform": {
                 "clusterName": platform.cluster_name,
