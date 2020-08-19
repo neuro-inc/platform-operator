@@ -727,6 +727,10 @@ class TestHelmValuesFactory:
         result = factory.create_platform_reports_values(gcp_platform_config)
 
         assert result == {
+            "objectStore": {
+                "supported": True,
+                "configMapName": "thanos-object-storage-config",
+            },
             "image": {"pullSecretName": "platform-docker-config"},
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
@@ -741,6 +745,13 @@ class TestHelmValuesFactory:
             "prometheus-operator": {
                 "prometheus": {
                     "prometheusSpec": {
+                        "thanos": {
+                            "version": "v0.13.0",
+                            "objectStorageConfig": {
+                                "name": "thanos-object-storage-config",
+                                "key": "thanos-object-storage.yaml",
+                            },
+                        },
                         "storageSpec": {
                             "volumeClaimTemplate": {
                                 "spec": {
@@ -749,7 +760,7 @@ class TestHelmValuesFactory:
                                     )
                                 }
                             }
-                        }
+                        },
                     }
                 },
                 "prometheusOperator": {"kubeletService": {"namespace": "platform"}},
@@ -837,8 +848,12 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_reports_values(on_prem_platform_config)
 
-        assert result["objectStoreSupported"] is False
+        assert result["objectStore"] == {"supported": False}
         assert result["prometheusProxy"] == {
             "prometheus": {"host": "prometheus-prometheus", "port": 9090}
         }
-        assert "thanos" not in result
+        assert (
+            "thanos"
+            not in result["prometheus-operator"]["prometheus"]["prometheusSpec"]
+        )
+        assert result

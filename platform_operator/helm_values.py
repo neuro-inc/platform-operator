@@ -570,7 +570,12 @@ class HelmValuesFactory:
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
         alphabet = string.ascii_letters + string.digits
+        object_store_config_map_name = "thanos-object-storage-config"
         result: Dict[str, Any] = {
+            "objectStore": {
+                "supported": True,
+                "configMapName": object_store_config_map_name,
+            },
             "image": {"pullSecretName": platform.image_pull_secret_name},
             "platform": {
                 "clusterName": platform.cluster_name,
@@ -581,6 +586,13 @@ class HelmValuesFactory:
             "prometheus-operator": {
                 "prometheus": {
                     "prometheusSpec": {
+                        "thanos": {
+                            "version": "v0.13.0",
+                            "objectStorageConfig": {
+                                "name": object_store_config_map_name,
+                                "key": "thanos-object-storage.yaml",
+                            },
+                        },
                         "storageSpec": {
                             "volumeClaimTemplate": {
                                 "spec": {
@@ -589,7 +601,7 @@ class HelmValuesFactory:
                                     )
                                 },
                             }
-                        }
+                        },
                     }
                 },
                 "prometheusOperator": {
@@ -662,9 +674,10 @@ class HelmValuesFactory:
                 },
             }
         if platform.on_prem:
-            result["objectStoreSupported"] = False
+            result["objectStore"] = {"supported": False}
             result["prometheusProxy"] = {
                 "prometheus": {"host": "prometheus-prometheus", "port": 9090}
             }
+            del result["prometheus-operator"]["prometheus"]["prometheusSpec"]["thanos"]
             del result["thanos"]
         return result
