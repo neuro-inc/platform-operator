@@ -39,7 +39,7 @@ dependencies:
     version: "1.0.6"
     repository: "@neuro"
   - name: platformstorageapi
-    version: "1.0.8"
+    version: "1.0.9"
     repository: "@neuro"
     alias: platform-storage
   - name: platformregistryapi
