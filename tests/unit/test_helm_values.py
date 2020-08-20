@@ -652,12 +652,14 @@ class TestHelmValuesFactory:
             replace(on_prem_platform_config, cluster_name="megafon-public")
         )
 
-        assert result["NP_CORS_ORIGINS"] == (
-            "https://megafon-release.neu.ro"
-            ",http://megafon-neuro.netlify.app"
-            ",https://release--neuro-web.netlify.app"
-            ",https://app.neu.ro"
-            ",https://app.ml.megafon.ru"
+        assert result["NP_CORS_ORIGINS"] == ",".join(
+            [
+                "https://megafon-release.neu.ro",
+                "http://megafon-neuro.netlify.app",
+                "https://release--neuro-web.netlify.app",
+                "https://app.neu.ro",
+                "https://app.ml.megafon.ru",
+            ]
         )
 
     def test_create_platform_monitoring_values_for_megafon_poc(
@@ -667,13 +669,15 @@ class TestHelmValuesFactory:
             replace(on_prem_platform_config, cluster_name="megafon-poc")
         )
 
-        assert result["NP_CORS_ORIGINS"] == (
-            "https://megafon-release.neu.ro"
-            ",http://megafon-neuro.netlify.app"
-            ",https://release--neuro-web.netlify.app"
-            ",https://app.neu.ro"
-            ",https://app.ml.megafon.ru"
-            ",https://master--megafon-neuro.netlify.app"
+        assert result["NP_CORS_ORIGINS"] == ",".join(
+            [
+                "https://megafon-release.neu.ro",
+                "http://megafon-neuro.netlify.app",
+                "https://release--neuro-web.netlify.app",
+                "https://app.neu.ro",
+                "https://app.ml.megafon.ru",
+                "https://master--megafon-neuro.netlify.app",
+            ]
         )
 
     def test_create_ssh_auth_values(
@@ -731,12 +735,14 @@ class TestHelmValuesFactory:
             replace(on_prem_platform_config, cluster_name="megafon-public")
         )
 
-        assert result["NP_CORS_ORIGINS"] == (
-            "https://megafon-release.neu.ro"
-            ",http://megafon-neuro.netlify.app"
-            ",https://release--neuro-web.netlify.app"
-            ",https://app.neu.ro"
-            ",https://app.ml.megafon.ru"
+        assert result["NP_CORS_ORIGINS"] == ",".join(
+            [
+                "https://megafon-release.neu.ro",
+                "http://megafon-neuro.netlify.app",
+                "https://release--neuro-web.netlify.app",
+                "https://app.neu.ro",
+                "https://app.ml.megafon.ru",
+            ]
         )
 
     def test_create_platform_secrets_values_for_megafon_poc(
@@ -746,13 +752,15 @@ class TestHelmValuesFactory:
             replace(on_prem_platform_config, cluster_name="megafon-poc")
         )
 
-        assert result["NP_CORS_ORIGINS"] == (
-            "https://megafon-release.neu.ro"
-            ",http://megafon-neuro.netlify.app"
-            ",https://release--neuro-web.netlify.app"
-            ",https://app.neu.ro"
-            ",https://app.ml.megafon.ru"
-            ",https://master--megafon-neuro.netlify.app"
+        assert result["NP_CORS_ORIGINS"] == ",".join(
+            [
+                "https://megafon-release.neu.ro",
+                "http://megafon-neuro.netlify.app",
+                "https://release--neuro-web.netlify.app",
+                "https://app.neu.ro",
+                "https://app.ml.megafon.ru",
+                "https://master--megafon-neuro.netlify.app",
+            ]
         )
 
     def test_create_gcp_platform_reports_values(
