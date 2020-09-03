@@ -69,6 +69,7 @@ class TestHelmValuesFactory:
             "platform-object-storage": mock.ANY,
             "platform-secrets": mock.ANY,
             "platform-reports": mock.ANY,
+            "platform-disk-api": mock.ANY,
         }
 
     def test_create_gcp_platform_values_with_gcs_storage(
@@ -899,3 +900,75 @@ class TestHelmValuesFactory:
             not in result["prometheus-operator"]["prometheus"]["prometheusSpec"]
         )
         assert result
+
+    def test_create_platform_disk_api_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_disk_api_values(gcp_platform_config)
+
+        assert result == {
+            "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
+            "NP_DISK_API_K8S_NS": "platform-jobs",
+            "NP_DISK_API_PLATFORM_AUTH_URL": "https://dev.neu.ro",
+            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+            "NP_CORS_ORIGINS": (
+                "https://release--neuro-web.netlify.app,https://app.neu.ro"
+            ),
+            "NP_DISK_PROVIDER": "gcp",
+        }
+
+    def test_create_platform_disk_api_values_for_megafon_public(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_disk_api_values(
+            replace(on_prem_platform_config, cluster_name="megafon-public")
+        )
+
+        assert result["NP_CORS_ORIGINS"] == ",".join(
+            [
+                "https://megafon-release.neu.ro",
+                "http://megafon-neuro.netlify.app",
+                "https://release--neuro-web.netlify.app",
+                "https://app.neu.ro",
+                "https://app.ml.megafon.ru",
+            ]
+        )
+
+    def test_create_platform_disk_api_values_for_megafon_poc(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_disk_api_values(
+            replace(on_prem_platform_config, cluster_name="megafon-poc")
+        )
+
+        assert result["NP_CORS_ORIGINS"] == ",".join(
+            [
+                "https://megafon-release.neu.ro",
+                "http://megafon-neuro.netlify.app",
+                "https://release--neuro-web.netlify.app",
+                "https://app.neu.ro",
+                "https://app.ml.megafon.ru",
+                "https://master--megafon-neuro.netlify.app",
+            ]
+        )
+
+    def test_create_aws_platform_disk_api_values(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_disk_api_values(aws_platform_config)
+
+        assert result["NP_DISK_PROVIDER"] == "aws"
+
+    def test_create_azure_platform_disk_api_values(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_disk_api_values(azure_platform_config)
+
+        assert result["NP_DISK_PROVIDER"] == "azure"
+
+    def test_create_gcp_platform_disk_api_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_disk_api_values(gcp_platform_config)
+
+        assert result["NP_DISK_PROVIDER"] == "gcp"
