@@ -65,3 +65,7 @@ dependencies:
   - name: platform-reports
     version: "20200818"
     repository: "@neuro"
+  - name: platformdiskapi
+    version: "20200907"
+    repository: "@neuro"
+    alias: platform-disk-api

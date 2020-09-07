@@ -82,6 +82,7 @@ class HelmChartNames:
     platform_ssh_auth: str = "ssh-auth"
     platform_secrets: str = "platform-secrets"
     platform_reports: str = "platform-reports"
+    platform_disk_api: str = "platform-disk-api"
 
 
 @dataclass(frozen=True)
