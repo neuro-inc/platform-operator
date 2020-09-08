@@ -49,11 +49,3 @@ spec:
     metrics:
       bucket: neuro-metrics-a44a2ab779525184303d93f9583a3ceb
 ```
-# Run Unit Tests
-```
-make test_unit
-```
-# Run Integration Tests
-```
-make test_integration
-```
