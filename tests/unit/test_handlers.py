@@ -111,13 +111,6 @@ def traefik_service() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def ssh_auth_service() -> Dict[str, Any]:
-    return {
-        "status": {"loadBalancer": {"ingress": [{"ip": "192.168.0.2"}]}},
-    }
-
-
-@pytest.fixture
 def aws_traefik_service() -> Dict[str, Any]:
     return {
         "status": {"loadBalancer": {"ingress": [{"hostname": "platform-traefik"}]}},
@@ -125,23 +118,9 @@ def aws_traefik_service() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def aws_ssh_auth_service() -> Dict[str, Any]:
-    return {
-        "status": {"loadBalancer": {"ingress": [{"hostname": "ssh-auth"}]}},
-    }
-
-
-@pytest.fixture
 def aws_traefik_lb() -> Dict[str, Any]:
     return {
         "CanonicalHostedZoneNameID": "/hostedzone/traefik",
-    }
-
-
-@pytest.fixture
-def aws_ssh_auth_lb() -> Dict[str, Any]:
-    return {
-        "CanonicalHostedZoneNameID": "/hostedzone/ssh-auth",
     }
 
 
@@ -162,26 +141,20 @@ async def test_configure_dns(
     config_client: mock.Mock,
     gcp_platform_config: PlatformConfig,
     traefik_service: Dict[str, Any],
-    ssh_auth_service: Dict[str, Any],
 ) -> None:
     from platform_operator.handlers import configure_dns
 
-    kube_client.get_service.side_effect = [traefik_service, ssh_auth_service]
+    kube_client.get_service.side_effect = [traefik_service]
 
     await configure_dns(gcp_platform_config)
 
     kube_client.get_service.assert_has_awaits(
-        [
-            mock.call(namespace="platform", name="platform-traefik"),
-            mock.call(namespace="platform", name="ssh-auth"),
-        ]
+        [mock.call(namespace="platform", name="platform-traefik")]
     )
     config_client.configure_dns.assert_awaited_with(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_config.token,
-        payload=gcp_platform_config.create_dns_config(
-            traefik_service=traefik_service, ssh_auth_service=ssh_auth_service
-        ),
+        payload=gcp_platform_config.create_dns_config(traefik_service=traefik_service),
     )
 
 
@@ -193,37 +166,26 @@ async def test_configure_aws_dns(
     aws_elb_client: mock.Mock,
     aws_platform_config: PlatformConfig,
     aws_traefik_service: Dict[str, Any],
-    aws_ssh_auth_service: Dict[str, Any],
     aws_traefik_lb: Dict[str, Any],
-    aws_ssh_auth_lb: Dict[str, Any],
 ) -> None:
     from platform_operator.handlers import configure_dns
 
-    kube_client.get_service.side_effect = [aws_traefik_service, aws_ssh_auth_service]
-    aws_elb_client.get_load_balancer_by_dns_name.side_effect = [
-        aws_traefik_lb,
-        aws_ssh_auth_lb,
-    ]
+    kube_client.get_service.side_effect = [aws_traefik_service]
+    aws_elb_client.get_load_balancer_by_dns_name.side_effect = [aws_traefik_lb]
 
     await configure_dns(aws_platform_config)
 
     kube_client.get_service.assert_has_awaits(
-        [
-            mock.call(namespace="platform", name="platform-traefik"),
-            mock.call(namespace="platform", name="ssh-auth"),
-        ]
+        [mock.call(namespace="platform", name="platform-traefik")]
     )
     aws_elb_client.get_load_balancer_by_dns_name.assert_has_awaits(
-        [mock.call("platform-traefik"), mock.call("ssh-auth")]
+        [mock.call("platform-traefik")]
     )
     config_client.configure_dns.assert_awaited_with(
         cluster_name=aws_platform_config.cluster_name,
         token=aws_platform_config.token,
         payload=aws_platform_config.create_dns_config(
-            traefik_service=aws_traefik_service,
-            ssh_auth_service=aws_ssh_auth_service,
-            aws_traefik_lb=aws_traefik_lb,
-            aws_ssh_auth_lb=aws_ssh_auth_lb,
+            traefik_service=aws_traefik_service, aws_traefik_lb=aws_traefik_lb
         ),
     )
 

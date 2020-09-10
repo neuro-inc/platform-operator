@@ -79,7 +79,6 @@ class HelmChartNames:
     platform_object_storage: str = "platform-object-storage"
     platform_registry: str = "platform-registry"
     platform_monitoring: str = "platform-monitoring"
-    platform_ssh_auth: str = "ssh-auth"
     platform_secrets: str = "platform-secrets"
     platform_reports: str = "platform-reports"
     platform_disk_api: str = "platform-disk-api"
@@ -244,7 +243,6 @@ class OnPremConfig:
     kubelet_port: int
     http_node_port: int
     https_node_port: int
-    ssh_auth_node_port: int
 
 
 @dataclass(frozen=True)
@@ -264,10 +262,9 @@ class PlatformConfig:
     ingress_url: URL
     ingress_registry_url: URL
     ingress_metrics_url: URL
-    ingress_ssh_auth_server: str
+    ingress_ssh_auth_server: str  # TODO: remove after removal in config service
     ingress_acme_environment: str
     service_traefik_name: str
-    service_ssh_auth_name: str
     jobs_namespace: str
     jobs_label: str
     jobs_node_pools: Sequence[Dict[str, Any]]
@@ -289,31 +286,19 @@ class PlatformConfig:
     def create_dns_config(
         self,
         traefik_service: Dict[str, Any],
-        ssh_auth_service: Dict[str, Any],
         aws_traefik_lb: Optional[Dict[str, Any]] = None,
-        aws_ssh_auth_lb: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         traefik_zone_id = ""
-        ssh_auth_zone_id = ""
         if self.aws:
             traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0][
                 "hostname"
             ]
-            ssh_auth_host = ssh_auth_service["status"]["loadBalancer"]["ingress"][0][
-                "hostname"
-            ]
             assert aws_traefik_lb
-            assert aws_ssh_auth_lb
             traefik_zone_id = aws_traefik_lb["CanonicalHostedZoneNameID"]
-            ssh_auth_zone_id = aws_ssh_auth_lb["CanonicalHostedZoneNameID"]
         elif self.on_prem:
             traefik_host = str(self.on_prem.kubernetes_public_ip)
-            ssh_auth_host = str(self.on_prem.kubernetes_public_ip)
         else:
             traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0]["ip"]
-            ssh_auth_host = ssh_auth_service["status"]["loadBalancer"]["ingress"][0][
-                "ip"
-            ]
         result: Dict[str, Any] = {
             "zone_id": self.dns_zone_id,
             "zone_name": self.dns_zone_name,
@@ -354,18 +339,6 @@ class PlatformConfig:
                     {"name": f"metrics.{self.dns_zone_name}", "ips": [traefik_host]},
                 )
             )
-        if ssh_auth_zone_id:
-            result["a_records"].append(
-                {
-                    "name": f"ssh-auth.{self.dns_zone_name}",
-                    "dns_name": ssh_auth_host,
-                    "zone_id": ssh_auth_zone_id,
-                }
-            )
-        else:
-            result["a_records"].append(
-                {"name": f"ssh-auth.{self.dns_zone_name}", "ips": [ssh_auth_host]}
-            )
         return result
 
     def create_cluster_config(
@@ -398,7 +371,9 @@ class PlatformConfig:
                 "job_fallback_hostname": str(self.jobs_fallback_host),
                 "resource_pool_types": self.jobs_resource_pool_types,
             },
-            "ssh": {"server": self.ingress_ssh_auth_server},
+            "ssh": {
+                "server": self.ingress_ssh_auth_server
+            },  # TODO: remove after removal in config service
             "monitoring": {"url": str(self.ingress_url / "api/v1/jobs")},
             "secrets": {"url": str(self.ingress_url / "api/v1/secrets")},
             "metrics": {"url": str(self.ingress_metrics_url)},
@@ -412,7 +387,6 @@ class PlatformConfigFactory:
 
     def create(self, platform_body: bodies.Body, cluster: Cluster) -> "PlatformConfig":
         ingress_host = cluster["dns"]["zone_name"].strip(".")
-        ingress_ssh_auth_server = f"ssh-auth.{ingress_host}"
         standard_storage_class_name = (
             f"{self._config.platform_namespace}-standard-topology-aware"
         )
@@ -426,7 +400,6 @@ class PlatformConfigFactory:
             )
         if cluster.cloud_provider_type == "on_prem":
             standard_storage_class_name = kubernetes_spec["standardStorageClassName"]
-            ingress_ssh_auth_server += f":{kubernetes_spec['nodePorts']['sshAuth']}"
         monitoring_spec = platform_body["spec"]["monitoring"]
         return PlatformConfig(
             auth_url=self._config.platform_auth_url,
@@ -444,10 +417,9 @@ class PlatformConfigFactory:
             ingress_url=URL(f"https://{ingress_host}"),
             ingress_registry_url=URL(f"https://registry.{ingress_host}"),
             ingress_metrics_url=URL(f"https://metrics.{ingress_host}"),
-            ingress_ssh_auth_server=ingress_ssh_auth_server,
+            ingress_ssh_auth_server=f"ssh-auth.{ingress_host}",
             ingress_acme_environment=cluster.acme_environment,
             service_traefik_name=f"{self._config.platform_namespace}-traefik",
-            service_ssh_auth_name="ssh-auth",
             jobs_namespace=self._config.platform_jobs_namespace,
             jobs_label="platform.neuromation.io/job",
             jobs_node_pools=self._create_node_pools(
@@ -588,7 +560,6 @@ class PlatformConfigFactory:
             kubelet_port=int(kubernetes_spec["nodePorts"]["kubelet"]),
             http_node_port=int(kubernetes_spec["nodePorts"]["http"]),
             https_node_port=int(kubernetes_spec["nodePorts"]["https"]),
-            ssh_auth_node_port=int(kubernetes_spec["nodePorts"]["sshAuth"]),
         )
 
     @classmethod
