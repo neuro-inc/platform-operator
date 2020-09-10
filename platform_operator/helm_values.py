@@ -59,9 +59,6 @@ class HelmValuesFactory:
             self._chart_names.platform_registry: self.create_platform_registry_values(
                 platform
             ),
-            self._chart_names.platform_ssh_auth: self.create_platform_ssh_auth_values(
-                platform
-            ),
             self._chart_names.platform_monitoring: (
                 self.create_platform_monitoring_values(platform)
             ),
@@ -535,28 +532,6 @@ class HelmValuesFactory:
             if platform.cluster_name == "megafon-poc":
                 cors_origins.append("https://master--megafon-neuro.netlify.app")
             result["NP_CORS_ORIGINS"] = ",".join(cors_origins)
-        return result
-
-    def create_platform_ssh_auth_values(
-        self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
-            "NP_AUTH_URL": str(platform.auth_url),
-            "NP_PLATFORM_API_URL": str(platform.api_url),
-            "NP_K8S_NS": platform.jobs_namespace,
-            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
-        }
-        if platform.aws:
-            result["service"] = {
-                "annotations": {
-                    (
-                        "service.beta.kubernetes.io/"
-                        "aws-load-balancer-connection-idle-timeout"
-                    ): "3600"
-                }
-            }
-        if platform.on_prem:
-            result["NODEPORT"] = platform.on_prem.ssh_auth_node_port
         return result
 
     def create_platform_secrets_values(

@@ -343,12 +343,7 @@ def on_prem_platform_body(cluster_name: str) -> bodies.Body:
                 "publicIP": "192.168.0.3",
                 "mastersCount": 1,
                 "standardStorageClassName": "standard",
-                "nodePorts": {
-                    "kubelet": 10250,
-                    "http": 30080,
-                    "https": 30443,
-                    "sshAuth": 30022,
-                },
+                "nodePorts": {"kubelet": 10250, "http": 30080, "https": 30443},
             },
             "registry": {
                 "kubernetes": {
@@ -413,7 +408,6 @@ def gcp_platform_config(
         ingress_ssh_auth_server=f"ssh-auth.{cluster_name}.org.neu.ro",
         ingress_acme_environment="staging",
         service_traefik_name="platform-traefik",
-        service_ssh_auth_name="ssh-auth",
         monitoring_logs_bucket_name="job-logs",
         monitoring_metrics_bucket_name="job-metrics",
         storage_pvc_name="platform-storage",
@@ -500,7 +494,7 @@ def on_prem_platform_config(
         standard_storage_class_name="standard",
         cloud_provider="on_prem",
         ingress_ssh_auth_server=(
-            f"ssh-auth.{gcp_platform_config.cluster_name}.org.neu.ro:30022"
+            f"ssh-auth.{gcp_platform_config.cluster_name}.org.neu.ro"
         ),
         jobs_node_pools=[{"name": "gpu-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}],
         jobs_resource_pool_types=[resource_pool_type_factory()],
@@ -520,6 +514,5 @@ def on_prem_platform_config(
             kubelet_port=10250,
             http_node_port=30080,
             https_node_port=30443,
-            ssh_auth_node_port=30022,
         ),
     )

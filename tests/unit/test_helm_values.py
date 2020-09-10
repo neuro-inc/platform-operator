@@ -64,7 +64,6 @@ class TestHelmValuesFactory:
             "traefik": mock.ANY,
             "platform-storage": mock.ANY,
             "platform-registry": mock.ANY,
-            "ssh-auth": mock.ANY,
             "platform-monitoring": mock.ANY,
             "platform-object-storage": mock.ANY,
             "platform-secrets": mock.ANY,
@@ -680,39 +679,6 @@ class TestHelmValuesFactory:
                 "https://master--megafon-neuro.netlify.app",
             ]
         )
-
-    def test_create_ssh_auth_values(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_ssh_auth_values(gcp_platform_config)
-
-        assert result == {
-            "NP_AUTH_URL": "https://dev.neu.ro",
-            "NP_PLATFORM_API_URL": "https://dev.neu.ro/api/v1",
-            "NP_K8S_NS": "platform-jobs",
-            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
-        }
-
-    def test_create_aws_ssh_auth_values(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_ssh_auth_values(aws_platform_config)
-
-        assert result["service"] == {
-            "annotations": {
-                (
-                    "service.beta.kubernetes.io/"
-                    "aws-load-balancer-connection-idle-timeout"
-                ): "3600"
-            }
-        }
-
-    def test_create_on_prem_ssh_auth_values(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_ssh_auth_values(on_prem_platform_config)
-
-        assert result["NODEPORT"] == 30022
 
     def test_create_platform_secrets_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory

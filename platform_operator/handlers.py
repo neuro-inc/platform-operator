@@ -259,24 +259,14 @@ async def configure_dns(platform: PlatformConfig) -> None:
     traefik_service = await app.kube_client.get_service(
         namespace=platform.namespace, name=platform.service_traefik_name
     )
-    ssh_auth_service = await app.kube_client.get_service(
-        namespace=platform.namespace, name=platform.service_ssh_auth_name
-    )
     aws_traefik_lb: Optional[Dict[str, Any]] = None
-    aws_ssh_auth_lb: Optional[Dict[str, Any]] = None
     if platform.aws:
         async with AwsElbClient(region=platform.aws.region) as client:
             aws_traefik_lb = await client.get_load_balancer_by_dns_name(
                 traefik_service["status"]["loadBalancer"]["ingress"][0]["hostname"]
             )
-            aws_ssh_auth_lb = await client.get_load_balancer_by_dns_name(
-                ssh_auth_service["status"]["loadBalancer"]["ingress"][0]["hostname"]
-            )
     dns_config = platform.create_dns_config(
-        traefik_service=traefik_service,
-        ssh_auth_service=ssh_auth_service,
-        aws_traefik_lb=aws_traefik_lb,
-        aws_ssh_auth_lb=aws_ssh_auth_lb,
+        traefik_service=traefik_service, aws_traefik_lb=aws_traefik_lb,
     )
     await app.config_client.configure_dns(
         cluster_name=platform.cluster_name, token=platform.token, payload=dns_config
