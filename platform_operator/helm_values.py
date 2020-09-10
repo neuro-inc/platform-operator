@@ -212,6 +212,10 @@ class HelmValuesFactory:
     def create_traefik_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         result: Dict[str, Any] = {
             "replicas": 4,
+            "deploymentStrategy": {
+                "type": "RollingUpdate",
+                "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
+            },
             "imageTag": "1.7.20-alpine",
             "logLevel": "debug",
             "serviceType": "LoadBalancer",
@@ -300,14 +304,34 @@ class HelmValuesFactory:
                     },
                 },
             ],
+            "resources": {
+                "requests": {"cpu": "1200m", "memory": "5Gi"},
+                "limits": {"cpu": "1200m", "memory": "5Gi"},
+            },
         }
+        if platform.gcp:
+            result["timeouts"] = {
+                "responding": {
+                    # must be greater than lb timeout
+                    # gcp lb default timeout is 600s and cannot be changed
+                    "idleTimeout": "660s"  # must be greater than lb timeout
+                }
+            }
         if platform.aws:
-            result["service"] = {
-                "annotations": {
-                    (
-                        "service.beta.kubernetes.io/"
-                        "aws-load-balancer-connection-idle-timeout"
-                    ): "3600"
+            result["timeouts"] = {
+                "responding": {
+                    # must be greater than lb timeout
+                    # aws lb default idle timeout is 60s
+                    # aws network lb default idle timeout is 350s and cannot be changed
+                    "idleTimeout": "410s"  # must be greater than lb timeout
+                }
+            }
+        if platform.azure:
+            result["timeouts"] = {
+                "responding": {
+                    # must be greater than lb timeout
+                    # azure lb default and minimum idle timeout is 4m
+                    "idleTimeout": "300s"  # must be greater than lb timeout
                 }
             }
         if platform.on_prem:
@@ -323,10 +347,7 @@ class HelmValuesFactory:
                 "httpEnabled": True,
                 "httpsEnabled": True,
             }
-            result["deploymentStrategy"] = {
-                "type": "RollingUpdate",
-                "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
-            }
+            result["timeouts"] = {"responding": {"idleTimeout": "300s"}}
         return result
 
     def create_cluster_autoscaler_values(
