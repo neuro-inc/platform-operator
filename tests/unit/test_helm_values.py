@@ -226,7 +226,7 @@ class TestHelmValuesFactory:
             "StorageClass": "standard",
         }
 
-    def test_create_traefik_values(
+    def test_create_gcp_traefik_values(
         self,
         cluster_name: str,
         gcp_platform_config: PlatformConfig,
@@ -236,6 +236,10 @@ class TestHelmValuesFactory:
 
         assert result == {
             "replicas": 4,
+            "deploymentStrategy": {
+                "type": "RollingUpdate",
+                "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
+            },
             "imageTag": "1.7.20-alpine",
             "logLevel": "debug",
             "serviceType": "LoadBalancer",
@@ -321,6 +325,11 @@ class TestHelmValuesFactory:
                     },
                 },
             ],
+            "resources": {
+                "requests": {"cpu": "1200m", "memory": "5Gi"},
+                "limits": {"cpu": "1200m", "memory": "5Gi"},
+            },
+            "timeouts": {"responding": {"idleTimeout": "660s"}},
         }
 
     def test_create_aws_traefik_values(
@@ -328,14 +337,14 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_traefik_values(aws_platform_config)
 
-        assert result["service"] == {
-            "annotations": {
-                (
-                    "service.beta.kubernetes.io/"
-                    "aws-load-balancer-connection-idle-timeout"
-                ): "3600"
-            }
-        }
+        assert result["timeouts"] == {"responding": {"idleTimeout": "410s"}}
+
+    def test_create_azure_traefik_values(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_traefik_values(azure_platform_config)
+
+        assert result["timeouts"] == {"responding": {"idleTimeout": "300s"}}
 
     def test_create_on_prem_traefik_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory,
@@ -349,10 +358,7 @@ class TestHelmValuesFactory:
             "httpEnabled": True,
             "httpsEnabled": True,
         }
-        assert result["deploymentStrategy"] == {
-            "type": "RollingUpdate",
-            "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
-        }
+        assert result["timeouts"] == {"responding": {"idleTimeout": "300s"}}
 
     def test_create_cluster_autoscaler_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
