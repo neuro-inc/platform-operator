@@ -34,6 +34,7 @@ class TestHelmValuesFactory:
                         {"image": "neuromation/web-shell"},
                     ],
                 },
+                "labels": {"nodePool": "platform.neuromation.io/nodepool"},
             },
             "gcp": {"serviceAccountKeyBase64": "e30="},
             "standardStorageClass": {
@@ -235,7 +236,7 @@ class TestHelmValuesFactory:
         result = factory.create_traefik_values(gcp_platform_config)
 
         assert result == {
-            "replicas": 4,
+            "replicas": 3,
             "deploymentStrategy": {
                 "type": "RollingUpdate",
                 "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},

@@ -16,6 +16,7 @@ from platform_operator.models import (
     HelmRepo,
     KubeClientAuthType,
     KubeConfig,
+    LabelsConfig,
     PlatformConfig,
     PlatformConfigFactory,
 )
@@ -36,6 +37,10 @@ class TestConfig:
             "NP_KUBE_AUTH_CERT_KEY_PATH": "/client.key",
             "NP_KUBE_AUTH_TOKEN_PATH": "/token",
             "NP_KUBE_AUTH_TOKEN": "token",
+            "NP_LABEL_JOB": "platform.neuromation.io/job",
+            "NP_LABEL_NODE_POOL": "platform.neuromation.io/nodepool",
+            "NP_LABEL_ACCELERATOR": "platform.neuromation.io/accelerator",
+            "NP_LABEL_PREEMPTIBLE": "platform.neuromation.io/preemptible",
             "NP_HELM_STABLE_REPO_URL": (
                 "https://kubernetes-charts.storage.googleapis.com"
             ),
@@ -62,6 +67,12 @@ class TestConfig:
                 conn_timeout_s=300,
                 read_timeout_s=100,
                 conn_pool_size=100,
+            ),
+            labels=LabelsConfig(
+                job="platform.neuromation.io/job",
+                node_pool="platform.neuromation.io/nodepool",
+                accelerator="platform.neuromation.io/accelerator",
+                preemptible="platform.neuromation.io/preemptible",
             ),
             helm_stable_repo=HelmRepo(
                 name="stable",
@@ -90,6 +101,10 @@ class TestConfig:
             "NP_PLATFORM_URL": "https://dev.neu.ro",
             "NP_KUBE_URL": "https://kubernetes.default",
             "NP_KUBE_AUTH_TYPE": "none",
+            "NP_LABEL_JOB": "platform.neuromation.io/job",
+            "NP_LABEL_NODE_POOL": "platform.neuromation.io/nodepool",
+            "NP_LABEL_ACCELERATOR": "platform.neuromation.io/accelerator",
+            "NP_LABEL_PREEMPTIBLE": "platform.neuromation.io/preemptible",
             "NP_HELM_STABLE_REPO_URL": (
                 "https://kubernetes-charts.storage.googleapis.com"
             ),
@@ -110,6 +125,12 @@ class TestConfig:
                 conn_timeout_s=300,
                 read_timeout_s=100,
                 conn_pool_size=100,
+            ),
+            labels=LabelsConfig(
+                job="platform.neuromation.io/job",
+                node_pool="platform.neuromation.io/nodepool",
+                accelerator="platform.neuromation.io/accelerator",
+                preemptible="platform.neuromation.io/preemptible",
             ),
             helm_stable_repo=HelmRepo(
                 name="stable",
@@ -288,8 +309,8 @@ class TestPlatformConfig:
                     "auth_type": "token",
                     "token": "token",
                     "namespace": "platform-jobs",
-                    "node_label_gpu": "cloud.google.com/gke-accelerator",
-                    "node_label_preemptible": "cloud.google.com/gke-preemptible",
+                    "node_label_gpu": "platform.neuromation.io/accelerator",
+                    "node_label_preemptible": "platform.neuromation.io/preemptible",
                     "node_label_job": "platform.neuromation.io/job",
                     "job_pod_priority_class_name": "platform-job",
                 },

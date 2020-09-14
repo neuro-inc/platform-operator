@@ -39,6 +39,14 @@ class KubeConfig:
     conn_pool_size: int = 100
 
 
+@dataclass(frozen=True)
+class LabelsConfig:
+    job: str
+    node_pool: str
+    accelerator: str
+    preemptible: str
+
+
 class HelmRepoName(str, Enum):
     STABLE = "stable"
     NEURO = "neuro"
@@ -105,6 +113,7 @@ class Config:
     retries: int
     backoff: int
     kube_config: KubeConfig
+    labels: LabelsConfig
     helm_stable_repo: HelmRepo
     helm_release_names: HelmReleaseNames
     helm_chart_names: HelmChartNames
@@ -141,6 +150,12 @@ class Config:
                     env.get("NP_KUBE_AUTH_TOKEN_PATH")
                 ),
                 auth_token=env.get("NP_KUBE_AUTH_TOKEN"),
+            ),
+            labels=LabelsConfig(
+                job=env["NP_LABEL_JOB"],
+                node_pool=env["NP_LABEL_NODE_POOL"],
+                accelerator=env["NP_LABEL_ACCELERATOR"],
+                preemptible=env["NP_LABEL_PREEMPTIBLE"],
             ),
             helm_stable_repo=HelmRepo(
                 name=HelmRepoName.STABLE, url=URL(env["NP_HELM_STABLE_REPO_URL"])
@@ -256,6 +271,7 @@ class PlatformConfig:
     image_pull_secret_name: str
     standard_storage_class_name: str
     kubernetes_public_url: URL
+    labels: LabelsConfig
     dns_zone_id: str
     dns_zone_name: str
     dns_zone_name_servers: Sequence[str]
@@ -266,7 +282,6 @@ class PlatformConfig:
     ingress_acme_environment: str
     service_traefik_name: str
     jobs_namespace: str
-    jobs_label: str
     jobs_node_pools: Sequence[Dict[str, Any]]
     jobs_resource_pool_types: Sequence[Dict[str, Any]]
     jobs_priority_class_name: str
@@ -361,9 +376,9 @@ class PlatformConfig:
                     "auth_type": "token",
                     "token": service_account_secret["data"]["token"],
                     "namespace": self.jobs_namespace,
-                    "node_label_gpu": "cloud.google.com/gke-accelerator",
-                    "node_label_preemptible": "cloud.google.com/gke-preemptible",
-                    "node_label_job": self.jobs_label,
+                    "node_label_gpu": self.labels.accelerator,
+                    "node_label_preemptible": self.labels.preemptible,
+                    "node_label_job": self.labels.job,
                     "job_pod_priority_class_name": self.jobs_priority_class_name,
                 },
                 "is_http_ingress_secure": True,
@@ -411,6 +426,7 @@ class PlatformConfigFactory:
             image_pull_secret_name=f"{self._config.platform_namespace}-docker-config",
             standard_storage_class_name=standard_storage_class_name,
             kubernetes_public_url=URL(kubernetes_spec["publicUrl"]),
+            labels=self._config.labels,
             dns_zone_id=cluster["dns"]["zone_id"],
             dns_zone_name=cluster["dns"]["zone_name"],
             dns_zone_name_servers=cluster["dns"]["name_servers"],
@@ -421,7 +437,6 @@ class PlatformConfigFactory:
             ingress_acme_environment=cluster.acme_environment,
             service_traefik_name=f"{self._config.platform_namespace}-traefik",
             jobs_namespace=self._config.platform_jobs_namespace,
-            jobs_label="platform.neuromation.io/job",
             jobs_node_pools=self._create_node_pools(
                 cluster["cloud_provider"]["node_pools"]
             ),

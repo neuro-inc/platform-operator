@@ -6,3 +6,9 @@ controller:
 
 platform:
   url: https://staging.neu.ro
+
+labels:
+  job: platform.neuromation.io/job
+  nodePool: platform.neuromation.io/nodepool
+  gpu: platform.neuromation.io/accelerator
+  preemptible: platform.neuromation.io/preemptible

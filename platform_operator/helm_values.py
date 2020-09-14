@@ -19,6 +19,7 @@ class HelmValuesFactory:
             "serviceToken": platform.token,
             "kubernetes": {
                 "nodePools": platform.jobs_node_pools,
+                "labels": {"nodePool": platform.labels.node_pool},
                 # NOTE: should images prepulling be configured in config service?
                 "imagesPrepull": {
                     "refreshInterval": "1h",
@@ -49,7 +50,7 @@ class HelmValuesFactory:
             },
             "jobs": {
                 "namespace": {"create": True, "name": platform.jobs_namespace},
-                "label": platform.jobs_label,
+                "label": platform.labels.job,
             },
             self._chart_names.consul: self.create_consul_values(platform),
             self._chart_names.traefik: self.create_traefik_values(platform),
@@ -211,7 +212,7 @@ class HelmValuesFactory:
 
     def create_traefik_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         result: Dict[str, Any] = {
-            "replicas": 4,
+            "replicas": 3,
             "deploymentStrategy": {
                 "type": "RollingUpdate",
                 "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
