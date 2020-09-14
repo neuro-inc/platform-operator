@@ -212,7 +212,7 @@ class HelmValuesFactory:
 
     def create_traefik_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         result: Dict[str, Any] = {
-            "replicas": 3,
+            "replicas": 4,
             "deploymentStrategy": {
                 "type": "RollingUpdate",
                 "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},

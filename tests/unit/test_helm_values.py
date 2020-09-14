@@ -236,7 +236,7 @@ class TestHelmValuesFactory:
         result = factory.create_traefik_values(gcp_platform_config)
 
         assert result == {
-            "replicas": 3,
+            "replicas": 4,
             "deploymentStrategy": {
                 "type": "RollingUpdate",
                 "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
