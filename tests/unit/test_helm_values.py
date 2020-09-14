@@ -34,6 +34,7 @@ class TestHelmValuesFactory:
                         {"image": "neuromation/web-shell"},
                     ],
                 },
+                "labels": {"nodePool": "platform.neuromation.io/nodepool"},
             },
             "gcp": {"serviceAccountKeyBase64": "e30="},
             "standardStorageClass": {

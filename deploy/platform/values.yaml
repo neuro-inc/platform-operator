@@ -2,6 +2,8 @@ serviceToken: ""
 
 kubernetes:
   nodePools: []
+  labels:
+    nodePool: platform.neuromation.io/nodepool
   # imagesPrepull:
   #   refreshInterval: 1h
   #   images: []

@@ -21,6 +21,7 @@ from platform_operator.models import (
     HelmRepoName,
     KubeClientAuthType,
     KubeConfig,
+    LabelsConfig,
     OnPremConfig,
     PlatformConfig,
 )
@@ -34,6 +35,12 @@ def config() -> Config:
         backoff=60,
         kube_config=KubeConfig(
             url=URL("https://kubernetes.default"), auth_type=KubeClientAuthType.NONE,
+        ),
+        labels=LabelsConfig(
+            job="platform.neuromation.io/job",
+            node_pool="platform.neuromation.io/nodepool",
+            accelerator="platform.neuromation.io/accelerator",
+            preemptible="platform.neuromation.io/preemptible",
         ),
         helm_stable_repo=HelmRepo(
             name="stable", url=URL("https://kubernetes-charts.storage.googleapis.com"),
@@ -389,11 +396,16 @@ def gcp_platform_config(
         image_pull_secret_name="platform-docker-config",
         standard_storage_class_name="platform-standard-topology-aware",
         kubernetes_public_url=URL("https://kubernetes.default"),
+        labels=LabelsConfig(
+            job="platform.neuromation.io/job",
+            node_pool="platform.neuromation.io/nodepool",
+            accelerator="platform.neuromation.io/accelerator",
+            preemptible="platform.neuromation.io/preemptible",
+        ),
         dns_zone_id="/hostedzone/id",
         dns_zone_name=f"{cluster_name}.org.neu.ro.",
         dns_zone_name_servers=["192.168.0.2"],
         jobs_namespace="platform-jobs",
-        jobs_label="platform.neuromation.io/job",
         jobs_node_pools=[
             {"name": "n1-highmem-8-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}
         ],

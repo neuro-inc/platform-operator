@@ -64,12 +64,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
             - matchExpressions:
-              - key: platform.neuromation.io/nodepool
-                operator: In
-                values:
-                - {{ .name }}
-            - matchExpressions:
-              - key: cloud.google.com/gke-nodepool
+              - key: {{ .Values.kubernetes.labels.nodePool }}
                 operator: In
                 values:
                 - {{ .name }}
