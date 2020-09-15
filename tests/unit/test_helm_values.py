@@ -63,6 +63,7 @@ class TestHelmValuesFactory:
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
             "consul": mock.ANY,
             "traefik": mock.ANY,
+            "nvidia-gpu-driver-gcp": mock.ANY,
             "platform-storage": mock.ANY,
             "platform-registry": mock.ANY,
             "platform-monitoring": mock.ANY,
@@ -94,6 +95,7 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(aws_platform_config)
 
         assert "cluster-autoscaler" in result
+        assert "nvidia-gpu-driver" in result
 
     def test_create_azure_platform_values(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory,
@@ -117,6 +119,7 @@ class TestHelmValuesFactory:
                 "storageAccountKey": "accountKey2",
             }
         }
+        assert "nvidia-gpu-driver" in result
 
     def test_create_on_prem_platform_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory,
@@ -132,6 +135,7 @@ class TestHelmValuesFactory:
         }
         assert "docker-registry" in result
         assert "minio" in result
+        assert "nvidia-gpu-driver" in result
         assert "platform-object-storage" not in result
 
     def test_create_docker_registry_values(
@@ -394,6 +398,24 @@ class TestHelmValuesFactory:
 
         assert result["podAnnotations"] == {
             "iam.amazonaws.com/role": "auto_scaling_role"
+        }
+
+    def test_create_nvidia_gpu_driver_gcp_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_nvidia_gpu_driver_gcp_values(gcp_platform_config)
+
+        assert result == {
+            "gpuNodeLabel": gcp_platform_config.kubernetes_node_labels.accelerator
+        }
+
+    def test_create_nvidia_gpu_driver_values(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_nvidia_gpu_driver_values(aws_platform_config)
+
+        assert result == {
+            "gpuNodeLabel": aws_platform_config.kubernetes_node_labels.accelerator
         }
 
     def test_create_platform_storage_values(

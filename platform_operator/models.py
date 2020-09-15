@@ -82,6 +82,8 @@ class HelmChartNames:
     consul: str = "consul"
     traefik: str = "traefik"
     cluster_autoscaler: str = "cluster-autoscaler"
+    nvidia_gpu_driver: str = "nvidia-gpu-driver"
+    nvidia_gpu_driver_gcp: str = "nvidia-gpu-driver-gcp"
     platform: str = "platform"
     platform_storage: str = "platform-storage"
     platform_object_storage: str = "platform-object-storage"

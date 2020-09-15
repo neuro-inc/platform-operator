@@ -78,6 +78,9 @@ class HelmValuesFactory:
                 self._chart_names.platform_object_storage
             ] = self.create_platform_object_storage_values(platform)
         if platform.gcp:
+            result[
+                self._chart_names.nvidia_gpu_driver_gcp
+            ] = self.create_nvidia_gpu_driver_gcp_values(platform)
             result["gcp"] = {
                 "serviceAccountKeyBase64": platform.gcp.service_account_key_base64
             }
@@ -92,6 +95,10 @@ class HelmValuesFactory:
                 result["storage"] = {
                     "gcs": {"bucketName": platform.gcp.storage_gcs_bucket_name}
                 }
+        else:
+            result[
+                self._chart_names.nvidia_gpu_driver
+            ] = self.create_nvidia_gpu_driver_values(platform)
         if platform.aws:
             result["storage"] = {
                 "nfs": {
@@ -382,6 +389,16 @@ class HelmValuesFactory:
                 "iam.amazonaws.com/role": platform.aws.role_auto_scaling_arn
             }
         return result
+
+    def create_nvidia_gpu_driver_gcp_values(
+        self, platform: PlatformConfig
+    ) -> Dict[str, Any]:
+        return {"gpuNodeLabel": platform.kubernetes_node_labels.accelerator}
+
+    def create_nvidia_gpu_driver_values(
+        self, platform: PlatformConfig
+    ) -> Dict[str, Any]:
+        return {"gpuNodeLabel": platform.kubernetes_node_labels.accelerator}
 
     def create_platform_storage_values(
         self, platform: PlatformConfig
