@@ -36,12 +36,6 @@ def config() -> Config:
         kube_config=KubeConfig(
             url=URL("https://kubernetes.default"), auth_type=KubeClientAuthType.NONE,
         ),
-        labels=LabelsConfig(
-            job="platform.neuromation.io/job",
-            node_pool="platform.neuromation.io/nodepool",
-            accelerator="platform.neuromation.io/accelerator",
-            preemptible="platform.neuromation.io/preemptible",
-        ),
         helm_stable_repo=HelmRepo(
             name="stable", url=URL("https://kubernetes-charts.storage.googleapis.com"),
         ),
@@ -396,7 +390,7 @@ def gcp_platform_config(
         image_pull_secret_name="platform-docker-config",
         standard_storage_class_name="platform-standard-topology-aware",
         kubernetes_public_url=URL("https://kubernetes.default"),
-        labels=LabelsConfig(
+        kubernetes_node_labels=LabelsConfig(
             job="platform.neuromation.io/job",
             node_pool="platform.neuromation.io/nodepool",
             accelerator="platform.neuromation.io/accelerator",

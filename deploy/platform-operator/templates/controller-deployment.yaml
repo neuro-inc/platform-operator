@@ -45,14 +45,6 @@ spec:
           value: token
         - name: NP_KUBE_AUTH_TOKEN_PATH
           value: /var/run/secrets/kubernetes.io/serviceaccount/token
-        - name: NP_LABEL_JOB
-          value: {{ .Values.labels.job }}
-        - name: NP_LABEL_NODE_POOL
-          value: {{ .Values.labels.nodePool }}
-        - name: NP_LABEL_ACCELERATOR
-          value: {{ .Values.labels.gpu }}
-        - name: NP_LABEL_PREEMPTIBLE
-          value: {{ .Values.labels.preemptible }}
         - name: NP_HELM_STABLE_REPO_URL
           value: https://kubernetes-charts.storage.googleapis.com
         - name: NP_HELM_SERVICE_ACCOUNT_NAME
