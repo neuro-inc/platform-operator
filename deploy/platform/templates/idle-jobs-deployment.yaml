@@ -4,6 +4,7 @@
 {{- $priorityClassName := include "platform.idleJobs.priorityClass.name" . }}
 {{- $jobsNamespace := include "platform.jobs.namespace.name" . }}
 {{- $jobsLabel := .Values.jobs.label }}
+{{- $nodePoolLabel := .Values.kubernetes.labels.nodePool }}
 {{- range .Values.kubernetes.nodePools }}
 {{- if gt (.idleSize | int) 0 }}
 apiVersion: apps/v1
@@ -64,7 +65,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
             - matchExpressions:
-              - key: {{ .Values.kubernetes.labels.nodePool }}
+              - key: {{ $nodePoolLabel }}
                 operator: In
                 values:
                 - {{ .name }}
