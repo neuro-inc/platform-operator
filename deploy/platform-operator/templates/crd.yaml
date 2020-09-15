@@ -112,6 +112,17 @@ spec:
                       type: integer
                     https:
                       type: integer
+                nodeLabels:
+                  type: object
+                  properties:
+                    job:
+                      type: string
+                    nodePool:
+                      type: string
+                    accelerator:
+                      type: string
+                    preemptible:
+                      type: string
             iam:
               type: object
               properties:

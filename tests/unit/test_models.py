@@ -68,12 +68,6 @@ class TestConfig:
                 read_timeout_s=100,
                 conn_pool_size=100,
             ),
-            labels=LabelsConfig(
-                job="platform.neuromation.io/job",
-                node_pool="platform.neuromation.io/nodepool",
-                accelerator="platform.neuromation.io/accelerator",
-                preemptible="platform.neuromation.io/preemptible",
-            ),
             helm_stable_repo=HelmRepo(
                 name="stable",
                 url=URL("https://kubernetes-charts.storage.googleapis.com"),
@@ -125,12 +119,6 @@ class TestConfig:
                 conn_timeout_s=300,
                 read_timeout_s=100,
                 conn_pool_size=100,
-            ),
-            labels=LabelsConfig(
-                job="platform.neuromation.io/job",
-                node_pool="platform.neuromation.io/nodepool",
-                accelerator="platform.neuromation.io/accelerator",
-                preemptible="platform.neuromation.io/preemptible",
             ),
             helm_stable_repo=HelmRepo(
                 name="stable",
@@ -336,12 +324,33 @@ class TestPlatformConfigFactory:
         factory: PlatformConfigFactory,
         gcp_platform_body: bodies.Body,
         gcp_cluster: Cluster,
-        gcp_platform_config: PlatformConfig,
     ) -> None:
         del gcp_platform_body["spec"]["kubernetes"]["publicUrl"]
 
         with pytest.raises(KeyError):
             factory.create(gcp_platform_body, gcp_cluster)
+
+    def test_platform_config_with_custom_labels(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+    ) -> None:
+        gcp_platform_body["spec"]["kubernetes"]["nodeLabels"] = {
+            "job": "job",
+            "nodePool": "nodepool",
+            "accelerator": "accelerator",
+            "preemptible": "preemptible",
+        }
+
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result.kubernetes_node_labels == LabelsConfig(
+            job="job",
+            node_pool="nodepool",
+            accelerator="accelerator",
+            preemptible="preemptible",
+        )
 
     def test_gcp_platform_config(
         self,
