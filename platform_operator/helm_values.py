@@ -326,20 +326,36 @@ class HelmValuesFactory:
                 }
             }
         if platform.aws:
+            # aws lb default idle timeout is 60s
+            # aws network lb default idle timeout is 350s and cannot be changed
+            result["service"] = {
+                "annotations": {
+                    (
+                        "service.beta.kubernetes.io/"
+                        "aws-load-balancer-connection-idle-timeout"
+                    ): "600"
+                }
+            }
             result["timeouts"] = {
                 "responding": {
                     # must be greater than lb timeout
-                    # aws lb default idle timeout is 60s
-                    # aws network lb default idle timeout is 350s and cannot be changed
-                    "idleTimeout": "410s"  # must be greater than lb timeout
+                    "idleTimeout": "660s"  # must be greater than lb timeout
                 }
             }
         if platform.azure:
+            # azure lb default and minimum idle timeout is 4m, maximum is 30m
+            result["service"] = {
+                "annotations": {
+                    (
+                        "service.beta.kubernetes.io/"
+                        "azure-load-balancer-tcp-idle-timeout"
+                    ): "10"
+                }
+            }
             result["timeouts"] = {
                 "responding": {
                     # must be greater than lb timeout
-                    # azure lb default and minimum idle timeout is 4m
-                    "idleTimeout": "300s"  # must be greater than lb timeout
+                    "idleTimeout": "660s"  # must be greater than lb timeout
                 }
             }
         if platform.on_prem:
@@ -355,7 +371,7 @@ class HelmValuesFactory:
                 "httpEnabled": True,
                 "httpsEnabled": True,
             }
-            result["timeouts"] = {"responding": {"idleTimeout": "300s"}}
+            result["timeouts"] = {"responding": {"idleTimeout": "600s"}}
         return result
 
     def create_cluster_autoscaler_values(

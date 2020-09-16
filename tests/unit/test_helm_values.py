@@ -342,14 +342,27 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_traefik_values(aws_platform_config)
 
-        assert result["timeouts"] == {"responding": {"idleTimeout": "410s"}}
+        assert result["timeouts"] == {"responding": {"idleTimeout": "660s"}}
+        assert result["service"] == {
+            "annotations": {
+                (
+                    "service.beta.kubernetes.io/"
+                    "aws-load-balancer-connection-idle-timeout"
+                ): "600"
+            }
+        }
 
     def test_create_azure_traefik_values(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory,
     ) -> None:
         result = factory.create_traefik_values(azure_platform_config)
 
-        assert result["timeouts"] == {"responding": {"idleTimeout": "300s"}}
+        assert result["timeouts"] == {"responding": {"idleTimeout": "660s"}}
+        assert result["service"] == {
+            "annotations": {
+                "service.beta.kubernetes.io/azure-load-balancer-tcp-idle-timeout": "10"
+            }
+        }
 
     def test_create_on_prem_traefik_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory,
@@ -363,7 +376,7 @@ class TestHelmValuesFactory:
             "httpEnabled": True,
             "httpsEnabled": True,
         }
-        assert result["timeouts"] == {"responding": {"idleTimeout": "300s"}}
+        assert result["timeouts"] == {"responding": {"idleTimeout": "600s"}}
 
     def test_create_cluster_autoscaler_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
