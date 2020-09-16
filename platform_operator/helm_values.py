@@ -408,6 +408,7 @@ class HelmValuesFactory:
             "NP_STORAGE_AUTH_URL": str(platform.auth_url),
             "NP_STORAGE_PVC_CLAIM_NAME": (f"{self._release_names.platform}-storage"),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
+            "NP_CORS_ORIGINS": self._create_cors_origins(platform.cluster_name),
         }
 
     def create_platform_object_storage_values(
@@ -488,9 +489,7 @@ class HelmValuesFactory:
             "NP_MONITORING_PLATFORM_AUTH_URL": str(platform.auth_url),
             "NP_MONITORING_PLATFORM_CONFIG_URL": str(platform.api_url),
             "NP_MONITORING_REGISTRY_URL": str(platform.ingress_registry_url),
-            "NP_CORS_ORIGINS": (
-                "https://release--neuro-web.netlify.app,https://app.neu.ro"
-            ),
+            "NP_CORS_ORIGINS": self._create_cors_origins(platform.cluster_name),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
             "fluentd": {
                 "persistence": {
@@ -558,19 +557,6 @@ class HelmValuesFactory:
                 }
             }
             result["NP_MONITORING_K8S_KUBELET_PORT"] = platform.on_prem.kubelet_port
-
-        # TODO: get cors configuration from config service
-        if platform.cluster_name in ("megafon-poc", "megafon-public"):
-            cors_origins = [
-                "https://megafon-release.neu.ro",
-                "http://megafon-neuro.netlify.app",
-                "https://release--neuro-web.netlify.app",
-                "https://app.neu.ro",
-                "https://app.ml.megafon.ru",
-            ]
-            if platform.cluster_name == "megafon-poc":
-                cors_origins.append("https://master--megafon-neuro.netlify.app")
-            result["NP_CORS_ORIGINS"] = ",".join(cors_origins)
         return result
 
     def create_platform_secrets_values(
@@ -581,22 +567,8 @@ class HelmValuesFactory:
             "NP_SECRETS_K8S_NS": platform.jobs_namespace,
             "NP_SECRETS_PLATFORM_AUTH_URL": str(platform.auth_url),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
-            "NP_CORS_ORIGINS": (
-                "https://release--neuro-web.netlify.app,https://app.neu.ro"
-            ),
+            "NP_CORS_ORIGINS": self._create_cors_origins(platform.cluster_name),
         }
-        # TODO: get cors configuration from config service
-        if platform.cluster_name in ("megafon-poc", "megafon-public"):
-            cors_origins = [
-                "https://megafon-release.neu.ro",
-                "http://megafon-neuro.netlify.app",
-                "https://release--neuro-web.netlify.app",
-                "https://app.neu.ro",
-                "https://app.ml.megafon.ru",
-            ]
-            if platform.cluster_name == "megafon-poc":
-                cors_origins.append("https://master--megafon-neuro.netlify.app")
-            result["NP_CORS_ORIGINS"] = ",".join(cors_origins)
         return result
 
     def create_platform_reports_values(
@@ -723,22 +695,8 @@ class HelmValuesFactory:
             "NP_DISK_API_K8S_NS": platform.jobs_namespace,
             "NP_DISK_API_PLATFORM_AUTH_URL": str(platform.auth_url),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
-            "NP_CORS_ORIGINS": (
-                "https://release--neuro-web.netlify.app,https://app.neu.ro"
-            ),
+            "NP_CORS_ORIGINS": self._create_cors_origins(platform.cluster_name),
         }
-        # TODO: get cors configuration from config service
-        if platform.cluster_name in ("megafon-poc", "megafon-public"):
-            cors_origins = [
-                "https://megafon-release.neu.ro",
-                "http://megafon-neuro.netlify.app",
-                "https://release--neuro-web.netlify.app",
-                "https://app.neu.ro",
-                "https://app.ml.megafon.ru",
-            ]
-            if platform.cluster_name == "megafon-poc":
-                cors_origins.append("https://master--megafon-neuro.netlify.app")
-            result["NP_CORS_ORIGINS"] = ",".join(cors_origins)
         if platform.aws:
             result["NP_DISK_PROVIDER"] = "aws"
         if platform.azure:
@@ -746,3 +704,18 @@ class HelmValuesFactory:
         if platform.gcp:
             result["NP_DISK_PROVIDER"] = "gcp"
         return result
+
+    def _create_cors_origins(self, cluster_name: str) -> str:
+        # TODO: get cors configuration from config service
+        if cluster_name in ("megafon-poc", "megafon-public"):
+            cors_origins = [
+                "https://megafon-release.neu.ro",
+                "http://megafon-neuro.netlify.app",
+                "https://release--neuro-web.netlify.app",
+                "https://app.neu.ro",
+                "https://app.ml.megafon.ru",
+            ]
+            if cluster_name == "megafon-poc":
+                cors_origins.append("https://master--megafon-neuro.netlify.app")
+            return ",".join(cors_origins)
+        return "https://release--neuro-web.netlify.app,https://app.neu.ro"

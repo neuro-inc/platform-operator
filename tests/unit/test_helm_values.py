@@ -428,7 +428,45 @@ class TestHelmValuesFactory:
             "NP_STORAGE_AUTH_URL": "https://dev.neu.ro",
             "NP_STORAGE_PVC_CLAIM_NAME": "platform-storage",
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+            "NP_CORS_ORIGINS": (
+                "https://release--neuro-web.netlify.app,https://app.neu.ro"
+            ),
         }
+
+    def test_create_platform_storage_values_for_megafon_public(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_storage_values(
+            replace(on_prem_platform_config, cluster_name="megafon-public")
+        )
+
+        assert result["NP_CORS_ORIGINS"] == ",".join(
+            [
+                "https://megafon-release.neu.ro",
+                "http://megafon-neuro.netlify.app",
+                "https://release--neuro-web.netlify.app",
+                "https://app.neu.ro",
+                "https://app.ml.megafon.ru",
+            ]
+        )
+
+    def test_create_platform_storage_values_for_megafon_poc(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_storage_values(
+            replace(on_prem_platform_config, cluster_name="megafon-poc")
+        )
+
+        assert result["NP_CORS_ORIGINS"] == ",".join(
+            [
+                "https://megafon-release.neu.ro",
+                "http://megafon-neuro.netlify.app",
+                "https://release--neuro-web.netlify.app",
+                "https://app.neu.ro",
+                "https://app.ml.megafon.ru",
+                "https://master--megafon-neuro.netlify.app",
+            ]
+        )
 
     def test_create_gcp_platform_object_storage_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
