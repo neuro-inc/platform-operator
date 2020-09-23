@@ -60,9 +60,9 @@ dependencies:
     repository: "@neuro"
     alias: platform-secrets
   - name: platform-reports
-    version: "20200922"
+    version: "20200923"
     repository: "@neuro"
   - name: platformdiskapi
-    version: "20200907"
+    version: "20200923"
     repository: "@neuro"
     alias: platform-disk-api
