@@ -593,6 +593,7 @@ class HelmValuesFactory:
         alphabet = string.ascii_letters + string.digits
         object_store_config_map_name = "thanos-object-storage-config"
         result: Dict[str, Any] = {
+            "nodePoolLabels": {"gpu": platform.kubernetes_node_labels.accelerator},
             "objectStore": {
                 "supported": True,
                 "configMapName": object_store_config_map_name,

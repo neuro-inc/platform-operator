@@ -816,6 +816,7 @@ class TestHelmValuesFactory:
         result = factory.create_platform_reports_values(gcp_platform_config)
 
         assert result == {
+            "nodePoolLabels": {"gpu": "platform.neuromation.io/accelerator"},
             "objectStore": {
                 "supported": True,
                 "configMapName": "thanos-object-storage-config",
