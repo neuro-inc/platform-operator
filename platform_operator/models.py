@@ -26,6 +26,7 @@ class KubeClientAuthType(str, Enum):
 
 @dataclass(frozen=True)
 class KubeConfig:
+    version: str
     url: URL
     cert_authority_path: Optional[Path] = None
     cert_authority_data_pem: Optional[str] = None
@@ -137,6 +138,7 @@ class Config:
             retries=int(env.get("NP_CONTROLLER_RETRIES") or "3"),
             backoff=int(env.get("NP_CONTROLLER_BACKOFF") or "60"),
             kube_config=KubeConfig(
+                version=env["NP_KUBE_VERSION"].lstrip("v"),
                 url=URL(env["NP_KUBE_URL"]),
                 cert_authority_path=cls._convert_to_path(
                     env.get("NP_KUBE_CERT_AUTHORITY_PATH")
@@ -265,6 +267,7 @@ class PlatformConfig:
     namespace: str
     image_pull_secret_name: str
     standard_storage_class_name: str
+    kubernetes_version: str
     kubernetes_public_url: URL
     kubernetes_node_labels: LabelsConfig
     dns_zone_id: str
@@ -421,6 +424,7 @@ class PlatformConfigFactory:
             namespace=self._config.platform_namespace,
             image_pull_secret_name=f"{self._config.platform_namespace}-docker-config",
             standard_storage_class_name=standard_storage_class_name,
+            kubernetes_version=self._config.kube_config.version,
             kubernetes_public_url=URL(kubernetes_spec["publicUrl"]),
             kubernetes_node_labels=LabelsConfig(
                 job=kubernetes_node_labels.get("job", "platform.neuromation.io/job"),

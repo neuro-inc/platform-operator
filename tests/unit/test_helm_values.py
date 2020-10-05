@@ -386,7 +386,10 @@ class TestHelmValuesFactory:
         assert result == {
             "cloudProvider": "aws",
             "awsRegion": "us-east-1",
-            "image": {"tag": "v1.13.9"},
+            "image": {
+                "repository": "k8s.gcr.io/autoscaling/cluster-autoscaler",
+                "tag": "v1.14.8",
+            },
             "rbac": {"create": True},
             "autoDiscovery": {"clusterName": aws_platform_config.cluster_name},
             "extraArgs": {
@@ -396,6 +399,35 @@ class TestHelmValuesFactory:
                 "balance-similar-node-groups": True,
             },
         }
+
+    def test_create_cluster_autoscaler_not_supported(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        with pytest.raises(
+            ValueError,
+            match="Cluster autoscaler for Kubernetes 1.13.8 is not supported",
+        ):
+            result = factory.create_cluster_autoscaler_values(
+                replace(aws_platform_config, kubernetes_version="1.13.8")
+            )
+
+    def test_create_cluster_autoscaler_for_kube_1_15(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_cluster_autoscaler_values(
+            replace(aws_platform_config, kubernetes_version="1.15.3")
+        )
+
+        assert result["image"]["tag"] == "v1.15.7"
+
+    def test_create_cluster_autoscaler_for_kube_1_16(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_cluster_autoscaler_values(
+            replace(aws_platform_config, kubernetes_version="1.16.13")
+        )
+
+        assert result["image"]["tag"] == "v1.16.6"
 
     def test_create_cluster_autoscaler_values_with_role(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory

@@ -29,6 +29,7 @@ class TestConfig:
             "NP_CONTROLLER_LOG_LEVEL": "debug",
             "NP_CONTROLLER_RETRIES": "5",
             "NP_CONTROLLER_BACKOFF": "120",
+            "NP_KUBE_VERSION": "v1.14.10",
             "NP_KUBE_URL": "https://kubernetes.default",
             "NP_KUBE_CERT_AUTHORITY_PATH": "/ca.crt",
             "NP_KUBE_CERT_AUTHORITY_DATA_PEM": "cert-authority-data",
@@ -56,6 +57,7 @@ class TestConfig:
             retries=5,
             backoff=120,
             kube_config=KubeConfig(
+                version="1.14.10",
                 url=URL("https://kubernetes.default"),
                 cert_authority_path=Path("/ca.crt"),
                 cert_authority_data_pem="cert-authority-data",
@@ -93,6 +95,7 @@ class TestConfig:
     def test_config_defaults(self) -> None:
         env = {
             "NP_PLATFORM_URL": "https://dev.neu.ro",
+            "NP_KUBE_VERSION": "v1.14.10",
             "NP_KUBE_URL": "https://kubernetes.default",
             "NP_KUBE_AUTH_TYPE": "none",
             "NP_LABEL_JOB": "platform.neuromation.io/job",
@@ -114,6 +117,7 @@ class TestConfig:
             retries=3,
             backoff=60,
             kube_config=KubeConfig(
+                version="1.14.10",
                 url=URL("https://kubernetes.default"),
                 auth_type=KubeClientAuthType.NONE,
                 conn_timeout_s=300,

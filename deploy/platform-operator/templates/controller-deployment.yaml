@@ -37,6 +37,8 @@ spec:
           value: {{ .Values.controller.retries | quote }}
         - name: NP_CONTROLLER_BACKOFF
           value: {{ .Values.controller.backoff | quote }}
+        - name: NP_KUBE_VERSION
+          value: {{ .Capabilities.KubeVersion | toString | quote }}
         - name: NP_KUBE_URL
           value: https://kubernetes.default.svc
         - name: NP_KUBE_CERT_AUTHORITY_PATH
