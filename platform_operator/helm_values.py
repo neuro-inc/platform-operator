@@ -378,10 +378,24 @@ class HelmValuesFactory:
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
         assert platform.aws
+        if platform.kubernetes_version.startswith("1.14"):
+            image_tag = "v1.14.8"
+        elif platform.kubernetes_version.startswith("1.15"):
+            image_tag = "v1.15.7"
+        elif platform.kubernetes_version.startswith("1.16"):
+            image_tag = "v1.16.6"
+        else:
+            raise ValueError(
+                f"Cluster autoscaler for Kubernetes {platform.kubernetes_version} "
+                "is not supported"
+            )
         result = {
             "cloudProvider": "aws",
             "awsRegion": platform.aws.region,
-            "image": {"tag": "v1.13.9"},
+            "image": {
+                "repository": "k8s.gcr.io/autoscaling/cluster-autoscaler",
+                "tag": image_tag,
+            },
             "rbac": {"create": True},
             "autoDiscovery": {"clusterName": platform.cluster_name},
             "extraArgs": {

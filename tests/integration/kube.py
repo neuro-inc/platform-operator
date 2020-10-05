@@ -56,6 +56,7 @@ def kube_config(
     _cert_authority_data_pem: Optional[str],
 ) -> KubeConfig:
     return KubeConfig(
+        version="1.14.10",
         url=URL(_kube_config_cluster_payload["server"]),
         cert_authority_data_pem=_cert_authority_data_pem,
         auth_type=KubeClientAuthType.CERTIFICATE,
