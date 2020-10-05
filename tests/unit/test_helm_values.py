@@ -407,7 +407,7 @@ class TestHelmValuesFactory:
             ValueError,
             match="Cluster autoscaler for Kubernetes 1.13.8 is not supported",
         ):
-            result = factory.create_cluster_autoscaler_values(
+            factory.create_cluster_autoscaler_values(
                 replace(aws_platform_config, kubernetes_version="1.13.8")
             )
 
