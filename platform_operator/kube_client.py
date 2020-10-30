@@ -97,7 +97,10 @@ class KubeClient:
             )
         else:
             logger.info(
-                "Received %s %s %s", params.method, params.response.status, params.url,
+                "Received %s %s %s",
+                params.method,
+                params.response.status,
+                params.url,
             )
 
     async def __aenter__(self) -> "KubeClient":
@@ -141,14 +144,16 @@ class KubeClient:
     async def create_namespace(self, name: str) -> None:
         assert self._session
         async with self._session.post(
-            self._get_namespace_url(), json={"metadata": {"name": name}},
+            self._get_namespace_url(),
+            json={"metadata": {"name": name}},
         ) as response:
             response.raise_for_status()
 
     async def delete_namespace(self, name: str) -> None:
         assert self._session
         async with self._session.delete(
-            self._get_namespace_url(name), json={"propagationPolicy": "Background"},
+            self._get_namespace_url(name),
+            json={"propagationPolicy": "Background"},
         ) as response:
             response.raise_for_status()
 

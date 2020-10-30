@@ -207,7 +207,8 @@ async def test_configure_cluster(
     await configure_cluster(gcp_platform_config)
 
     kube_client.get_service_account.assert_awaited_with(
-        namespace="platform-jobs", name="platform-jobs",
+        namespace="platform-jobs",
+        name="platform-jobs",
     )
     kube_client.get_secret.assert_awaited_with(namespace="platform-jobs", name="token")
     config_client.configure_cluster.assert_awaited_with(

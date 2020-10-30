@@ -49,7 +49,11 @@ class HelmOptions:
 
 
 class HelmClient:
-    def __init__(self, kube_context: str = "", tiller_namespace: str = "",) -> None:
+    def __init__(
+        self,
+        kube_context: str = "",
+        tiller_namespace: str = "",
+    ) -> None:
         self._global_options = HelmOptions(
             kube_context=kube_context or None, tiller_namespace=tiller_namespace or None
         )
@@ -94,11 +98,16 @@ class HelmClient:
             username=repo.username or None, password=repo.password or None
         )
         logger.info(
-            "Running helm repo add %s %s %s", repo.name, repo.url, options.masked,
+            "Running helm repo add %s %s %s",
+            repo.name,
+            repo.url,
+            options.masked,
         )
         cmd = f"helm repo add {repo.name} {repo.url!s} {options!s}"
         process, _, stderr_text = await self._run(
-            cmd, capture_stdout=False, capture_stderr=True,
+            cmd,
+            capture_stdout=False,
+            capture_stderr=True,
         )
         if process.returncode != 0:
             logger.error(
@@ -114,11 +123,14 @@ class HelmClient:
         cmd = f"helm repo update {self._global_options!s}"
         logger.info("Running %s", cmd)
         process, _, stderr_text = await self._run(
-            cmd, capture_stdout=False, capture_stderr=True,
+            cmd,
+            capture_stdout=False,
+            capture_stderr=True,
         )
         if process.returncode != 0:
             logger.error(
-                "Failed to update helm repositories: %s", stderr_text.strip(),
+                "Failed to update helm repositories: %s",
+                stderr_text.strip(),
             )
             raise HelmException("Failed to update helm repositories")
         logger.info("Updated helm repo")
@@ -128,7 +140,9 @@ class HelmClient:
         cmd = f'helm list "^{release_name}$" {options!s}'
         logger.info("Running %s", cmd)
         process, stdout_text, stderr_text = await self._run(
-            cmd, capture_stdout=True, capture_stderr=True,
+            cmd,
+            capture_stdout=True,
+            capture_stderr=True,
         )
         if process.returncode != 0:
             logger.error("Failed to initialize helm: %s", stderr_text.strip())
@@ -162,12 +176,18 @@ class HelmClient:
             timeout=timeout,
         )
         logger.info(
-            "Running helm upgrade %s %s %s", release_name, chart_name, options.masked,
+            "Running helm upgrade %s %s %s",
+            release_name,
+            chart_name,
+            options.masked,
         )
         cmd = f"helm upgrade {release_name} {chart_name} {options!s}"
         values_yaml = yaml.safe_dump(values or {})
         process, _, stderr_text = await self._run(
-            cmd, values_yaml, capture_stdout=False, capture_stderr=True,
+            cmd,
+            values_yaml,
+            capture_stdout=False,
+            capture_stderr=True,
         )
         if process.returncode != 0:
             logger.error(
@@ -183,7 +203,9 @@ class HelmClient:
         cmd = f"helm delete {release_name} {options!s}"
         logger.info("Running %s", cmd)
         process, _, stderr_text = await self._run(
-            cmd, capture_stdout=False, capture_stderr=True,
+            cmd,
+            capture_stdout=False,
+            capture_stderr=True,
         )
         if process.returncode != 0 and "not found" not in stderr_text:
             logger.error(

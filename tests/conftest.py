@@ -39,7 +39,8 @@ def config() -> Config:
             auth_type=KubeClientAuthType.NONE,
         ),
         helm_stable_repo=HelmRepo(
-            name="stable", url=URL("https://kubernetes-charts.storage.googleapis.com"),
+            name="stable",
+            url=URL("https://kubernetes-charts.storage.googleapis.com"),
         ),
         helm_release_names=HelmReleaseNames(
             platform="platform",

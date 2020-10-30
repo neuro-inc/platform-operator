@@ -26,7 +26,10 @@ def config_map() -> Dict[str, Any]:
 class TestHelmClient:
     @pytest.mark.asyncio
     async def test_upgrade_and_delete(
-        self, kube_namespace: str, helm_client: HelmClient, config_map: Dict[str, Any],
+        self,
+        kube_namespace: str,
+        helm_client: HelmClient,
+        config_map: Dict[str, Any],
     ) -> None:
         await helm_client.init(client_only=True)
         await helm_client.add_repo(
@@ -60,7 +63,8 @@ class TestHelmClient:
     @pytest.mark.asyncio
     async def test_add_unknown_repo(self, helm_client: HelmClient) -> None:
         with pytest.raises(
-            HelmException, match="Failed to add helm repo unknown https://unknown",
+            HelmException,
+            match="Failed to add helm repo unknown https://unknown",
         ):
             await helm_client.init(client_only=True)
             await helm_client.add_repo(HelmRepo("unknown", URL("https://unknown")))
@@ -68,11 +72,15 @@ class TestHelmClient:
     @pytest.mark.asyncio
     async def test_install_unknown_chart(self, helm_client: HelmClient) -> None:
         with pytest.raises(
-            HelmException, match="Failed to upgrade release unknown",
+            HelmException,
+            match="Failed to upgrade release unknown",
         ):
             await helm_client.init(client_only=True)
             await helm_client.upgrade(
-                "unknown", "unknown/unknown", install=True, wait=True,
+                "unknown",
+                "unknown/unknown",
+                install=True,
+                wait=True,
             )
 
     @pytest.mark.asyncio

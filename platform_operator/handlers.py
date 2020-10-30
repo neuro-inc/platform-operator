@@ -77,13 +77,23 @@ async def cleanup(**_: Any) -> None:
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 @kopf.on.update(
-    PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff,
+    PLATFORM_GROUP,
+    PLATFORM_API_VERSION,
+    PLATFORM_PLURAL,
+    backoff=config.backoff,
 )
 async def deploy(
-    name: str, body: bodies.Body, logger: Logger, retry: int, **kwargs: Any,
+    name: str,
+    body: bodies.Body,
+    logger: Logger,
+    retry: int,
+    **kwargs: Any,
 ) -> None:
     status_manager = PlatformStatusManager(
-        app.kube_client, namespace=config.platform_namespace, name=name, logger=logger,
+        app.kube_client,
+        namespace=config.platform_namespace,
+        name=name,
+        logger=logger,
     )
     if retry > config.retries:
         await status_manager.fail_deployment()
@@ -185,10 +195,16 @@ async def deploy(
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def delete(
-    name: str, body: bodies.Body, logger: Logger, retry: int, **_: Any,
+    name: str,
+    body: bodies.Body,
+    logger: Logger,
+    retry: int,
+    **_: Any,
 ) -> None:
     status_manager = PlatformStatusManager(
-        app.kube_client, namespace=config.platform_namespace, name=name,
+        app.kube_client,
+        namespace=config.platform_namespace,
+        name=name,
     )
     if retry == 0:
         await status_manager.start_deletion()
@@ -210,7 +226,8 @@ async def delete(
 
     logger.info("Deleting platform helm chart")
     await app.helm_client.delete(
-        config.helm_release_names.platform, purge=True,
+        config.helm_release_names.platform,
+        purge=True,
     )
     logger.info("platform helm chart deleted")
 
@@ -243,14 +260,16 @@ async def delete(
     if is_gcp_gcs_platform:
         logger.info("Deleting obs-csi-driver helm chart")
         await app.helm_client.delete(
-            config.helm_release_names.obs_csi_driver, purge=True,
+            config.helm_release_names.obs_csi_driver,
+            purge=True,
         )
         logger.info("obs-csi-driver helm chart deleted")
 
     if platform.on_prem:
         logger.info("Deleting nfs-server helm chart")
         await app.helm_client.delete(
-            config.helm_release_names.nfs_server, purge=True,
+            config.helm_release_names.nfs_server,
+            purge=True,
         )
         logger.info("nfs-server helm chart deleted")
 
@@ -266,7 +285,8 @@ async def configure_dns(platform: PlatformConfig) -> None:
                 traefik_service["status"]["loadBalancer"]["ingress"][0]["hostname"]
             )
     dns_config = platform.create_dns_config(
-        traefik_service=traefik_service, aws_traefik_lb=aws_traefik_lb,
+        traefik_service=traefik_service,
+        aws_traefik_lb=aws_traefik_lb,
     )
     await app.config_client.configure_dns(
         cluster_name=platform.cluster_name, token=platform.token, payload=dns_config
@@ -275,11 +295,13 @@ async def configure_dns(platform: PlatformConfig) -> None:
 
 async def configure_cluster(platform: PlatformConfig) -> None:
     service_account = await app.kube_client.get_service_account(
-        namespace=platform.jobs_namespace, name=platform.jobs_service_account_name,
+        namespace=platform.jobs_namespace,
+        name=platform.jobs_service_account_name,
     )
     secret_name = service_account["secrets"][0]["name"]
     secret = await app.kube_client.get_secret(
-        namespace=platform.jobs_namespace, name=secret_name,
+        namespace=platform.jobs_namespace,
+        name=secret_name,
     )
     cluster_config = platform.create_cluster_config(secret)
     await app.config_client.configure_cluster(

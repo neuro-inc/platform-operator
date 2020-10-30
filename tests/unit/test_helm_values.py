@@ -74,7 +74,9 @@ class TestHelmValuesFactory:
         }
 
     def test_create_gcp_platform_values_with_gcs_storage(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory,
+        self,
+        gcp_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
     ) -> None:
         result = factory.create_platform_values(
             replace(
@@ -90,7 +92,9 @@ class TestHelmValuesFactory:
         assert result["storage"] == {"gcs": {"bucketName": "platform-storage"}}
 
     def test_create_aws_platform_values(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory,
+        self,
+        aws_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
     ) -> None:
         result = factory.create_platform_values(aws_platform_config)
 
@@ -98,7 +102,9 @@ class TestHelmValuesFactory:
         assert "nvidia-gpu-driver" in result
 
     def test_create_azure_platform_values(
-        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory,
+        self,
+        azure_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
     ) -> None:
         result = factory.create_platform_values(azure_platform_config)
 
@@ -122,7 +128,9 @@ class TestHelmValuesFactory:
         assert "nvidia-gpu-driver" in result
 
     def test_create_on_prem_platform_values(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory,
+        self,
+        on_prem_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
     ) -> None:
         result = factory.create_platform_values(on_prem_platform_config)
 
@@ -212,7 +220,9 @@ class TestHelmValuesFactory:
         }
 
     def test_create_consul_values(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory,
+        self,
+        gcp_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
     ) -> None:
         result = factory.create_consul_values(gcp_platform_config)
 
@@ -222,7 +232,9 @@ class TestHelmValuesFactory:
         }
 
     def test_create_on_prem_consul_values(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory,
+        self,
+        on_prem_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
     ) -> None:
         result = factory.create_consul_values(on_prem_platform_config)
 
@@ -338,7 +350,9 @@ class TestHelmValuesFactory:
         }
 
     def test_create_aws_traefik_values(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory,
+        self,
+        aws_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
     ) -> None:
         result = factory.create_traefik_values(aws_platform_config)
 
@@ -353,7 +367,9 @@ class TestHelmValuesFactory:
         }
 
     def test_create_azure_traefik_values(
-        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory,
+        self,
+        azure_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
     ) -> None:
         result = factory.create_traefik_values(azure_platform_config)
 
@@ -365,7 +381,9 @@ class TestHelmValuesFactory:
         }
 
     def test_create_on_prem_traefik_values(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory,
+        self,
+        on_prem_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
     ) -> None:
         result = factory.create_traefik_values(on_prem_platform_config)
 

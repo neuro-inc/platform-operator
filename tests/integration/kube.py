@@ -19,7 +19,7 @@ def kube_context() -> str:
 @pytest.fixture(scope="session")
 def _kube_config_payload() -> Dict[str, Any]:
     kube_config_path = os.path.expanduser("~/.kube/config")
-    with open(kube_config_path, "r") as kube_config:
+    with open(kube_config_path) as kube_config:
         return yaml.safe_load(kube_config)
 
 
