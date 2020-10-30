@@ -93,7 +93,8 @@ class TestCertificateStore:
             cert = await store.get_certificate()
 
             assert cert == Certificate(
-                private_key="PrivateKey", certificate="Certificate",
+                private_key="PrivateKey",
+                certificate="Certificate",
             )
 
             await store.wait_till_certificate_created()

@@ -57,7 +57,9 @@ class TestPlatformStatusManager:
 
     @pytest.mark.asyncio
     async def test_start_deployment_of_new_platform(
-        self, kube_client: mock.AsyncMock, manager: PlatformStatusManager,
+        self,
+        kube_client: mock.AsyncMock,
+        manager: PlatformStatusManager,
     ) -> None:
         kube_client.get_platform_status.return_value = None
 
@@ -85,7 +87,9 @@ class TestPlatformStatusManager:
         status["retries"] = 0
         status["conditions"] = []
         kube_client.update_platform_status.assert_awaited_with(
-            namespace="default", name="neuro", payload=status,
+            namespace="default",
+            name="neuro",
+            payload=status,
         )
 
     @pytest.mark.asyncio
@@ -102,12 +106,16 @@ class TestPlatformStatusManager:
 
         status["retries"] = 1
         kube_client.update_platform_status.assert_awaited_with(
-            namespace="default", name="neuro", payload=status,
+            namespace="default",
+            name="neuro",
+            payload=status,
         )
 
     @pytest.mark.asyncio
     async def test_transition(
-        self, kube_client: mock.AsyncMock, manager: PlatformStatusManager,
+        self,
+        kube_client: mock.AsyncMock,
+        manager: PlatformStatusManager,
     ) -> None:
         kube_client.get_platform_status.return_value = None
 
@@ -115,7 +123,9 @@ class TestPlatformStatusManager:
 
         status: Dict[str, Any] = {"phase": "Deploying", "retries": 0, "conditions": []}
         kube_client.update_platform_status.assert_awaited_with(
-            namespace="default", name="neuro", payload=status,
+            namespace="default",
+            name="neuro",
+            payload=status,
         )
 
         async with manager.transition(PlatformConditionType.PLATFORM_DEPLOYED):
@@ -127,12 +137,16 @@ class TestPlatformStatusManager:
                 }
             )
             kube_client.update_platform_status.assert_awaited_with(
-                namespace="default", name="neuro", payload=status,
+                namespace="default",
+                name="neuro",
+                payload=status,
             )
 
         status["conditions"][-1]["status"] = "True"
         kube_client.update_platform_status.assert_awaited_with(
-            namespace="default", name="neuro", payload=status,
+            namespace="default",
+            name="neuro",
+            payload=status,
         )
 
     @pytest.mark.asyncio
@@ -149,14 +163,18 @@ class TestPlatformStatusManager:
 
         status["retries"] = 1
         kube_client.update_platform_status.assert_awaited_with(
-            namespace="default", name="neuro", payload=status,
+            namespace="default",
+            name="neuro",
+            payload=status,
         )
 
         await manager.complete_deployment()
 
         status["phase"] = "Deployed"
         kube_client.update_platform_status.assert_awaited_with(
-            namespace="default", name="neuro", payload=status,
+            namespace="default",
+            name="neuro",
+            payload=status,
         )
 
     @pytest.mark.asyncio
@@ -173,7 +191,9 @@ class TestPlatformStatusManager:
 
         status["phase"] = "Failed"
         kube_client.update_platform_status.assert_awaited_with(
-            namespace="default", name="neuro", payload=status,
+            namespace="default",
+            name="neuro",
+            payload=status,
         )
 
     @pytest.mark.asyncio
@@ -193,7 +213,9 @@ class TestPlatformStatusManager:
         status["conditions"][-1]["status"] = "Unknown"
         status["conditions"][-1]["lastTransitionTime"] = mock.ANY
         kube_client.update_platform_status.assert_awaited_with(
-            namespace="default", name="neuro", payload=status,
+            namespace="default",
+            name="neuro",
+            payload=status,
         )
 
     @pytest.mark.asyncio
@@ -209,5 +231,7 @@ class TestPlatformStatusManager:
 
         status["phase"] = "Deleting"
         kube_client.update_platform_status.assert_awaited_with(
-            namespace="default", name="neuro", payload=status,
+            namespace="default",
+            name="neuro",
+            payload=status,
         )

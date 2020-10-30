@@ -104,7 +104,10 @@ class TestKubeClient:
 
     @pytest.mark.asyncio
     async def test_platform_status(
-        self, kube_client: KubeClient, kube_namespace: str, platform: Dict[str, Any],
+        self,
+        kube_client: KubeClient,
+        kube_namespace: str,
+        platform: Dict[str, Any],
     ) -> None:
         name = platform["metadata"]["name"]
         result = await kube_client.get_platform_status(

@@ -5,14 +5,12 @@ IMAGE = $(DOCKER_REPO)/platform-operator-controller:$(TAG)
 setup:
 	pip install setuptools wheel
 	pip install -r requirements/dev.txt
+	pre-commit install
 
 format:
-	isort -rc platform_operator tests setup.py
-	black .
+	pre-commit run --all-files --show-diff-on-failure
 
-lint:
-	black --check platform_operator tests setup.py
-	flake8 platform_operator tests setup.py
+lint: format
 	mypy platform_operator tests setup.py
 
 test_unit:

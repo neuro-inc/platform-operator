@@ -452,7 +452,8 @@ class PlatformConfigFactory:
                 cluster["cloud_provider"]["node_pools"]
             ),
             jobs_resource_pool_types=self._update_tpu_network(
-                cluster["orchestrator"].get("resource_pool_types", ()), tpu_network,
+                cluster["orchestrator"].get("resource_pool_types", ()),
+                tpu_network,
             ),
             jobs_priority_class_name=f"{self._config.platform_namespace}-job",
             jobs_host_template=f"{{job_id}}.jobs.{ingress_host}",

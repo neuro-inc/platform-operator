@@ -40,7 +40,10 @@ class ConfigClient:
             )
         else:
             logger.info(
-                "Received %s %s %s", params.method, params.response.status, params.url,
+                "Received %s %s %s",
+                params.method,
+                params.response.status,
+                params.url,
             )
 
     async def __aenter__(self) -> "ConfigClient":
