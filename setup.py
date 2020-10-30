@@ -6,7 +6,7 @@ install_requires = (
     "aiohttp==3.6.2",
     "pyyaml==5.3.1",
     "idna==2.8",
-    "aiobotocore==1.0.4",
+    "aiobotocore==1.1.2",
 )
 
 setup(
