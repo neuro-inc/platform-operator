@@ -4,7 +4,7 @@ boto3==1.12.32
 botocore==1.15.32
 flake8==3.8.3
 isort==5.6.4
-moto[server]==1.3.14
+moto[server]==1.3.16
 mypy==0.782
 pre-commit==2.7.1
 pytest==6.0.1
