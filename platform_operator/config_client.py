@@ -48,8 +48,8 @@ class ConfigClient:
 
     async def __aenter__(self) -> "ConfigClient":
         trace_config = aiohttp.TraceConfig()
-        trace_config.on_request_start.append(self._on_request_start)  # type: ignore
-        trace_config.on_request_end.append(self._on_request_end)  # type: ignore
+        trace_config.on_request_start.append(self._on_request_start)
+        trace_config.on_request_end.append(self._on_request_end)
         self._session = aiohttp.ClientSession(trace_configs=[trace_config])
         return self
 
