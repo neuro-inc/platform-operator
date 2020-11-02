@@ -86,6 +86,7 @@ class TestConfig:
             helm_service_account="default",
             platform_url=URL("https://dev.neu.ro"),
             platform_auth_url=URL("https://dev.neu.ro"),
+            platform_config_url=URL("https://dev.neu.ro"),
             platform_api_url=URL("https://dev.neu.ro/api/v1"),
             platform_namespace="platform",
             platform_jobs_namespace="platform-jobs",
@@ -140,6 +141,7 @@ class TestConfig:
             helm_service_account="default",
             platform_url=URL("https://dev.neu.ro"),
             platform_auth_url=URL("https://dev.neu.ro"),
+            platform_config_url=URL("https://dev.neu.ro"),
             platform_api_url=URL("https://dev.neu.ro/api/v1"),
             platform_namespace="platform",
             platform_jobs_namespace="platform-jobs",
@@ -199,9 +201,7 @@ class TestPlatformConfig:
         return {"data": {"ca.crt": "cert-authority-data", "token": "token"}}
 
     def test_create_dns_config(
-        self,
-        gcp_platform_config: PlatformConfig,
-        traefik_service: Dict[str, Any],
+        self, gcp_platform_config: PlatformConfig, traefik_service: Dict[str, Any]
     ) -> None:
         result = gcp_platform_config.create_dns_config(traefik_service=traefik_service)
         zone_name = gcp_platform_config.dns_zone_name

@@ -607,7 +607,12 @@ class HelmValuesFactory:
         alphabet = string.ascii_letters + string.digits
         object_store_config_map_name = "thanos-object-storage-config"
         result: Dict[str, Any] = {
-            "nodePoolLabels": {"gpu": platform.kubernetes_node_labels.accelerator},
+            "nodePoolLabels": {
+                "job": platform.kubernetes_node_labels.job,
+                "gpu": platform.kubernetes_node_labels.accelerator,
+                "nodePool": platform.kubernetes_node_labels.node_pool,
+                "preemptible": platform.kubernetes_node_labels.preemptible,
+            },
             "objectStore": {
                 "supported": True,
                 "configMapName": object_store_config_map_name,
@@ -616,8 +621,10 @@ class HelmValuesFactory:
             "platform": {
                 "clusterName": platform.cluster_name,
                 "authUrl": str(platform.auth_url),
+                "configUrl": str(platform.config_url),
                 "apiUrl": str(platform.api_url),
             },
+            "platformJobs": {"namespace": platform.jobs_namespace},
             "grafanaProxy": {"ingress": {"host": platform.ingress_metrics_url.host}},
             "prometheus-operator": {
                 "prometheus": {
@@ -677,6 +684,14 @@ class HelmValuesFactory:
                     ).decode(),
                 },
             }
+            result["cloudProvider"] = {
+                "type": "gcp",
+                "region": platform.gcp.region,
+                "serviceAccountSecret": {
+                    "name": f"{self._release_names.platform}-gcp-service-account-key",
+                    "key": "key.json",
+                },
+            }
         if platform.aws:
             if platform.aws.role_s3_arn:
                 result["prometheus-operator"]["prometheus"]["prometheusSpec"][
@@ -700,6 +715,7 @@ class HelmValuesFactory:
                     "endpoint": f"s3.{platform.aws.region}.amazonaws.com",
                 },
             }
+            result["cloudProvider"] = {"type": "aws", "region": platform.aws.region}
         if platform.azure:
             result["thanos"]["objstore"] = {
                 "type": "AZURE",
@@ -709,6 +725,7 @@ class HelmValuesFactory:
                     "storage_account_key": platform.azure.blob_storage_account_key,
                 },
             }
+            result["cloudProvider"] = {"type": "azure", "region": platform.azure.region}
         if platform.on_prem:
             result["objectStore"] = {"supported": False}
             result["prometheusProxy"] = {
