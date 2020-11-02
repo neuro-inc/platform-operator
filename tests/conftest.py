@@ -39,8 +39,7 @@ def config() -> Config:
             auth_type=KubeClientAuthType.NONE,
         ),
         helm_stable_repo=HelmRepo(
-            name="stable",
-            url=URL("https://kubernetes-charts.storage.googleapis.com"),
+            name="stable", url=URL("https://kubernetes-charts.storage.googleapis.com")
         ),
         helm_release_names=HelmReleaseNames(
             platform="platform",
@@ -54,6 +53,7 @@ def config() -> Config:
         helm_service_account="default",
         platform_url=URL("https://dev.neu.ro"),
         platform_auth_url=URL("https://dev.neu.ro"),
+        platform_config_url=URL("https://dev.neu.ro"),
         platform_api_url=URL("https://dev.neu.ro/api/v1"),
         platform_namespace="platform",
         platform_jobs_namespace="platform-jobs",
@@ -385,6 +385,7 @@ def gcp_platform_config(
 ) -> PlatformConfig:
     return PlatformConfig(
         auth_url=URL("https://dev.neu.ro"),
+        config_url=URL("https://dev.neu.ro"),
         api_url=URL("https://dev.neu.ro/api/v1"),
         token="token",
         cluster_name=cluster_name,

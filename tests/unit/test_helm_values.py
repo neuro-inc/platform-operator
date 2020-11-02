@@ -74,9 +74,7 @@ class TestHelmValuesFactory:
         }
 
     def test_create_gcp_platform_values_with_gcs_storage(
-        self,
-        gcp_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_values(
             replace(
@@ -92,9 +90,7 @@ class TestHelmValuesFactory:
         assert result["storage"] == {"gcs": {"bucketName": "platform-storage"}}
 
     def test_create_aws_platform_values(
-        self,
-        aws_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_values(aws_platform_config)
 
@@ -102,9 +98,7 @@ class TestHelmValuesFactory:
         assert "nvidia-gpu-driver" in result
 
     def test_create_azure_platform_values(
-        self,
-        azure_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_values(azure_platform_config)
 
@@ -128,9 +122,7 @@ class TestHelmValuesFactory:
         assert "nvidia-gpu-driver" in result
 
     def test_create_on_prem_platform_values(
-        self,
-        on_prem_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_values(on_prem_platform_config)
 
@@ -220,9 +212,7 @@ class TestHelmValuesFactory:
         }
 
     def test_create_consul_values(
-        self,
-        gcp_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_consul_values(gcp_platform_config)
 
@@ -232,9 +222,7 @@ class TestHelmValuesFactory:
         }
 
     def test_create_on_prem_consul_values(
-        self,
-        on_prem_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_consul_values(on_prem_platform_config)
 
@@ -350,9 +338,7 @@ class TestHelmValuesFactory:
         }
 
     def test_create_aws_traefik_values(
-        self,
-        aws_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_traefik_values(aws_platform_config)
 
@@ -367,9 +353,7 @@ class TestHelmValuesFactory:
         }
 
     def test_create_azure_traefik_values(
-        self,
-        azure_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_traefik_values(azure_platform_config)
 
@@ -381,9 +365,7 @@ class TestHelmValuesFactory:
         }
 
     def test_create_on_prem_traefik_values(
-        self,
-        on_prem_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_traefik_values(on_prem_platform_config)
 
@@ -866,7 +848,12 @@ class TestHelmValuesFactory:
         result = factory.create_platform_reports_values(gcp_platform_config)
 
         assert result == {
-            "nodePoolLabels": {"gpu": "platform.neuromation.io/accelerator"},
+            "nodePoolLabels": {
+                "gpu": "platform.neuromation.io/accelerator",
+                "job": "platform.neuromation.io/job",
+                "nodePool": "platform.neuromation.io/nodepool",
+                "preemptible": "platform.neuromation.io/preemptible",
+            },
             "objectStore": {
                 "supported": True,
                 "configMapName": "thanos-object-storage-config",
@@ -875,8 +862,10 @@ class TestHelmValuesFactory:
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
+                "configUrl": "https://dev.neu.ro",
                 "apiUrl": "https://dev.neu.ro/api/v1",
             },
+            "platformJobs": {"namespace": "platform-jobs"},
             "grafanaProxy": {
                 "ingress": {
                     "host": f"metrics.{gcp_platform_config.cluster_name}.org.neu.ro"
@@ -923,6 +912,14 @@ class TestHelmValuesFactory:
                     "config": {"bucket": "job-metrics", "service_account": "{}"},
                 },
             },
+            "cloudProvider": {
+                "type": "gcp",
+                "region": "us-central1",
+                "serviceAccountSecret": {
+                    "name": "platform-gcp-service-account-key",
+                    "key": "key.json",
+                },
+            },
         }
 
     def test_create_aws_platform_reports_values(
@@ -937,6 +934,7 @@ class TestHelmValuesFactory:
                 "endpoint": "s3.us-east-1.amazonaws.com",
             },
         }
+        assert result["cloudProvider"] == {"type": "aws", "region": "us-east-1"}
 
     def test_create_aws_platform_reports_values_with_roles(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -968,6 +966,7 @@ class TestHelmValuesFactory:
                 "endpoint": "s3.us-east-1.amazonaws.com",
             },
         }
+        assert result["cloudProvider"] == {"type": "aws", "region": "us-east-1"}
 
     def test_create_azure_platform_reports_values(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -982,6 +981,7 @@ class TestHelmValuesFactory:
                 "storage_account_key": "accountKey2",
             },
         }
+        assert result["cloudProvider"] == {"type": "azure", "region": "westus"}
 
     def test_create_on_prem_platform_reports_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -996,7 +996,7 @@ class TestHelmValuesFactory:
             "thanos"
             not in result["prometheus-operator"]["prometheus"]["prometheusSpec"]
         )
-        assert result
+        assert "cloudProvider" not in result
 
     def test_create_platform_disk_api_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
