@@ -123,6 +123,7 @@ class Config:
     helm_service_account: str
     platform_url: URL
     platform_auth_url: URL
+    platform_config_url: URL
     platform_api_url: URL
     platform_namespace: str
     platform_jobs_namespace: str
@@ -171,6 +172,7 @@ class Config:
             ),
             platform_url=platform_url,
             platform_auth_url=platform_url,
+            platform_config_url=platform_url,
             platform_api_url=platform_url / "api/v1",
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
             platform_jobs_namespace=env["NP_PLATFORM_NAMESPACE"] + "-jobs",
@@ -260,6 +262,7 @@ class OnPremConfig:
 @dataclass(frozen=True)
 class PlatformConfig:
     auth_url: URL
+    config_url: URL
     api_url: URL
     token: str
     cluster_name: str
@@ -417,6 +420,7 @@ class PlatformConfigFactory:
         monitoring_spec = platform_body["spec"]["monitoring"]
         return PlatformConfig(
             auth_url=self._config.platform_auth_url,
+            config_url=self._config.platform_config_url,
             api_url=self._config.platform_api_url,
             token=platform_body["spec"]["token"],
             cluster_name=platform_body["metadata"]["name"],
