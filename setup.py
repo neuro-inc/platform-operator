@@ -5,7 +5,7 @@ install_requires = (
     "kopf==0.28",
     "aiohttp==3.7.2",
     "pyyaml==5.3.1",
-    "idna==2.8",
+    "idna==2.10",
     "aiobotocore==1.0.4",
 )
 
