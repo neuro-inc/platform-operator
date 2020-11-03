@@ -414,10 +414,8 @@ class HelmValuesFactory:
                 "balance-similar-node-groups": True,
             },
         }
-        if platform.aws.role_auto_scaling_arn:
-            result["podAnnotations"] = {
-                "iam.amazonaws.com/role": platform.aws.role_auto_scaling_arn
-            }
+        if platform.aws.role_arn:
+            result["podAnnotations"] = {"iam.amazonaws.com/role": platform.aws.role_arn}
         return result
 
     def create_nvidia_gpu_driver_gcp_values(
@@ -458,9 +456,9 @@ class HelmValuesFactory:
         if platform.aws:
             result["NP_OBSTORAGE_LOCATION"] = platform.aws.region
             result["NP_OBSTORAGE_AWS_SECRET"] = secret_name
-            if platform.aws.role_s3_arn:
+            if platform.aws.role_arn:
                 result["annotations"] = {
-                    "iam.amazonaws.com/role": platform.aws.role_s3_arn
+                    "iam.amazonaws.com/role": platform.aws.role_arn
                 }
         if platform.azure:
             result["NP_OBSTORAGE_LOCATION"] = platform.azure.region
@@ -497,10 +495,8 @@ class HelmValuesFactory:
             result["NP_REGISTRY_UPSTREAM_TOKEN_URL"] = str(
                 platform.azure.registry_url / "oauth2/token"
             )
-        if platform.aws and platform.aws.role_ecr_arn:
-            result["annotations"] = {
-                "iam.amazonaws.com/role": platform.aws.role_ecr_arn
-            }
+        if platform.aws and platform.aws.role_arn:
+            result["annotations"] = {"iam.amazonaws.com/role": platform.aws.role_arn}
         if platform.on_prem:
             result["NP_REGISTRY_UPSTREAM_TYPE"] = "basic"
             result[
@@ -543,14 +539,12 @@ class HelmValuesFactory:
                 }
             }
         if platform.aws:
-            if platform.aws.role_s3_arn:
+            if platform.aws.role_arn:
                 result["monitoring"] = {
-                    "podAnnotations": {
-                        "iam.amazonaws.com/role": platform.aws.role_s3_arn
-                    }
+                    "podAnnotations": {"iam.amazonaws.com/role": platform.aws.role_arn}
                 }
                 result["fluentd"]["podAnnotations"] = {
-                    "iam.amazonaws.com/role": platform.aws.role_s3_arn
+                    "iam.amazonaws.com/role": platform.aws.role_arn
                 }
             result["logs"] = {
                 "persistence": {
@@ -693,20 +687,23 @@ class HelmValuesFactory:
                 },
             }
         if platform.aws:
-            if platform.aws.role_s3_arn:
+            if platform.aws.role_arn:
+                result["metricsServer"] = {
+                    "podMetadata": {
+                        "annotations": {"iam.amazonaws.com/role": platform.aws.role_arn}
+                    }
+                }
                 result["prometheus-operator"]["prometheus"]["prometheusSpec"][
                     "podMetadata"
-                ] = {
-                    "annotations": {"iam.amazonaws.com/role": platform.aws.role_s3_arn}
-                }
+                ] = {"annotations": {"iam.amazonaws.com/role": platform.aws.role_arn}}
                 result["thanos"]["store"]["annotations"] = {
-                    "iam.amazonaws.com/role": platform.aws.role_s3_arn
+                    "iam.amazonaws.com/role": platform.aws.role_arn
                 }
                 result["thanos"]["bucket"] = {
-                    "annotations": {"iam.amazonaws.com/role": platform.aws.role_s3_arn}
+                    "annotations": {"iam.amazonaws.com/role": platform.aws.role_arn}
                 }
                 result["thanos"]["compact"]["annotations"] = {
-                    "iam.amazonaws.com/role": platform.aws.role_s3_arn
+                    "iam.amazonaws.com/role": platform.aws.role_arn
                 }
             result["thanos"]["objstore"] = {
                 "type": "S3",
