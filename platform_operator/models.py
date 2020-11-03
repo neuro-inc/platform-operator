@@ -223,9 +223,7 @@ class AwsConfig:
     registry_url: URL
     storage_nfs_server: str
     storage_nfs_path: str
-    role_ecr_arn: str = ""
-    role_s3_arn: str = ""
-    role_auto_scaling_arn: str = ""
+    role_arn: str = ""
 
 
 @dataclass(frozen=True)
@@ -533,15 +531,12 @@ class PlatformConfigFactory:
 
     @classmethod
     def _create_aws(cls, spec: bodies.Spec, cluster: Cluster) -> "AwsConfig":
-        iam_roles = spec.get("iam", {}).get("aws", {}).get("roles", {})
         registry_url = URL(spec["registry"]["aws"]["url"])
         if not registry_url.scheme:
             registry_url = URL(f"https://{registry_url!s}")
         return AwsConfig(
             region=cluster["cloud_provider"]["region"],
-            role_ecr_arn=iam_roles.get("ecrRoleArn", ""),
-            role_auto_scaling_arn=iam_roles.get("autoScalingRoleArn", ""),
-            role_s3_arn=iam_roles.get("s3RoleArn", ""),
+            role_arn=spec.get("iam", {}).get("aws", {}).get("roleArn", ""),
             registry_url=registry_url,
             storage_nfs_server=spec["storage"]["nfs"]["server"],
             storage_nfs_path=spec["storage"]["nfs"].get("path", "/"),
