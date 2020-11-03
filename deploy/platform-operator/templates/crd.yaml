@@ -134,16 +134,8 @@ spec:
                 aws:
                   type: object
                   properties:
-                    roles:
-                      type: object
-                      required:
-                      properties:
-                        ecrRoleArn:
-                          type: string
-                        autoScalingRoleArn:
-                          type: string
-                        s3RoleArn:
-                          type: string
+                    roleArn:
+                      type: string
               oneOf:
               - properties:
                   gcp: {}

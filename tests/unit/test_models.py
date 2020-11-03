@@ -473,24 +473,14 @@ class TestPlatformConfigFactory:
         aws_cluster: Cluster,
         aws_platform_config: PlatformConfig,
     ) -> None:
-        aws_platform_body["spec"]["iam"] = {
-            "aws": {
-                "roles": {
-                    "ecrRoleArn": "ecr_role_arn",
-                    "s3RoleArn": "s3_role_arn",
-                    "autoScalingRoleArn": "auto_scaling_role_arn",
-                }
-            }
-        }
+        aws_platform_body["spec"]["iam"] = {"aws": {"roleArn": "role_arn"}}
         result = factory.create(aws_platform_body, aws_cluster)
 
         assert result == replace(
             aws_platform_config,
             aws=replace(
                 aws_platform_config.aws,
-                role_ecr_arn="ecr_role_arn",
-                role_s3_arn="s3_role_arn",
-                role_auto_scaling_arn="auto_scaling_role_arn",
+                role_arn="role_arn",
             ),
         )
 

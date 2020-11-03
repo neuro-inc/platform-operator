@@ -435,9 +435,7 @@ class TestHelmValuesFactory:
         result = factory.create_cluster_autoscaler_values(
             replace(
                 aws_platform_config,
-                aws=replace(
-                    aws_platform_config.aws, role_auto_scaling_arn="auto_scaling_role"
-                ),
+                aws=replace(aws_platform_config.aws, role_arn="auto_scaling_role"),
             )
         )
 
@@ -548,7 +546,7 @@ class TestHelmValuesFactory:
         result = factory.create_platform_object_storage_values(
             replace(
                 aws_platform_config,
-                aws=replace(aws_platform_config.aws, role_s3_arn="s3_role"),
+                aws=replace(aws_platform_config.aws, role_arn="s3_role"),
             )
         )
 
@@ -609,7 +607,7 @@ class TestHelmValuesFactory:
         result = factory.create_platform_registry_values(
             replace(
                 aws_platform_config,
-                aws=replace(aws_platform_config.aws, role_ecr_arn="ecr_role"),
+                aws=replace(aws_platform_config.aws, role_arn="ecr_role"),
             )
         )
 
@@ -710,7 +708,7 @@ class TestHelmValuesFactory:
         result = factory.create_platform_monitoring_values(
             replace(
                 aws_platform_config,
-                aws=replace(aws_platform_config.aws, role_s3_arn="s3_role"),
+                aws=replace(aws_platform_config.aws, role_arn="s3_role"),
             )
         )
 
@@ -942,22 +940,24 @@ class TestHelmValuesFactory:
         result = factory.create_platform_reports_values(
             replace(
                 aws_platform_config,
-                aws=replace(aws_platform_config.aws, role_s3_arn="s3_role"),
+                aws=replace(aws_platform_config.aws, role_arn="role_arn"),
             )
         )
 
+        assert result["metricsServer"]["podMetadata"]["annotations"] == {
+            "iam.amazonaws.com/role": "role_arn"
+        }
         assert result["prometheus-operator"]["prometheus"]["prometheusSpec"][
             "podMetadata"
-        ] == {"annotations": {"iam.amazonaws.com/role": "s3_role"}}
-
+        ] == {"annotations": {"iam.amazonaws.com/role": "role_arn"}}
         assert result["thanos"]["store"]["annotations"] == {
-            "iam.amazonaws.com/role": "s3_role"
+            "iam.amazonaws.com/role": "role_arn"
         }
         assert result["thanos"]["bucket"]["annotations"] == {
-            "iam.amazonaws.com/role": "s3_role"
+            "iam.amazonaws.com/role": "role_arn"
         }
         assert result["thanos"]["compact"]["annotations"] == {
-            "iam.amazonaws.com/role": "s3_role"
+            "iam.amazonaws.com/role": "role_arn"
         }
         assert result["thanos"]["objstore"] == {
             "type": "S3",
