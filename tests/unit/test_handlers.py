@@ -71,12 +71,6 @@ def certificate_store() -> mock.Mock:
 
 
 @pytest.fixture
-def configure_dns() -> Iterator[mock.Mock]:
-    with mock.patch("platform_operator.handlers.configure_dns") as configure_dns:
-        yield configure_dns
-
-
-@pytest.fixture
 def configure_cluster() -> Iterator[mock.Mock]:
     with mock.patch(
         "platform_operator.handlers.configure_cluster"
@@ -136,44 +130,24 @@ def service_account_secret() -> Dict[str, Any]:
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("setup_app")
-async def test_configure_dns(
-    kube_client: mock.Mock,
-    config_client: mock.Mock,
-    gcp_platform_config: PlatformConfig,
-    traefik_service: Dict[str, Any],
-) -> None:
-    from platform_operator.handlers import configure_dns
-
-    kube_client.get_service.side_effect = [traefik_service]
-
-    await configure_dns(gcp_platform_config)
-
-    kube_client.get_service.assert_has_awaits(
-        [mock.call(namespace="platform", name="platform-traefik")]
-    )
-    config_client.configure_dns.assert_awaited_with(
-        cluster_name=gcp_platform_config.cluster_name,
-        token=gcp_platform_config.token,
-        payload=gcp_platform_config.create_dns_config(traefik_service=traefik_service),
-    )
-
-
-@pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
-async def test_configure_aws_dns(
+async def test_configure_aws_cluster(
     kube_client: mock.Mock,
     config_client: mock.Mock,
     aws_elb_client: mock.Mock,
     aws_platform_config: PlatformConfig,
     aws_traefik_service: Dict[str, Any],
     aws_traefik_lb: Dict[str, Any],
+    service_account: Dict[str, Any],
+    service_account_secret: Dict[str, Any],
 ) -> None:
-    from platform_operator.handlers import configure_dns
+    from platform_operator.handlers import configure_cluster
 
+    kube_client.get_service_account.return_value = service_account
+    kube_client.get_secret.return_value = service_account_secret
     kube_client.get_service.side_effect = [aws_traefik_service]
     aws_elb_client.get_load_balancer_by_dns_name.side_effect = [aws_traefik_lb]
 
-    await configure_dns(aws_platform_config)
+    await configure_cluster(aws_platform_config)
 
     kube_client.get_service.assert_has_awaits(
         [mock.call(namespace="platform", name="platform-traefik")]
@@ -181,11 +155,13 @@ async def test_configure_aws_dns(
     aws_elb_client.get_load_balancer_by_dns_name.assert_has_awaits(
         [mock.call("platform-traefik")]
     )
-    config_client.configure_dns.assert_awaited_with(
+    config_client.patch_cluster.assert_awaited_with(
         cluster_name=aws_platform_config.cluster_name,
         token=aws_platform_config.token,
-        payload=aws_platform_config.create_dns_config(
-            traefik_service=aws_traefik_service, aws_traefik_lb=aws_traefik_lb
+        payload=aws_platform_config.create_cluster_config(
+            service_account_secret=service_account_secret,
+            traefik_service=aws_traefik_service,
+            aws_traefik_lb=aws_traefik_lb,
         ),
     )
 
@@ -198,23 +174,31 @@ async def test_configure_cluster(
     config_client: mock.Mock,
     service_account: Dict[str, Any],
     service_account_secret: Dict[str, Any],
+    traefik_service: Dict[str, Any],
 ) -> None:
     from platform_operator.handlers import configure_cluster
 
+    kube_client.get_service.side_effect = [traefik_service]
     kube_client.get_service_account.return_value = service_account
     kube_client.get_secret.return_value = service_account_secret
 
     await configure_cluster(gcp_platform_config)
 
+    kube_client.get_service.assert_has_awaits(
+        [mock.call(namespace="platform", name="platform-traefik")]
+    )
     kube_client.get_service_account.assert_awaited_with(
         namespace="platform-jobs",
         name="platform-jobs",
     )
     kube_client.get_secret.assert_awaited_with(namespace="platform-jobs", name="token")
-    config_client.configure_cluster.assert_awaited_with(
+    config_client.patch_cluster.assert_awaited_with(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_config.token,
-        payload=gcp_platform_config.create_cluster_config(service_account_secret),
+        payload=gcp_platform_config.create_cluster_config(
+            service_account_secret=service_account_secret,
+            traefik_service=traefik_service,
+        ),
     )
 
 
@@ -225,7 +209,6 @@ async def test_deploy(
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
     certificate_store: mock.AsyncMock,
-    configure_dns: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     logger: logging.Logger,
     config: Config,
@@ -267,13 +250,11 @@ async def test_deploy(
     )
 
     certificate_store.wait_till_certificate_created.assert_awaited_once()
-    configure_dns.assert_awaited_once_with(gcp_platform_config)
     configure_cluster.assert_awaited_once_with(gcp_platform_config)
 
     status_manager.start_deployment.assert_awaited_once_with(0)
     status_manager.transition.assert_any_call(PlatformConditionType.PLATFORM_DEPLOYED)
     status_manager.transition.assert_any_call(PlatformConditionType.CERTIFICATE_CREATED)
-    status_manager.transition.assert_any_call(PlatformConditionType.DNS_CONFIGURED)
     status_manager.transition.assert_any_call(PlatformConditionType.CLUSTER_CONFIGURED)
     status_manager.complete_deployment.assert_awaited_once()
 
@@ -356,7 +337,6 @@ async def test_deploy_with_all_components_deployed(
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
     certificate_store: mock.AsyncMock,
-    configure_dns: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     logger: logging.Logger,
     config: Config,
@@ -389,7 +369,6 @@ async def test_deploy_with_all_components_deployed(
     helm_client.upgrade.assert_not_awaited()
 
     certificate_store.wait_till_certificate_created.assert_not_awaited()
-    configure_dns.assert_not_awaited()
     configure_cluster.assert_not_awaited()
 
     status_manager.start_deployment.assert_awaited_once_with(0)
