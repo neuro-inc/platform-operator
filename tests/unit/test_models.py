@@ -282,19 +282,19 @@ class TestPlatformConfig:
         cluster_name: str,
         gcp_platform_config: PlatformConfig,
         service_account_secret: Dict[str, Any],
+        traefik_service: Dict[str, Any],
         resource_pool_type_factory: Callable[[str], Dict[str, Any]],
     ) -> None:
-        result = gcp_platform_config.create_cluster_config(service_account_secret)
+        result = gcp_platform_config.create_cluster_config(
+            service_account_secret=service_account_secret,
+            traefik_service=traefik_service,
+        )
+        zone_name = gcp_platform_config.dns_zone_name
 
         assert result == {
-            "name": cluster_name,
             "storage": {
                 "url": f"https://{cluster_name}.org.neu.ro/api/v1/storage",
                 "pvc": {"name": "platform-storage"},
-            },
-            "registry": {
-                "url": f"https://registry.{cluster_name}.org.neu.ro",
-                "email": f"{cluster_name}@neu.ro",
             },
             "orchestrator": {
                 "kubernetes": {
@@ -306,6 +306,7 @@ class TestPlatformConfig:
                     "node_label_gpu": "platform.neuromation.io/accelerator",
                     "node_label_preemptible": "platform.neuromation.io/preemptible",
                     "node_label_job": "platform.neuromation.io/job",
+                    "node_label_node_pool": "platform.neuromation.io/nodepool",
                     "job_pod_priority_class_name": "platform-job",
                 },
                 "is_http_ingress_secure": True,
@@ -313,11 +314,33 @@ class TestPlatformConfig:
                 "job_fallback_hostname": "default.jobs-dev.neu.ro",
                 "resource_pool_types": [resource_pool_type_factory("192.168.0.0/16")],
             },
-            "ssh": {"server": f"ssh-auth.{cluster_name}.org.neu.ro"},
-            "monitoring": {"url": f"https://{cluster_name}.org.neu.ro/api/v1/jobs"},
-            "secrets": {"url": f"https://{cluster_name}.org.neu.ro/api/v1/secrets"},
-            "metrics": {"url": f"https://metrics.{cluster_name}.org.neu.ro"},
+            "dns": {
+                "zone_id": gcp_platform_config.dns_zone_id,
+                "zone_name": gcp_platform_config.dns_zone_name,
+                "name_servers": gcp_platform_config.dns_zone_name_servers,
+                "a_records": [
+                    {"name": zone_name, "ips": ["192.168.0.1"]},
+                    {"name": f"*.jobs.{zone_name}", "ips": ["192.168.0.1"]},
+                    {"name": f"registry.{zone_name}", "ips": ["192.168.0.1"]},
+                    {"name": f"metrics.{zone_name}", "ips": ["192.168.0.1"]},
+                ],
+            },
         }
+
+    def test_create_azure_cluster_config(
+        self,
+        azure_platform_config: PlatformConfig,
+        service_account_secret: Dict[str, Any],
+        traefik_service: Dict[str, Any],
+    ) -> None:
+        result = azure_platform_config.create_cluster_config(
+            service_account_secret=service_account_secret,
+            traefik_service=traefik_service,
+        )
+        assert (
+            result["orchestrator"]["kubernetes"]["job_pod_preemptible_toleration_key"]
+            == "kubernetes.azure.com/scalesetpriority"
+        )
 
 
 class TestPlatformConfigFactory:

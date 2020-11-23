@@ -177,10 +177,6 @@ async def deploy(
                 app.certificate_store.wait_till_certificate_created(), 300
             )
 
-    if not status_manager.is_condition_satisfied(PlatformConditionType.DNS_CONFIGURED):
-        async with status_manager.transition(PlatformConditionType.DNS_CONFIGURED):
-            await configure_dns(platform)
-
     if not status_manager.is_condition_satisfied(
         PlatformConditionType.CLUSTER_CONFIGURED
     ):
@@ -274,7 +270,7 @@ async def delete(
         logger.info("nfs-server helm chart deleted")
 
 
-async def configure_dns(platform: PlatformConfig) -> None:
+async def configure_cluster(platform: PlatformConfig) -> None:
     traefik_service = await app.kube_client.get_service(
         namespace=platform.namespace, name=platform.service_traefik_name
     )
@@ -284,16 +280,6 @@ async def configure_dns(platform: PlatformConfig) -> None:
             aws_traefik_lb = await client.get_load_balancer_by_dns_name(
                 traefik_service["status"]["loadBalancer"]["ingress"][0]["hostname"]
             )
-    dns_config = platform.create_dns_config(
-        traefik_service=traefik_service,
-        aws_traefik_lb=aws_traefik_lb,
-    )
-    await app.config_client.configure_dns(
-        cluster_name=platform.cluster_name, token=platform.token, payload=dns_config
-    )
-
-
-async def configure_cluster(platform: PlatformConfig) -> None:
     service_account = await app.kube_client.get_service_account(
         namespace=platform.jobs_namespace,
         name=platform.jobs_service_account_name,
@@ -303,7 +289,11 @@ async def configure_cluster(platform: PlatformConfig) -> None:
         namespace=platform.jobs_namespace,
         name=secret_name,
     )
-    cluster_config = platform.create_cluster_config(secret)
-    await app.config_client.configure_cluster(
+    cluster_config = platform.create_cluster_config(
+        service_account_secret=secret,
+        traefik_service=traefik_service,
+        aws_traefik_lb=aws_traefik_lb,
+    )
+    await app.config_client.patch_cluster(
         cluster_name=platform.cluster_name, token=platform.token, payload=cluster_config
     )

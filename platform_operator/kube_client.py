@@ -34,7 +34,6 @@ class PlatformConditionType(str, Enum):
     NFS_SERVER_DEPLOYED = "NfsServerDeployed"
     PLATFORM_DEPLOYED = "PlatformDeployed"
     CERTIFICATE_CREATED = "CertificateCreated"
-    DNS_CONFIGURED = "DnsConfigured"
     CLUSTER_CONFIGURED = "ClusterConfigured"
 
 

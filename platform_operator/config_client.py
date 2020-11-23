@@ -72,23 +72,11 @@ class ConfigClient:
             payload = await response.json()
             return Cluster(payload)
 
-    async def configure_dns(
+    async def patch_cluster(
         self, cluster_name: str, token: str, payload: Dict[str, Any]
     ) -> None:
         assert self._session
-        logger.info("cluster '%s' dns configuration: %s", cluster_name, str(payload))
-        async with self._session.put(
-            self._base_url / "api/v1/clusters" / cluster_name / "dns",
-            json=payload,
-            headers={"Authorization": f"Bearer {token}"},
-        ) as response:
-            response.raise_for_status()
-
-    async def configure_cluster(
-        self, cluster_name: str, token: str, payload: Dict[str, Any]
-    ) -> None:
-        assert self._session
-        async with self._session.put(
+        async with self._session.patch(
             self._base_url / "api/v1/clusters" / cluster_name,
             json=payload,
             headers={"Authorization": f"Bearer {token}"},

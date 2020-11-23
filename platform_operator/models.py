@@ -356,17 +356,18 @@ class PlatformConfig:
         return result
 
     def create_cluster_config(
-        self, service_account_secret: Dict[str, Any]
+        self,
+        service_account_secret: Dict[str, Any],
+        traefik_service: Dict[str, Any],
+        aws_traefik_lb: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         result = {
-            "name": self.cluster_name,
+            "dns": self.create_dns_config(
+                traefik_service=traefik_service, aws_traefik_lb=aws_traefik_lb
+            ),
             "storage": {
                 "url": str(self.ingress_url / "api/v1/storage"),
                 "pvc": {"name": self.storage_pvc_name},
-            },
-            "registry": {
-                "url": str(self.ingress_registry_url),
-                "email": f"{self.cluster_name}@neu.ro",
             },
             "orchestrator": {
                 "kubernetes": {
@@ -378,6 +379,7 @@ class PlatformConfig:
                     "node_label_gpu": self.kubernetes_node_labels.accelerator,
                     "node_label_preemptible": self.kubernetes_node_labels.preemptible,
                     "node_label_job": self.kubernetes_node_labels.job,
+                    "node_label_node_pool": self.kubernetes_node_labels.node_pool,
                     "job_pod_priority_class_name": self.jobs_priority_class_name,
                 },
                 "is_http_ingress_secure": True,
@@ -385,13 +387,11 @@ class PlatformConfig:
                 "job_fallback_hostname": str(self.jobs_fallback_host),
                 "resource_pool_types": self.jobs_resource_pool_types,
             },
-            "ssh": {
-                "server": self.ingress_ssh_auth_server
-            },  # TODO: remove after removal in config service
-            "monitoring": {"url": str(self.ingress_url / "api/v1/jobs")},
-            "secrets": {"url": str(self.ingress_url / "api/v1/secrets")},
-            "metrics": {"url": str(self.ingress_metrics_url)},
         }
+        if self.azure:
+            result["orchestrator"]["kubernetes"][
+                "job_pod_preemptible_toleration_key"
+            ] = "kubernetes.azure.com/scalesetpriority"
         return result
 
 
