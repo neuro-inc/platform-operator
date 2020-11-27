@@ -23,6 +23,8 @@ spec:
     secretNamespace: {{ .Release.Namespace }}
     shareName: {{ .Values.storage.azureFile.shareName }}
     readOnly: false
+  mountOptions:
+    - mfsymlinks
 {{- else if hasKey .Values.storage "gcs" }}
   csi:
     driver: obs.csi.neu.ro
