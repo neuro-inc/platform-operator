@@ -663,7 +663,9 @@ class TestHelmValuesFactory:
             "NP_MONITORING_K8S_NS": "platform-jobs",
             "NP_MONITORING_PLATFORM_API_URL": "https://dev.neu.ro/api/v1",
             "NP_MONITORING_PLATFORM_AUTH_URL": "https://dev.neu.ro",
-            "NP_MONITORING_PLATFORM_CONFIG_URL": "https://dev.neu.ro/api/v1",
+            "NP_MONITORING_PLATFORM_CONFIG_URL": "https://dev.neu.ro",
+            "NP_MONITORING_NODE_LABEL_JOB": "platform.neuromation.io/job",
+            "NP_MONITORING_NODE_LABEL_NODE_POOL": "platform.neuromation.io/nodepool",
             "NP_MONITORING_REGISTRY_URL": (
                 f"https://registry.{gcp_platform_config.cluster_name}.org.neu.ro"
             ),
@@ -1007,6 +1009,7 @@ class TestHelmValuesFactory:
             "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
             "NP_DISK_API_K8S_NS": "platform-jobs",
             "NP_DISK_API_PLATFORM_AUTH_URL": "https://dev.neu.ro",
+            "NP_DISK_API_STORAGE_LIMIT_PER_USER": "10995116277760",
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
             "NP_CORS_ORIGINS": (
                 "https://release--neuro-web.netlify.app,https://app.neu.ro"

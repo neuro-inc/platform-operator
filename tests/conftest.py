@@ -106,8 +106,23 @@ def resource_pool_type_factory() -> Callable[[], Dict[str, Any]]:
 
 
 @pytest.fixture
+def resource_preset_factory() -> Callable[[], Dict[str, Any]]:
+    def _factory() -> Dict[str, Any]:
+        return {
+            "name": "gpu-small",
+            "cpu": 1,
+            "memory_mb": 1024,
+            "gpu": 1,
+            "gpu_model": "nvidia-tesla-k80",
+        }
+
+    return _factory
+
+
+@pytest.fixture
 def cluster_factory(
-    resource_pool_type_factory: Callable[[], Dict[str, Any]]
+    resource_pool_type_factory: Callable[[], Dict[str, Any]],
+    resource_preset_factory: Callable[[], Dict[str, Any]],
 ) -> Callable[[str], Cluster]:
     def _factory(name: str) -> Cluster:
         payload = {
@@ -124,8 +139,11 @@ def cluster_factory(
                 "job_hostname_template": f"{{job_id}}.jobs.{name}.org.neu.ro",
                 "is_http_ingress_secure": True,
                 "resource_pool_types": [resource_pool_type_factory()],
+                "resource_presets": [resource_preset_factory()],
                 "kubernetes": {},
                 "job_fallback_hostname": "default.jobs-dev.neu.ro",
+                "job_schedule_timeout_s": 60,
+                "job_schedule_scale_up_timeout_s": 30,
             },
             "ssh": {"server": f"ssh-auth.{name}.org.neu.ro"},
             "monitoring": {"url": f"https://{name}.org.neu.ro/api/v1/jobs"},
@@ -142,10 +160,7 @@ def cluster_factory(
                     "url": "https://neuro.jfrog.io/neuro/helm-virtual-public",
                 },
                 "neuro": {
-                    "registry_token": "token",
-                    "storage_token": "token",
-                    "compute_token": "token",
-                    "cluster_token": "token",
+                    "token": "token",
                     "url": "https://dev.neu.ro",
                 },
             },
@@ -154,7 +169,8 @@ def cluster_factory(
                 "zone_name": f"{name}.org.neu.ro.",
                 "name_servers": ["192.168.0.2"],
             },
-            "lb": {"acme_environment": "staging"},
+            "disks": {"storage_limit_per_user_gb": 10240},
+            "ingress": {"acme_environment": "staging"},
         }
         return Cluster(payload)
 
@@ -381,7 +397,9 @@ def on_prem_platform_body(cluster_name: str) -> bodies.Body:
 
 @pytest.fixture
 def gcp_platform_config(
-    cluster_name: str, resource_pool_type_factory: Callable[[str], Dict[str, Any]]
+    cluster_name: str,
+    resource_pool_type_factory: Callable[[str], Dict[str, Any]],
+    resource_preset_factory: Callable[[], Dict[str, Any]],
 ) -> PlatformConfig:
     return PlatformConfig(
         auth_url=URL("https://dev.neu.ro"),
@@ -409,15 +427,18 @@ def gcp_platform_config(
             {"name": "n1-highmem-8-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}
         ],
         jobs_resource_pool_types=[resource_pool_type_factory("192.168.0.0/16")],
+        jobs_resource_presets=[resource_preset_factory()],
         jobs_fallback_host="default.jobs-dev.neu.ro",
         jobs_host_template=f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
         jobs_priority_class_name="platform-job",
         jobs_service_account_name="platform-jobs",
+        jobs_schedule_timeout_s=60,
+        jobs_schedule_scale_up_timeout_s=30,
         ingress_url=URL(f"https://{cluster_name}.org.neu.ro"),
         ingress_registry_url=URL(f"https://registry.{cluster_name}.org.neu.ro"),
         ingress_metrics_url=URL(f"https://metrics.{cluster_name}.org.neu.ro"),
-        ingress_ssh_auth_server=f"ssh-auth.{cluster_name}.org.neu.ro",
         ingress_acme_environment="staging",
+        disks_storage_limit_per_user_gb=10240,
         service_traefik_name="platform-traefik",
         monitoring_logs_bucket_name="job-logs",
         monitoring_metrics_bucket_name="job-metrics",
@@ -504,9 +525,6 @@ def on_prem_platform_config(
         gcp=None,
         standard_storage_class_name="standard",
         cloud_provider="on_prem",
-        ingress_ssh_auth_server=(
-            f"ssh-auth.{gcp_platform_config.cluster_name}.org.neu.ro"
-        ),
         jobs_node_pools=[{"name": "gpu-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}],
         jobs_resource_pool_types=[resource_pool_type_factory()],
         monitoring_metrics_bucket_name="",
