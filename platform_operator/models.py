@@ -42,10 +42,10 @@ class KubeConfig:
 
 @dataclass(frozen=True)
 class LabelsConfig:
-    job: str
-    node_pool: str
-    accelerator: str
-    preemptible: str
+    job: str = "platform.neuromation.io/job"
+    node_pool: str = "platform.neuromation.io/nodepool"
+    accelerator: str = "platform.neuromation.io/accelerator"
+    preemptible: str = "platform.neuromation.io/preemptible"
 
 
 class HelmRepoName(str, Enum):
@@ -429,15 +429,15 @@ class PlatformConfigFactory:
             kubernetes_version=self._config.kube_config.version,
             kubernetes_public_url=URL(kubernetes_spec["publicUrl"]),
             kubernetes_node_labels=LabelsConfig(
-                job=kubernetes_node_labels.get("job", "platform.neuromation.io/job"),
+                job=kubernetes_node_labels.get("job", LabelsConfig.job),
                 node_pool=kubernetes_node_labels.get(
-                    "nodePool", "platform.neuromation.io/nodepool"
+                    "nodePool", LabelsConfig.node_pool
                 ),
                 accelerator=kubernetes_node_labels.get(
-                    "accelerator", "platform.neuromation.io/accelerator"
+                    "accelerator", LabelsConfig.accelerator
                 ),
                 preemptible=kubernetes_node_labels.get(
-                    "preemptible", "platform.neuromation.io/preemptible"
+                    "preemptible", LabelsConfig.preemptible
                 ),
             ),
             dns_zone_id=cluster["dns"]["zone_id"],

@@ -4,7 +4,7 @@ from unittest import mock
 import pytest
 
 from platform_operator.helm_values import HelmValuesFactory
-from platform_operator.models import Config, PlatformConfig
+from platform_operator.models import Config, LabelsConfig, PlatformConfig
 
 
 class TestHelmValuesFactory:
@@ -892,6 +892,18 @@ class TestHelmValuesFactory:
                 },
                 "prometheusOperator": {"kubeletService": {"namespace": "platform"}},
                 "kubelet": {"namespace": "platform"},
+                "kubeStateMetrics": {
+                    "serviceMonitor": {
+                        "metricRelabelings": [
+                            {
+                                "sourceLabels": [
+                                    "label_beta_kubernetes_io_instance_type"
+                                ],
+                                "targetLabel": "label_node_kubernetes_io_instance_type",
+                            }
+                        ]
+                    }
+                },
                 "grafana": {"adminPassword": mock.ANY},
             },
             "thanos": {
@@ -919,6 +931,60 @@ class TestHelmValuesFactory:
                 },
             },
         }
+
+    def test_create_gcp_platform_reports_values_with_k8s_label_relabelings(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_reports_values(
+            replace(gcp_platform_config, kubernetes_version="1.17.3")
+        )
+
+        assert (
+            result["prometheus-operator"]["kubeStateMetrics"]["serviceMonitor"][
+                "metricRelabelings"
+            ]
+            == []
+        )
+
+    def test_create_gcp_platform_reports_values_with_platform_label_relabelings(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_reports_values(
+            replace(
+                gcp_platform_config,
+                kubernetes_node_labels=LabelsConfig(
+                    job="other.io/job",
+                    node_pool="other.io/node-pool",
+                    accelerator="other.io/accelerator",
+                    preemptible="other.io/preemptible",
+                ),
+            )
+        )
+
+        assert result["prometheus-operator"]["kubeStateMetrics"]["serviceMonitor"][
+            "metricRelabelings"
+        ] == [
+            {
+                "sourceLabels": ["label_other_io_job"],
+                "targetLabel": "label_platform_neuromation_io_job",
+            },
+            {
+                "sourceLabels": ["label_other_io_node_pool"],
+                "targetLabel": "label_platform_neuromation_io_nodepool",
+            },
+            {
+                "sourceLabels": ["label_other_io_accelerator"],
+                "targetLabel": "label_platform_neuromation_io_accelerator",
+            },
+            {
+                "sourceLabels": ["label_other_io_preemptible"],
+                "targetLabel": "label_platform_neuromation_io_preemptible",
+            },
+            {
+                "sourceLabels": ["label_beta_kubernetes_io_instance_type"],
+                "targetLabel": "label_node_kubernetes_io_instance_type",
+            },
+        ]
 
     def test_create_aws_platform_reports_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory

@@ -1,9 +1,9 @@
 import secrets
 import string
 from base64 import b64decode
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from .models import HelmChartNames, HelmReleaseNames, PlatformConfig
+from .models import HelmChartNames, HelmReleaseNames, LabelsConfig, PlatformConfig
 
 
 class HelmValuesFactory:
@@ -600,6 +600,32 @@ class HelmValuesFactory:
     ) -> Dict[str, Any]:
         alphabet = string.ascii_letters + string.digits
         object_store_config_map_name = "thanos-object-storage-config"
+        relabelings = [
+            self._relabel_reports_label(
+                platform.kubernetes_node_labels.job,
+                LabelsConfig.job,
+            ),
+            self._relabel_reports_label(
+                platform.kubernetes_node_labels.node_pool,
+                LabelsConfig.node_pool,
+            ),
+            self._relabel_reports_label(
+                platform.kubernetes_node_labels.accelerator,
+                LabelsConfig.accelerator,
+            ),
+            self._relabel_reports_label(
+                platform.kubernetes_node_labels.preemptible,
+                LabelsConfig.preemptible,
+            ),
+        ]
+        relabelings = [r for r in relabelings if r]
+        if platform.kubernetes_version < "1.17":
+            relabelings.append(
+                self._relabel_reports_label(
+                    "beta.kubernetes.io/instance-type",
+                    "node.kubernetes.io/instance-type",
+                )
+            )
         result: Dict[str, Any] = {
             "nodePoolLabels": {
                 "job": platform.kubernetes_node_labels.job,
@@ -645,6 +671,9 @@ class HelmValuesFactory:
                     "kubeletService": {"namespace": platform.namespace}
                 },
                 "kubelet": {"namespace": platform.namespace},
+                "kubeStateMetrics": {
+                    "serviceMonitor": {"metricRelabelings": relabelings}
+                },
                 "grafana": {
                     "adminPassword": "".join(
                         secrets.choice(alphabet) for i in range(16)
@@ -731,6 +760,19 @@ class HelmValuesFactory:
             del result["prometheus-operator"]["prometheus"]["prometheusSpec"]["thanos"]
             del result["thanos"]
         return result
+
+    def _relabel_reports_label(
+        self, source_label: str, target_label: str
+    ) -> Optional[Dict[str, Any]]:
+        if source_label == target_label:
+            return None
+        return {
+            "sourceLabels": [self._convert_label_to_reports_value(source_label)],
+            "targetLabel": self._convert_label_to_reports_value(target_label),
+        }
+
+    def _convert_label_to_reports_value(self, value: str) -> str:
+        return "label_" + value.replace(".", "_").replace("/", "_").replace("-", "_")
 
     def create_platform_disk_api_values(
         self, platform: PlatformConfig
