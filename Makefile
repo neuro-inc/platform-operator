@@ -14,7 +14,6 @@ else
 	pre-commit run --all-files
 endif
 
-
 lint: format
 	mypy platform_operator tests setup.py
 

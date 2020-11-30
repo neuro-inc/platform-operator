@@ -197,9 +197,7 @@ class Cluster(Dict[str, Any]):
 
     @property
     def acme_environment(self) -> str:
-        if "acme_environment" in self["lb"]:
-            return self["lb"]["acme_environment"]
-        return self["lb"]["http"]["acme_environment"]
+        return self["ingress"]["acme_environment"]
 
     @property
     def dns_zone_name(self) -> str:
@@ -277,12 +275,15 @@ class PlatformConfig:
     ingress_url: URL
     ingress_registry_url: URL
     ingress_metrics_url: URL
-    ingress_ssh_auth_server: str  # TODO: remove after removal in config service
     ingress_acme_environment: str
+    disks_storage_limit_per_user_gb: int
     service_traefik_name: str
     jobs_namespace: str
     jobs_node_pools: Sequence[Dict[str, Any]]
+    jobs_schedule_timeout_s: float
+    jobs_schedule_scale_up_timeout_s: float
     jobs_resource_pool_types: Sequence[Dict[str, Any]]
+    jobs_resource_presets: Sequence[Dict[str, Any]]
     jobs_priority_class_name: str
     jobs_host_template: str
     jobs_fallback_host: str
@@ -385,7 +386,12 @@ class PlatformConfig:
                 "is_http_ingress_secure": True,
                 "job_hostname_template": self.jobs_host_template,
                 "job_fallback_hostname": str(self.jobs_fallback_host),
+                "job_schedule_timeout_s": self.jobs_schedule_timeout_s,
+                "job_schedule_scale_up_timeout_s": (
+                    self.jobs_schedule_scale_up_timeout_s
+                ),
                 "resource_pool_types": self.jobs_resource_pool_types,
+                "resource_presets": self.jobs_resource_presets,
             },
         }
         if self.azure:
@@ -446,8 +452,10 @@ class PlatformConfigFactory:
             ingress_url=URL(f"https://{ingress_host}"),
             ingress_registry_url=URL(f"https://registry.{ingress_host}"),
             ingress_metrics_url=URL(f"https://metrics.{ingress_host}"),
-            ingress_ssh_auth_server=f"ssh-auth.{ingress_host}",
             ingress_acme_environment=cluster.acme_environment,
+            disks_storage_limit_per_user_gb=cluster["disks"][
+                "storage_limit_per_user_gb"
+            ],
             service_traefik_name=f"{self._config.platform_namespace}-traefik",
             jobs_namespace=self._config.platform_jobs_namespace,
             jobs_node_pools=self._create_node_pools(
@@ -457,6 +465,11 @@ class PlatformConfigFactory:
                 cluster["orchestrator"].get("resource_pool_types", ()),
                 tpu_network,
             ),
+            jobs_resource_presets=cluster["orchestrator"].get("resource_presets", ()),
+            jobs_schedule_timeout_s=cluster["orchestrator"]["job_schedule_timeout_s"],
+            jobs_schedule_scale_up_timeout_s=cluster["orchestrator"][
+                "job_schedule_scale_up_timeout_s"
+            ],
             jobs_priority_class_name=f"{self._config.platform_namespace}-job",
             jobs_host_template=f"{{job_id}}.jobs.{ingress_host}",
             jobs_fallback_host=cluster["orchestrator"]["job_fallback_hostname"],

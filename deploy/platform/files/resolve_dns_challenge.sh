@@ -64,7 +64,7 @@ apk add -q --update --no-cache curl
 ACTION="$1"
 DNS_NAME="$2"
 VALUE="$3"
-PLATFORM_API_PATH="clusters/$NP_CLUSTER_NAME/lb/http/acme/challenges/dns"
+PLATFORM_API_PATH="clusters/$NP_CLUSTER_NAME/dns/acme_challenge"
 PAYLOAD="$(cat <<EOM
 {
     "dns_name": "$DNS_NAME",

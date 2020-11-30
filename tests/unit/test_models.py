@@ -161,11 +161,7 @@ class TestCluster:
         assert cluster.cloud_provider_type == "gcp"
 
     def test_acme_environment(self) -> None:
-        cluster = Cluster({"lb": {"acme_environment": "staging"}})
-
-        assert cluster.acme_environment == "staging"
-
-        cluster = Cluster({"lb": {"http": {"acme_environment": "staging"}}})
+        cluster = Cluster({"ingress": {"acme_environment": "staging"}})
 
         assert cluster.acme_environment == "staging"
 
@@ -284,6 +280,7 @@ class TestPlatformConfig:
         service_account_secret: Dict[str, Any],
         traefik_service: Dict[str, Any],
         resource_pool_type_factory: Callable[[str], Dict[str, Any]],
+        resource_preset_factory: Callable[[], Dict[str, Any]],
     ) -> None:
         result = gcp_platform_config.create_cluster_config(
             service_account_secret=service_account_secret,
@@ -312,7 +309,10 @@ class TestPlatformConfig:
                 "is_http_ingress_secure": True,
                 "job_hostname_template": f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
                 "job_fallback_hostname": "default.jobs-dev.neu.ro",
+                "job_schedule_timeout_s": 60,
+                "job_schedule_scale_up_timeout_s": 30,
                 "resource_pool_types": [resource_pool_type_factory("192.168.0.0/16")],
+                "resource_presets": [resource_preset_factory()],
             },
             "dns": {
                 "zone_id": gcp_platform_config.dns_zone_id,

@@ -513,9 +513,13 @@ class HelmValuesFactory:
             "NP_MONITORING_K8S_NS": platform.jobs_namespace,
             "NP_MONITORING_PLATFORM_API_URL": str(platform.api_url),
             "NP_MONITORING_PLATFORM_AUTH_URL": str(platform.auth_url),
-            "NP_MONITORING_PLATFORM_CONFIG_URL": str(platform.api_url),
+            "NP_MONITORING_PLATFORM_CONFIG_URL": str(platform.config_url),
             "NP_MONITORING_REGISTRY_URL": str(platform.ingress_registry_url),
             "NP_CORS_ORIGINS": self._create_cors_origins(platform.cluster_name),
+            "NP_MONITORING_NODE_LABEL_JOB": platform.kubernetes_node_labels.job,
+            "NP_MONITORING_NODE_LABEL_NODE_POOL": (
+                platform.kubernetes_node_labels.node_pool
+            ),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
             "fluentd": {
                 "persistence": {
@@ -739,6 +743,9 @@ class HelmValuesFactory:
             "NP_CLUSTER_NAME": platform.cluster_name,
             "NP_DISK_API_K8S_NS": platform.jobs_namespace,
             "NP_DISK_API_PLATFORM_AUTH_URL": str(platform.auth_url),
+            "NP_DISK_API_STORAGE_LIMIT_PER_USER": str(
+                platform.disks_storage_limit_per_user_gb * 1024 ** 3
+            ),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
             "NP_CORS_ORIGINS": self._create_cors_origins(platform.cluster_name),
         }
