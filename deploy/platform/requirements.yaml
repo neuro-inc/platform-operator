@@ -44,7 +44,7 @@ dependencies:
     repository: "@neuro"
     alias: platform-registry
   - name: platformmonitoringapi
-    version: "1.1.9"
+    version: "1.1.10"
     repository: "@neuro"
     alias: platform-monitoring
   - name: platformobjectstorage
@@ -63,7 +63,7 @@ dependencies:
     version: "20201110"
     repository: "@neuro"
   - name: platformdiskapi
-    version: "20201103"
+    version: "20201130"
     repository: "@neuro"
     alias: platform-disk-api
     tags:
