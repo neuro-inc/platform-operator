@@ -89,6 +89,7 @@ def node_pool_factory() -> Callable[[str], Dict[str, Any]]:
 def resource_pool_type_factory() -> Callable[[], Dict[str, Any]]:
     def _factory(tpu_ipv4_cidr_block: str = "") -> Dict[str, Any]:
         result = {
+            "name": "gpu",
             "is_preemptible": False,
             "min_size": 0,
             "max_size": 1,
@@ -114,6 +115,7 @@ def resource_preset_factory() -> Callable[[], Dict[str, Any]]:
             "memory_mb": 1024,
             "gpu": 1,
             "gpu_model": "nvidia-tesla-k80",
+            "resource_affinity": ["gpu"],
         }
 
     return _factory

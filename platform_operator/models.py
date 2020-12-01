@@ -2,6 +2,7 @@ import copy
 import json
 import os
 from base64 import b64encode
+from copy import deepcopy
 from dataclasses import dataclass
 from enum import Enum
 from ipaddress import IPv4Address, IPv4Network
@@ -391,13 +392,21 @@ class PlatformConfig:
                     self.jobs_schedule_scale_up_timeout_s
                 ),
                 "resource_pool_types": self.jobs_resource_pool_types,
-                "resource_presets": self.jobs_resource_presets,
+                "resource_presets": self._create_resource_presets(),
             },
         }
         if self.azure:
             result["orchestrator"]["kubernetes"][
                 "job_pod_preemptible_toleration_key"
             ] = "kubernetes.azure.com/scalesetpriority"
+        return result
+
+    def _create_resource_presets(self) -> Sequence[Dict[str, Any]]:
+        result = []
+        for preset in self.jobs_resource_presets:
+            new_preset = deepcopy(preset)
+            new_preset.pop("resource_affinity", None)
+            result.append(new_preset)
         return result
 
 
