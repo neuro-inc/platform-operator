@@ -282,6 +282,9 @@ class TestPlatformConfig:
         resource_pool_type_factory: Callable[[str], Dict[str, Any]],
         resource_preset_factory: Callable[[], Dict[str, Any]],
     ) -> None:
+        resource_preset = resource_preset_factory()
+        resource_preset.pop("resource_affinity", None)
+
         result = gcp_platform_config.create_cluster_config(
             service_account_secret=service_account_secret,
             traefik_service=traefik_service,
@@ -312,7 +315,7 @@ class TestPlatformConfig:
                 "job_schedule_timeout_s": 60,
                 "job_schedule_scale_up_timeout_s": 30,
                 "resource_pool_types": [resource_pool_type_factory("192.168.0.0/16")],
-                "resource_presets": [resource_preset_factory()],
+                "resource_presets": [resource_preset],
             },
             "dns": {
                 "zone_id": gcp_platform_config.dns_zone_id,
