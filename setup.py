@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 
 install_requires = (
-    "kopf==0.28",
+    "kopf==0.28.2",
     "aiohttp==3.7.3",
     "pyyaml==5.3.1",
     "idna==2.10",
