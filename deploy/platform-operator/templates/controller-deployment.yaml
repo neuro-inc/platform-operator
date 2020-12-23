@@ -48,7 +48,7 @@ spec:
         - name: NP_KUBE_AUTH_TOKEN_PATH
           value: /var/run/secrets/kubernetes.io/serviceaccount/token
         - name: NP_HELM_STABLE_REPO_URL
-          value: https://kubernetes-charts.storage.googleapis.com
+          value: https://charts.helm.sh/stable
         - name: NP_HELM_SERVICE_ACCOUNT_NAME
           value: {{ include "platformOperator.fullname" . }}
         - name: NP_HELM_PLATFORM_CHART_VERSION

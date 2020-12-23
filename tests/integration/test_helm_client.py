@@ -33,10 +33,7 @@ class TestHelmClient:
     ) -> None:
         await helm_client.init(client_only=True)
         await helm_client.add_repo(
-            HelmRepo(
-                "incubator",
-                URL("https://kubernetes-charts-incubator.storage.googleapis.com"),
-            )
+            HelmRepo("incubator", URL("https://charts.helm.sh/incubator"))
         )
         await helm_client.update_repo()
         release_name = str(uuid.uuid4())

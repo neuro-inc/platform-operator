@@ -3,6 +3,7 @@ DOCKER_REPO ?= neuro-docker-local-anonymous.jfrog.io
 IMAGE = $(DOCKER_REPO)/platform-operator-controller:$(TAG)
 
 setup:
+	pip install -U pip
 	pip install setuptools wheel
 	pip install -r requirements/dev.txt
 	pre-commit install
@@ -39,8 +40,7 @@ endif
 	docker push $(IMAGE)
 
 helm_install:
-	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get \
-		| bash -s -- -v v2.16.7
+	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v $(HELM_VERSION)
 
 helm_plugin_install:
 	helm plugin install https://github.com/belitre/helm-push-artifactory-plugin
