@@ -701,6 +701,7 @@ class HelmValuesFactory:
                 },
             },
         }
+        prometheus_spec = result["prometheus-operator"]["prometheus"]["prometheusSpec"]
         if platform.gcp:
             result["thanos"]["objstore"] = {
                 "type": "GCS",
@@ -726,9 +727,9 @@ class HelmValuesFactory:
                         "annotations": {"iam.amazonaws.com/role": platform.aws.role_arn}
                     }
                 }
-                result["prometheus-operator"]["prometheus"]["prometheusSpec"][
-                    "podMetadata"
-                ] = {"annotations": {"iam.amazonaws.com/role": platform.aws.role_arn}}
+                prometheus_spec["podMetadata"] = {
+                    "annotations": {"iam.amazonaws.com/role": platform.aws.role_arn}
+                }
                 result["thanos"]["store"]["annotations"] = {
                     "iam.amazonaws.com/role": platform.aws.role_arn
                 }
@@ -760,6 +761,12 @@ class HelmValuesFactory:
             result["objectStore"] = {"supported": False}
             result["prometheusProxy"] = {
                 "prometheus": {"host": "prometheus-prometheus", "port": 9090}
+            }
+            prometheus_spec["storageSpec"]["volumeClaimTemplate"]["spec"] = {
+                "storageClassName": platform.monitoring_metrics_storage_class_name,
+                "resources": {
+                    "requests": {"storage": platform.monitoring_metrics_storage_size}
+                },
             }
             del result["prometheus-operator"]["prometheus"]["prometheusSpec"]["thanos"]
             del result["thanos"]

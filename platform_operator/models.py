@@ -289,11 +289,13 @@ class PlatformConfig:
     jobs_host_template: str
     jobs_fallback_host: str
     jobs_service_account_name: str
-    monitoring_logs_bucket_name: str
-    monitoring_metrics_bucket_name: str
     storage_pvc_name: str
     helm_repo: HelmRepo
     docker_registry: DockerRegistry
+    monitoring_logs_bucket_name: str = ""
+    monitoring_metrics_bucket_name: str = ""
+    monitoring_metrics_storage_class_name: str = ""
+    monitoring_metrics_storage_size: str = ""
     gcp: Optional[GcpConfig] = None
     aws: Optional[AwsConfig] = None
     azure: Optional[AzureConfig] = None
@@ -431,6 +433,10 @@ class PlatformConfigFactory:
         if cluster.cloud_provider_type == "on_prem":
             standard_storage_class_name = kubernetes_spec["standardStorageClassName"]
         monitoring_spec = platform_body["spec"]["monitoring"]
+        monitoring_metrics_spec = platform_body["spec"]["monitoring"].get("metrics", {})
+        monitoring_metrics_default_storage_size = ""
+        if cluster.cloud_provider_type == "on_prem":
+            monitoring_metrics_default_storage_size = "10Gi"
         return PlatformConfig(
             auth_url=self._config.platform_auth_url,
             config_url=self._config.platform_config_url,
@@ -483,9 +489,21 @@ class PlatformConfigFactory:
             jobs_host_template=f"{{job_id}}.jobs.{ingress_host}",
             jobs_fallback_host=cluster["orchestrator"]["job_fallback_hostname"],
             jobs_service_account_name=f"{self._config.platform_namespace}-jobs",
-            monitoring_logs_bucket_name=monitoring_spec["logs"]["bucket"],
-            monitoring_metrics_bucket_name=monitoring_spec.get("metrics", {}).get(
-                "bucket", ""
+            monitoring_logs_bucket_name=(
+                monitoring_spec["logs"]["blobStorage"]["bucket"]
+            ),
+            monitoring_metrics_bucket_name=(
+                monitoring_metrics_spec.get("blobStorage", {}).get("bucket", "")
+            ),
+            monitoring_metrics_storage_class_name=(
+                monitoring_metrics_spec.get("kubernetes", {})
+                .get("persistence", {})
+                .get("storageClassName", "")
+            ),
+            monitoring_metrics_storage_size=(
+                monitoring_metrics_spec.get("kubernetes", {})
+                .get("persistence", {})
+                .get("size", monitoring_metrics_default_storage_size)
             ),
             storage_pvc_name=f"{self._config.platform_namespace}-storage",
             helm_repo=self._create_helm_repo(cluster),
