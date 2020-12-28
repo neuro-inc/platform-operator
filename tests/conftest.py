@@ -286,8 +286,8 @@ def gcp_platform_body(cluster_name: str) -> bodies.Body:
             "iam": {"gcp": {"serviceAccountKeyBase64": "e30="}},
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
             "monitoring": {
-                "logs": {"bucket": "job-logs"},
-                "metrics": {"bucket": "job-metrics"},
+                "logs": {"blobStorage": {"bucket": "job-logs"}},
+                "metrics": {"blobStorage": {"bucket": "job-metrics"}},
             },
         },
     }
@@ -306,8 +306,8 @@ def aws_platform_body(cluster_name: str) -> bodies.Body:
             "registry": {"aws": {"url": "platform.dkr.ecr.us-east-1.amazonaws.com"}},
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
             "monitoring": {
-                "logs": {"bucket": "job-logs"},
-                "metrics": {"bucket": "job-metrics"},
+                "logs": {"blobStorage": {"bucket": "job-logs"}},
+                "metrics": {"blobStorage": {"bucket": "job-metrics"}},
             },
         },
     }
@@ -344,8 +344,8 @@ def azure_platform_body(cluster_name: str) -> bodies.Body:
                 },
             },
             "monitoring": {
-                "logs": {"bucket": "job-logs"},
-                "metrics": {"bucket": "job-metrics"},
+                "logs": {"blobStorage": {"bucket": "job-logs"}},
+                "metrics": {"blobStorage": {"bucket": "job-metrics"}},
             },
         },
     }
@@ -391,7 +391,17 @@ def on_prem_platform_body(cluster_name: str) -> bodies.Body:
                     }
                 }
             },
-            "monitoring": {"logs": {"bucket": "job-logs"}},
+            "monitoring": {
+                "logs": {"blobStorage": {"bucket": "job-logs"}},
+                "metrics": {
+                    "kubernetes": {
+                        "persistence": {
+                            "storageClassName": "metrics-standard",
+                            "size": "100Gi",
+                        }
+                    }
+                },
+            },
         },
     }
     return bodies.Body(payload)
@@ -530,6 +540,8 @@ def on_prem_platform_config(
         jobs_node_pools=[{"name": "gpu-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}],
         jobs_resource_pool_types=[resource_pool_type_factory()],
         monitoring_metrics_bucket_name="",
+        monitoring_metrics_storage_class_name="metrics-standard",
+        monitoring_metrics_storage_size="100Gi",
         on_prem=OnPremConfig(
             kubernetes_public_ip=IPv4Address("192.168.0.3"),
             masters_count=1,

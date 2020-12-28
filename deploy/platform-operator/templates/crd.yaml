@@ -298,18 +298,50 @@ spec:
               type: object
               required:
               - logs
+              - metrics
               properties:
                 logs:
                   type: object
                   required:
-                  - bucket
+                  - blobStorage
                   properties:
-                    bucket:
-                      type: string
+                    blobStorage:
+                      type: object
+                      required:
+                      - bucket
+                      properties:
+                        bucket:
+                          type: string
                 metrics:
                   type: object
-                  required:
-                  - bucket
                   properties:
-                    bucket:
-                      type: string
+                    blobStorage:
+                      type: object
+                      required:
+                      - bucket
+                      properties:
+                        bucket:
+                          type: string
+                    kubernetes:
+                      type: object
+                      required:
+                      - persistence
+                      properties:
+                        persistence:
+                          type: object
+                          required:
+                          - storageClassName
+                          properties:
+                            storageClassName:
+                              type: string
+                            size:
+                              type: string
+                  oneOf:
+                  - properties:
+                      blobStorage: {}
+                    required:
+                    - blobStorage
+                  - properties:
+                      kubernetes: {}
+                    required:
+                    - kubernetes
