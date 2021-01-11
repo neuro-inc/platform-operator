@@ -264,7 +264,9 @@ class TestHelmValuesFactory:
                 "challengeType": "dns-01",
                 "dnsProvider": {
                     "name": "exec",
-                    "exec": {"EXEC_PATH": "/dns-01/resolve_dns_challenge.sh"},
+                    "exec": {
+                        "EXEC_PATH": "/dns-01/challenge/resolve_dns_challenge.sh",
+                    },
                 },
                 "logging": True,
                 "email": f"{cluster_name}@neuromation.io",
@@ -301,33 +303,27 @@ class TestHelmValuesFactory:
             },
             "extraVolumes": [
                 {
-                    "name": "resolve-dns-challenge-script",
+                    "name": "dns-challenge",
                     "configMap": {
-                        "name": "platform-resolve-dns-challenge-script",
-                        "defaultMode": 511,
-                        "items": [
-                            {
-                                "key": "resolve_dns_challenge.sh",
-                                "path": "resolve_dns_challenge.sh",
-                            }
-                        ],
+                        "name": "platform-dns-challenge",
+                        "defaultMode": 0o777,
                     },
-                }
+                },
+                {
+                    "name": "dns-challenge-secret",
+                    "secret": {"secretName": "platform-dns-challenge"},
+                },
             ],
             "extraVolumeMounts": [
-                {"name": "resolve-dns-challenge-script", "mountPath": "/dns-01"}
+                {"name": "dns-challenge", "mountPath": "/dns-01/challenge"},
+                {"name": "dns-challenge-secret", "mountPath": "/dns-01/secret"},
             ],
             "env": [
-                {"name": "NP_PLATFORM_API_URL", "value": "https://dev.neu.ro/api/v1"},
+                {"name": "NP_PLATFORM_CONFIG_URL", "value": "https://dev.neu.ro"},
                 {"name": "NP_CLUSTER_NAME", "value": cluster_name},
                 {
-                    "name": "NP_CLUSTER_TOKEN",
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": "platformservices-secret",
-                            "key": "cluster_token",
-                        }
-                    },
+                    "name": "NP_DNS_CHALLENGE_SCRIPT_NAME",
+                    "value": "resolve_dns_challenge.sh",
                 },
             ],
             "resources": {

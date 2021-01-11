@@ -55,40 +55,41 @@ function _curl {
     return ${RETURN_CODE:-1}
 }
 
-if [ -z "$NP_PLATFORM_API_URL" ]; then _error "NP_PLATFORM_API_URL is empty"; fi
-if [ -z "$NP_CLUSTER_TOKEN" ]; then _error "NP_CLUSTER_TOKEN is empty"; fi
-if [ -z "$NP_CLUSTER_NAME" ]; then _error "NP_CLUSTER_NAME is empty"; fi
-
-apk add -q --update --no-cache curl
-
-ACTION="$1"
-DNS_NAME="$2"
-VALUE="$3"
-PLATFORM_API_PATH="clusters/$NP_CLUSTER_NAME/dns/acme_challenge"
-PAYLOAD="$(cat <<EOM
+# braces protect from script file edits
 {
-    "dns_name": "$DNS_NAME",
-    "value": "$VALUE"
+    NP_CHALLENGE_PATH="$(dirname "$0")"
+    NP_SECRET_PATH="$(dirname "$NP_CHALLENGE_PATH")/secret"
+    NP_PLATFORM_TOKEN="$(cat "$NP_SECRET_PATH/token" | tr -d '[:space:]')"
+
+    if [ -z "$NP_PLATFORM_CONFIG_URL" ]; then _error "NP_PLATFORM_CONFIG_URL is empty"; fi
+    if [ -z "$NP_PLATFORM_TOKEN" ]; then _error "NP_PLATFORM_TOKEN is empty"; fi
+    if [ -z "$NP_CLUSTER_NAME" ]; then _error "NP_CLUSTER_NAME is empty"; fi
+
+    apk add -q --update --no-cache curl
+
+    ACTION="$1"
+    URL="$NP_PLATFORM_CONFIG_URL/api/v1/clusters/$NP_CLUSTER_NAME/dns/acme_challenge"
+    PAYLOAD="{\"dns_name\": \"$2\", \"value\": \"$3\"}"
+
+    if [ "$ACTION" == "present" ]; then
+        _retry \
+            3 \
+            1 \
+            _curl -X PUT \
+                -H "Authorization: Bearer $NP_PLATFORM_TOKEN" \
+                -d "$PAYLOAD" \
+                "$URL"
+    fi
+
+    if [ "$ACTION" == "cleanup" ]; then
+        _retry \
+            3 \
+            1 \
+            _curl -X DELETE \
+                -H "Authorization: Bearer $NP_PLATFORM_TOKEN" \
+                -d "$PAYLOAD" \
+                "$URL"
+    fi
+
+    exit 0
 }
-EOM
-)"
-
-if [ "$ACTION" == "present" ]; then
-    _retry \
-        3 \
-        1 \
-        _curl -X PUT \
-            -H "Authorization: Bearer $NP_CLUSTER_TOKEN" \
-            -d "$PAYLOAD" \
-            "$NP_PLATFORM_API_URL/$PLATFORM_API_PATH"
-fi
-
-if [ "$ACTION" == "cleanup" ]; then
-    _retry \
-        3 \
-        1 \
-        _curl -X DELETE \
-            -H "Authorization: Bearer $NP_CLUSTER_TOKEN" \
-            -d "$PAYLOAD" \
-            "$NP_PLATFORM_API_URL/$PLATFORM_API_PATH"
-fi

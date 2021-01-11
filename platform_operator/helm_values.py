@@ -218,6 +218,7 @@ class HelmValuesFactory:
         return result
 
     def create_traefik_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+        dns_challenge_script_name = "resolve_dns_challenge.sh"
         result: Dict[str, Any] = {
             "replicas": 3,
             "deploymentStrategy": {
@@ -243,7 +244,9 @@ class HelmValuesFactory:
                 "challengeType": "dns-01",
                 "dnsProvider": {
                     "name": "exec",
-                    "exec": {"EXEC_PATH": "/dns-01/resolve_dns_challenge.sh"},
+                    "exec": {
+                        "EXEC_PATH": f"/dns-01/challenge/{dns_challenge_script_name}",
+                    },
                 },
                 "logging": True,
                 "email": f"{platform.cluster_name}@neuromation.io",
@@ -279,37 +282,34 @@ class HelmValuesFactory:
                 "podLabels": {"platform.neuromation.io/app": "ingress"},
             },
             "extraVolumes": [
+                # Mounted secret and configmap volumes are updated automatically
+                # by kubelet
+                # https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically
+                # https://kubernetes.io/docs/concepts/configuration/secret/#mounted-secrets-are-updated-automatically
                 {
-                    "name": "resolve-dns-challenge-script",
+                    "name": "dns-challenge",
                     "configMap": {
-                        "name": (
-                            f"{self._release_names.platform}"
-                            "-resolve-dns-challenge-script"
-                        ),
+                        "name": f"{self._release_names.platform}-dns-challenge",
                         "defaultMode": 0o777,
-                        "items": [
-                            {
-                                "key": "resolve_dns_challenge.sh",
-                                "path": "resolve_dns_challenge.sh",
-                            }
-                        ],
                     },
-                }
+                },
+                {
+                    "name": "dns-challenge-secret",
+                    "secret": {
+                        "secretName": f"{self._release_names.platform}-dns-challenge"
+                    },
+                },
             ],
             "extraVolumeMounts": [
-                {"name": "resolve-dns-challenge-script", "mountPath": "/dns-01"}
+                {"name": "dns-challenge", "mountPath": "/dns-01/challenge"},
+                {"name": "dns-challenge-secret", "mountPath": "/dns-01/secret"},
             ],
             "env": [
-                {"name": "NP_PLATFORM_API_URL", "value": str(platform.api_url)},
+                {"name": "NP_PLATFORM_CONFIG_URL", "value": str(platform.config_url)},
                 {"name": "NP_CLUSTER_NAME", "value": platform.cluster_name},
                 {
-                    "name": "NP_CLUSTER_TOKEN",
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": "platformservices-secret",
-                            "key": "cluster_token",
-                        }
-                    },
+                    "name": "NP_DNS_CHALLENGE_SCRIPT_NAME",
+                    "value": dns_challenge_script_name,
                 },
             ],
             "resources": {
