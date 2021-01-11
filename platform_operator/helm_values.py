@@ -282,6 +282,10 @@ class HelmValuesFactory:
                 "podLabels": {"platform.neuromation.io/app": "ingress"},
             },
             "extraVolumes": [
+                # Mounted secret and configmap volumes are updated automatically
+                # by kubelet
+                # https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically
+                # https://kubernetes.io/docs/concepts/configuration/secret/#mounted-secrets-are-updated-automatically
                 {
                     "name": "dns-challenge",
                     "configMap": {
