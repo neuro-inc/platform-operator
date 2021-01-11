@@ -81,9 +81,6 @@ class HelmValuesFactory:
             result[
                 self._chart_names.nvidia_gpu_driver_gcp
             ] = self.create_nvidia_gpu_driver_gcp_values(platform)
-            result["gcp"] = {
-                "serviceAccountKeyBase64": platform.gcp.service_account_key_base64
-            }
             if platform.gcp.storage_type == "nfs":
                 result["storage"] = {
                     "nfs": {
@@ -110,10 +107,6 @@ class HelmValuesFactory:
                 self._chart_names.cluster_autoscaler
             ] = self.create_cluster_autoscaler_values(platform)
         if platform.azure:
-            result["registry"] = {
-                "username": platform.azure.registry_username,
-                "password": platform.azure.registry_password,
-            }
             result["storage"] = {
                 "azureFile": {
                     "storageAccountName": platform.azure.storage_account_name,
@@ -128,10 +121,6 @@ class HelmValuesFactory:
                 }
             }
         if platform.on_prem:
-            result["registry"] = {
-                "username": platform.docker_registry.username,
-                "password": platform.docker_registry.password,
-            }
             result["storage"] = {
                 "nfs": {
                     "server": (
@@ -434,9 +423,26 @@ class HelmValuesFactory:
         return {
             "NP_CLUSTER_NAME": platform.cluster_name,
             "NP_STORAGE_AUTH_URL": str(platform.auth_url),
-            "NP_STORAGE_PVC_CLAIM_NAME": (f"{self._release_names.platform}-storage"),
+            "NP_STORAGE_PVC_CLAIM_NAME": f"{self._release_names.platform}-storage",
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
             "NP_CORS_ORIGINS": self._create_cors_origins(platform.cluster_name),
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": f"{self._release_names.platform}-storage-token",
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
+            "secrets": [
+                {
+                    "name": f"{self._release_names.platform}-storage-token",
+                    "data": {"token": platform.token},
+                }
+            ],
         }
 
     def create_platform_object_storage_values(
@@ -444,65 +450,239 @@ class HelmValuesFactory:
     ) -> Dict[str, Any]:
         result: Dict[str, Any] = {
             "NP_CLUSTER_NAME": platform.cluster_name,
-            "NP_OBSTORAGE_PROVIDER": platform.cloud_provider,
             "NP_OBSTORAGE_AUTH_URL": str(platform.auth_url),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": (
+                                f"{self._release_names.platform}-object-storage-token"
+                            ),
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
+            "secrets": [
+                {
+                    "name": f"{self._release_names.platform}-object-storage-token",
+                    "data": {"token": platform.token},
+                }
+            ],
         }
-        secret_name = f"{self._release_names.platform}-blob-storage-key"
         if platform.gcp:
-            result["NP_OBSTORAGE_LOCATION"] = platform.gcp.region
-            result["NP_OBSTORAGE_GCP_PROJECT_ID"] = platform.gcp.project
-            result["NP_OBSTORAGE_GCP_KEY_SECRET"] = secret_name
+            result["objectStorage"] = {
+                "provider": "gcp",
+                "location": platform.gcp.region,
+                "gcp": {
+                    "project": platform.gcp.project,
+                    "keySecret": {
+                        "name": f"{self._release_names.platform}-object-storage-gcp-key"
+                    },
+                },
+            }
+            result["secrets"].append(
+                {
+                    "name": f"{self._release_names.platform}-object-storage-gcp-key",
+                    "data": {"key.json": platform.gcp.service_account_key},
+                }
+            )
         if platform.aws:
-            result["NP_OBSTORAGE_LOCATION"] = platform.aws.region
-            result["NP_OBSTORAGE_AWS_SECRET"] = secret_name
+            result["objectStorage"] = {
+                "provider": "aws",
+                "location": platform.aws.region,
+                "aws": {
+                    "accessKey": {"value": ""},
+                    "secretKey": {"value": ""},
+                },
+            }
             if platform.aws.role_arn:
                 result["annotations"] = {
                     "iam.amazonaws.com/role": platform.aws.role_arn
                 }
         if platform.azure:
-            result["NP_OBSTORAGE_LOCATION"] = platform.azure.region
-            result["NP_OBSTORAGE_AZURE_SECRET"] = secret_name
+            azure_object_storage_secret_name = (
+                f"{self._release_names.platform}-object-storage-azure-credentials"
+            )
+            result["objectStorage"] = {
+                "provider": "azure",
+                "location": platform.azure.region,
+                "azure": {
+                    "accountName": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": azure_object_storage_secret_name,
+                                "key": "account_name",
+                            }
+                        }
+                    },
+                    "accountKey": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": azure_object_storage_secret_name,
+                                "key": "account_key",
+                            }
+                        }
+                    },
+                },
+            }
+            result["secrets"].append(
+                {
+                    "name": azure_object_storage_secret_name,
+                    "data": {
+                        "account_name": platform.azure.blob_storage_account_name,
+                        "account_key": platform.azure.blob_storage_account_key,
+                    },
+                }
+            )
         return result
 
     def create_platform_registry_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
         result: Dict[str, Any] = {
-            "INGRESS_HOST": platform.ingress_registry_url.host,
             "NP_CLUSTER_NAME": platform.cluster_name,
             "NP_REGISTRY_AUTH_URL": str(platform.auth_url),
-            "NP_REGISTRY_UPSTREAM_MAX_CATALOG_ENTRIES": 10000,
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": f"{self._release_names.platform}-registry-token",
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "ingress": {"enabled": True, "hosts": [platform.ingress_registry_url.host]},
+            "secrets": [
+                {
+                    "name": f"{self._release_names.platform}-registry-token",
+                    "data": {"token": platform.token},
+                }
+            ],
         }
         if platform.gcp:
-            result["NP_REGISTRY_UPSTREAM_TYPE"] = "oauth"
-            result["NP_REGISTRY_UPSTREAM_URL"] = "https://gcr.io"
-            result["NP_REGISTRY_UPSTREAM_PROJECT"] = platform.gcp.project
-        if platform.aws:
-            result["NP_REGISTRY_UPSTREAM_TYPE"] = "aws_ecr"
-            result["NP_REGISTRY_UPSTREAM_URL"] = str(platform.aws.registry_url)
-            result["NP_REGISTRY_UPSTREAM_PROJECT"] = "neuro"
-            result["NP_REGISTRY_UPSTREAM_MAX_CATALOG_ENTRIES"] = 1000
-            result["AWS_DEFAULT_REGION"] = platform.aws.region
-        if platform.azure:
-            result["NP_REGISTRY_UPSTREAM_TYPE"] = "oauth"
-            result["NP_REGISTRY_UPSTREAM_URL"] = str(platform.azure.registry_url)
-            result["NP_REGISTRY_UPSTREAM_PROJECT"] = "neuro"
-            result[
-                "NP_REGISTRY_UPSTREAM_TOKEN_SERVICE"
-            ] = platform.azure.registry_url.host
-            result["NP_REGISTRY_UPSTREAM_TOKEN_URL"] = str(
-                platform.azure.registry_url / "oauth2/token"
+            gcp_key_secret_name = f"{self._release_names.platform}-registry-gcp-key"
+            result["upstreamRegistry"] = {
+                "type": "oauth",
+                "url": "https://gcr.io",
+                "tokenUrl": "https://gcr.io/v2/token",
+                "tokenService": "gcr.io",
+                "tokenUsername": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": gcp_key_secret_name,
+                            "key": "username",
+                        }
+                    }
+                },
+                "tokenPassword": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": gcp_key_secret_name,
+                            "key": "password",
+                        }
+                    }
+                },
+                "project": platform.gcp.project,
+                "maxCatalogEntries": 10000,
+            }
+            result["secrets"].append(
+                {
+                    "name": gcp_key_secret_name,
+                    "data": {
+                        "username": "_json_key",
+                        "password": platform.gcp.service_account_key,
+                    },
+                }
             )
-        if platform.aws and platform.aws.role_arn:
-            result["annotations"] = {"iam.amazonaws.com/role": platform.aws.role_arn}
+        if platform.aws:
+            result["AWS_DEFAULT_REGION"] = platform.aws.region
+            result["upstreamRegistry"] = {
+                "type": "aws_ecr",
+                "url": str(platform.aws.registry_url),
+                "project": "neuro",
+                "maxCatalogEntries": 1000,
+            }
+            if platform.aws.role_arn:
+                result["annotations"] = {
+                    "iam.amazonaws.com/role": platform.aws.role_arn
+                }
+        if platform.azure:
+            azure_credentials_secret_name = (
+                f"{self._release_names.platform}-registry-azure-credentials"
+            )
+            result["upstreamRegistry"] = {
+                "type": "oauth",
+                "url": str(platform.azure.registry_url),
+                "tokenUrl": str(platform.azure.registry_url / "oauth2/token"),
+                "tokenService": platform.azure.registry_url.host,
+                "tokenUsername": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": azure_credentials_secret_name,
+                            "key": "username",
+                        }
+                    }
+                },
+                "tokenPassword": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": azure_credentials_secret_name,
+                            "key": "password",
+                        }
+                    }
+                },
+                "project": "neuro",
+                "maxCatalogEntries": 10000,
+            }
+            result["secrets"].append(
+                {
+                    "name": azure_credentials_secret_name,
+                    "data": {
+                        "username": platform.azure.registry_username,
+                        "password": platform.azure.registry_password,
+                    },
+                }
+            )
         if platform.on_prem:
-            result["NP_REGISTRY_UPSTREAM_TYPE"] = "basic"
-            result[
-                "NP_REGISTRY_UPSTREAM_URL"
-            ] = f"http://{self._release_names.platform}-docker-registry:5000"
-            result["NP_REGISTRY_UPSTREAM_PROJECT"] = "neuro"
+            docker_registry_credentials_secret_name = (
+                f"{self._release_names.platform}-docker-registry"
+            )
+            result["upstreamRegistry"] = {
+                "type": "basic",
+                "url": f"http://{self._release_names.platform}-docker-registry:5000",
+                "basicUsername": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": docker_registry_credentials_secret_name,
+                            "key": "username",
+                        }
+                    }
+                },
+                "basicPassword": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": docker_registry_credentials_secret_name,
+                            "key": "password",
+                        }
+                    }
+                },
+                "project": "neuro",
+                "maxCatalogEntries": 10000,
+            }
+            result["secrets"].append(
+                {
+                    "name": docker_registry_credentials_secret_name,
+                    "data": {
+                        "username": platform.docker_registry.username,
+                        "password": platform.docker_registry.password,
+                    },
+                }
+            )
         return result
 
     def create_platform_monitoring_values(
@@ -521,12 +701,29 @@ class HelmValuesFactory:
                 platform.kubernetes_node_labels.node_pool
             ),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": f"{self._release_names.platform}-monitoring-token",
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
             "fluentd": {
                 "persistence": {
                     "enabled": True,
                     "storageClassName": platform.standard_storage_class_name,
                 }
             },
+            "secrets": [
+                {
+                    "name": f"{self._release_names.platform}-monitoring-token",
+                    "data": {"token": platform.token},
+                }
+            ],
         }
         if platform.gcp:
             result["logs"] = {
@@ -596,6 +793,23 @@ class HelmValuesFactory:
             "NP_SECRETS_PLATFORM_AUTH_URL": str(platform.auth_url),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
             "NP_CORS_ORIGINS": self._create_cors_origins(platform.cluster_name),
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": f"{self._release_names.platform}-secrets-token",
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
+            "secrets": [
+                {
+                    "name": f"{self._release_names.platform}-secrets-token",
+                    "data": {"token": platform.token},
+                }
+            ],
         }
         return result
 
@@ -647,9 +861,28 @@ class HelmValuesFactory:
                 "authUrl": str(platform.auth_url),
                 "configUrl": str(platform.config_url),
                 "apiUrl": str(platform.api_url),
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": f"{self._release_names.platform}-reports-token",
+                            "key": "token",
+                        }
+                    }
+                },
             },
+            "secrets": [
+                {
+                    "name": f"{self._release_names.platform}-reports-token",
+                    "data": {"token": platform.token},
+                }
+            ],
             "platformJobs": {"namespace": platform.jobs_namespace},
-            "grafanaProxy": {"ingress": {"host": platform.ingress_metrics_url.host}},
+            "grafanaProxy": {
+                "ingress": {
+                    "enabled": True,
+                    "hosts": [platform.ingress_metrics_url.host],
+                }
+            },
             "prometheus-operator": {
                 "prometheus": {
                     "prometheusSpec": {
@@ -716,10 +949,16 @@ class HelmValuesFactory:
                 "type": "gcp",
                 "region": platform.gcp.region,
                 "serviceAccountSecret": {
-                    "name": f"{self._release_names.platform}-gcp-service-account-key",
+                    "name": f"{self._release_names.platform}-reports-gcp-key",
                     "key": "key.json",
                 },
             }
+            result["secrets"].append(
+                {
+                    "name": f"{self._release_names.platform}-reports-gcp-key",
+                    "data": {"key.json": platform.gcp.service_account_key},
+                }
+            )
         if platform.aws:
             if platform.aws.role_arn:
                 result["metricsServer"] = {
@@ -797,6 +1036,23 @@ class HelmValuesFactory:
             ),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": platform.image_pull_secret_name,
             "NP_CORS_ORIGINS": self._create_cors_origins(platform.cluster_name),
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": f"{self._release_names.platform}-disks-token",
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
+            "secrets": [
+                {
+                    "name": f"{self._release_names.platform}-disks-token",
+                    "data": {"token": platform.token},
+                }
+            ],
         }
         if platform.aws:
             result["NP_DISK_PROVIDER"] = "aws"
@@ -808,7 +1064,7 @@ class HelmValuesFactory:
 
     def _create_cors_origins(self, cluster_name: str) -> str:
         # TODO: get cors configuration from config service
-        if cluster_name in ("megafon-poc", "megafon-public"):
+        if cluster_name in ("megafon-poc"):
             cors_origins = [
                 "https://megafon-release.neu.ro",
                 "http://megafon-neuro.netlify.app",

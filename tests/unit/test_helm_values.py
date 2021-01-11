@@ -36,7 +36,6 @@ class TestHelmValuesFactory:
                 },
                 "labels": {"nodePool": "platform.neuromation.io/nodepool"},
             },
-            "gcp": {"serviceAccountKeyBase64": "e30="},
             "standardStorageClass": {
                 "create": True,
                 "name": "platform-standard-topology-aware",
@@ -102,10 +101,6 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_values(azure_platform_config)
 
-        assert result["registry"] == {
-            "username": "admin",
-            "password": "admin-password",
-        }
         assert result["storage"] == {
             "azureFile": {
                 "storageAccountName": "accountName1",
@@ -470,24 +465,22 @@ class TestHelmValuesFactory:
             "NP_CORS_ORIGINS": (
                 "https://release--neuro-web.netlify.app,https://app.neu.ro"
             ),
+            "ingress": {
+                "enabled": True,
+                "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-storage-token",
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "secrets": [{"name": "platform-storage-token", "data": {"token": "token"}}],
         }
-
-    def test_create_platform_storage_values_for_megafon_public(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_storage_values(
-            replace(on_prem_platform_config, cluster_name="megafon-public")
-        )
-
-        assert result["NP_CORS_ORIGINS"] == ",".join(
-            [
-                "https://megafon-release.neu.ro",
-                "http://megafon-neuro.netlify.app",
-                "https://release--neuro-web.netlify.app",
-                "https://app.neu.ro",
-                "https://app.ml.megafon.ru",
-            ]
-        )
 
     def test_create_platform_storage_values_for_megafon_poc(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -514,12 +507,37 @@ class TestHelmValuesFactory:
 
         assert result == {
             "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
-            "NP_OBSTORAGE_PROVIDER": "gcp",
             "NP_OBSTORAGE_AUTH_URL": "https://dev.neu.ro",
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
-            "NP_OBSTORAGE_LOCATION": "us-central1",
-            "NP_OBSTORAGE_GCP_PROJECT_ID": "project",
-            "NP_OBSTORAGE_GCP_KEY_SECRET": "platform-blob-storage-key",
+            "ingress": {
+                "enabled": True,
+                "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "objectStorage": {
+                "provider": "gcp",
+                "location": "us-central1",
+                "gcp": {
+                    "project": "project",
+                    "keySecret": {"name": "platform-object-storage-gcp-key"},
+                },
+            },
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-object-storage-token",
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "secrets": [
+                {"name": "platform-object-storage-token", "data": {"token": "token"}},
+                {
+                    "name": "platform-object-storage-gcp-key",
+                    "data": {"key.json": "{}"},
+                },
+            ],
         }
 
     def test_create_aws_platform_object_storage_values(
@@ -529,11 +547,30 @@ class TestHelmValuesFactory:
 
         assert result == {
             "NP_CLUSTER_NAME": aws_platform_config.cluster_name,
-            "NP_OBSTORAGE_PROVIDER": "aws",
             "NP_OBSTORAGE_AUTH_URL": "https://dev.neu.ro",
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
-            "NP_OBSTORAGE_LOCATION": "us-east-1",
-            "NP_OBSTORAGE_AWS_SECRET": "platform-blob-storage-key",
+            "ingress": {
+                "enabled": True,
+                "hosts": [f"{aws_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "objectStorage": {
+                "provider": "aws",
+                "location": "us-east-1",
+                "aws": {"accessKey": {"value": ""}, "secretKey": {"value": ""}},
+            },
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-object-storage-token",
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "secrets": [
+                {"name": "platform-object-storage-token", "data": {"token": "token"}}
+            ],
         }
 
     def test_create_aws_platform_object_storage_values_with_role(
@@ -553,13 +590,61 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_object_storage_values(azure_platform_config)
 
+        assert azure_platform_config.azure
         assert result == {
             "NP_CLUSTER_NAME": azure_platform_config.cluster_name,
-            "NP_OBSTORAGE_PROVIDER": "azure",
             "NP_OBSTORAGE_AUTH_URL": "https://dev.neu.ro",
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
-            "NP_OBSTORAGE_LOCATION": "westus",
-            "NP_OBSTORAGE_AZURE_SECRET": "platform-blob-storage-key",
+            "ingress": {
+                "enabled": True,
+                "hosts": [f"{azure_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "objectStorage": {
+                "provider": "azure",
+                "location": "westus",
+                "azure": {
+                    "accountName": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": "platform-object-storage-azure-credentials",
+                                "key": "account_name",
+                            }
+                        }
+                    },
+                    "accountKey": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": "platform-object-storage-azure-credentials",
+                                "key": "account_key",
+                            }
+                        }
+                    },
+                },
+            },
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-object-storage-token",
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "secrets": [
+                {"name": "platform-object-storage-token", "data": {"token": "token"}},
+                {
+                    "name": "platform-object-storage-azure-credentials",
+                    "data": {
+                        "account_name": (
+                            azure_platform_config.azure.blob_storage_account_name
+                        ),
+                        "account_key": (
+                            azure_platform_config.azure.blob_storage_account_key
+                        ),
+                    },
+                },
+            ],
         }
 
     def test_create_gcp_platform_registry_values(
@@ -567,15 +652,62 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_registry_values(gcp_platform_config)
 
+        assert gcp_platform_config.gcp
         assert result == {
-            "INGRESS_HOST": f"registry.{gcp_platform_config.cluster_name}.org.neu.ro",
             "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
             "NP_REGISTRY_AUTH_URL": "https://dev.neu.ro",
-            "NP_REGISTRY_UPSTREAM_MAX_CATALOG_ENTRIES": 10000,
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
-            "NP_REGISTRY_UPSTREAM_TYPE": "oauth",
-            "NP_REGISTRY_UPSTREAM_URL": "https://gcr.io",
-            "NP_REGISTRY_UPSTREAM_PROJECT": "project",
+            "ingress": {
+                "enabled": True,
+                "hosts": [f"registry.{gcp_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-registry-token",
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "secrets": [
+                {
+                    "name": "platform-registry-token",
+                    "data": {"token": gcp_platform_config.token},
+                },
+                {
+                    "name": "platform-registry-gcp-key",
+                    "data": {
+                        "username": "_json_key",
+                        "password": gcp_platform_config.gcp.service_account_key,
+                    },
+                },
+            ],
+            "upstreamRegistry": {
+                "maxCatalogEntries": 10000,
+                "project": "project",
+                "tokenPassword": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "key": "password",
+                            "name": "platform-registry-gcp-key",
+                        }
+                    }
+                },
+                "tokenService": "gcr.io",
+                "tokenUrl": "https://gcr.io/v2/token",
+                "tokenUsername": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "key": "username",
+                            "name": "platform-registry-gcp-key",
+                        }
+                    }
+                },
+                "type": "oauth",
+                "url": "https://gcr.io",
+            },
         }
 
     def test_create_aws_platform_registry_values(
@@ -584,17 +716,36 @@ class TestHelmValuesFactory:
         result = factory.create_platform_registry_values(aws_platform_config)
 
         assert result == {
-            "INGRESS_HOST": (f"registry.{aws_platform_config.cluster_name}.org.neu.ro"),
             "NP_CLUSTER_NAME": aws_platform_config.cluster_name,
             "NP_REGISTRY_AUTH_URL": "https://dev.neu.ro",
-            "NP_REGISTRY_UPSTREAM_MAX_CATALOG_ENTRIES": 1000,
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
-            "NP_REGISTRY_UPSTREAM_TYPE": "aws_ecr",
-            "NP_REGISTRY_UPSTREAM_URL": (
-                "https://platform.dkr.ecr.us-east-1.amazonaws.com"
-            ),
-            "NP_REGISTRY_UPSTREAM_PROJECT": "neuro",
             "AWS_DEFAULT_REGION": "us-east-1",
+            "ingress": {
+                "enabled": True,
+                "hosts": [f"registry.{aws_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-registry-token",
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "secrets": [
+                {
+                    "name": "platform-registry-token",
+                    "data": {"token": aws_platform_config.token},
+                }
+            ],
+            "upstreamRegistry": {
+                "url": "https://platform.dkr.ecr.us-east-1.amazonaws.com",
+                "type": "aws_ecr",
+                "maxCatalogEntries": 1000,
+                "project": "neuro",
+            },
         }
 
     def test_create_aws_platform_registry_values_with_role(
@@ -614,21 +765,62 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_registry_values(azure_platform_config)
 
+        assert azure_platform_config.azure
         assert result == {
-            "INGRESS_HOST": (
-                f"registry.{azure_platform_config.cluster_name}.org.neu.ro"
-            ),
             "NP_CLUSTER_NAME": azure_platform_config.cluster_name,
             "NP_REGISTRY_AUTH_URL": "https://dev.neu.ro",
-            "NP_REGISTRY_UPSTREAM_MAX_CATALOG_ENTRIES": 10000,
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
-            "NP_REGISTRY_UPSTREAM_TYPE": "oauth",
-            "NP_REGISTRY_UPSTREAM_URL": "https://platform.azurecr.io",
-            "NP_REGISTRY_UPSTREAM_PROJECT": "neuro",
-            "NP_REGISTRY_UPSTREAM_TOKEN_SERVICE": "platform.azurecr.io",
-            "NP_REGISTRY_UPSTREAM_TOKEN_URL": (
-                "https://platform.azurecr.io/oauth2/token"
-            ),
+            "ingress": {
+                "enabled": True,
+                "hosts": [f"registry.{azure_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-registry-token",
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "secrets": [
+                {
+                    "name": "platform-registry-token",
+                    "data": {"token": azure_platform_config.token},
+                },
+                {
+                    "name": "platform-registry-azure-credentials",
+                    "data": {
+                        "username": azure_platform_config.azure.registry_username,
+                        "password": azure_platform_config.azure.registry_password,
+                    },
+                },
+            ],
+            "upstreamRegistry": {
+                "maxCatalogEntries": 10000,
+                "project": "neuro",
+                "tokenPassword": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-registry-azure-credentials",
+                            "key": "password",
+                        }
+                    }
+                },
+                "tokenService": "platform.azurecr.io",
+                "tokenUrl": "https://platform.azurecr.io/oauth2/token",
+                "tokenUsername": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-registry-azure-credentials",
+                            "key": "username",
+                        }
+                    }
+                },
+                "type": "oauth",
+                "url": "https://platform.azurecr.io",
+            },
         }
 
     def test_create_on_prem_platform_registry_values(
@@ -637,16 +829,60 @@ class TestHelmValuesFactory:
         result = factory.create_platform_registry_values(on_prem_platform_config)
 
         assert result == {
-            "INGRESS_HOST": (
-                f"registry.{on_prem_platform_config.cluster_name}.org.neu.ro"
-            ),
             "NP_CLUSTER_NAME": on_prem_platform_config.cluster_name,
             "NP_REGISTRY_AUTH_URL": "https://dev.neu.ro",
-            "NP_REGISTRY_UPSTREAM_MAX_CATALOG_ENTRIES": 10000,
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
-            "NP_REGISTRY_UPSTREAM_TYPE": "basic",
-            "NP_REGISTRY_UPSTREAM_URL": "http://platform-docker-registry:5000",
-            "NP_REGISTRY_UPSTREAM_PROJECT": "neuro",
+            "ingress": {
+                "enabled": True,
+                "hosts": [
+                    f"registry.{on_prem_platform_config.cluster_name}.org.neu.ro"
+                ],
+            },
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "key": "token",
+                            "name": "platform-registry-token",
+                        }
+                    }
+                }
+            },
+            "secrets": [
+                {
+                    "name": "platform-registry-token",
+                    "data": {"token": on_prem_platform_config.token},
+                },
+                {
+                    "name": "platform-docker-registry",
+                    "data": {
+                        "username": on_prem_platform_config.docker_registry.username,
+                        "password": on_prem_platform_config.docker_registry.password,
+                    },
+                },
+            ],
+            "upstreamRegistry": {
+                "type": "basic",
+                "url": "http://platform-docker-registry:5000",
+                "maxCatalogEntries": 10000,
+                "project": "neuro",
+                "basicUsername": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-docker-registry",
+                            "key": "username",
+                        }
+                    }
+                },
+                "basicPassword": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-docker-registry",
+                            "key": "password",
+                        }
+                    }
+                },
+            },
         }
 
     def test_create_gcp_platform_monitoring_values(
@@ -669,6 +905,26 @@ class TestHelmValuesFactory:
                 "https://release--neuro-web.netlify.app,https://app.neu.ro"
             ),
             "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "key": "token",
+                            "name": "platform-monitoring-token",
+                        }
+                    }
+                }
+            },
+            "ingress": {
+                "enabled": True,
+                "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "secrets": [
+                {
+                    "data": {"token": gcp_platform_config.token},
+                    "name": "platform-monitoring-token",
+                }
+            ],
             "fluentd": {
                 "persistence": {
                     "enabled": True,
@@ -753,23 +1009,6 @@ class TestHelmValuesFactory:
             },
         }
 
-    def test_create_platform_monitoring_values_for_megafon_public(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_monitoring_values(
-            replace(on_prem_platform_config, cluster_name="megafon-public")
-        )
-
-        assert result["NP_CORS_ORIGINS"] == ",".join(
-            [
-                "https://megafon-release.neu.ro",
-                "http://megafon-neuro.netlify.app",
-                "https://release--neuro-web.netlify.app",
-                "https://app.neu.ro",
-                "https://app.ml.megafon.ru",
-            ]
-        )
-
     def test_create_platform_monitoring_values_for_megafon_poc(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -801,24 +1040,27 @@ class TestHelmValuesFactory:
             "NP_CORS_ORIGINS": (
                 "https://release--neuro-web.netlify.app,https://app.neu.ro"
             ),
+            "ingress": {
+                "enabled": True,
+                "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-secrets-token",
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "secrets": [
+                {
+                    "name": "platform-secrets-token",
+                    "data": {"token": gcp_platform_config.token},
+                }
+            ],
         }
-
-    def test_create_platform_secrets_values_for_megafon_public(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_secrets_values(
-            replace(on_prem_platform_config, cluster_name="megafon-public")
-        )
-
-        assert result["NP_CORS_ORIGINS"] == ",".join(
-            [
-                "https://megafon-release.neu.ro",
-                "http://megafon-neuro.netlify.app",
-                "https://release--neuro-web.netlify.app",
-                "https://app.neu.ro",
-                "https://app.ml.megafon.ru",
-            ]
-        )
 
     def test_create_platform_secrets_values_for_megafon_poc(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -860,11 +1102,30 @@ class TestHelmValuesFactory:
                 "authUrl": "https://dev.neu.ro",
                 "configUrl": "https://dev.neu.ro",
                 "apiUrl": "https://dev.neu.ro/api/v1",
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-reports-token",
+                            "key": "token",
+                        }
+                    }
+                },
             },
+            "secrets": [
+                {
+                    "name": "platform-reports-token",
+                    "data": {"token": gcp_platform_config.token},
+                },
+                {
+                    "name": "platform-reports-gcp-key",
+                    "data": {"key.json": "{}"},
+                },
+            ],
             "platformJobs": {"namespace": "platform-jobs"},
             "grafanaProxy": {
                 "ingress": {
-                    "host": f"metrics.{gcp_platform_config.cluster_name}.org.neu.ro"
+                    "enabled": True,
+                    "hosts": [f"metrics.{gcp_platform_config.cluster_name}.org.neu.ro"],
                 }
             },
             "prometheus-operator": {
@@ -924,7 +1185,7 @@ class TestHelmValuesFactory:
                 "type": "gcp",
                 "region": "us-central1",
                 "serviceAccountSecret": {
-                    "name": "platform-gcp-service-account-key",
+                    "name": "platform-reports-gcp-key",
                     "key": "key.json",
                 },
             },
@@ -1077,24 +1338,24 @@ class TestHelmValuesFactory:
                 "https://release--neuro-web.netlify.app,https://app.neu.ro"
             ),
             "NP_DISK_PROVIDER": "gcp",
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {"key": "token", "name": "platform-disks-token"}
+                    }
+                }
+            },
+            "ingress": {
+                "enabled": True,
+                "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "secrets": [
+                {
+                    "name": "platform-disks-token",
+                    "data": {"token": gcp_platform_config.token},
+                }
+            ],
         }
-
-    def test_create_platform_disk_api_values_for_megafon_public(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_disk_api_values(
-            replace(on_prem_platform_config, cluster_name="megafon-public")
-        )
-
-        assert result["NP_CORS_ORIGINS"] == ",".join(
-            [
-                "https://megafon-release.neu.ro",
-                "http://megafon-neuro.netlify.app",
-                "https://release--neuro-web.netlify.app",
-                "https://app.neu.ro",
-                "https://app.ml.megafon.ru",
-            ]
-        )
 
     def test_create_platform_disk_api_values_for_megafon_poc(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory

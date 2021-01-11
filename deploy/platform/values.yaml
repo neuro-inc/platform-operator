@@ -21,9 +21,6 @@ standardStorageClass:
   create: true
   name: ""
 
-# gcp:
-#   serviceAccountKeyBase64: ""
-
 ingress: {}
   # host: default.org.neu.ro
   # jobFallbackHost: default.jobs-dev.neu.ro
@@ -46,10 +43,6 @@ storage:
   #   path: /
   # gcs:
   #   bucketName: bucket
-
-registry:
-  username: ""
-  password: ""
 
 tags:
   gcp: false
