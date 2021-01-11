@@ -470,6 +470,7 @@ def gcp_platform_config(
         gcp=GcpConfig(
             project="project",
             region="us-central1",
+            service_account_key="{}",
             service_account_key_base64="e30=",
             storage_type="nfs",
             storage_nfs_server="192.168.0.3",

@@ -428,6 +428,9 @@ class TestPlatformConfigFactory:
             gcp_platform_config,
             gcp=replace(
                 gcp_platform_config.gcp,
+                service_account_key=(
+                    '{"client_email": "test-acc@test-project.iam.gserviceaccount.com"}'
+                ),
                 service_account_key_base64=(
                     "eyJjbGllbnRfZW1haWwiOiAidGVzdC1hY2NAdGV"
                     "zdC1wcm9qZWN0LmlhbS5nc2VydmljZWFjY291bnQuY29tIn0="

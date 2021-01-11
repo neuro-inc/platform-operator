@@ -1,7 +1,7 @@
 import copy
 import json
 import os
-from base64 import b64encode
+from base64 import b64decode, b64encode
 from copy import deepcopy
 from dataclasses import dataclass
 from enum import Enum
@@ -134,7 +134,7 @@ class Config:
     def load_from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Config":
         env = env or os.environ
         platform_url = URL(env["NP_PLATFORM_URL"])
-        platform_release_name = env["NP_PLATFORM_NAMESPACE"]
+        platform_release_name = "platform"
         return cls(
             log_level=(env.get("NP_CONTROLLER_LOG_LEVEL") or "INFO").upper(),
             retries=int(env.get("NP_CONTROLLER_RETRIES") or "3"),
@@ -209,6 +209,7 @@ class Cluster(Dict[str, Any]):
 class GcpConfig:
     project: str
     region: str
+    service_account_key: str
     service_account_key_base64: str
     storage_type: str
     storage_nfs_server: str = ""
@@ -554,6 +555,9 @@ class PlatformConfigFactory:
     def _create_gcp(cls, spec: bodies.Spec, cluster: Cluster) -> GcpConfig:
         cloud_provider = cluster["cloud_provider"]
         iam_gcp_spec = spec.get("iam", {}).get("gcp")
+        service_account_key = cls._base64_decode(
+            iam_gcp_spec.get("serviceAccountKeyBase64")
+        ) or json.dumps(cloud_provider["credentials"])
         service_account_key_base64 = iam_gcp_spec.get(
             "serviceAccountKeyBase64"
         ) or cls._base64_encode(json.dumps(cloud_provider["credentials"]))
@@ -562,6 +566,7 @@ class PlatformConfigFactory:
         return GcpConfig(
             project=cloud_provider["project"],
             region=cloud_provider["region"],
+            service_account_key=service_account_key,
             service_account_key_base64=service_account_key_base64,
             storage_type="gcs" if "gcs" in storage_spec else "nfs",
             storage_nfs_server=storage_spec.get("nfs", {}).get("server", ""),
@@ -631,6 +636,12 @@ class PlatformConfigFactory:
     @classmethod
     def _base64_encode(cls, value: str) -> str:
         return b64encode(value.encode("utf-8")).decode("utf-8")
+
+    @classmethod
+    def _base64_decode(cls, value: Optional[str]) -> str:
+        if not value:
+            return ""
+        return b64decode(value.encode("utf-8")).decode("utf-8")
 
     @classmethod
     def _update_tpu_network(
