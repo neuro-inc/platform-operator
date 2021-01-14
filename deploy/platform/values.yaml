@@ -26,6 +26,9 @@ ingress: {}
   # jobFallbackHost: default.jobs-dev.neu.ro
   # registryHost: registry.default.org.neu.ro
 
+ingressController:
+  enabled: true
+
 jobs:
   namespace:
     create: true

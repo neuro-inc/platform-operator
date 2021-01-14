@@ -278,6 +278,7 @@ class PlatformConfig:
     ingress_registry_url: URL
     ingress_metrics_url: URL
     ingress_acme_environment: str
+    ingress_controller_enabled: bool
     disks_storage_limit_per_user_gb: int
     service_traefik_name: str
     jobs_namespace: str
@@ -363,13 +364,10 @@ class PlatformConfig:
     def create_cluster_config(
         self,
         service_account_secret: Dict[str, Any],
-        traefik_service: Dict[str, Any],
+        traefik_service: Optional[Dict[str, Any]] = None,
         aws_traefik_lb: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        result = {
-            "dns": self.create_dns_config(
-                traefik_service=traefik_service, aws_traefik_lb=aws_traefik_lb
-            ),
+        result: Dict[str, Any] = {
             "storage": {
                 "url": str(self.ingress_url / "api/v1/storage"),
                 "pvc": {"name": self.storage_pvc_name},
@@ -398,6 +396,10 @@ class PlatformConfig:
                 "resource_presets": self._create_resource_presets(),
             },
         }
+        if traefik_service:
+            result["dns"] = self.create_dns_config(
+                traefik_service=traefik_service, aws_traefik_lb=aws_traefik_lb
+            )
         if self.azure:
             result["orchestrator"]["kubernetes"][
                 "job_pod_preemptible_toleration_key"
@@ -469,6 +471,9 @@ class PlatformConfigFactory:
             ingress_registry_url=URL(f"https://registry.{ingress_host}"),
             ingress_metrics_url=URL(f"https://metrics.{ingress_host}"),
             ingress_acme_environment=cluster.acme_environment,
+            ingress_controller_enabled=kubernetes_spec.get("ingressController", {}).get(
+                "enabled", True
+            ),
             disks_storage_limit_per_user_gb=cluster["disks"][
                 "storage_limit_per_user_gb"
             ],

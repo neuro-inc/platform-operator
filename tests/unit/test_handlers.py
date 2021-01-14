@@ -1,4 +1,5 @@
 import logging
+from dataclasses import replace
 from typing import Any, Dict, Iterator
 from unittest import mock
 
@@ -204,6 +205,38 @@ async def test_configure_cluster(
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("setup_app")
+async def test_configure_cluster_with_ingress_controller_disabled(
+    gcp_platform_config: PlatformConfig,
+    kube_client: mock.Mock,
+    config_client: mock.Mock,
+    service_account: Dict[str, Any],
+    service_account_secret: Dict[str, Any],
+) -> None:
+    from platform_operator.handlers import configure_cluster
+
+    gcp_platform_config = replace(gcp_platform_config, ingress_controller_enabled=False)
+
+    kube_client.get_service_account.return_value = service_account
+    kube_client.get_secret.return_value = service_account_secret
+
+    await configure_cluster(gcp_platform_config)
+
+    kube_client.get_service_account.assert_awaited_with(
+        namespace="platform-jobs",
+        name="platform-jobs",
+    )
+    kube_client.get_secret.assert_awaited_with(namespace="platform-jobs", name="token")
+    config_client.patch_cluster.assert_awaited_with(
+        cluster_name=gcp_platform_config.cluster_name,
+        token=gcp_platform_config.token,
+        payload=gcp_platform_config.create_cluster_config(
+            service_account_secret=service_account_secret,
+        ),
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("setup_app")
 async def test_deploy(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -255,6 +288,65 @@ async def test_deploy(
     status_manager.start_deployment.assert_awaited_once_with(0)
     status_manager.transition.assert_any_call(PlatformConditionType.PLATFORM_DEPLOYED)
     status_manager.transition.assert_any_call(PlatformConditionType.CERTIFICATE_CREATED)
+    status_manager.transition.assert_any_call(PlatformConditionType.CLUSTER_CONFIGURED)
+    status_manager.complete_deployment.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("setup_app")
+async def test_deploy_with_ingress_controller_disabled(
+    status_manager: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    certificate_store: mock.AsyncMock,
+    configure_cluster: mock.AsyncMock,
+    logger: logging.Logger,
+    config: Config,
+    gcp_cluster: Cluster,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import deploy
+
+    gcp_platform_body["spec"]["kubernetes"]["ingressController"] = {"enabled": False}
+    gcp_platform_config = replace(gcp_platform_config, ingress_controller_enabled=False)
+
+    status_manager.is_condition_satisfied.return_value = False
+    config_client.get_cluster.return_value = gcp_cluster
+
+    await deploy(
+        name=gcp_platform_config.cluster_name,
+        body=gcp_platform_body,
+        logger=logger,
+        retry=0,
+    )
+
+    config_client.get_cluster.assert_awaited_once_with(
+        cluster_name=gcp_platform_config.cluster_name,
+        token=gcp_platform_body["spec"]["token"],
+    )
+
+    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
+    helm_client.add_repo.assert_has_awaits(
+        [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
+    )
+    helm_client.update_repo.assert_awaited_once()
+    helm_client.upgrade.assert_awaited_once_with(
+        "platform",
+        "neuro/platform",
+        values=mock.ANY,
+        version="1.0.0",
+        namespace="platform",
+        install=True,
+        wait=True,
+        timeout=600,
+    )
+
+    certificate_store.wait_till_certificate_created.assert_not_awaited()
+    configure_cluster.assert_awaited_once_with(gcp_platform_config)
+
+    status_manager.start_deployment.assert_awaited_once_with(0)
+    status_manager.transition.assert_any_call(PlatformConditionType.PLATFORM_DEPLOYED)
     status_manager.transition.assert_any_call(PlatformConditionType.CLUSTER_CONFIGURED)
     status_manager.complete_deployment.assert_awaited_once()
 

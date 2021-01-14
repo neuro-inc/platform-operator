@@ -169,8 +169,11 @@ async def deploy(
                 timeout=600,
             )
 
-    if not status_manager.is_condition_satisfied(
-        PlatformConditionType.CERTIFICATE_CREATED
+    if (
+        platform.ingress_controller_enabled
+        and not status_manager.is_condition_satisfied(
+            PlatformConditionType.CERTIFICATE_CREATED
+        )
     ):
         async with status_manager.transition(PlatformConditionType.CERTIFICATE_CREATED):
             await asyncio.wait_for(
@@ -271,15 +274,19 @@ async def delete(
 
 
 async def configure_cluster(platform: PlatformConfig) -> None:
-    traefik_service = await app.kube_client.get_service(
-        namespace=platform.namespace, name=platform.service_traefik_name
-    )
+    traefik_service: Optional[Dict[str, Any]] = None
     aws_traefik_lb: Optional[Dict[str, Any]] = None
-    if platform.aws:
-        async with AwsElbClient(region=platform.aws.region) as client:
-            aws_traefik_lb = await client.get_load_balancer_by_dns_name(
-                traefik_service["status"]["loadBalancer"]["ingress"][0]["hostname"]
-            )
+
+    if platform.ingress_controller_enabled:
+        traefik_service = await app.kube_client.get_service(
+            namespace=platform.namespace, name=platform.service_traefik_name
+        )
+        if platform.aws:
+            async with AwsElbClient(region=platform.aws.region) as client:
+                aws_traefik_lb = await client.get_load_balancer_by_dns_name(
+                    traefik_service["status"]["loadBalancer"]["ingress"][0]["hostname"]
+                )
+
     service_account = await app.kube_client.get_service_account(
         namespace=platform.jobs_namespace,
         name=platform.jobs_service_account_name,
