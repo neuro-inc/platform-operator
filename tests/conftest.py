@@ -421,6 +421,7 @@ def gcp_platform_config(
         cluster_name=cluster_name,
         cloud_provider="gcp",
         namespace="platform",
+        service_account_name="default",
         image_pull_secret_name="platform-docker-config",
         standard_storage_class_name="platform-standard-topology-aware",
         kubernetes_version="1.14.9",
