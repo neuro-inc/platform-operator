@@ -450,6 +450,7 @@ def gcp_platform_config(
         ingress_registry_url=URL(f"https://registry.{cluster_name}.org.neu.ro"),
         ingress_metrics_url=URL(f"https://metrics.{cluster_name}.org.neu.ro"),
         ingress_acme_environment="staging",
+        ingress_controller_enabled=True,
         disks_storage_limit_per_user_gb=10240,
         service_traefik_name="platform-traefik",
         monitoring_logs_bucket_name="job-logs",

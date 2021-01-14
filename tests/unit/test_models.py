@@ -330,6 +330,17 @@ class TestPlatformConfig:
             },
         }
 
+    def test_create_cluster_config_without_traefik_service(
+        self,
+        gcp_platform_config: PlatformConfig,
+        service_account_secret: Dict[str, Any],
+    ) -> None:
+        result = gcp_platform_config.create_cluster_config(
+            service_account_secret=service_account_secret,
+        )
+
+        assert "dns" not in result
+
     def test_create_azure_cluster_config(
         self,
         azure_platform_config: PlatformConfig,
@@ -443,7 +454,6 @@ class TestPlatformConfigFactory:
         factory: PlatformConfigFactory,
         gcp_platform_body: bodies.Body,
         gcp_cluster: Cluster,
-        gcp_platform_config: PlatformConfig,
     ) -> None:
         del gcp_platform_body["spec"]["iam"]["gcp"]["serviceAccountKeyBase64"]
         del gcp_cluster["cloud_provider"]["credentials"]
@@ -477,12 +487,25 @@ class TestPlatformConfigFactory:
         factory: PlatformConfigFactory,
         gcp_platform_body: bodies.Body,
         gcp_cluster: Cluster,
-        gcp_platform_config: PlatformConfig,
     ) -> None:
         gcp_platform_body["spec"]["storage"] = {}
 
         with pytest.raises(AssertionError):
             factory.create(gcp_platform_body, gcp_cluster)
+
+    def test_gcp_platform_config_with_ingress_controller_disabled(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        gcp_platform_body["spec"]["kubernetes"]["ingressController"] = {
+            "enabled": False
+        }
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result == replace(gcp_platform_config, ingress_controller_enabled=False)
 
     def test_aws_platform_config(
         self,

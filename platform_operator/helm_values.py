@@ -48,6 +48,7 @@ class HelmValuesFactory:
                 "jobFallbackHost": str(platform.jobs_fallback_host),
                 "registryHost": platform.ingress_registry_url.host,
             },
+            "ingressController": {"enabled": platform.ingress_controller_enabled},
             "jobs": {
                 "namespace": {"create": True, "name": platform.jobs_namespace},
                 "label": platform.kubernetes_node_labels.job,

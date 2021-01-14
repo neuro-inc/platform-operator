@@ -2,9 +2,11 @@ dependencies:
   - name: consul
     version: "3.6.0"
     repository: "@neuro"
+    condition: ingressController.enabled
   - name: traefik
     version: "1.85.1"
     repository: "@stable"
+    condition: ingressController.enabled
   - name: cluster-autoscaler
     version: "6.2.0"
     repository: "@stable"

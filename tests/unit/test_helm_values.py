@@ -55,6 +55,7 @@ class TestHelmValuesFactory:
                 "jobFallbackHost": "default.jobs-dev.neu.ro",
                 "registryHost": f"registry.{cluster_name}.org.neu.ro",
             },
+            "ingressController": {"enabled": True},
             "jobs": {
                 "namespace": {"create": True, "name": "platform-jobs"},
                 "label": "platform.neuromation.io/job",
