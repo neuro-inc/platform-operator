@@ -103,6 +103,7 @@ class KubeClient:
             )
 
     async def __aenter__(self) -> "KubeClient":
+        headers = {}
         if self._config.auth_type == KubeClientAuthType.TOKEN:
             assert self._config.auth_token or self._config.auth_token_path
             if self._config.auth_token:
@@ -112,8 +113,6 @@ class KubeClient:
                     "Authorization": "Bearer "
                     + self._config.auth_token_path.read_text()
                 }
-        else:
-            headers = {}
         connector = aiohttp.TCPConnector(
             limit=self._config.conn_pool_size, ssl=self._create_ssl_context()
         )
@@ -173,6 +172,19 @@ class KubeClient:
             response.raise_for_status()
             payload = await response.json()
             return payload
+
+    async def update_service_account_image_pull_secrets(
+        self, namespace: str, name: str, image_pull_secrets: Sequence[str]
+    ) -> None:
+        assert self._session
+        async with self._session.patch(
+            self._get_namespace_url(namespace) / "serviceaccounts" / name,
+            headers={"Content-Type": "application/merge-patch+json"},
+            data=json.dumps(
+                {"imagePullSecrets": [{"name": name} for name in image_pull_secrets]}
+            ),
+        ) as response:
+            response.raise_for_status()
 
     async def get_secret(self, namespace: str, name: str) -> Dict[str, Any]:
         assert self._session

@@ -51,6 +51,18 @@ class TestKubeClient:
         assert secret["data"]["namespace"] == "default"
 
     @pytest.mark.asyncio
+    async def test_update_service_account_image_pull_secrets(
+        self, kube_client: KubeClient
+    ) -> None:
+        await kube_client.update_service_account_image_pull_secrets(
+            "default", "default", ["secret"]
+        )
+
+        service_account = await kube_client.get_service_account("default", "default")
+
+        assert service_account["imagePullSecrets"] == [{"name": "secret"}]
+
+    @pytest.mark.asyncio
     async def test_get_unknown_secret__raises_error(
         self, kube_client: KubeClient
     ) -> None:

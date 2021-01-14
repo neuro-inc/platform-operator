@@ -162,8 +162,8 @@ class Config:
             helm_service_account=env["NP_HELM_SERVICE_ACCOUNT_NAME"],
             helm_release_names=HelmReleaseNames(
                 platform=platform_release_name,
-                obs_csi_driver=env["NP_PLATFORM_NAMESPACE"] + "-obs-csi-driver",
-                nfs_server=env["NP_PLATFORM_NAMESPACE"] + "-nfs-server",
+                obs_csi_driver="platform-obs-csi-driver",
+                nfs_server="platform-nfs-server",
             ),
             helm_chart_names=HelmChartNames(),
             helm_chart_versions=HelmChartVersions(
@@ -266,6 +266,7 @@ class PlatformConfig:
     cluster_name: str
     cloud_provider: str
     namespace: str
+    service_account_name: str
     image_pull_secret_name: str
     standard_storage_class_name: str
     kubernetes_version: str
@@ -448,6 +449,7 @@ class PlatformConfigFactory:
             cluster_name=platform_body["metadata"]["name"],
             cloud_provider=cluster.cloud_provider_type,
             namespace=self._config.platform_namespace,
+            service_account_name="default",
             image_pull_secret_name=f"{self._config.platform_namespace}-docker-config",
             standard_storage_class_name=standard_storage_class_name,
             kubernetes_version=self._config.kube_config.version,

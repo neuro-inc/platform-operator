@@ -158,6 +158,11 @@ async def deploy(
         PlatformConditionType.PLATFORM_DEPLOYED
     ):
         async with status_manager.transition(PlatformConditionType.PLATFORM_DEPLOYED):
+            await app.kube_client.update_service_account_image_pull_secrets(
+                namespace=platform.namespace,
+                name=platform.service_account_name,
+                image_pull_secrets=[platform.image_pull_secret_name],
+            )
             await app.helm_client.upgrade(
                 config.helm_release_names.platform,
                 f"{HelmRepoName.NEURO}/{config.helm_chart_names.platform}",

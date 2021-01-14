@@ -240,6 +240,7 @@ async def test_configure_cluster_with_ingress_controller_disabled(
 async def test_deploy(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
+    kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
     certificate_store: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
@@ -264,6 +265,12 @@ async def test_deploy(
     config_client.get_cluster.assert_awaited_once_with(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_body["spec"]["token"],
+    )
+
+    kube_client.update_service_account_image_pull_secrets.assert_awaited_once_with(
+        namespace=gcp_platform_config.namespace,
+        name=gcp_platform_config.service_account_name,
+        image_pull_secrets=[gcp_platform_config.image_pull_secret_name],
     )
 
     helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
@@ -427,6 +434,7 @@ async def test_deploy_on_prem(
 async def test_deploy_with_all_components_deployed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
+    kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
     certificate_store: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
@@ -452,6 +460,8 @@ async def test_deploy_with_all_components_deployed(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_body["spec"]["token"],
     )
+
+    kube_client.update_service_account_image_pull_secrets.assert_not_awaited()
 
     helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
     helm_client.add_repo.assert_has_awaits(
