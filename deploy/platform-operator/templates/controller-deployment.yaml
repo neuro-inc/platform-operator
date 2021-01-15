@@ -29,7 +29,13 @@ spec:
       automountServiceAccountToken: true
       containers:
       - name: controller
-        image: neuro-docker-local-anonymous.jfrog.io/platform-operator-controller:{{ .Chart.Version }}
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        args:
+        - --standalone
+        - --namespace={{ .Release.Namespace }}
+        - --liveness=http://0.0.0.0:8080/healthz
+        - --verbose
+        - --log-format=full
         env:
         - name: NP_CONTROLLER_LOG_LEVEL
           value: {{ .Values.logLevel | default "INFO" }}

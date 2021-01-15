@@ -14,8 +14,4 @@ RUN \
 COPY platform_operator/ platform_operator/
 RUN pip install -e .
 
-CMD kopf run \
-    --standalone \
-    --namespace "$NP_PLATFORM_NAMESPACE" \
-    --liveness=http://0.0.0.0:8080/healthz \
-    -m platform_operator.handlers
+ENTRYPOINT ["kopf", "run", "-m", "platform_operator.handlers"]

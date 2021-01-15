@@ -1,13 +1,13 @@
 dockerImage:
-  repository: docker
+  repository: $DOCKER_SERVER/docker
   tag: 19.03.8
 
 pauseImage:
-  repository: gcr.io/google_containers/pause
+  repository: $DOCKER_SERVER/google_containers/pause
   tag: "3.0"
 
 alpineImage:
-  repository: alpine
+  repository: $DOCKER_SERVER/alpine
   tag: latest
 
 serviceToken: ""
