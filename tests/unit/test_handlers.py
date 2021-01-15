@@ -141,14 +141,14 @@ async def test_configure_aws_cluster(
     service_account: Dict[str, Any],
     service_account_secret: Dict[str, Any],
 ) -> None:
-    from platform_operator.handlers import configure_cluster
+    from platform_operator.handlers import configure_cluster as _configure_cluster
 
     kube_client.get_service_account.return_value = service_account
     kube_client.get_secret.return_value = service_account_secret
     kube_client.get_service.side_effect = [aws_traefik_service]
     aws_elb_client.get_load_balancer_by_dns_name.side_effect = [aws_traefik_lb]
 
-    await configure_cluster(aws_platform_config)
+    await _configure_cluster(aws_platform_config)
 
     kube_client.get_service.assert_has_awaits(
         [mock.call(namespace="platform", name="platform-traefik")]
@@ -177,13 +177,13 @@ async def test_configure_cluster(
     service_account_secret: Dict[str, Any],
     traefik_service: Dict[str, Any],
 ) -> None:
-    from platform_operator.handlers import configure_cluster
+    from platform_operator.handlers import configure_cluster as _configure_cluster
 
     kube_client.get_service.side_effect = [traefik_service]
     kube_client.get_service_account.return_value = service_account
     kube_client.get_secret.return_value = service_account_secret
 
-    await configure_cluster(gcp_platform_config)
+    await _configure_cluster(gcp_platform_config)
 
     kube_client.get_service.assert_has_awaits(
         [mock.call(namespace="platform", name="platform-traefik")]
@@ -212,14 +212,14 @@ async def test_configure_cluster_with_ingress_controller_disabled(
     service_account: Dict[str, Any],
     service_account_secret: Dict[str, Any],
 ) -> None:
-    from platform_operator.handlers import configure_cluster
+    from platform_operator.handlers import configure_cluster as _configure_cluster
 
     gcp_platform_config = replace(gcp_platform_config, ingress_controller_enabled=False)
 
     kube_client.get_service_account.return_value = service_account
     kube_client.get_secret.return_value = service_account_secret
 
-    await configure_cluster(gcp_platform_config)
+    await _configure_cluster(gcp_platform_config)
 
     kube_client.get_service_account.assert_awaited_with(
         namespace="platform-jobs",

@@ -27,6 +27,9 @@ from platform_operator.models import (
 )
 
 
+pytest_plugins = ["tests.integration.kube", "tests.integration.aws"]
+
+
 @pytest.fixture
 def config() -> Config:
     return Config(
