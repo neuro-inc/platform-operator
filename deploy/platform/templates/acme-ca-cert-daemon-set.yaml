@@ -26,7 +26,7 @@ spec:
         effect: NoExecute
       initContainers:
       - name: acme-ca-cert
-        image: alpine
+        image: {{ .Values.alpineImage.repository }}:{{ .Values.alpineImage.tag }}
         command:
         - sh
         - -c
@@ -39,7 +39,7 @@ spec:
           name: certs
       containers:
       - name: pause
-        image: gcr.io/google_containers/pause:3.0
+        image: {{ .Values.pauseImage.repository }}:{{ .Values.pauseImage.tag }}
       volumes:
       - name: certs
         hostPath:

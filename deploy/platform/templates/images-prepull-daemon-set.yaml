@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: images-prepull
-          image: docker:19.03.8
+          image: {{ .Values.dockerImage.repository }}:{{ .Values.dockerImage.tag }}
           command:
             - /bin/sh
             - "-c"

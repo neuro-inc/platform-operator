@@ -156,7 +156,7 @@ def cluster_factory(
                 "neuro_registry": {
                     "username": name,
                     "password": "password",
-                    "url": "https://neuro-docker-local-public.jfrog.io",
+                    "url": "https://neuro.io",
                     "email": f"{name}@neuromation.io",
                 },
                 "neuro_helm": {
@@ -467,7 +467,7 @@ def gcp_platform_config(
             password="password",
         ),
         docker_registry=DockerRegistry(
-            url=URL("https://neuro-docker-local-public.jfrog.io"),
+            url=URL("https://neuro.io"),
             email=f"{cluster_name}@neuromation.io",
             username=cluster_name,
             password="password",

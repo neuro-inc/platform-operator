@@ -83,6 +83,7 @@ class HelmChartNames:
     minio: str = "minio"
     consul: str = "consul"
     traefik: str = "traefik"
+    adjust_inotify: str = "adjust-inotify"
     cluster_autoscaler: str = "cluster-autoscaler"
     nvidia_gpu_driver: str = "nvidia-gpu-driver"
     nvidia_gpu_driver_gcp: str = "nvidia-gpu-driver-gcp"

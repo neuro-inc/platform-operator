@@ -35,7 +35,7 @@ spec:
     spec:
       containers:
       - name: pause
-        image: gcr.io/google_containers/pause:3.0
+        image: {{ .Values.pauseImage.repository }}:{{ .Values.pauseImage.tag }}
         resources:
           requests:
 {{- if gt (.gpu | int) 0 }}
