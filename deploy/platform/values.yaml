@@ -1,3 +1,15 @@
+dockerImage:
+  repository: docker
+  tag: 19.03.8
+
+pauseImage:
+  repository: gcr.io/google_containers/pause
+  tag: "3.0"
+
+alpineImage:
+  repository: alpine
+  tag: latest
+
 serviceToken: ""
 
 kubernetes:

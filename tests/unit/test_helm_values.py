@@ -22,6 +22,9 @@ class TestHelmValuesFactory:
 
         assert result == {
             "tags": {"gcp": True},
+            "dockerImage": {"repository": "neuro.io/docker"},
+            "alpineImage": {"repository": "neuro.io/alpine"},
+            "pauseImage": {"repository": "neuro.io/google_containers/pause"},
             "serviceToken": "token",
             "kubernetes": {
                 "nodePools": [
@@ -44,7 +47,7 @@ class TestHelmValuesFactory:
                 "create": True,
                 "name": "platform-docker-config",
                 "credentials": {
-                    "url": "https://neuro-docker-local-public.jfrog.io",
+                    "url": "https://neuro.io",
                     "email": f"{cluster_name}@neuromation.io",
                     "username": cluster_name,
                     "password": "password",
@@ -63,6 +66,7 @@ class TestHelmValuesFactory:
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
             "consul": mock.ANY,
             "traefik": mock.ANY,
+            "adjust-inotify": mock.ANY,
             "nvidia-gpu-driver-gcp": mock.ANY,
             "platform-storage": mock.ANY,
             "platform-registry": mock.ANY,
@@ -140,6 +144,7 @@ class TestHelmValuesFactory:
         result = factory.create_docker_registry_values(on_prem_platform_config)
 
         assert result == {
+            "image": {"repository": "neuro.io/registry"},
             "ingress": {"enabled": False},
             "persistence": {
                 "enabled": True,
@@ -160,6 +165,8 @@ class TestHelmValuesFactory:
         result = factory.create_nfs_server_values(on_prem_platform_config)
 
         assert result == {
+            "image": {"repository": "neuro.io/volume-nfs"},
+            "imagePullSecrets": [{"name": "platform-docker-config"}],
             "rbac": {"create": True},
             "persistence": {
                 "enabled": True,
@@ -174,6 +181,11 @@ class TestHelmValuesFactory:
         result = factory.create_minio_values(on_prem_platform_config)
 
         assert result == {
+            "image": {
+                "repository": "neuro.io/minio/minio",
+                "tag": "RELEASE.2020-03-05T01-04-19Z",
+            },
+            "imagePullSecrets": [{"name": "platform-docker-config"}],
             "mode": "standalone",
             "persistence": {
                 "enabled": True,
@@ -191,19 +203,11 @@ class TestHelmValuesFactory:
         result = factory.create_obs_csi_driver_values(gcp_platform_config)
 
         assert result == {
+            "image": "neuro.io/obs-csi-driver",
             "driverName": "obs.csi.neu.ro",
             "credentialsSecret": {
                 "create": True,
                 "gcpServiceAccountKeyBase64": "e30=",
-            },
-            "imagePullSecret": {
-                "create": True,
-                "credentials": {
-                    "url": "https://neuro-docker-local-public.jfrog.io",
-                    "email": f"{gcp_platform_config.cluster_name}@neuromation.io",
-                    "username": gcp_platform_config.cluster_name,
-                    "password": "password",
-                },
             },
         }
 
@@ -213,6 +217,7 @@ class TestHelmValuesFactory:
         result = factory.create_consul_values(gcp_platform_config)
 
         assert result == {
+            "Image": "neuro.io/consul",
             "Replicas": 3,
             "StorageClass": "platform-standard-topology-aware",
         }
@@ -223,6 +228,7 @@ class TestHelmValuesFactory:
         result = factory.create_consul_values(on_prem_platform_config)
 
         assert result == {
+            "Image": "neuro.io/consul",
             "Replicas": 1,
             "StorageClass": "standard",
         }
@@ -241,7 +247,9 @@ class TestHelmValuesFactory:
                 "type": "RollingUpdate",
                 "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
             },
+            "image": "neuro.io/traefik",
             "imageTag": "1.7.20-alpine",
+            "imagePullSecrets": ["platform-docker-config"],
             "logLevel": "debug",
             "serviceType": "LoadBalancer",
             "externalTrafficPolicy": "Cluster",
@@ -379,8 +387,9 @@ class TestHelmValuesFactory:
             "cloudProvider": "aws",
             "awsRegion": "us-east-1",
             "image": {
-                "repository": "k8s.gcr.io/autoscaling/cluster-autoscaler",
+                "repository": "neuro.io/autoscaling/cluster-autoscaler",
                 "tag": "v1.14.8",
+                "pullSecrets": ["platform-docker-config"],
             },
             "rbac": {"create": True},
             "autoDiscovery": {"clusterName": aws_platform_config.cluster_name},
@@ -441,7 +450,9 @@ class TestHelmValuesFactory:
         result = factory.create_nvidia_gpu_driver_gcp_values(gcp_platform_config)
 
         assert result == {
-            "gpuNodeLabel": gcp_platform_config.kubernetes_node_labels.accelerator
+            "kubectlImage": {"repository": "neuro.io/bitnami/kubectl"},
+            "pauseImage": {"repository": "neuro.io/google_containers/pause"},
+            "gpuNodeLabel": gcp_platform_config.kubernetes_node_labels.accelerator,
         }
 
     def test_create_nvidia_gpu_driver_values(
@@ -450,8 +461,16 @@ class TestHelmValuesFactory:
         result = factory.create_nvidia_gpu_driver_values(aws_platform_config)
 
         assert result == {
-            "gpuNodeLabel": aws_platform_config.kubernetes_node_labels.accelerator
+            "image": {"repository": "neuro.io/nvidia/k8s-device-plugin"},
+            "gpuNodeLabel": aws_platform_config.kubernetes_node_labels.accelerator,
         }
+
+    def test_create_adjust_inotify_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_adjust_inotify_values(gcp_platform_config)
+
+        assert result == {"image": {"repository": "neuro.io/busybox"}}
 
     def test_create_platform_storage_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -462,10 +481,10 @@ class TestHelmValuesFactory:
             "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
             "NP_STORAGE_AUTH_URL": "https://dev.neu.ro",
             "NP_STORAGE_PVC_CLAIM_NAME": "platform-storage",
-            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
             "NP_CORS_ORIGINS": (
                 "https://release--neuro-web.netlify.app,https://app.neu.ro"
             ),
+            "image": {"repository": "neuro.io/platformstorageapi"},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
@@ -509,7 +528,8 @@ class TestHelmValuesFactory:
         assert result == {
             "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
             "NP_OBSTORAGE_AUTH_URL": "https://dev.neu.ro",
-            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+            "image": {"repository": "neuro.io/platformobjectstorage"},
+            "minio": {"image": {"repository": "neuro.io/minio/minio"}},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
@@ -549,7 +569,8 @@ class TestHelmValuesFactory:
         assert result == {
             "NP_CLUSTER_NAME": aws_platform_config.cluster_name,
             "NP_OBSTORAGE_AUTH_URL": "https://dev.neu.ro",
-            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+            "image": {"repository": "neuro.io/platformobjectstorage"},
+            "minio": {"image": {"repository": "neuro.io/minio/minio"}},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{aws_platform_config.cluster_name}.org.neu.ro"],
@@ -595,7 +616,8 @@ class TestHelmValuesFactory:
         assert result == {
             "NP_CLUSTER_NAME": azure_platform_config.cluster_name,
             "NP_OBSTORAGE_AUTH_URL": "https://dev.neu.ro",
-            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+            "image": {"repository": "neuro.io/platformobjectstorage"},
+            "minio": {"image": {"repository": "neuro.io/minio/minio"}},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{azure_platform_config.cluster_name}.org.neu.ro"],
@@ -657,7 +679,7 @@ class TestHelmValuesFactory:
         assert result == {
             "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
             "NP_REGISTRY_AUTH_URL": "https://dev.neu.ro",
-            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+            "image": {"repository": "neuro.io/platformregistryapi"},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"registry.{gcp_platform_config.cluster_name}.org.neu.ro"],
@@ -719,8 +741,8 @@ class TestHelmValuesFactory:
         assert result == {
             "NP_CLUSTER_NAME": aws_platform_config.cluster_name,
             "NP_REGISTRY_AUTH_URL": "https://dev.neu.ro",
-            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
             "AWS_DEFAULT_REGION": "us-east-1",
+            "image": {"repository": "neuro.io/platformregistryapi"},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"registry.{aws_platform_config.cluster_name}.org.neu.ro"],
@@ -770,7 +792,7 @@ class TestHelmValuesFactory:
         assert result == {
             "NP_CLUSTER_NAME": azure_platform_config.cluster_name,
             "NP_REGISTRY_AUTH_URL": "https://dev.neu.ro",
-            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+            "image": {"repository": "neuro.io/platformregistryapi"},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"registry.{azure_platform_config.cluster_name}.org.neu.ro"],
@@ -832,7 +854,7 @@ class TestHelmValuesFactory:
         assert result == {
             "NP_CLUSTER_NAME": on_prem_platform_config.cluster_name,
             "NP_REGISTRY_AUTH_URL": "https://dev.neu.ro",
-            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+            "image": {"repository": "neuro.io/platformregistryapi"},
             "ingress": {
                 "enabled": True,
                 "hosts": [
@@ -897,15 +919,17 @@ class TestHelmValuesFactory:
             "NP_MONITORING_PLATFORM_API_URL": "https://dev.neu.ro/api/v1",
             "NP_MONITORING_PLATFORM_AUTH_URL": "https://dev.neu.ro",
             "NP_MONITORING_PLATFORM_CONFIG_URL": "https://dev.neu.ro",
-            "NP_MONITORING_NODE_LABEL_JOB": "platform.neuromation.io/job",
-            "NP_MONITORING_NODE_LABEL_NODE_POOL": "platform.neuromation.io/nodepool",
             "NP_MONITORING_REGISTRY_URL": (
                 f"https://registry.{gcp_platform_config.cluster_name}.org.neu.ro"
             ),
             "NP_CORS_ORIGINS": (
                 "https://release--neuro-web.netlify.app,https://app.neu.ro"
             ),
-            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
+            "image": {"repository": "neuro.io/platformmonitoringapi"},
+            "nodeLabels": {
+                "job": "platform.neuromation.io/job",
+                "nodePool": "platform.neuromation.io/nodepool",
+            },
             "platform": {
                 "token": {
                     "valueFrom": {
@@ -926,12 +950,17 @@ class TestHelmValuesFactory:
                     "name": "platform-monitoring-token",
                 }
             ],
+            "fluentbit": {
+                "image": {"repository": "neuro.io/fluent/fluent-bit"},
+            },
             "fluentd": {
+                "image": {"repository": "neuro.io/bitnami/fluentd"},
                 "persistence": {
                     "enabled": True,
                     "storageClassName": "platform-standard-topology-aware",
-                }
+                },
             },
+            "minio": {"image": {"repository": "neuro.io/minio/minio"}},
             "logs": {
                 "persistence": {
                     "type": "gcp",
@@ -967,9 +996,7 @@ class TestHelmValuesFactory:
             )
         )
 
-        assert result["monitoring"] == {
-            "podAnnotations": {"iam.amazonaws.com/role": "s3_role"}
-        }
+        assert result["podAnnotations"] == {"iam.amazonaws.com/role": "s3_role"}
         assert result["fluentd"]["podAnnotations"] == {
             "iam.amazonaws.com/role": "s3_role"
         }
@@ -1037,10 +1064,10 @@ class TestHelmValuesFactory:
             "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
             "NP_SECRETS_K8S_NS": "platform-jobs",
             "NP_SECRETS_PLATFORM_AUTH_URL": "https://dev.neu.ro",
-            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
             "NP_CORS_ORIGINS": (
                 "https://release--neuro-web.netlify.app,https://app.neu.ro"
             ),
+            "image": {"repository": "neuro.io/platformsecrets"},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
@@ -1097,7 +1124,8 @@ class TestHelmValuesFactory:
                 "supported": True,
                 "configMapName": "thanos-object-storage-config",
             },
-            "image": {"pullSecretName": "platform-docker-config"},
+            "image": {"repository": "neuro.io/platform-reports"},
+            "nvidiaDCGMExporterImage": {"repository": "neuro.io/nvidia/dcgm-exporter"},
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
@@ -1130,10 +1158,12 @@ class TestHelmValuesFactory:
                 }
             },
             "prometheus-operator": {
+                "global": {"imagePullSecrets": [{"name": "platform-docker-config"}]},
                 "prometheus": {
                     "prometheusSpec": {
                         "thanos": {
-                            "version": "v0.13.0",
+                            "image": "neuro.io/thanos/thanos:v0.14.0",
+                            "version": "v0.14.0",
                             "objectStorageConfig": {
                                 "name": "thanos-object-storage-config",
                                 "key": "thanos-object-storage.yaml",
@@ -1150,7 +1180,20 @@ class TestHelmValuesFactory:
                         },
                     }
                 },
-                "prometheusOperator": {"kubeletService": {"namespace": "platform"}},
+                "prometheusOperator": {
+                    "image": {"repository": "neuro.io/coreos/prometheus-operator"},
+                    "prometheusConfigReloaderImage": {
+                        "repository": ("neuro.io/coreos/prometheus-config-reloader")
+                    },
+                    "configmapReloadImage": {
+                        "repository": "neuro.io/coreos/configmap-reload"
+                    },
+                    "tlsProxy": {"repository": "neuro.io/squareup/ghostunnel"},
+                    "admissionWebhooks": {
+                        "repository": "neuro.io/jettech/kube-webhook-certgen"
+                    },
+                    "kubeletService": {"namespace": "platform"},
+                },
                 "kubelet": {"namespace": "platform"},
                 "kubeStateMetrics": {
                     "serviceMonitor": {
@@ -1164,9 +1207,21 @@ class TestHelmValuesFactory:
                         ]
                     }
                 },
-                "grafana": {"adminPassword": mock.ANY},
+                "kube-state-metrics": {
+                    "image": {"repository": "neuro.io/coreos/kube-state-metrics"},
+                    "serviceAccount": {
+                        "imagePullSecrets": [{"name": "platform-docker-config"}]
+                    },
+                },
+                "prometheus-node-exporter": {
+                    "image": {"repository": "neuro.io/prometheus/node-exporter"},
+                    "serviceAccount": {
+                        "imagePullSecrets": [{"name": "platform-docker-config"}]
+                    },
+                },
             },
             "thanos": {
+                "image": {"repository": "neuro.io/thanos/thanos"},
                 "store": {
                     "persistentVolumeClaim": {
                         "spec": {"storageClassName": "platform-standard-topology-aware"}
@@ -1189,6 +1244,25 @@ class TestHelmValuesFactory:
                     "name": "platform-reports-gcp-key",
                     "key": "key.json",
                 },
+            },
+            "grafana": {
+                "image": {
+                    "repository": "neuro.io/grafana/grafana",
+                    "pullSecrets": ["platform-docker-config"],
+                },
+                "initChownData": {
+                    "image": {
+                        "repository": "neuro.io/grafana/grafana",
+                        "pullSecrets": ["platform-docker-config"],
+                    }
+                },
+                "sidecar": {
+                    "image": {
+                        "repository": "neuro.io/kiwigrid/k8s-sidecar",
+                        "pullSecrets": ["platform-docker-config"],
+                    }
+                },
+                "adminPassword": mock.ANY,
             },
         }
 
@@ -1334,11 +1408,11 @@ class TestHelmValuesFactory:
             "NP_DISK_API_K8S_NS": "platform-jobs",
             "NP_DISK_API_PLATFORM_AUTH_URL": "https://dev.neu.ro",
             "NP_DISK_API_STORAGE_LIMIT_PER_USER": "10995116277760",
-            "DOCKER_LOGIN_ARTIFACTORY_SECRET_NAME": "platform-docker-config",
             "NP_CORS_ORIGINS": (
                 "https://release--neuro-web.netlify.app,https://app.neu.ro"
             ),
             "NP_DISK_PROVIDER": "gcp",
+            "image": {"repository": "neuro.io/platformdiskapi"},
             "platform": {
                 "token": {
                     "valueFrom": {

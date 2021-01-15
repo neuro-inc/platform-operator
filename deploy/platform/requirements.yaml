@@ -13,15 +13,15 @@ dependencies:
     tags:
     - aws
   - name: adjust-inotify
-    version: "0.3.0"
+    version: "0.4.0"
     repository: "@neuro"
   - name: nvidia-gpu-driver-gcp
-    version: "1.1.0"
+    version: "1.2.0"
     repository: "@neuro"
     tags:
     - gcp
   - name: nvidia-gpu-driver
-    version: "1.1.0"
+    version: "1.2.0"
     repository: "@neuro"
     tags:
     - aws
@@ -33,24 +33,24 @@ dependencies:
     tags:
     - on_prem
   - name: minio
-    version: "5.0.29"
+    version: "5.0.33"
     repository: "@stable"
     tags:
     - on_prem
   - name: platformstorageapi
-    version: "20.12.30"
+    version: "21.1.14"
     repository: "@neuro"
     alias: platform-storage
   - name: platformregistryapi
-    version: "21.1.10"
+    version: "21.1.14"
     repository: "@neuro"
     alias: platform-registry
   - name: platformmonitoringapi
-    version: "20.12.30"
+    version: "21.1.13"
     repository: "@neuro"
     alias: platform-monitoring
   - name: platformobjectstorage
-    version: "20.12.30"
+    version: "21.1.13"
     repository: "@neuro"
     alias: platform-object-storage
     tags:
@@ -58,14 +58,14 @@ dependencies:
     - aws
     - azure
   - name: platformsecrets
-    version: "20.12.30"
+    version: "21.1.14"
     repository: "@neuro"
     alias: platform-secrets
   - name: platform-reports
-    version: "20.12.30"
+    version: "21.1.13"
     repository: "@neuro"
   - name: platformdiskapi
-    version: "20.12.30"
+    version: "21.1.14"
     repository: "@neuro"
     alias: platform-disk-api
     tags:
