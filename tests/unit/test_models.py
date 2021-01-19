@@ -507,6 +507,35 @@ class TestPlatformConfigFactory:
 
         assert result == replace(gcp_platform_config, ingress_controller_enabled=False)
 
+    def test_gcp_platform_config_with_custom_docker_config_secret(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+    ) -> None:
+        gcp_platform_body["spec"]["kubernetes"]["dockerConfigSecret"] = {
+            "create": False,
+            "name": "secret",
+        }
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result.docker_config_secret_create is False
+        assert result.docker_config_secret_name == "secret"
+        assert result.image_pull_secret_names == ["secret"]
+
+    def test_gcp_platform_config_with_service_account_image_pull_secrets(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+    ) -> None:
+        gcp_platform_body["spec"]["kubernetes"]["serviceAccount"] = {
+            "imagePullSecrets": [{"name": "secret"}, {"name": "platform-docker-config"}]
+        }
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result.image_pull_secret_names == ["secret", "platform-docker-config"]
+
     def test_aws_platform_config(
         self,
         factory: PlatformConfigFactory,

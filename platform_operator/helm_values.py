@@ -37,16 +37,6 @@ class HelmValuesFactory:
                 "create": not platform.on_prem,
                 "name": platform.standard_storage_class_name,
             },
-            "imagePullSecret": {
-                "create": True,
-                "name": platform.image_pull_secret_name,
-                "credentials": {
-                    "url": str(platform.docker_registry.url),
-                    "email": platform.docker_registry.email,
-                    "username": platform.docker_registry.username,
-                    "password": platform.docker_registry.password,
-                },
-            },
             "ingress": {
                 "host": platform.ingress_url.host,
                 "jobFallbackHost": str(platform.jobs_fallback_host),
@@ -81,6 +71,19 @@ class HelmValuesFactory:
                 self.create_platform_disk_api_values(platform)
             ),
         }
+        if platform.docker_config_secret_create:
+            result["dockerConfigSecret"] = {
+                "create": True,
+                "name": platform.docker_config_secret_name,
+                "credentials": {
+                    "url": str(platform.docker_registry.url),
+                    "email": platform.docker_registry.email,
+                    "username": platform.docker_registry.username,
+                    "password": platform.docker_registry.password,
+                },
+            }
+        else:
+            result["dockerConfigSecret"] = {"create": False}
         if not platform.on_prem:
             result[
                 self._chart_names.platform_object_storage
@@ -159,7 +162,9 @@ class HelmValuesFactory:
         assert platform.on_prem
         return {
             "image": {"repository": f"{platform.docker_registry.url.host}/volume-nfs"},
-            "imagePullSecrets": [{"name": platform.image_pull_secret_name}],
+            "imagePullSecrets": [
+                {"name": name} for name in platform.image_pull_secret_names
+            ],
             "rbac": {"create": True},
             "persistence": {
                 "enabled": True,
@@ -193,7 +198,9 @@ class HelmValuesFactory:
                 "repository": f"{platform.docker_registry.url.host}/minio/minio",
                 "tag": "RELEASE.2020-03-05T01-04-19Z",
             },
-            "imagePullSecrets": [{"name": platform.image_pull_secret_name}],
+            "imagePullSecrets": [
+                {"name": name} for name in platform.image_pull_secret_names
+            ],
             "mode": "standalone",
             "persistence": {
                 "enabled": True,
@@ -225,7 +232,7 @@ class HelmValuesFactory:
             },
             "image": f"{platform.docker_registry.url.host}/traefik",
             "imageTag": "1.7.20-alpine",
-            "imagePullSecrets": [platform.image_pull_secret_name],
+            "imagePullSecrets": platform.image_pull_secret_names,
             "logLevel": "debug",
             "serviceType": "LoadBalancer",
             "externalTrafficPolicy": "Cluster",
@@ -396,7 +403,7 @@ class HelmValuesFactory:
             "image": {
                 "repository": f"{docker_server}/autoscaling/cluster-autoscaler",
                 "tag": image_tag,
-                "pullSecrets": [platform.image_pull_secret_name],
+                "pullSecrets": platform.image_pull_secret_names,
             },
             "rbac": {"create": True},
             "autoDiscovery": {"clusterName": platform.cluster_name},
@@ -925,7 +932,9 @@ class HelmValuesFactory:
             },
             "prometheus-operator": {
                 "global": {
-                    "imagePullSecrets": [{"name": platform.image_pull_secret_name}]
+                    "imagePullSecrets": [
+                        {"name": name} for name in platform.image_pull_secret_names
+                    ]
                 },
                 "prometheus": {
                     "prometheusSpec": {
@@ -975,7 +984,9 @@ class HelmValuesFactory:
                         "repository": f"{docker_server}/coreos/kube-state-metrics"
                     },
                     "serviceAccount": {
-                        "imagePullSecrets": [{"name": platform.image_pull_secret_name}]
+                        "imagePullSecrets": [
+                            {"name": name} for name in platform.image_pull_secret_names
+                        ]
                     },
                 },
                 "prometheus-node-exporter": {
@@ -983,7 +994,9 @@ class HelmValuesFactory:
                         "repository": f"{docker_server}/prometheus/node-exporter"
                     },
                     "serviceAccount": {
-                        "imagePullSecrets": [{"name": platform.image_pull_secret_name}]
+                        "imagePullSecrets": [
+                            {"name": name} for name in platform.image_pull_secret_names
+                        ]
                     },
                 },
             },
@@ -1007,18 +1020,18 @@ class HelmValuesFactory:
             "grafana": {
                 "image": {
                     "repository": f"{docker_server}/grafana/grafana",
-                    "pullSecrets": [platform.image_pull_secret_name],
+                    "pullSecrets": platform.image_pull_secret_names,
                 },
                 "initChownData": {
                     "image": {
                         "repository": f"{docker_server}/grafana/grafana",
-                        "pullSecrets": [platform.image_pull_secret_name],
+                        "pullSecrets": platform.image_pull_secret_names,
                     }
                 },
                 "sidecar": {
                     "image": {
                         "repository": f"{docker_server}/kiwigrid/k8s-sidecar",
-                        "pullSecrets": [platform.image_pull_secret_name],
+                        "pullSecrets": platform.image_pull_secret_names,
                     }
                 },
                 "adminPassword": "".join(secrets.choice(alphabet) for i in range(16)),

@@ -267,8 +267,10 @@ class PlatformConfig:
     cluster_name: str
     cloud_provider: str
     namespace: str
+    docker_config_secret_create: bool
+    docker_config_secret_name: str
     service_account_name: str
-    image_pull_secret_name: str
+    image_pull_secret_names: Sequence[str]
     standard_storage_class_name: str
     kubernetes_version: str
     kubernetes_public_url: URL
@@ -442,6 +444,15 @@ class PlatformConfigFactory:
         monitoring_metrics_default_storage_size = ""
         if cluster.cloud_provider_type == "on_prem":
             monitoring_metrics_default_storage_size = "10Gi"
+        docker_config_secret_spec = kubernetes_spec.get("dockerConfigSecret", {})
+        docker_config_secret_name = docker_config_secret_spec.get(
+            "name", f"{self._config.platform_namespace}-docker-config"
+        )
+        service_account_spec = kubernetes_spec.get("serviceAccount", {})
+        image_pull_secrets = service_account_spec.get("imagePullSecrets", [])
+        image_pull_secret_names = [secret["name"] for secret in image_pull_secrets]
+        if docker_config_secret_name not in image_pull_secret_names:
+            image_pull_secret_names.append(docker_config_secret_name)
         return PlatformConfig(
             auth_url=self._config.platform_auth_url,
             config_url=self._config.platform_config_url,
@@ -450,8 +461,10 @@ class PlatformConfigFactory:
             cluster_name=platform_body["metadata"]["name"],
             cloud_provider=cluster.cloud_provider_type,
             namespace=self._config.platform_namespace,
+            docker_config_secret_create=docker_config_secret_spec.get("create", True),
+            docker_config_secret_name=docker_config_secret_name,
             service_account_name="default",
-            image_pull_secret_name=f"{self._config.platform_namespace}-docker-config",
+            image_pull_secret_names=image_pull_secret_names,
             standard_storage_class_name=standard_storage_class_name,
             kubernetes_version=self._config.kube_config.version,
             kubernetes_public_url=URL(kubernetes_spec["publicUrl"]),
