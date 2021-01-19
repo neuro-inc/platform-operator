@@ -20,7 +20,7 @@ kubernetes:
   #   refreshInterval: 1h
   #   images: []
 
-imagePullSecret:
+dockerConfigSecret:
   create: false
   name: ""
   # credentials:

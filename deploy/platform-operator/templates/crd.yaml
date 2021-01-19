@@ -128,6 +128,25 @@ spec:
                   properties:
                     enabled:
                       type: boolean
+                dockerConfigSecret:
+                  type: object
+                  properties:
+                    create:
+                      type: boolean
+                    name:
+                      type: string
+                serviceAccount:
+                  type: object
+                  properties:
+                    imagePullSecrets:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                        required:
+                        - name
             iam:
               type: object
               properties:

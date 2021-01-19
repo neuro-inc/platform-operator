@@ -43,7 +43,7 @@ class TestHelmValuesFactory:
                 "create": True,
                 "name": "platform-standard-topology-aware",
             },
-            "imagePullSecret": {
+            "dockerConfigSecret": {
                 "create": True,
                 "name": "platform-docker-config",
                 "credentials": {
@@ -92,6 +92,15 @@ class TestHelmValuesFactory:
         )
 
         assert result["storage"] == {"gcs": {"bucketName": "platform-storage"}}
+
+    def test_create_gcp_platform_values_without_docker_config_secret(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(gcp_platform_config, docker_config_secret_create=False)
+        )
+
+        assert result["dockerConfigSecret"] == {"create": False}
 
     def test_create_aws_platform_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory

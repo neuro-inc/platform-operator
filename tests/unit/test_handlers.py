@@ -270,7 +270,7 @@ async def test_deploy(
     kube_client.update_service_account_image_pull_secrets.assert_awaited_once_with(
         namespace=gcp_platform_config.namespace,
         name=gcp_platform_config.service_account_name,
-        image_pull_secrets=[gcp_platform_config.image_pull_secret_name],
+        image_pull_secrets=gcp_platform_config.image_pull_secret_names,
     )
 
     helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
