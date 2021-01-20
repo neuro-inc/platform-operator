@@ -123,7 +123,6 @@ class Config:
     helm_chart_names: HelmChartNames
     helm_chart_versions: HelmChartVersions
     helm_service_account: str
-    platform_url: URL
     platform_auth_url: URL
     platform_config_url: URL
     platform_api_url: URL
@@ -134,7 +133,6 @@ class Config:
     @classmethod
     def load_from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Config":
         env = env or os.environ
-        platform_url = URL(env["NP_PLATFORM_URL"])
         platform_release_name = "platform"
         return cls(
             log_level=(env.get("NP_CONTROLLER_LOG_LEVEL") or "INFO").upper(),
@@ -172,10 +170,9 @@ class Config:
                 obs_csi_driver=env["NP_HELM_OBS_CSI_DRIVER_CHART_VERSION"],
                 nfs_server=env["NP_HELM_NFS_SERVER_CHART_VERSION"],
             ),
-            platform_url=platform_url,
-            platform_auth_url=platform_url,
-            platform_config_url=platform_url,
-            platform_api_url=platform_url / "api/v1",
+            platform_auth_url=URL(env["NP_PLATFORM_AUTH_URL"]),
+            platform_config_url=URL(env["NP_PLATFORM_CONFIG_URL"]),
+            platform_api_url=URL(env["NP_PLATFORM_API_URL"]),
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
             platform_jobs_namespace=env["NP_PLATFORM_NAMESPACE"] + "-jobs",
             platform_consul_url=URL.build(
