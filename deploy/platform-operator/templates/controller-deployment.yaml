@@ -63,8 +63,12 @@ spec:
           value: "1.0.5"
         - name: NP_HELM_NFS_SERVER_CHART_VERSION
           value: "1.0.0"
-        - name: NP_PLATFORM_URL
-          value: {{ .Values.platform.url }}
+        - name: NP_PLATFORM_AUTH_URL
+          value: {{ .Values.platform.authUrl }}
+        - name: NP_PLATFORM_CONFIG_URL
+          value: {{ .Values.platform.configUrl }}
+        - name: NP_PLATFORM_API_URL
+          value: {{ .Values.platform.apiUrl }}
         - name: NP_PLATFORM_NAMESPACE
           value: {{ .Release.Namespace }}
         ports:

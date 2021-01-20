@@ -54,10 +54,9 @@ def config() -> Config:
             platform="1.0.0", obs_csi_driver="2.0.0", nfs_server="3.0.0"
         ),
         helm_service_account="default",
-        platform_url=URL("https://dev.neu.ro"),
         platform_auth_url=URL("https://dev.neu.ro"),
         platform_config_url=URL("https://dev.neu.ro"),
-        platform_api_url=URL("https://dev.neu.ro/api/v1"),
+        platform_api_url=URL("https://dev.neu.ro"),
         platform_namespace="platform",
         platform_jobs_namespace="platform-jobs",
         platform_consul_url=URL("http://platform-consul:8500"),
@@ -419,7 +418,7 @@ def gcp_platform_config(
     return PlatformConfig(
         auth_url=URL("https://dev.neu.ro"),
         config_url=URL("https://dev.neu.ro"),
-        api_url=URL("https://dev.neu.ro/api/v1"),
+        api_url=URL("https://dev.neu.ro"),
         token="token",
         cluster_name=cluster_name,
         cloud_provider="gcp",

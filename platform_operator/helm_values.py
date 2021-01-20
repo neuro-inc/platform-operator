@@ -728,7 +728,7 @@ class HelmValuesFactory:
         result: Dict[str, Any] = {
             "NP_MONITORING_CLUSTER_NAME": platform.cluster_name,
             "NP_MONITORING_K8S_NS": platform.jobs_namespace,
-            "NP_MONITORING_PLATFORM_API_URL": str(platform.api_url),
+            "NP_MONITORING_PLATFORM_API_URL": str(platform.api_url / "api/v1"),
             "NP_MONITORING_PLATFORM_AUTH_URL": str(platform.auth_url),
             "NP_MONITORING_PLATFORM_CONFIG_URL": str(platform.config_url),
             "NP_MONITORING_REGISTRY_URL": str(platform.ingress_registry_url),
@@ -907,7 +907,7 @@ class HelmValuesFactory:
                 "clusterName": platform.cluster_name,
                 "authUrl": str(platform.auth_url),
                 "configUrl": str(platform.config_url),
-                "apiUrl": str(platform.api_url),
+                "apiUrl": str(platform.api_url / "api/v1"),
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {

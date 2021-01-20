@@ -25,7 +25,9 @@ from platform_operator.models import (
 class TestConfig:
     def test_config(self) -> None:
         env = {
-            "NP_PLATFORM_URL": "https://dev.neu.ro",
+            "NP_PLATFORM_AUTH_URL": "http://platformauthapi:8080",
+            "NP_PLATFORM_CONFIG_URL": "http://platformconfig:8080",
+            "NP_PLATFORM_API_URL": "http://platformapi:8080",
             "NP_CONTROLLER_LOG_LEVEL": "debug",
             "NP_CONTROLLER_RETRIES": "5",
             "NP_CONTROLLER_BACKOFF": "120",
@@ -84,10 +86,9 @@ class TestConfig:
                 platform="1.0.0", obs_csi_driver="2.0.0", nfs_server="3.0.0"
             ),
             helm_service_account="default",
-            platform_url=URL("https://dev.neu.ro"),
-            platform_auth_url=URL("https://dev.neu.ro"),
-            platform_config_url=URL("https://dev.neu.ro"),
-            platform_api_url=URL("https://dev.neu.ro/api/v1"),
+            platform_auth_url=URL("http://platformauthapi:8080"),
+            platform_config_url=URL("http://platformconfig:8080"),
+            platform_api_url=URL("http://platformapi:8080"),
             platform_namespace="platform",
             platform_jobs_namespace="platform-jobs",
             platform_consul_url=URL("http://platform-consul:8500"),
@@ -95,7 +96,9 @@ class TestConfig:
 
     def test_config_defaults(self) -> None:
         env = {
-            "NP_PLATFORM_URL": "https://dev.neu.ro",
+            "NP_PLATFORM_AUTH_URL": "http://platformauthapi:8080",
+            "NP_PLATFORM_CONFIG_URL": "http://platformconfig:8080",
+            "NP_PLATFORM_API_URL": "http://platformapi:8080",
             "NP_KUBE_VERSION": "v1.14.10",
             "NP_KUBE_URL": "https://kubernetes.default",
             "NP_KUBE_AUTH_TYPE": "none",
@@ -139,10 +142,9 @@ class TestConfig:
                 platform="1.0.0", obs_csi_driver="2.0.0", nfs_server="3.0.0"
             ),
             helm_service_account="default",
-            platform_url=URL("https://dev.neu.ro"),
-            platform_auth_url=URL("https://dev.neu.ro"),
-            platform_config_url=URL("https://dev.neu.ro"),
-            platform_api_url=URL("https://dev.neu.ro/api/v1"),
+            platform_auth_url=URL("http://platformauthapi:8080"),
+            platform_config_url=URL("http://platformconfig:8080"),
+            platform_api_url=URL("http://platformapi:8080"),
             platform_namespace="platform",
             platform_jobs_namespace="platform-jobs",
             platform_consul_url=URL("http://platform-consul:8500"),

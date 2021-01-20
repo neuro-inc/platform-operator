@@ -53,7 +53,7 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
         KubeClient(config.kube_config)
     )
     app.config_client = await app.exit_stack.enter_async_context(
-        ConfigClient(config.platform_url)
+        ConfigClient(config.platform_config_url)
     )
     app.certificate_store = await app.exit_stack.enter_async_context(
         CertificateStore(config.platform_consul_url)
