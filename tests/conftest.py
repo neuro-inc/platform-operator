@@ -58,7 +58,6 @@ def config() -> Config:
         platform_config_url=URL("https://dev.neu.ro"),
         platform_api_url=URL("https://dev.neu.ro"),
         platform_namespace="platform",
-        platform_jobs_namespace="platform-jobs",
         platform_consul_url=URL("http://platform-consul:8500"),
     )
 
@@ -439,6 +438,7 @@ def gcp_platform_config(
         dns_zone_id="/hostedzone/id",
         dns_zone_name=f"{cluster_name}.org.neu.ro.",
         dns_zone_name_servers=["192.168.0.2"],
+        jobs_namespace_create=True,
         jobs_namespace="platform-jobs",
         jobs_node_pools=[
             {"name": "n1-highmem-8-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}
