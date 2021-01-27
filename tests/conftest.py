@@ -363,8 +363,7 @@ def on_prem_platform_body(cluster_name: str) -> bodies.Body:
             "token": "token",
             "kubernetes": {
                 "publicUrl": "https://kubernetes.default",
-                "publicIP": "192.168.0.3",
-                "mastersCount": 1,
+                "ingressPublicIPs": ["192.168.0.3"],
                 "standardStorageClassName": "standard",
                 "nodePorts": {"kubelet": 10250, "http": 30080, "https": 30443},
             },
@@ -456,6 +455,7 @@ def gcp_platform_config(
         ingress_metrics_url=URL(f"https://metrics.{cluster_name}.org.neu.ro"),
         ingress_acme_environment="staging",
         ingress_controller_enabled=True,
+        ingress_public_ips=[],
         disks_storage_limit_per_user_gb=10240,
         service_traefik_name="platform-traefik",
         monitoring_logs_bucket_name="job-logs",
@@ -542,6 +542,7 @@ def on_prem_platform_config(
     return replace(
         gcp_platform_config,
         gcp=None,
+        ingress_public_ips=[IPv4Address("192.168.0.3")],
         standard_storage_class_name="standard",
         cloud_provider="on_prem",
         jobs_node_pools=[{"name": "gpu-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}],
@@ -550,8 +551,6 @@ def on_prem_platform_config(
         monitoring_metrics_storage_class_name="metrics-standard",
         monitoring_metrics_storage_size="100Gi",
         on_prem=OnPremConfig(
-            kubernetes_public_ip=IPv4Address("192.168.0.3"),
-            masters_count=1,
             registry_storage_class_name="registry-standard",
             registry_storage_size="100Gi",
             storage_class_name="storage-standard",

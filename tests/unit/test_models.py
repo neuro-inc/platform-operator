@@ -1,5 +1,4 @@
 from dataclasses import replace
-from ipaddress import AddressValueError, IPv4Address
 from pathlib import Path
 from typing import Any, Callable, Dict
 
@@ -196,7 +195,7 @@ class TestPlatformConfig:
     def service_account_secret(self) -> Dict[str, Any]:
         return {"data": {"ca.crt": "cert-authority-data", "token": "token"}}
 
-    def test_create_dns_config(
+    def test_create_dns_config_from_traefik_service(
         self, gcp_platform_config: PlatformConfig, traefik_service: Dict[str, Any]
     ) -> None:
         result = gcp_platform_config.create_dns_config(traefik_service=traefik_service)
@@ -214,12 +213,10 @@ class TestPlatformConfig:
             ],
         }
 
-    def test_create_on_prem_dns_config(
-        self, on_prem_platform_config: PlatformConfig, traefik_service: Dict[str, Any]
+    def test_create_dns_config_from_ingress_public_ips(
+        self, on_prem_platform_config: PlatformConfig
     ) -> None:
-        result = on_prem_platform_config.create_dns_config(
-            traefik_service=traefik_service
-        )
+        result = on_prem_platform_config.create_dns_config()
         zone_name = on_prem_platform_config.dns_zone_name
 
         assert result == {
@@ -330,13 +327,13 @@ class TestPlatformConfig:
             },
         }
 
-    def test_create_cluster_config_without_traefik_service(
+    def test_create_cluster_config_without_dns(
         self,
         gcp_platform_config: PlatformConfig,
         service_account_secret: Dict[str, Any],
     ) -> None:
         result = gcp_platform_config.create_cluster_config(
-            service_account_secret=service_account_secret,
+            service_account_secret=service_account_secret
         )
 
         assert "dns" not in result
@@ -661,35 +658,6 @@ class TestPlatformConfigFactory:
         result = factory.create(on_prem_platform_body, on_prem_cluster)
 
         assert result == on_prem_platform_config
-
-    def test_on_prem_platform_config_with_public_ip_from_kubernetes_public_url(
-        self,
-        factory: PlatformConfigFactory,
-        on_prem_platform_body: bodies.Body,
-        on_prem_cluster: Cluster,
-    ) -> None:
-        del on_prem_platform_body["spec"]["kubernetes"]["publicIP"]
-        on_prem_platform_body["spec"]["kubernetes"][
-            "publicUrl"
-        ] = "https://192.168.0.1:6443"
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
-
-        assert result.on_prem
-        assert result.on_prem.kubernetes_public_ip == IPv4Address("192.168.0.1")
-
-    def test_on_prem_platform_config_without_public_ip__fails(
-        self,
-        factory: PlatformConfigFactory,
-        on_prem_platform_body: bodies.Body,
-        on_prem_cluster: Cluster,
-    ) -> None:
-        del on_prem_platform_body["spec"]["kubernetes"]["publicIP"]
-        on_prem_platform_body["spec"]["kubernetes"][
-            "publicUrl"
-        ] = "https://kubernetes:6443"
-
-        with pytest.raises(AddressValueError):
-            factory.create(on_prem_platform_body, on_prem_cluster)
 
     def test_on_prem_platform_config_with_default_persistence_sizes(
         self,
