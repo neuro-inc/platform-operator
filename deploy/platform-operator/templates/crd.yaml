@@ -147,6 +147,13 @@ spec:
                             type: string
                         required:
                         - name
+                jobsNamespace:
+                  type: object
+                  properties:
+                    create:
+                      type: boolean
+                    name:
+                      type: string
             iam:
               type: object
               properties:
