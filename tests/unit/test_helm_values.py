@@ -971,6 +971,9 @@ class TestHelmValuesFactory:
                     "name": "platform-monitoring-token",
                 }
             ],
+            "dockerEngine": {
+                "image": {"repository": "neuro.io/nginx"},
+            },
             "fluentbit": {
                 "image": {"repository": "neuro.io/fluent/fluent-bit"},
             },
@@ -1182,6 +1185,7 @@ class TestHelmValuesFactory:
                 "global": {"imagePullSecrets": [{"name": "platform-docker-config"}]},
                 "prometheus": {
                     "prometheusSpec": {
+                        "image": {"repository": "neuro.io/prometheus/prometheus"},
                         "thanos": {
                             "image": "neuro.io/thanos/thanos:v0.14.0",
                             "version": "v0.14.0",
@@ -1209,9 +1213,15 @@ class TestHelmValuesFactory:
                     "configmapReloadImage": {
                         "repository": "neuro.io/coreos/configmap-reload"
                     },
-                    "tlsProxy": {"repository": "neuro.io/squareup/ghostunnel"},
+                    "tlsProxy": {
+                        "image": {"repository": "neuro.io/squareup/ghostunnel"}
+                    },
                     "admissionWebhooks": {
-                        "repository": "neuro.io/jettech/kube-webhook-certgen"
+                        "patch": {
+                            "image": {
+                                "repository": "neuro.io/jettech/kube-webhook-certgen"
+                            }
+                        }
                     },
                     "kubeletService": {"namespace": "platform"},
                 },
