@@ -80,3 +80,6 @@ spec:
             port: liveness-port
           initialDelaySeconds: 10
           periodSeconds: 3
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml .Values.imagePullSecrets | nindent 6 }}
+      {{- end }}
