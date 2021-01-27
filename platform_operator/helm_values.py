@@ -44,7 +44,10 @@ class HelmValuesFactory:
             },
             "ingressController": {"enabled": platform.ingress_controller_enabled},
             "jobs": {
-                "namespace": {"create": True, "name": platform.jobs_namespace},
+                "namespace": {
+                    "create": platform.jobs_namespace_create,
+                    "name": platform.jobs_namespace,
+                },
                 "label": platform.kubernetes_node_labels.job,
             },
             self._chart_names.adjust_inotify: self.create_adjust_inotify_values(

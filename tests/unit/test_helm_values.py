@@ -93,6 +93,18 @@ class TestHelmValuesFactory:
 
         assert result["storage"] == {"gcs": {"bucketName": "platform-storage"}}
 
+    def test_create_gcp_platform_values_without_namespace(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(gcp_platform_config, jobs_namespace_create=False)
+        )
+
+        assert result["jobs"]["namespace"] == {
+            "create": False,
+            "name": gcp_platform_config.jobs_namespace,
+        }
+
     def test_create_gcp_platform_values_without_docker_config_secret(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:

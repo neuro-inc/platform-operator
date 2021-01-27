@@ -90,7 +90,6 @@ class TestConfig:
             platform_config_url=URL("http://platformconfig:8080"),
             platform_api_url=URL("http://platformapi:8080"),
             platform_namespace="platform",
-            platform_jobs_namespace="platform-jobs",
             platform_consul_url=URL("http://platform-consul:8500"),
         )
 
@@ -146,7 +145,6 @@ class TestConfig:
             platform_config_url=URL("http://platformconfig:8080"),
             platform_api_url=URL("http://platformapi:8080"),
             platform_namespace="platform",
-            platform_jobs_namespace="platform-jobs",
             platform_consul_url=URL("http://platform-consul:8500"),
         )
 
@@ -508,6 +506,21 @@ class TestPlatformConfigFactory:
         result = factory.create(gcp_platform_body, gcp_cluster)
 
         assert result == replace(gcp_platform_config, ingress_controller_enabled=False)
+
+    def test_gcp_platform_config_with_custom_jobs_namespace(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+    ) -> None:
+        gcp_platform_body["spec"]["kubernetes"]["jobsNamespace"] = {
+            "create": False,
+            "name": "jobs-namespace",
+        }
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result.jobs_namespace_create is False
+        assert result.jobs_namespace == "jobs-namespace"
 
     def test_gcp_platform_config_with_custom_docker_config_secret(
         self,

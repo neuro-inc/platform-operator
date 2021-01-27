@@ -127,7 +127,6 @@ class Config:
     platform_config_url: URL
     platform_api_url: URL
     platform_namespace: str
-    platform_jobs_namespace: str
     platform_consul_url: URL
 
     @classmethod
@@ -174,7 +173,6 @@ class Config:
             platform_config_url=URL(env["NP_PLATFORM_CONFIG_URL"]),
             platform_api_url=URL(env["NP_PLATFORM_API_URL"]),
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
-            platform_jobs_namespace=env["NP_PLATFORM_NAMESPACE"] + "-jobs",
             platform_consul_url=URL.build(
                 scheme="http", host=platform_release_name + "-consul", port=8500
             ),
@@ -282,6 +280,7 @@ class PlatformConfig:
     ingress_controller_enabled: bool
     disks_storage_limit_per_user_gb: int
     service_traefik_name: str
+    jobs_namespace_create: bool
     jobs_namespace: str
     jobs_node_pools: Sequence[Dict[str, Any]]
     jobs_schedule_timeout_s: float
@@ -450,6 +449,10 @@ class PlatformConfigFactory:
         image_pull_secret_names = [secret["name"] for secret in image_pull_secrets]
         if docker_config_secret_name not in image_pull_secret_names:
             image_pull_secret_names.append(docker_config_secret_name)
+        jobs_namespace_spec = kubernetes_spec.get("jobsNamespace", {})
+        jobs_namespace = jobs_namespace_spec.get(
+            "name", self._config.platform_namespace + "-jobs"
+        )
         return PlatformConfig(
             auth_url=self._config.platform_auth_url,
             config_url=self._config.platform_config_url,
@@ -491,7 +494,8 @@ class PlatformConfigFactory:
                 "storage_limit_per_user_gb"
             ],
             service_traefik_name=f"{self._config.platform_namespace}-traefik",
-            jobs_namespace=self._config.platform_jobs_namespace,
+            jobs_namespace_create=jobs_namespace_spec.get("create", True),
+            jobs_namespace=jobs_namespace,
             jobs_node_pools=self._create_node_pools(
                 cluster["cloud_provider"]["node_pools"]
             ),
