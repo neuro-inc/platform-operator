@@ -1424,8 +1424,8 @@ class TestHelmValuesFactory:
             "prometheus": {"host": "prometheus-prometheus", "port": 9090}
         }
         assert (
-            "thanos"
-            not in result["prometheus-operator"]["prometheus"]["prometheusSpec"]
+            result["prometheus-operator"]["prometheus"]["prometheusSpec"]["thanos"]
+            == {}
         )
         assert "cloudProvider" not in result
 

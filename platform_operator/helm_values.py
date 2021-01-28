@@ -1125,7 +1125,7 @@ class HelmValuesFactory:
                     "requests": {"storage": platform.monitoring_metrics_storage_size}
                 },
             }
-            del result["prometheus-operator"]["prometheus"]["prometheusSpec"]["thanos"]
+            prometheus_spec["thanos"] = {}
             del result["thanos"]
         return result
 
