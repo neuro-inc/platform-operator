@@ -91,10 +91,6 @@ spec:
               properties:
                 publicUrl:
                   type: string
-                publicIP:
-                  type: string
-                mastersCount:
-                  type: integer
                 standardStorageClassName:
                   type: string
                 tpuIPv4CIDR:
@@ -128,6 +124,10 @@ spec:
                   properties:
                     enabled:
                       type: boolean
+                ingressPublicIPs:
+                  type: array
+                  items:
+                    type: string
                 dockerConfigSecret:
                   type: object
                   properties:

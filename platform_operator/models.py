@@ -237,8 +237,6 @@ class AzureConfig:
 
 @dataclass(frozen=True)
 class OnPremConfig:
-    kubernetes_public_ip: IPv4Address
-    masters_count: int
     registry_storage_class_name: str
     registry_storage_size: str
     storage_class_name: str
@@ -278,6 +276,7 @@ class PlatformConfig:
     ingress_metrics_url: URL
     ingress_acme_environment: str
     ingress_controller_enabled: bool
+    ingress_public_ips: Sequence[IPv4Address]
     disks_storage_limit_per_user_gb: int
     service_traefik_name: str
     jobs_namespace_create: bool
@@ -305,27 +304,33 @@ class PlatformConfig:
 
     def create_dns_config(
         self,
-        traefik_service: Dict[str, Any],
+        traefik_service: Optional[Dict[str, Any]] = None,
         aws_traefik_lb: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        traefik_zone_id = ""
-        if self.aws:
-            traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0][
-                "hostname"
-            ]
-            assert aws_traefik_lb
-            traefik_zone_id = aws_traefik_lb["CanonicalHostedZoneNameID"]
-        elif self.on_prem:
-            traefik_host = str(self.on_prem.kubernetes_public_ip)
-        else:
-            traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0]["ip"]
+    ) -> Optional[Dict[str, Any]]:
+        if not traefik_service and not self.ingress_public_ips:
+            return None
         result: Dict[str, Any] = {
             "zone_id": self.dns_zone_id,
             "zone_name": self.dns_zone_name,
             "name_servers": self.dns_zone_name_servers,
             "a_records": [],
         }
-        if traefik_zone_id:
+        if self.ingress_public_ips:
+            ips = [str(ip) for ip in self.ingress_public_ips]
+            result["a_records"].extend(
+                (
+                    {"name": self.dns_zone_name, "ips": ips},
+                    {"name": f"*.jobs.{self.dns_zone_name}", "ips": ips},
+                    {"name": f"registry.{self.dns_zone_name}", "ips": ips},
+                    {"name": f"metrics.{self.dns_zone_name}", "ips": ips},
+                )
+            )
+        elif self.aws and traefik_service:
+            traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0][
+                "hostname"
+            ]
+            assert aws_traefik_lb
+            traefik_zone_id = aws_traefik_lb["CanonicalHostedZoneNameID"]
             result["a_records"].extend(
                 (
                     {
@@ -350,7 +355,8 @@ class PlatformConfig:
                     },
                 )
             )
-        else:
+        elif traefik_service:
+            traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0]["ip"]
             result["a_records"].extend(
                 (
                     {"name": self.dns_zone_name, "ips": [traefik_host]},
@@ -396,10 +402,11 @@ class PlatformConfig:
                 "resource_presets": self._create_resource_presets(),
             },
         }
-        if traefik_service:
-            result["dns"] = self.create_dns_config(
-                traefik_service=traefik_service, aws_traefik_lb=aws_traefik_lb
-            )
+        dns = self.create_dns_config(
+            traefik_service=traefik_service, aws_traefik_lb=aws_traefik_lb
+        )
+        if dns:
+            result["dns"] = dns
         if self.azure:
             result["orchestrator"]["kubernetes"][
                 "job_pod_preemptible_toleration_key"
@@ -490,6 +497,9 @@ class PlatformConfigFactory:
             ingress_controller_enabled=kubernetes_spec.get("ingressController", {}).get(
                 "enabled", True
             ),
+            ingress_public_ips=[
+                IPv4Address(ip) for ip in kubernetes_spec.get("ingressPublicIPs", [])
+            ],
             disks_storage_limit_per_user_gb=cluster["disks"][
                 "storage_limit_per_user_gb"
             ],
@@ -631,16 +641,10 @@ class PlatformConfigFactory:
     @classmethod
     def _create_on_prem(cls, spec: bodies.Spec) -> OnPremConfig:
         kubernetes_spec = spec["kubernetes"]
-        if "publicIP" in kubernetes_spec:
-            public_ip = IPv4Address(kubernetes_spec["publicIP"])
-        else:
-            public_ip = IPv4Address(URL(kubernetes_spec["publicUrl"]).host)
         registry_persistence = spec["registry"]["kubernetes"]["persistence"]
         storage_persistence = spec["storage"]["kubernetes"]["persistence"]
         blob_storage_persistence = spec["blobStorage"]["kubernetes"]["persistence"]
         return OnPremConfig(
-            kubernetes_public_ip=public_ip,
-            masters_count=int(kubernetes_spec.get("mastersCount", "1")),
             registry_storage_class_name=registry_persistence["storageClassName"],
             registry_storage_size=registry_persistence.get("size") or "10Gi",
             storage_class_name=storage_persistence["storageClassName"],

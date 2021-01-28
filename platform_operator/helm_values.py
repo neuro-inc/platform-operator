@@ -222,7 +222,7 @@ class HelmValuesFactory:
             "Replicas": 3,
         }
         if platform.on_prem:
-            result["Replicas"] = platform.on_prem.masters_count
+            result["Replicas"] = 1
         return result
 
     def create_traefik_values(self, platform: PlatformConfig) -> Dict[str, Any]:
@@ -369,7 +369,7 @@ class HelmValuesFactory:
                 }
             }
         if platform.on_prem:
-            result["replicas"] = platform.on_prem.masters_count
+            result["replicas"] = 1
             result["serviceType"] = "NodePort"
             result["service"] = {
                 "nodePorts": {
