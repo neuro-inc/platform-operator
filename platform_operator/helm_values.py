@@ -752,8 +752,9 @@ class HelmValuesFactory:
                 }
             },
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
+            "dockerEngine": {"image": {"repository": f"{docker_server}/nginx"}},
             "fluentbit": {
-                "image": {"repository": f"{docker_server}/fluent/fluent-bit"},
+                "image": {"repository": f"{docker_server}/fluent/fluent-bit"}
             },
             "fluentd": {
                 "image": {"repository": f"{docker_server}/bitnami/fluentd"},
@@ -941,6 +942,9 @@ class HelmValuesFactory:
                 },
                 "prometheus": {
                     "prometheusSpec": {
+                        "image": {
+                            "repository": f"{docker_server}/prometheus/prometheus"
+                        },
                         "thanos": {
                             "image": f"{docker_server}/thanos/thanos:v0.14.0",
                             "version": "v0.14.0",
@@ -972,9 +976,17 @@ class HelmValuesFactory:
                     "configmapReloadImage": {
                         "repository": f"{docker_server}/coreos/configmap-reload"
                     },
-                    "tlsProxy": {"repository": f"{docker_server}/squareup/ghostunnel"},
+                    "tlsProxy": {
+                        "image": {"repository": f"{docker_server}/squareup/ghostunnel"}
+                    },
                     "admissionWebhooks": {
-                        "repository": f"{docker_server}/jettech/kube-webhook-certgen"
+                        "patch": {
+                            "image": {
+                                "repository": (
+                                    f"{docker_server}/jettech/kube-webhook-certgen"
+                                )
+                            }
+                        }
                     },
                     "kubeletService": {"namespace": platform.namespace},
                 },
@@ -1113,7 +1125,7 @@ class HelmValuesFactory:
                     "requests": {"storage": platform.monitoring_metrics_storage_size}
                 },
             }
-            del result["prometheus-operator"]["prometheus"]["prometheusSpec"]["thanos"]
+            prometheus_spec["thanos"] = {}
             del result["thanos"]
         return result
 
