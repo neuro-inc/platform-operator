@@ -1153,6 +1153,7 @@ class TestHelmValuesFactory:
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
+                "ingressAuthUrl": "https://platformingressauth",
                 "configUrl": "https://dev.neu.ro",
                 "apiUrl": "https://dev.neu.ro/api/v1",
                 "token": {

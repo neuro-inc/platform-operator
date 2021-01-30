@@ -25,6 +25,7 @@ class TestConfig:
     def test_config(self) -> None:
         env = {
             "NP_PLATFORM_AUTH_URL": "http://platformauthapi:8080",
+            "NP_PLATFORM_INGRESS_AUTH_URL": "http://platformingressauth:8080",
             "NP_PLATFORM_CONFIG_URL": "http://platformconfig:8080",
             "NP_PLATFORM_API_URL": "http://platformapi:8080",
             "NP_CONTROLLER_LOG_LEVEL": "debug",
@@ -86,6 +87,7 @@ class TestConfig:
             ),
             helm_service_account="default",
             platform_auth_url=URL("http://platformauthapi:8080"),
+            platform_ingress_auth_url=URL("http://platformingressauth:8080"),
             platform_config_url=URL("http://platformconfig:8080"),
             platform_api_url=URL("http://platformapi:8080"),
             platform_namespace="platform",
@@ -95,6 +97,7 @@ class TestConfig:
     def test_config_defaults(self) -> None:
         env = {
             "NP_PLATFORM_AUTH_URL": "http://platformauthapi:8080",
+            "NP_PLATFORM_INGRESS_AUTH_URL": "http://platformingressauth:8080",
             "NP_PLATFORM_CONFIG_URL": "http://platformconfig:8080",
             "NP_PLATFORM_API_URL": "http://platformapi:8080",
             "NP_KUBE_VERSION": "v1.14.10",
@@ -141,6 +144,7 @@ class TestConfig:
             ),
             helm_service_account="default",
             platform_auth_url=URL("http://platformauthapi:8080"),
+            platform_ingress_auth_url=URL("http://platformingressauth:8080"),
             platform_config_url=URL("http://platformconfig:8080"),
             platform_api_url=URL("http://platformapi:8080"),
             platform_namespace="platform",
