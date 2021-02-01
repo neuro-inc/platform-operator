@@ -1,3 +1,4 @@
+{{- if ne .Values.storage.type "kubernetes" }}
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -11,18 +12,20 @@ spec:
   - ReadWriteMany
   volumeMode: Filesystem
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: ""
-{{- if hasKey .Values.storage "nfs" }}
+  storageClassName: {{ .Values.storage.storageClassName | default "" }}
+{{- if eq .Values.storage.type "nfs" }}
   nfs:
     server: {{ .Values.storage.nfs.server }}
     path: {{ .Values.storage.nfs.path }}
     readOnly: false
-{{- else if hasKey .Values.storage "azureFile" }}
+{{- else if eq .Values.storage.type "azureFile" }}
   azureFile:
     secretName: {{ include "platform.azure.storageAccount.secretName" . }}
     shareName: {{ .Values.storage.azureFile.shareName }}
     readOnly: false
-{{- else if hasKey .Values.storage "gcs" }}
+  mountOptions:
+    - mfsymlinks
+{{- else if eq .Values.storage.type "gcs" }}
   csi:
     driver: obs.csi.neu.ro
     volumeHandle: {{ .Values.storage.gcs.bucketName }}
@@ -30,4 +33,5 @@ spec:
       bucket: {{ .Values.storage.gcs.bucketName }}
       key_file: /accounts/key.json
       additional_args: --limit-ops-per-sec 0
+{{- end }}
 {{- end }}

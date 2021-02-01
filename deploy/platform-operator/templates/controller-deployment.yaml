@@ -61,8 +61,6 @@ spec:
           value: {{ .Chart.Version | quote }}
         - name: NP_HELM_OBS_CSI_DRIVER_CHART_VERSION
           value: "1.0.5"
-        - name: NP_HELM_NFS_SERVER_CHART_VERSION
-          value: "1.0.0"
         - name: NP_PLATFORM_AUTH_URL
           value: {{ .Values.platform.authUrl }}
         - name: NP_PLATFORM_INGRESS_AUTH_URL

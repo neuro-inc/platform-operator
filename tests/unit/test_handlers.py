@@ -396,41 +396,6 @@ async def test_deploy_gcp_with_gcs_storage(
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("setup_app")
-async def test_deploy_on_prem(
-    status_manager: mock.AsyncMock,
-    config_client: mock.AsyncMock,
-    helm_client: mock.AsyncMock,
-    logger: logging.Logger,
-    on_prem_cluster: Cluster,
-    on_prem_platform_body: bodies.Body,
-    on_prem_platform_config: PlatformConfig,
-) -> None:
-    from platform_operator.handlers import deploy
-
-    status_manager.is_condition_satisfied.return_value = False
-    config_client.get_cluster.return_value = on_prem_cluster
-
-    await deploy(
-        name=on_prem_platform_config.cluster_name,
-        body=on_prem_platform_body,
-        logger=logger,
-        retry=0,
-    )
-
-    helm_client.upgrade.assert_any_await(
-        "platform-nfs-server",
-        "neuro/nfs-server",
-        values=mock.ANY,
-        version="3.0.0",
-        namespace="platform",
-        install=True,
-        wait=True,
-        timeout=600,
-    )
-
-
-@pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
 async def test_deploy_with_all_components_deployed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -618,7 +583,6 @@ async def test_delete_on_prem(
     helm_client.delete.assert_has_awaits(
         [
             mock.call("platform", purge=True),
-            mock.call("platform-nfs-server", purge=True),
         ]
     )
 
