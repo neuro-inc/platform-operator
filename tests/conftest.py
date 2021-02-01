@@ -45,14 +45,10 @@ def config() -> Config:
             name="stable", url=URL("https://kubernetes-charts.storage.googleapis.com")
         ),
         helm_release_names=HelmReleaseNames(
-            platform="platform",
-            obs_csi_driver="platform-obs-csi-driver",
-            nfs_server="platform-nfs-server",
+            platform="platform", obs_csi_driver="platform-obs-csi-driver"
         ),
         helm_chart_names=HelmChartNames(),
-        helm_chart_versions=HelmChartVersions(
-            platform="1.0.0", obs_csi_driver="2.0.0", nfs_server="3.0.0"
-        ),
+        helm_chart_versions=HelmChartVersions(platform="1.0.0", obs_csi_driver="2.0.0"),
         helm_service_account="default",
         platform_auth_url=URL("https://dev.neu.ro"),
         platform_config_url=URL("https://dev.neu.ro"),
@@ -501,6 +497,7 @@ def aws_platform_config(
         aws=AwsConfig(
             region="us-east-1",
             registry_url=URL("https://platform.dkr.ecr.us-east-1.amazonaws.com"),
+            storage_type="nfs",
             storage_nfs_server="192.168.0.3",
             storage_nfs_path="/",
         ),
@@ -525,6 +522,7 @@ def azure_platform_config(
             registry_url=URL("https://platform.azurecr.io"),
             registry_username="admin",
             registry_password="admin-password",
+            storage_type="azureFile",
             storage_account_name="accountName1",
             storage_account_key="accountKey1",
             storage_share_name="share",
@@ -553,6 +551,7 @@ def on_prem_platform_config(
         on_prem=OnPremConfig(
             registry_storage_class_name="registry-standard",
             registry_storage_size="100Gi",
+            storage_type="kubernetes",
             storage_class_name="storage-standard",
             storage_size="1000Gi",
             blob_storage_region="minio",

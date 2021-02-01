@@ -49,13 +49,19 @@ jobs:
 
 storage:
   size: 10Gi
+  storageClassName: ""
+
+  type: kubernetes # nfs, gcs, azureFile
+
   # azureFile:
   #   storageAccountName: storage-account-name
   #   storageAccountKey: storage-account-key
   #   shareName: share
+
   # nfs:
   #   server: nfs-server
   #   path: /
+
   # gcs:
   #   bucketName: bucket
 

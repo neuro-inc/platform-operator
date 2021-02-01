@@ -95,39 +95,59 @@ class HelmValuesFactory:
             result[
                 self._chart_names.nvidia_gpu_driver_gcp
             ] = self.create_nvidia_gpu_driver_gcp_values(platform)
+            if platform.gcp.storage_type == "kubernetes":
+                result["storage"] = self._create_kubernetes_storage_values(
+                    storage_class_name=platform.gcp.storage_class_name,
+                    size=platform.gcp.storage_size,
+                )
             if platform.gcp.storage_type == "nfs":
-                result["storage"] = {
-                    "nfs": {
-                        "server": platform.gcp.storage_nfs_server,
-                        "path": platform.gcp.storage_nfs_path,
-                    }
-                }
+                result["storage"] = self._create_nfs_storage_values(
+                    server=platform.gcp.storage_nfs_server,
+                    path=platform.gcp.storage_nfs_path,
+                )
             if platform.gcp.storage_type == "gcs":
                 result["storage"] = {
-                    "gcs": {"bucketName": platform.gcp.storage_gcs_bucket_name}
+                    "type": "gcs",
+                    "gcs": {"bucketName": platform.gcp.storage_gcs_bucket_name},
                 }
         else:
             result[
                 self._chart_names.nvidia_gpu_driver
             ] = self.create_nvidia_gpu_driver_values(platform)
         if platform.aws:
-            result["storage"] = {
-                "nfs": {
-                    "server": platform.aws.storage_nfs_server,
-                    "path": platform.aws.storage_nfs_path,
-                }
-            }
+            if platform.aws.storage_type == "kubernetes":
+                result["storage"] = self._create_kubernetes_storage_values(
+                    storage_class_name=platform.aws.storage_class_name,
+                    size=platform.aws.storage_size,
+                )
+            if platform.aws.storage_type == "nfs":
+                result["storage"] = self._create_nfs_storage_values(
+                    server=platform.aws.storage_nfs_server,
+                    path=platform.aws.storage_nfs_path,
+                )
             result[
                 self._chart_names.cluster_autoscaler
             ] = self.create_cluster_autoscaler_values(platform)
         if platform.azure:
-            result["storage"] = {
-                "azureFile": {
-                    "storageAccountName": platform.azure.storage_account_name,
-                    "storageAccountKey": platform.azure.storage_account_key,
-                    "shareName": platform.azure.storage_share_name,
+            if platform.azure.storage_type == "kubernetes":
+                result["storage"] = self._create_kubernetes_storage_values(
+                    storage_class_name=platform.azure.storage_class_name,
+                    size=platform.azure.storage_size,
+                )
+            if platform.azure.storage_type == "nfs":
+                result["storage"] = self._create_nfs_storage_values(
+                    server=platform.azure.storage_nfs_server,
+                    path=platform.azure.storage_nfs_path,
+                )
+            if platform.azure.storage_type == "azureFile":
+                result["storage"] = {
+                    "type": "azureFile",
+                    "azureFile": {
+                        "storageAccountName": platform.azure.storage_account_name,
+                        "storageAccountKey": platform.azure.storage_account_key,
+                        "shareName": platform.azure.storage_share_name,
+                    },
                 }
-            }
             result["blobStorage"] = {
                 "azure": {
                     "storageAccountName": platform.azure.blob_storage_account_name,
@@ -135,20 +155,33 @@ class HelmValuesFactory:
                 }
             }
         if platform.on_prem:
-            result["storage"] = {
-                "nfs": {
-                    "server": (
-                        f"{self._release_names.nfs_server}"
-                        f".{platform.namespace}.svc.cluster.local"
-                    ),
-                    "path": "/",
-                }
-            }
+            if platform.on_prem.storage_type == "kubernetes":
+                result["storage"] = self._create_kubernetes_storage_values(
+                    storage_class_name=platform.on_prem.storage_class_name,
+                    size=platform.on_prem.storage_size,
+                )
+            if platform.on_prem.storage_type == "nfs":
+                result["storage"] = self._create_nfs_storage_values(
+                    server=platform.on_prem.storage_nfs_server,
+                    path=platform.on_prem.storage_nfs_path,
+                )
             result[
                 self._chart_names.docker_registry
             ] = self.create_docker_registry_values(platform)
             result[self._chart_names.minio] = self.create_minio_values(platform)
         return result
+
+    def _create_kubernetes_storage_values(
+        self, storage_class_name: str, size: str
+    ) -> Dict[str, Any]:
+        return {
+            "type": "kubernetes",
+            "storageClassName": storage_class_name,
+            "size": size,
+        }
+
+    def _create_nfs_storage_values(self, server: str, path: str) -> Dict[str, Any]:
+        return {"type": "nfs", "nfs": {"server": server, "path": path}}
 
     def create_obs_csi_driver_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         assert platform.gcp
@@ -158,21 +191,6 @@ class HelmValuesFactory:
             "credentialsSecret": {
                 "create": True,
                 "gcpServiceAccountKeyBase64": platform.gcp.service_account_key_base64,
-            },
-        }
-
-    def create_nfs_server_values(self, platform: PlatformConfig) -> Dict[str, Any]:
-        assert platform.on_prem
-        return {
-            "image": {"repository": f"{platform.docker_registry.url.host}/volume-nfs"},
-            "imagePullSecrets": [
-                {"name": name} for name in platform.image_pull_secret_names
-            ],
-            "rbac": {"create": True},
-            "persistence": {
-                "enabled": True,
-                "storageClass": platform.on_prem.storage_class_name,
-                "size": platform.on_prem.storage_size,
             },
         }
 

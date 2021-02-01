@@ -11,5 +11,5 @@ spec:
   resources:
     requests:
       storage: {{ .Values.storage.size }}
-  storageClassName: ""
+  storageClassName: {{ .Values.storage.storageClassName | default "" }}
   volumeName: {{ include "platform.storage.platformPvName" . }}

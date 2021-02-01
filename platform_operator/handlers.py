@@ -139,21 +139,6 @@ async def deploy(
                 timeout=600,
             )
 
-    if platform.on_prem and not status_manager.is_condition_satisfied(
-        PlatformConditionType.NFS_SERVER_DEPLOYED
-    ):
-        async with status_manager.transition(PlatformConditionType.NFS_SERVER_DEPLOYED):
-            await app.helm_client.upgrade(
-                config.helm_release_names.nfs_server,
-                f"{HelmRepoName.NEURO}/{config.helm_chart_names.nfs_server}",
-                values=app.helm_values_factory.create_nfs_server_values(platform),
-                version=config.helm_chart_versions.nfs_server,
-                namespace=config.platform_namespace,
-                install=True,
-                wait=True,
-                timeout=600,
-            )
-
     if not status_manager.is_condition_satisfied(
         PlatformConditionType.PLATFORM_DEPLOYED
     ):
@@ -268,14 +253,6 @@ async def delete(
             purge=True,
         )
         logger.info("obs-csi-driver helm chart deleted")
-
-    if platform.on_prem:
-        logger.info("Deleting nfs-server helm chart")
-        await app.helm_client.delete(
-            config.helm_release_names.nfs_server,
-            purge=True,
-        )
-        logger.info("nfs-server helm chart deleted")
 
 
 async def configure_cluster(platform: PlatformConfig) -> None:

@@ -63,7 +63,7 @@ class TestHelmValuesFactory:
                 "namespace": {"create": True, "name": "platform-jobs"},
                 "label": "platform.neuromation.io/job",
             },
-            "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
+            "storage": {"type": "nfs", "nfs": {"server": "192.168.0.3", "path": "/"}},
             "consul": mock.ANY,
             "traefik": mock.ANY,
             "adjust-inotify": mock.ANY,
@@ -75,6 +75,27 @@ class TestHelmValuesFactory:
             "platform-secrets": mock.ANY,
             "platform-reports": mock.ANY,
             "platform-disk-api": mock.ANY,
+        }
+
+    def test_create_gcp_platform_values_with_kubernetes_storage(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(
+                gcp_platform_config,
+                gcp=replace(
+                    gcp_platform_config.gcp,
+                    storage_type="kubernetes",
+                    storage_class_name="storage-class",
+                    storage_size="100Gi",
+                ),
+            )
+        )
+
+        assert result["storage"] == {
+            "type": "kubernetes",
+            "storageClassName": "storage-class",
+            "size": "100Gi",
         }
 
     def test_create_gcp_platform_values_with_gcs_storage(
@@ -91,7 +112,10 @@ class TestHelmValuesFactory:
             )
         )
 
-        assert result["storage"] == {"gcs": {"bucketName": "platform-storage"}}
+        assert result["storage"] == {
+            "type": "gcs",
+            "gcs": {"bucketName": "platform-storage"},
+        }
 
     def test_create_gcp_platform_values_without_namespace(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -122,17 +146,39 @@ class TestHelmValuesFactory:
         assert "cluster-autoscaler" in result
         assert "nvidia-gpu-driver" in result
 
+    def test_create_aws_platform_values_with_kubernetes_storage(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(
+                aws_platform_config,
+                aws=replace(
+                    aws_platform_config.aws,
+                    storage_type="kubernetes",
+                    storage_class_name="storage-class",
+                    storage_size="100Gi",
+                ),
+            )
+        )
+
+        assert result["storage"] == {
+            "type": "kubernetes",
+            "storageClassName": "storage-class",
+            "size": "100Gi",
+        }
+
     def test_create_azure_platform_values(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_values(azure_platform_config)
 
         assert result["storage"] == {
+            "type": "azureFile",
             "azureFile": {
                 "storageAccountName": "accountName1",
                 "storageAccountKey": "accountKey1",
                 "shareName": "share",
-            }
+            },
         }
         assert result["blobStorage"] == {
             "azure": {
@@ -142,6 +188,47 @@ class TestHelmValuesFactory:
         }
         assert "nvidia-gpu-driver" in result
 
+    def test_create_azure_platform_values_with_kubernetes_storage(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(
+                azure_platform_config,
+                azure=replace(
+                    azure_platform_config.azure,
+                    storage_type="kubernetes",
+                    storage_class_name="storage-class",
+                    storage_size="100Gi",
+                ),
+            )
+        )
+
+        assert result["storage"] == {
+            "type": "kubernetes",
+            "storageClassName": "storage-class",
+            "size": "100Gi",
+        }
+
+    def test_create_azure_platform_values_with_nfs_storage(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(
+                azure_platform_config,
+                azure=replace(
+                    azure_platform_config.azure,
+                    storage_type="nfs",
+                    storage_nfs_server="nfs-server",
+                    storage_nfs_path="/path",
+                ),
+            )
+        )
+
+        assert result["storage"] == {
+            "type": "nfs",
+            "nfs": {"server": "nfs-server", "path": "/path"},
+        }
+
     def test_create_on_prem_platform_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -149,10 +236,9 @@ class TestHelmValuesFactory:
 
         assert result["standardStorageClass"] == {"create": False, "name": "standard"}
         assert result["storage"] == {
-            "nfs": {
-                "server": "platform-nfs-server.platform.svc.cluster.local",
-                "path": "/",
-            }
+            "type": "kubernetes",
+            "storageClassName": "storage-standard",
+            "size": "1000Gi",
         }
         assert "docker-registry" in result
         assert "minio" in result
@@ -177,22 +263,6 @@ class TestHelmValuesFactory:
                     f"{on_prem_platform_config.docker_registry.username}:"
                     f"{on_prem_platform_config.docker_registry.password}"
                 )
-            },
-        }
-
-    def test_create_nfs_server_values(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_nfs_server_values(on_prem_platform_config)
-
-        assert result == {
-            "image": {"repository": "neuro.io/volume-nfs"},
-            "imagePullSecrets": [{"name": "platform-docker-config"}],
-            "rbac": {"create": True},
-            "persistence": {
-                "enabled": True,
-                "storageClass": "storage-standard",
-                "size": "1000Gi",
             },
         }
 

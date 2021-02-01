@@ -49,7 +49,6 @@ class TestConfig:
             "NP_HELM_SERVICE_ACCOUNT_NAME": "default",
             "NP_HELM_PLATFORM_CHART_VERSION": "1.0.0",
             "NP_HELM_OBS_CSI_DRIVER_CHART_VERSION": "2.0.0",
-            "NP_HELM_NFS_SERVER_CHART_VERSION": "3.0.0",
             "NP_PLATFORM_NAMESPACE": "platform",
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
         }
@@ -76,13 +75,11 @@ class TestConfig:
                 url=URL("https://kubernetes-charts.storage.googleapis.com"),
             ),
             helm_release_names=HelmReleaseNames(
-                platform="platform",
-                obs_csi_driver="platform-obs-csi-driver",
-                nfs_server="platform-nfs-server",
+                platform="platform", obs_csi_driver="platform-obs-csi-driver"
             ),
             helm_chart_names=HelmChartNames(),
             helm_chart_versions=HelmChartVersions(
-                platform="1.0.0", obs_csi_driver="2.0.0", nfs_server="3.0.0"
+                platform="1.0.0", obs_csi_driver="2.0.0"
             ),
             helm_service_account="default",
             platform_auth_url=URL("http://platformauthapi:8080"),
@@ -110,7 +107,6 @@ class TestConfig:
             "NP_HELM_SERVICE_ACCOUNT_NAME": "default",
             "NP_HELM_PLATFORM_CHART_VERSION": "1.0.0",
             "NP_HELM_OBS_CSI_DRIVER_CHART_VERSION": "2.0.0",
-            "NP_HELM_NFS_SERVER_CHART_VERSION": "3.0.0",
             "NP_PLATFORM_NAMESPACE": "platform",
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
         }
@@ -131,13 +127,11 @@ class TestConfig:
                 url=URL("https://kubernetes-charts.storage.googleapis.com"),
             ),
             helm_release_names=HelmReleaseNames(
-                platform="platform",
-                obs_csi_driver="platform-obs-csi-driver",
-                nfs_server="platform-nfs-server",
+                platform="platform", obs_csi_driver="platform-obs-csi-driver"
             ),
             helm_chart_names=HelmChartNames(),
             helm_chart_versions=HelmChartVersions(
-                platform="1.0.0", obs_csi_driver="2.0.0", nfs_server="3.0.0"
+                platform="1.0.0", obs_csi_driver="2.0.0"
             ),
             helm_service_account="default",
             platform_auth_url=URL("http://platformauthapi:8080"),
@@ -458,6 +452,32 @@ class TestPlatformConfigFactory:
         with pytest.raises(KeyError):
             factory.create(gcp_platform_body, gcp_cluster)
 
+    def test_gcp_platform_config_with_kubernetes_storage(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        gcp_platform_body["spec"]["storage"] = {
+            "kubernetes": {
+                "persistence": {"storageClassName": "storage-class", "size": "100Gi"}
+            }
+        }
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result == replace(
+            gcp_platform_config,
+            gcp=replace(
+                gcp_platform_config.gcp,
+                storage_type="kubernetes",
+                storage_class_name="storage-class",
+                storage_size="100Gi",
+                storage_nfs_server="",
+                storage_nfs_path="/",
+            ),
+        )
+
     def test_gcp_platform_config_with_gcs_storage(
         self,
         factory: PlatformConfigFactory,
@@ -582,23 +602,47 @@ class TestPlatformConfigFactory:
         factory: PlatformConfigFactory,
         aws_platform_body: bodies.Body,
         aws_cluster: Cluster,
-        aws_platform_config: PlatformConfig,
     ) -> None:
         del aws_platform_body["spec"]["registry"]
 
         with pytest.raises(KeyError):
             factory.create(aws_platform_body, aws_cluster)
 
-    def test_aws_platform_config_without_storage__fails(
+    def test_aws_platform_config_with_kubernetes_storage(
         self,
         factory: PlatformConfigFactory,
         aws_platform_body: bodies.Body,
         aws_cluster: Cluster,
         aws_platform_config: PlatformConfig,
     ) -> None:
+        aws_platform_body["spec"]["storage"] = {
+            "kubernetes": {
+                "persistence": {"storageClassName": "storage-class", "size": "100Gi"}
+            }
+        }
+        result = factory.create(aws_platform_body, aws_cluster)
+
+        assert result == replace(
+            aws_platform_config,
+            aws=replace(
+                aws_platform_config.aws,
+                storage_type="kubernetes",
+                storage_class_name="storage-class",
+                storage_size="100Gi",
+                storage_nfs_server="",
+                storage_nfs_path="/",
+            ),
+        )
+
+    def test_aws_platform_config_without_storage__fails(
+        self,
+        factory: PlatformConfigFactory,
+        aws_platform_body: bodies.Body,
+        aws_cluster: Cluster,
+    ) -> None:
         aws_platform_body["spec"]["storage"] = {}
 
-        with pytest.raises(KeyError):
+        with pytest.raises(AssertionError, match="Invalid storage type"):
             factory.create(aws_platform_body, aws_cluster)
 
     def test_azure_platform_config(
@@ -617,23 +661,75 @@ class TestPlatformConfigFactory:
         factory: PlatformConfigFactory,
         azure_platform_body: bodies.Body,
         azure_cluster: Cluster,
-        azure_platform_config: PlatformConfig,
     ) -> None:
         azure_platform_body["spec"]["registry"] = {}
 
         with pytest.raises(KeyError):
             factory.create(azure_platform_body, azure_cluster)
 
-    def test_azure_platform_config_without_storage__fails(
+    def test_azure_platform_config_with_kubernetes_storage(
         self,
         factory: PlatformConfigFactory,
         azure_platform_body: bodies.Body,
         azure_cluster: Cluster,
         azure_platform_config: PlatformConfig,
     ) -> None:
+        azure_platform_body["spec"]["storage"] = {
+            "kubernetes": {
+                "persistence": {"storageClassName": "storage-class", "size": "100Gi"}
+            }
+        }
+        result = factory.create(azure_platform_body, azure_cluster)
+
+        assert result == replace(
+            azure_platform_config,
+            azure=replace(
+                azure_platform_config.azure,
+                storage_type="kubernetes",
+                storage_class_name="storage-class",
+                storage_size="100Gi",
+                storage_nfs_server="",
+                storage_nfs_path="/",
+                storage_account_name="",
+                storage_account_key="",
+                storage_share_name="",
+            ),
+        )
+
+    def test_azure_platform_config_with_nfs_storage(
+        self,
+        factory: PlatformConfigFactory,
+        azure_platform_body: bodies.Body,
+        azure_cluster: Cluster,
+        azure_platform_config: PlatformConfig,
+    ) -> None:
+        azure_platform_body["spec"]["storage"] = {
+            "nfs": {"server": "nfs-server", "path": "/path"}
+        }
+        result = factory.create(azure_platform_body, azure_cluster)
+
+        assert result == replace(
+            azure_platform_config,
+            azure=replace(
+                azure_platform_config.azure,
+                storage_type="nfs",
+                storage_nfs_server="nfs-server",
+                storage_nfs_path="/path",
+                storage_account_name="",
+                storage_account_key="",
+                storage_share_name="",
+            ),
+        )
+
+    def test_azure_platform_config_without_storage__fails(
+        self,
+        factory: PlatformConfigFactory,
+        azure_platform_body: bodies.Body,
+        azure_cluster: Cluster,
+    ) -> None:
         azure_platform_body["spec"]["storage"] = {}
 
-        with pytest.raises(KeyError):
+        with pytest.raises(AssertionError, match="Invalid storage type"):
             factory.create(azure_platform_body, azure_cluster)
 
     def test_azure_platform_config_without_blob_storage__fails(
@@ -675,6 +771,30 @@ class TestPlatformConfigFactory:
 
         assert result.on_prem
         assert result.on_prem.registry_storage_size == "10Gi"
+
+    def test_on_prem_platform_config_with_nfs_storage(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: bodies.Body,
+        on_prem_cluster: Cluster,
+        on_prem_platform_config: PlatformConfig,
+    ) -> None:
+        on_prem_platform_body["spec"]["storage"] = {
+            "nfs": {"server": "nfs-server", "path": "/path"}
+        }
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result == replace(
+            on_prem_platform_config,
+            on_prem=replace(
+                on_prem_platform_config.on_prem,
+                storage_type="nfs",
+                storage_nfs_server="nfs-server",
+                storage_nfs_path="/path",
+                storage_class_name="",
+                storage_size="10Gi",
+            ),
+        )
 
     def test_on_prem_platform_config_without_node_ports__fails(
         self,
