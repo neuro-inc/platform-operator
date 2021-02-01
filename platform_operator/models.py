@@ -209,7 +209,7 @@ class StorageSpec(Dict[str, Any]):
 
     def get_storage_type(self, *supported_types: str) -> str:
         try:
-            return next(iter(t for t in supported_types if t in self))
+            return next(t for t in supported_types if t in self)
         except StopIteration:
             return ""
 
