@@ -507,7 +507,7 @@ class TestPlatformConfigFactory:
     ) -> None:
         gcp_platform_body["spec"]["storage"] = {}
 
-        with pytest.raises(AssertionError):
+        with pytest.raises(AssertionError, match="Invalid storage type"):
             factory.create(gcp_platform_body, gcp_cluster)
 
     def test_gcp_platform_config_with_ingress_controller_disabled(
