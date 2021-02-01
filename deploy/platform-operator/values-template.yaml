@@ -15,5 +15,6 @@ controller:
 
 platform:
   authUrl: https://staging.neu.ro
+  ingressAuthUrl: https://staging.neu.ro
   configUrl: https://staging.neu.ro
   apiUrl: https://staging.neu.ro

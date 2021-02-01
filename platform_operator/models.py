@@ -124,6 +124,7 @@ class Config:
     helm_chart_versions: HelmChartVersions
     helm_service_account: str
     platform_auth_url: URL
+    platform_ingress_auth_url: URL
     platform_config_url: URL
     platform_api_url: URL
     platform_namespace: str
@@ -170,6 +171,7 @@ class Config:
                 nfs_server=env["NP_HELM_NFS_SERVER_CHART_VERSION"],
             ),
             platform_auth_url=URL(env["NP_PLATFORM_AUTH_URL"]),
+            platform_ingress_auth_url=URL(env["NP_PLATFORM_INGRESS_AUTH_URL"]),
             platform_config_url=URL(env["NP_PLATFORM_CONFIG_URL"]),
             platform_api_url=URL(env["NP_PLATFORM_API_URL"]),
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
@@ -254,6 +256,7 @@ class OnPremConfig:
 @dataclass(frozen=True)
 class PlatformConfig:
     auth_url: URL
+    ingress_auth_url: URL
     config_url: URL
     api_url: URL
     token: str
@@ -462,6 +465,7 @@ class PlatformConfigFactory:
         )
         return PlatformConfig(
             auth_url=self._config.platform_auth_url,
+            ingress_auth_url=self._config.platform_ingress_auth_url,
             config_url=self._config.platform_config_url,
             api_url=self._config.platform_api_url,
             token=platform_body["spec"]["token"],

@@ -910,6 +910,7 @@ class HelmValuesFactory:
             "platform": {
                 "clusterName": platform.cluster_name,
                 "authUrl": str(platform.auth_url),
+                "ingressAuthUrl": str(platform.ingress_auth_url),
                 "configUrl": str(platform.config_url),
                 "apiUrl": str(platform.api_url / "api/v1"),
                 "token": {

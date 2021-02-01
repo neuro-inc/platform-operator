@@ -65,6 +65,8 @@ spec:
           value: "1.0.0"
         - name: NP_PLATFORM_AUTH_URL
           value: {{ .Values.platform.authUrl }}
+        - name: NP_PLATFORM_INGRESS_AUTH_URL
+          value: {{ .Values.platform.ingressAuthUrl }}
         - name: NP_PLATFORM_CONFIG_URL
           value: {{ .Values.platform.configUrl }}
         - name: NP_PLATFORM_API_URL

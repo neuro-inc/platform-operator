@@ -55,6 +55,7 @@ def config() -> Config:
         ),
         helm_service_account="default",
         platform_auth_url=URL("https://dev.neu.ro"),
+        platform_ingress_auth_url=URL("https://platformingressauth"),
         platform_config_url=URL("https://dev.neu.ro"),
         platform_api_url=URL("https://dev.neu.ro"),
         platform_namespace="platform",
@@ -415,6 +416,7 @@ def gcp_platform_config(
 ) -> PlatformConfig:
     return PlatformConfig(
         auth_url=URL("https://dev.neu.ro"),
+        ingress_auth_url=URL("https://platformingressauth"),
         config_url=URL("https://dev.neu.ro"),
         api_url=URL("https://dev.neu.ro"),
         token="token",
