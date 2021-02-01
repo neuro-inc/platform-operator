@@ -1496,7 +1496,7 @@ class TestHelmValuesFactory:
         }
         assert (
             result["prometheus-operator"]["prometheus"]["prometheusSpec"]["thanos"]
-            == {}
+            == ""
         )
         assert "cloudProvider" not in result
 
