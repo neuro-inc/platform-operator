@@ -1144,7 +1144,9 @@ class HelmValuesFactory:
                     "requests": {"storage": platform.monitoring_metrics_storage_size}
                 },
             }
-            prometheus_spec["thanos"] = {}
+            # Because of the bug in helm the only way to delete thanos values
+            # is to set it to empty string
+            prometheus_spec["thanos"] = ""
             del result["thanos"]
         return result
 
