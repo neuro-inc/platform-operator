@@ -68,7 +68,10 @@ async def startup(settings: kopf.OperatorSettings, **kwargs: Any) -> None:
     )
 
     # https://github.com/nolar/kopf/issues/232
-    settings.watching.server_timeout = 300
+    settings.watching.server_timeout = 5 * 60
+    settings.watching.client_timeout = 5 * 60
+    settings.watching.connect_timeout = 30
+    settings.watching.reconnect_backoff = 1
 
 
 @kopf.on.cleanup()
