@@ -43,7 +43,7 @@ app = App()
 
 
 @kopf.on.startup()
-async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
+async def startup(settings: kopf.OperatorSettings, **kwargs: Any) -> None:
     app.helm_values_factory = HelmValuesFactory(
         config.helm_release_names, config.helm_chart_names
     )
@@ -72,8 +72,34 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
 
 
 @kopf.on.cleanup()
-async def cleanup(**_: Any) -> None:
+async def cleanup(**kwargs: Any) -> None:
     await app.close()
+
+
+@kopf.on.login()
+def login(**kwargs: Any) -> kopf.ConnectionInfo:
+    ca_path = None
+    if config.kube_config.cert_authority_path:
+        ca_path = str(config.kube_config.cert_authority_path)
+
+    ca_data = None
+    if config.kube_config.cert_authority_data_pem:
+        ca_data = config.kube_config.cert_authority_data_pem.encode()
+
+    token = None
+    if config.kube_config.auth_token:
+        token = config.kube_config.auth_token
+    if config.kube_config.auth_token_path:
+        token = config.kube_config.auth_token_path.read_text()
+
+    return kopf.ConnectionInfo(
+        server=str(config.kube_config.url),
+        scheme="Bearer",
+        token=token,
+        ca_path=ca_path,
+        ca_data=ca_data,
+        default_namespace=config.platform_namespace,
+    )
 
 
 @kopf.on.create(
@@ -191,7 +217,7 @@ async def delete(
     body: bodies.Body,
     logger: Logger,
     retry: int,
-    **_: Any,
+    **kwargs: Any,
 ) -> None:
     status_manager = PlatformStatusManager(
         app.kube_client,
