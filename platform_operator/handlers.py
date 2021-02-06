@@ -67,6 +67,9 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
         kopf.storage.diffbase.AnnotationsDiffBaseStorage()
     )
 
+    # https://github.com/nolar/kopf/issues/232
+    settings.watching.server_timeout = 300
+
 
 @kopf.on.cleanup()
 async def cleanup(**_: Any) -> None:
