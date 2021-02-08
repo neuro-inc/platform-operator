@@ -38,11 +38,11 @@ dependencies:
     tags:
     - on_prem
   - name: platformstorageapi
-    version: "21.1.20"
+    version: "21.2.8"
     repository: "@neuro"
     alias: platform-storage
   - name: platformregistryapi
-    version: "21.1.20"
+    version: "21.2.8"
     repository: "@neuro"
     alias: platform-registry
   - name: platformmonitoringapi
