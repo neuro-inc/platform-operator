@@ -140,7 +140,7 @@ def cluster_factory(
                 "is_http_ingress_secure": True,
                 "resource_pool_types": [resource_pool_type_factory()],
                 "resource_presets": [resource_preset_factory()],
-                "kubernetes": {},
+                "kubernetes": {"pre_pull_images": ["neuromation/base"]},
                 "job_fallback_hostname": "default.jobs-dev.neu.ro",
                 "job_schedule_timeout_s": 60,
                 "job_schedule_scale_up_timeout_s": 30,
@@ -163,6 +163,7 @@ def cluster_factory(
                     "token": "token",
                     "url": "https://dev.neu.ro",
                 },
+                "grafana": {"username": "admin", "password": "grafana_password"},
             },
             "dns": {
                 "zone_id": "/hostedzone/id",
@@ -170,7 +171,13 @@ def cluster_factory(
                 "name_servers": ["192.168.0.2"],
             },
             "disks": {"storage_limit_per_user_gb": 10240},
-            "ingress": {"acme_environment": "staging"},
+            "ingress": {
+                "acme_environment": "staging",
+                "cors_origins": [
+                    "https://release--neuro-web.netlify.app",
+                    "https://app.neu.ro",
+                ],
+            },
         }
         return Cluster(payload)
 
@@ -423,6 +430,7 @@ def gcp_platform_config(
         docker_config_secret_create=True,
         docker_config_secret_name="platform-docker-config",
         image_pull_secret_names=["platform-docker-config"],
+        pre_pull_images=["neuromation/base"],
         standard_storage_class_name="platform-standard-topology-aware",
         kubernetes_version="1.14.9",
         kubernetes_public_url=URL("https://kubernetes.default"),
@@ -454,6 +462,10 @@ def gcp_platform_config(
         ingress_acme_environment="staging",
         ingress_controller_enabled=True,
         ingress_public_ips=[],
+        ingress_cors_origins=[
+            "https://release--neuro-web.netlify.app",
+            "https://app.neu.ro",
+        ],
         disks_storage_limit_per_user_gb=10240,
         service_traefik_name="platform-traefik",
         monitoring_logs_bucket_name="job-logs",
@@ -471,6 +483,8 @@ def gcp_platform_config(
             username=cluster_name,
             password="password",
         ),
+        grafana_username="admin",
+        grafana_password="grafana_password",
         gcp=GcpConfig(
             project="project",
             region="us-central1",
