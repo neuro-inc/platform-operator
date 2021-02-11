@@ -325,6 +325,7 @@ class PlatformConfig:
     docker_config_secret_name: str
     service_account_name: str
     image_pull_secret_names: Sequence[str]
+    pre_pull_images: Sequence[str]
     standard_storage_class_name: str
     kubernetes_version: str
     kubernetes_public_url: URL
@@ -338,6 +339,7 @@ class PlatformConfig:
     ingress_acme_environment: str
     ingress_controller_enabled: bool
     ingress_public_ips: Sequence[IPv4Address]
+    ingress_cors_origins: Sequence[str]
     disks_storage_limit_per_user_gb: int
     service_traefik_name: str
     jobs_namespace_create: bool
@@ -354,6 +356,8 @@ class PlatformConfig:
     storage_pvc_name: str
     helm_repo: HelmRepo
     docker_registry: DockerRegistry
+    grafana_username: str
+    grafana_password: str
     monitoring_logs_bucket_name: str = ""
     monitoring_metrics_bucket_name: str = ""
     monitoring_metrics_storage_class_name: str = ""
@@ -451,6 +455,7 @@ class PlatformConfig:
                     "node_label_job": self.kubernetes_node_labels.job,
                     "node_label_node_pool": self.kubernetes_node_labels.node_pool,
                     "job_pod_priority_class_name": self.jobs_priority_class_name,
+                    "pre_pull_images": self.pre_pull_images,
                 },
                 "is_http_ingress_secure": True,
                 "job_hostname_template": self.jobs_host_template,
@@ -534,6 +539,9 @@ class PlatformConfigFactory:
             docker_config_secret_name=docker_config_secret_name,
             service_account_name="default",
             image_pull_secret_names=image_pull_secret_names,
+            pre_pull_images=cluster["orchestrator"]["kubernetes"].get(
+                "pre_pull_images", ()
+            ),
             standard_storage_class_name=standard_storage_class_name,
             kubernetes_version=self._config.kube_config.version,
             kubernetes_public_url=URL(kubernetes_spec["publicUrl"]),
@@ -562,6 +570,7 @@ class PlatformConfigFactory:
             ingress_public_ips=[
                 IPv4Address(ip) for ip in kubernetes_spec.get("ingressPublicIPs", [])
             ],
+            ingress_cors_origins=cluster["ingress"].get("cors_origins", ()),
             disks_storage_limit_per_user_gb=cluster["disks"][
                 "storage_limit_per_user_gb"
             ],
@@ -603,6 +612,8 @@ class PlatformConfigFactory:
             storage_pvc_name=f"{self._config.platform_namespace}-storage",
             helm_repo=self._create_helm_repo(cluster),
             docker_registry=self._create_docker_registry(cluster),
+            grafana_username=cluster["credentials"]["grafana"]["username"],
+            grafana_password=cluster["credentials"]["grafana"]["password"],
             gcp=(
                 self._create_gcp(platform_body["spec"], cluster)
                 if cluster.cloud_provider_type == "gcp"

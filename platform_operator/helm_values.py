@@ -1,5 +1,3 @@
-import secrets
-import string
 from base64 import b64decode
 from typing import Any, Dict, Optional
 
@@ -27,10 +25,7 @@ class HelmValuesFactory:
                 # NOTE: should images prepulling be configured in config service?
                 "imagesPrepull": {
                     "refreshInterval": "1h",
-                    "images": [
-                        {"image": "neuromation/base"},
-                        {"image": "neuromation/web-shell"},
-                    ],
+                    "images": [{"image": image} for image in platform.pre_pull_images],
                 },
             },
             "standardStorageClass": {
@@ -478,7 +473,7 @@ class HelmValuesFactory:
             "NP_CLUSTER_NAME": platform.cluster_name,
             "NP_STORAGE_AUTH_URL": str(platform.auth_url),
             "NP_STORAGE_PVC_CLAIM_NAME": f"{self._release_names.platform}-storage",
-            "NP_CORS_ORIGINS": self._create_cors_origins(platform.cluster_name),
+            "NP_CORS_ORIGINS": ",".join(platform.ingress_cors_origins),
             "image": {"repository": f"{docker_server}/platformstorageapi"},
             "platform": {
                 "token": {
@@ -753,7 +748,7 @@ class HelmValuesFactory:
             "NP_MONITORING_PLATFORM_AUTH_URL": str(platform.auth_url),
             "NP_MONITORING_PLATFORM_CONFIG_URL": str(platform.config_url),
             "NP_MONITORING_REGISTRY_URL": str(platform.ingress_registry_url),
-            "NP_CORS_ORIGINS": self._create_cors_origins(platform.cluster_name),
+            "NP_CORS_ORIGINS": ",".join(platform.ingress_cors_origins),
             "image": {"repository": f"{docker_server}/platformmonitoringapi"},
             "nodeLabels": {
                 "job": platform.kubernetes_node_labels.job,
@@ -856,7 +851,7 @@ class HelmValuesFactory:
             "NP_CLUSTER_NAME": platform.cluster_name,
             "NP_SECRETS_K8S_NS": platform.jobs_namespace,
             "NP_SECRETS_PLATFORM_AUTH_URL": str(platform.auth_url),
-            "NP_CORS_ORIGINS": self._create_cors_origins(platform.cluster_name),
+            "NP_CORS_ORIGINS": ",".join(platform.ingress_cors_origins),
             "image": {"repository": f"{docker_server}/platformsecrets"},
             "platform": {
                 "token": {
@@ -881,7 +876,6 @@ class HelmValuesFactory:
     def create_platform_reports_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
-        alphabet = string.ascii_letters + string.digits
         object_store_config_map_name = "thanos-object-storage-config"
         relabelings = [
             self._relabel_reports_label(
@@ -1068,7 +1062,8 @@ class HelmValuesFactory:
                         "pullSecrets": platform.image_pull_secret_names,
                     }
                 },
-                "adminPassword": "".join(secrets.choice(alphabet) for i in range(16)),
+                "adminUser": platform.grafana_username,
+                "adminPassword": platform.grafana_password,
             },
         }
         prometheus_spec = result["prometheus-operator"]["prometheus"]["prometheusSpec"]
@@ -1174,7 +1169,7 @@ class HelmValuesFactory:
             "NP_DISK_API_STORAGE_LIMIT_PER_USER": str(
                 platform.disks_storage_limit_per_user_gb * 1024 ** 3
             ),
-            "NP_CORS_ORIGINS": self._create_cors_origins(platform.cluster_name),
+            "NP_CORS_ORIGINS": ",".join(platform.ingress_cors_origins),
             "image": {"repository": f"{docker_server}/platformdiskapi"},
             "platform": {
                 "token": {
@@ -1201,18 +1196,3 @@ class HelmValuesFactory:
         if platform.gcp:
             result["NP_DISK_PROVIDER"] = "gcp"
         return result
-
-    def _create_cors_origins(self, cluster_name: str) -> str:
-        # TODO: get cors configuration from config service
-        if cluster_name in ("megafon-poc"):
-            cors_origins = [
-                "https://megafon-release.neu.ro",
-                "http://megafon-neuro.netlify.app",
-                "https://release--neuro-web.netlify.app",
-                "https://app.neu.ro",
-                "https://app.ml.megafon.ru",
-            ]
-            if cluster_name == "megafon-poc":
-                cors_origins.append("https://master--megafon-neuro.netlify.app")
-            return ",".join(cors_origins)
-        return "https://release--neuro-web.netlify.app,https://app.neu.ro"

@@ -32,10 +32,7 @@ class TestHelmValuesFactory:
                 ],
                 "imagesPrepull": {
                     "refreshInterval": "1h",
-                    "images": [
-                        {"image": "neuromation/base"},
-                        {"image": "neuromation/web-shell"},
-                    ],
+                    "images": [{"image": "neuromation/base"}],
                 },
                 "labels": {"nodePool": "platform.neuromation.io/nodepool"},
             },
@@ -593,24 +590,6 @@ class TestHelmValuesFactory:
             "secrets": [{"name": "platform-storage-token", "data": {"token": "token"}}],
         }
 
-    def test_create_platform_storage_values_for_megafon_poc(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_storage_values(
-            replace(on_prem_platform_config, cluster_name="megafon-poc")
-        )
-
-        assert result["NP_CORS_ORIGINS"] == ",".join(
-            [
-                "https://megafon-release.neu.ro",
-                "http://megafon-neuro.netlify.app",
-                "https://release--neuro-web.netlify.app",
-                "https://app.neu.ro",
-                "https://app.ml.megafon.ru",
-                "https://master--megafon-neuro.netlify.app",
-            ]
-        )
-
     def test_create_gcp_platform_object_storage_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -1131,24 +1110,6 @@ class TestHelmValuesFactory:
             },
         }
 
-    def test_create_platform_monitoring_values_for_megafon_poc(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_monitoring_values(
-            replace(on_prem_platform_config, cluster_name="megafon-poc")
-        )
-
-        assert result["NP_CORS_ORIGINS"] == ",".join(
-            [
-                "https://megafon-release.neu.ro",
-                "http://megafon-neuro.netlify.app",
-                "https://release--neuro-web.netlify.app",
-                "https://app.neu.ro",
-                "https://app.ml.megafon.ru",
-                "https://master--megafon-neuro.netlify.app",
-            ]
-        )
-
     def test_create_platform_secrets_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -1183,24 +1144,6 @@ class TestHelmValuesFactory:
                 }
             ],
         }
-
-    def test_create_platform_secrets_values_for_megafon_poc(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_secrets_values(
-            replace(on_prem_platform_config, cluster_name="megafon-poc")
-        )
-
-        assert result["NP_CORS_ORIGINS"] == ",".join(
-            [
-                "https://megafon-release.neu.ro",
-                "http://megafon-neuro.netlify.app",
-                "https://release--neuro-web.netlify.app",
-                "https://app.neu.ro",
-                "https://app.ml.megafon.ru",
-                "https://master--megafon-neuro.netlify.app",
-            ]
-        )
 
     def test_create_gcp_platform_reports_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -1364,7 +1307,8 @@ class TestHelmValuesFactory:
                         "pullSecrets": ["platform-docker-config"],
                     }
                 },
-                "adminPassword": mock.ANY,
+                "adminUser": "admin",
+                "adminPassword": "grafana_password",
             },
         }
 
@@ -1533,24 +1477,6 @@ class TestHelmValuesFactory:
                 }
             ],
         }
-
-    def test_create_platform_disk_api_values_for_megafon_poc(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_disk_api_values(
-            replace(on_prem_platform_config, cluster_name="megafon-poc")
-        )
-
-        assert result["NP_CORS_ORIGINS"] == ",".join(
-            [
-                "https://megafon-release.neu.ro",
-                "http://megafon-neuro.netlify.app",
-                "https://release--neuro-web.netlify.app",
-                "https://app.neu.ro",
-                "https://app.ml.megafon.ru",
-                "https://master--megafon-neuro.netlify.app",
-            ]
-        )
 
     def test_create_aws_platform_disk_api_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
