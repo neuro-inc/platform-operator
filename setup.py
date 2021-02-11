@@ -5,7 +5,7 @@ install_requires = (
     "kopf==1.29.1",
     "aiohttp==3.7.3",
     "pyyaml==5.4.1",
-    "aiobotocore==1.2.0",
+    "aiobotocore==1.2.1",
 )
 
 setup(
