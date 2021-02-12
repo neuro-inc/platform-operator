@@ -8,6 +8,8 @@ from typing import Any, Dict, Optional
 import kopf
 from kopf.structs import bodies
 
+from platform_operator.consul_client import ConsulClient
+
 from .aws_client import AwsElbClient
 from .certificate_store import CertificateStore
 from .config_client import ConfigClient
@@ -30,6 +32,7 @@ class App:
     helm_values_factory: HelmValuesFactory = None  # type: ignore
     helm_client: HelmClient = None  # type: ignore
     kube_client: KubeClient = None  # type: ignore
+    consul_client: ConsulClient = None  # type: ignore
     config_client: ConfigClient = None  # type: ignore
     certificate_store: CertificateStore = None  # type: ignore
     exit_stack: AsyncExitStack = field(default_factory=AsyncExitStack)
@@ -55,9 +58,10 @@ async def startup(settings: kopf.OperatorSettings, **kwargs: Any) -> None:
     app.config_client = await app.exit_stack.enter_async_context(
         ConfigClient(config.platform_config_url)
     )
-    app.certificate_store = await app.exit_stack.enter_async_context(
-        CertificateStore(config.platform_consul_url)
+    app.consul_client = await app.exit_stack.enter_async_context(
+        ConsulClient(config.platform_consul_url)
     )
+    app.certificate_store = CertificateStore(app.consul_client)
 
     settings.posting.level = logging.getLevelName(config.log_level)
     settings.persistence.progress_storage = (

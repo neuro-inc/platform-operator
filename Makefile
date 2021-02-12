@@ -11,6 +11,9 @@ ARTIFACTORY_IMAGE = $(ARTIFACTORY_IMAGE_REPO):$(TAG)
 PLATFORM_HELM_CHART = platform
 HELM_CHART = platform-operator
 
+WAIT_FOR_IT_URL = https://raw.githubusercontent.com/eficode/wait-for/master/wait-for
+WAIT_FOR_IT = curl -s $(WAIT_FOR_IT_URL) | bash -s --
+
 setup:
 	pip install -U pip
 	pip install setuptools wheel
@@ -31,8 +34,14 @@ test_unit:
 	pytest -vv tests/unit
 
 test_integration:
+	docker-compose -f tests/integration/docker/docker-compose.yaml pull -q
+	docker-compose -f tests/integration/docker/docker-compose.yaml up -d
+	@$(WAIT_FOR_IT) 0.0.0.0:8500 -- echo "consul is up"
 	kubectl --context minikube apply -f deploy/platform-operator/templates/crd.yaml
-	pytest -vv --log-level=INFO tests/integration
+	@pytest -vv --log-level=INFO tests/integration; \
+	exit_code=$$?; \
+	docker-compose -f tests/integration/docker/docker-compose.yaml down -v; \
+	exit $$exit_code
 
 docker_build:
 	docker build -t $(IMAGE) .
