@@ -9,11 +9,6 @@ from platform_operator.models import HelmRepo
 
 
 @pytest.fixture
-async def helm_client(kube_context: str) -> HelmClient:
-    return HelmClient(kube_context=kube_context)
-
-
-@pytest.fixture
 def config_map() -> Dict[str, Any]:
     return {
         "apiVersion": "v1",
