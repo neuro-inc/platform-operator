@@ -455,7 +455,6 @@ class PlatformConfig:
                     "node_label_job": self.kubernetes_node_labels.job,
                     "node_label_node_pool": self.kubernetes_node_labels.node_pool,
                     "job_pod_priority_class_name": self.jobs_priority_class_name,
-                    "pre_pull_images": self.pre_pull_images,
                 },
                 "is_http_ingress_secure": True,
                 "job_hostname_template": self.jobs_host_template,
@@ -466,6 +465,7 @@ class PlatformConfig:
                 ),
                 "resource_pool_types": self.jobs_resource_pool_types,
                 "resource_presets": self._create_resource_presets(),
+                "pre_pull_images": self.pre_pull_images,
             },
         }
         dns = self.create_dns_config(
@@ -539,9 +539,7 @@ class PlatformConfigFactory:
             docker_config_secret_name=docker_config_secret_name,
             service_account_name="default",
             image_pull_secret_names=image_pull_secret_names,
-            pre_pull_images=cluster["orchestrator"]["kubernetes"].get(
-                "pre_pull_images", ()
-            ),
+            pre_pull_images=cluster["orchestrator"].get("pre_pull_images", ()),
             standard_storage_class_name=standard_storage_class_name,
             kubernetes_version=self._config.kube_config.version,
             kubernetes_public_url=URL(kubernetes_spec["publicUrl"]),

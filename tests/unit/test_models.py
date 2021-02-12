@@ -303,7 +303,6 @@ class TestPlatformConfig:
                     "node_label_job": "platform.neuromation.io/job",
                     "node_label_node_pool": "platform.neuromation.io/nodepool",
                     "job_pod_priority_class_name": "platform-job",
-                    "pre_pull_images": ["neuromation/base"],
                 },
                 "is_http_ingress_secure": True,
                 "job_hostname_template": f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
@@ -312,6 +311,7 @@ class TestPlatformConfig:
                 "job_schedule_scale_up_timeout_s": 30,
                 "resource_pool_types": [resource_pool_type_factory("192.168.0.0/16")],
                 "resource_presets": [resource_preset],
+                "pre_pull_images": ["neuromation/base"],
             },
             "dns": {
                 "zone_id": gcp_platform_config.dns_zone_id,
