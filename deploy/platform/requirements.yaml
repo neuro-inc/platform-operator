@@ -65,7 +65,7 @@ dependencies:
     version: "21.1.30"
     repository: "@neuro"
   - name: platformdiskapi
-    version: "21.1.20"
+    version: "21.2.15"
     repository: "@neuro"
     alias: platform-disk-api
     tags:
