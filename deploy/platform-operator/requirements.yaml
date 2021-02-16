@@ -1,0 +1,5 @@
+dependencies:
+  - name: consul
+    version: "0.29.0"
+    repository: "@hashicorp"
+    condition: consulEnabled

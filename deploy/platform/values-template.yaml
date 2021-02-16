@@ -41,6 +41,8 @@ ingress: {}
 ingressController:
   enabled: true
 
+consulEnabled: false
+
 jobs:
   namespace:
     create: true

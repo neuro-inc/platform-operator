@@ -52,6 +52,8 @@ class TestConfig:
             "NP_HELM_OBS_CSI_DRIVER_CHART_VERSION": "2.0.0",
             "NP_PLATFORM_NAMESPACE": "platform",
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
+            "NP_CONSUL_URL": "http://consul:8500",
+            "NP_CONSUL_INSTALLED": "true",
         }
         assert Config.load_from_env(env) == Config(
             log_level="DEBUG",
@@ -88,7 +90,8 @@ class TestConfig:
             platform_config_url=URL("http://platformconfig:8080"),
             platform_api_url=URL("http://platformapi:8080"),
             platform_namespace="platform",
-            platform_consul_url=URL("http://platform-consul:8500"),
+            consul_url=URL("http://consul:8500"),
+            consul_installed=True,
         )
 
     def test_config_defaults(self) -> None:
@@ -112,6 +115,7 @@ class TestConfig:
             "NP_HELM_OBS_CSI_DRIVER_CHART_VERSION": "2.0.0",
             "NP_PLATFORM_NAMESPACE": "platform",
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
+            "NP_CONSUL_URL": "http://consul:8500",
         }
         assert Config.load_from_env(env) == Config(
             log_level="INFO",
@@ -142,7 +146,8 @@ class TestConfig:
             platform_config_url=URL("http://platformconfig:8080"),
             platform_api_url=URL("http://platformapi:8080"),
             platform_namespace="platform",
-            platform_consul_url=URL("http://platform-consul:8500"),
+            consul_url=URL("http://consul:8500"),
+            consul_installed=False,
         )
 
 

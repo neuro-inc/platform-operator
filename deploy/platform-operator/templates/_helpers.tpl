@@ -21,3 +21,11 @@ chart: {{ include "platformOperator.chart" . }}
 heritage: {{ .Release.Service | quote }}
 release: {{ .Release.Name | quote }}
 {{- end -}}
+
+{{- define "platformOperator.consul.url" -}}
+{{- if .Values.consulEnabled -}}
+http://consul-server:8500
+{{- else -}}
+http://platform-consul:8500
+{{- end -}}
+{{- end -}}

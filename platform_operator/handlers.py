@@ -59,7 +59,7 @@ async def startup(settings: kopf.OperatorSettings, **kwargs: Any) -> None:
         ConfigClient(config.platform_config_url)
     )
     app.consul_client = await app.exit_stack.enter_async_context(
-        ConsulClient(config.platform_consul_url)
+        ConsulClient(config.consul_url)
     )
     app.certificate_store = CertificateStore(app.consul_client)
 

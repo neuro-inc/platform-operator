@@ -56,12 +56,12 @@ class TestHelmValuesFactory:
                 "registryHost": f"registry.{cluster_name}.org.neu.ro",
             },
             "ingressController": {"enabled": True},
+            "consulEnabled": False,
             "jobs": {
                 "namespace": {"create": True, "name": "platform-jobs"},
                 "label": "platform.neuromation.io/job",
             },
             "storage": {"type": "nfs", "nfs": {"server": "192.168.0.3", "path": "/"}},
-            "consul": mock.ANY,
             "traefik": mock.ANY,
             "adjust-inotify": mock.ANY,
             "nvidia-gpu-driver-gcp": mock.ANY,
@@ -73,6 +73,15 @@ class TestHelmValuesFactory:
             "platform-reports": mock.ANY,
             "platform-disk-api": mock.ANY,
         }
+
+    def test_create_gcp_platform_values_with_consul(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(gcp_platform_config, consul_install=True)
+        )
+
+        assert result["consul"]
 
     def test_create_gcp_platform_values_with_kubernetes_storage(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -378,7 +387,7 @@ class TestHelmValuesFactory:
             "kvprovider": {
                 "consul": {
                     "watch": True,
-                    "endpoint": "platform-consul:8500",
+                    "endpoint": "http://consul:8500",
                     "prefix": "traefik",
                 },
                 "storeAcme": True,

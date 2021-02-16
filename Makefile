@@ -56,6 +56,7 @@ helm_install:
 	helm plugin install https://github.com/belitre/helm-push-artifactory-plugin
 
 helm_repo_add:
+	helm repo add hashicorp https://helm.releases.hashicorp.com
 	@helm repo add neuro https://neuro.jfrog.io/artifactory/helm-virtual-public \
 		--username ${ARTIFACTORY_USERNAME} \
 		--password ${ARTIFACTORY_PASSWORD}
@@ -77,6 +78,7 @@ _helm_fetch:
 	mkdir -p temp_deploy/$(HELM_CHART)
 	cp -Rf deploy/$(HELM_CHART) temp_deploy/
 	find temp_deploy/$(HELM_CHART) -type f -name 'values*' -delete
+	helm dependency update temp_deploy/$(HELM_CHART)
 
 _helm_expand_vars:
 	export IMAGE_REPO=$(ARTIFACTORY_IMAGE_REPO); \

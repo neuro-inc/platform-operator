@@ -126,7 +126,8 @@ class Config:
     platform_config_url: URL
     platform_api_url: URL
     platform_namespace: str
-    platform_consul_url: URL
+    consul_url: URL
+    consul_installed: bool
 
     @classmethod
     def load_from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Config":
@@ -171,9 +172,8 @@ class Config:
             platform_config_url=URL(env["NP_PLATFORM_CONFIG_URL"]),
             platform_api_url=URL(env["NP_PLATFORM_API_URL"]),
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
-            platform_consul_url=URL.build(
-                scheme="http", host=platform_release_name + "-consul", port=8500
-            ),
+            consul_url=URL(env["NP_CONSUL_URL"]),
+            consul_installed=env.get("NP_CONSUL_INSTALLED", "false").lower() == "true",
         )
 
     @classmethod
@@ -358,6 +358,8 @@ class PlatformConfig:
     docker_registry: DockerRegistry
     grafana_username: str
     grafana_password: str
+    consul_url: URL
+    consul_install: bool
     monitoring_logs_bucket_name: str = ""
     monitoring_metrics_bucket_name: str = ""
     monitoring_metrics_storage_class_name: str = ""
@@ -612,6 +614,8 @@ class PlatformConfigFactory:
             docker_registry=self._create_docker_registry(cluster),
             grafana_username=cluster["credentials"]["grafana"]["username"],
             grafana_password=cluster["credentials"]["grafana"]["password"],
+            consul_url=self._config.consul_url,
+            consul_install=not self._config.consul_installed,
             gcp=(
                 self._create_gcp(platform_body["spec"], cluster)
                 if cluster.cloud_provider_type == "gcp"
