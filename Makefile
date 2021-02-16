@@ -37,7 +37,7 @@ test_integration:
 	docker-compose -f tests/integration/docker/docker-compose.yaml pull -q
 	docker-compose -f tests/integration/docker/docker-compose.yaml up -d
 	@$(WAIT_FOR_IT) 0.0.0.0:8500 -- echo "consul is up"
-	kubectl --context minikube apply -f deploy/platform-operator/templates/crd.yaml
+	kubectl --context minikube apply -f deploy/platform-operator/crds
 	@pytest -vv --log-level=INFO tests/integration; \
 	exit_code=$$?; \
 	docker-compose -f tests/integration/docker/docker-compose.yaml down -v; \
