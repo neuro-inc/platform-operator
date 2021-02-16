@@ -2,8 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "platformOperator.fullname" . }}-controller
-  labels:
-{{ include "platformOperator.labels.standard" . | indent 4 }}
+  labels: {{ include "platformOperator.labels.standard" . | nindent 4 }}
     component: controller
 spec:
   replicas: 1

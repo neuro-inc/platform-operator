@@ -7,6 +7,10 @@ imagePullSecrets: []
 tillerImage:
   repository: $DOCKER_SERVER/kubernetes-helm/tiller
 
+kubectlImage:
+  repository: $DOCKER_SERVER/bitnami/kubectl
+  tag: 1.16
+
 controller:
   retries: 3
   backoff: 60
