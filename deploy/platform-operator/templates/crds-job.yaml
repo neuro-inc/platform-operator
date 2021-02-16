@@ -12,6 +12,7 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      serviceAccountName: {{ include "platformOperator.fullname" . }}
       containers:
         - name: update-crds
           image: {{ .Values.kubectlImage.repository }}:{{ .Values.kubectlImage.tag }}
