@@ -71,6 +71,12 @@ spec:
           value: {{ .Values.platform.apiUrl }}
         - name: NP_PLATFORM_NAMESPACE
           value: {{ .Release.Namespace }}
+        - name: NP_CONSUL_URL
+          value: {{ include "platformOperator.consul.url" . | quote }}
+        {{- if .Values.consulEnabled }}
+        - name: NP_CONSUL_INSTALLED
+          value: {{ .Values.consulEnabled | quote }}
+        {{- end }}
         ports:
         - name: liveness-port
           containerPort: 8080

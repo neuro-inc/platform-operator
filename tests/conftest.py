@@ -55,7 +55,8 @@ def config() -> Config:
         platform_config_url=URL("https://dev.neu.ro"),
         platform_api_url=URL("https://dev.neu.ro"),
         platform_namespace="platform",
-        platform_consul_url=URL("http://platform-consul:8500"),
+        consul_url=URL("http://consul:8500"),
+        consul_installed=True,
     )
 
 
@@ -486,6 +487,8 @@ def gcp_platform_config(
         ),
         grafana_username="admin",
         grafana_password="grafana_password",
+        consul_url=URL("http://consul:8500"),
+        consul_install=False,
         gcp=GcpConfig(
             project="project",
             region="us-central1",

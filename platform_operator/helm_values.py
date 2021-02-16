@@ -38,6 +38,7 @@ class HelmValuesFactory:
                 "registryHost": platform.ingress_registry_url.host,
             },
             "ingressController": {"enabled": platform.ingress_controller_enabled},
+            "consulEnabled": platform.consul_install,
             "jobs": {
                 "namespace": {
                     "create": platform.jobs_namespace_create,
@@ -48,7 +49,6 @@ class HelmValuesFactory:
             self._chart_names.adjust_inotify: self.create_adjust_inotify_values(
                 platform
             ),
-            self._chart_names.consul: self.create_consul_values(platform),
             self._chart_names.traefik: self.create_traefik_values(platform),
             self._chart_names.platform_storage: self.create_platform_storage_values(
                 platform
@@ -82,6 +82,8 @@ class HelmValuesFactory:
             }
         else:
             result["dockerConfigSecret"] = {"create": False}
+        if platform.consul_install:
+            result[self._chart_names.consul] = self.create_consul_values(platform)
         if not platform.on_prem:
             result[
                 self._chart_names.platform_object_storage
@@ -289,7 +291,7 @@ class HelmValuesFactory:
             "kvprovider": {
                 "consul": {
                     "watch": True,
-                    "endpoint": f"{self._release_names.platform}-consul:8500",
+                    "endpoint": str(platform.consul_url),
                     "prefix": "traefik",
                 },
                 "storeAcme": True,

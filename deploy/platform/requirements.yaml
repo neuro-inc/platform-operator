@@ -1,8 +1,4 @@
 dependencies:
-  - name: consul
-    version: "3.6.0"
-    repository: "@neuro"
-    condition: ingressController.enabled
   - name: traefik
     version: "1.85.1"
     repository: "@stable"
@@ -72,3 +68,9 @@ dependencies:
     - gcp
     - aws
     - azure
+
+  # Deprecated, left for backward compatibility with old clusters
+  - name: consul
+    version: "3.6.0"
+    repository: "@neuro"
+    condition: consulEnabled

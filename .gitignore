@@ -130,4 +130,4 @@ dmypy.json
 
 .vscode/
 
-/temp_deploy
+temp_deploy/
