@@ -18,7 +18,7 @@ class TestPlatformStatusManager:
 
     @pytest.fixture
     def manager(self, kube_client: KubeClient) -> PlatformStatusManager:
-        return PlatformStatusManager(kube_client, namespace="default", name="neuro")
+        return PlatformStatusManager(kube_client, namespace="default")
 
     @pytest.fixture
     def status(self) -> Dict[str, Any]:
@@ -44,14 +44,18 @@ class TestPlatformStatusManager:
         status["phase"] = "Deploying"
         kube_client.get_platform_status.return_value = deepcopy(status)
 
-        await manager.start_deployment(retry=1)
+        await manager.start_deployment("neuro", retry=1)
 
         assert (
-            manager.is_condition_satisfied(PlatformConditionType.PLATFORM_DEPLOYED)
+            manager.is_condition_satisfied(
+                "neuro", PlatformConditionType.PLATFORM_DEPLOYED
+            )
             is True
         )
         assert (
-            manager.is_condition_satisfied(PlatformConditionType.CLUSTER_CONFIGURED)
+            manager.is_condition_satisfied(
+                "neuro", PlatformConditionType.CLUSTER_CONFIGURED
+            )
             is False
         )
 
@@ -63,7 +67,7 @@ class TestPlatformStatusManager:
     ) -> None:
         kube_client.get_platform_status.return_value = None
 
-        await manager.start_deployment(retry=0)
+        await manager.start_deployment("neuro", retry=0)
 
         kube_client.update_platform_status.assert_awaited_with(
             namespace="default",
@@ -81,7 +85,7 @@ class TestPlatformStatusManager:
         status["retries"] = 1
         kube_client.get_platform_status.return_value = deepcopy(status)
 
-        await manager.start_deployment(retry=0)
+        await manager.start_deployment("neuro", retry=0)
 
         status["phase"] = "Deploying"
         status["retries"] = 0
@@ -102,7 +106,7 @@ class TestPlatformStatusManager:
         status["phase"] = "Deploying"
         kube_client.get_platform_status.return_value = deepcopy(status)
 
-        await manager.start_deployment(retry=1)
+        await manager.start_deployment("neuro", retry=1)
 
         status["retries"] = 1
         kube_client.update_platform_status.assert_awaited_with(
@@ -119,7 +123,7 @@ class TestPlatformStatusManager:
     ) -> None:
         kube_client.get_platform_status.return_value = None
 
-        await manager.start_deployment(retry=0)
+        await manager.start_deployment("neuro", retry=0)
 
         status: Dict[str, Any] = {"phase": "Deploying", "retries": 0, "conditions": []}
         kube_client.update_platform_status.assert_awaited_with(
@@ -128,7 +132,7 @@ class TestPlatformStatusManager:
             payload=status,
         )
 
-        async with manager.transition(PlatformConditionType.PLATFORM_DEPLOYED):
+        async with manager.transition("neuro", PlatformConditionType.PLATFORM_DEPLOYED):
             status["conditions"].append(
                 {
                     "type": "PlatformDeployed",
@@ -159,7 +163,7 @@ class TestPlatformStatusManager:
         status["phase"] = "Deploying"
         kube_client.get_platform_status.return_value = deepcopy(status)
 
-        await manager.start_deployment(retry=1)
+        await manager.start_deployment("neuro", retry=1)
 
         status["retries"] = 1
         kube_client.update_platform_status.assert_awaited_with(
@@ -168,7 +172,7 @@ class TestPlatformStatusManager:
             payload=status,
         )
 
-        await manager.complete_deployment()
+        await manager.complete_deployment("neuro")
 
         status["phase"] = "Deployed"
         kube_client.update_platform_status.assert_awaited_with(
@@ -187,9 +191,29 @@ class TestPlatformStatusManager:
         status["phase"] = "Deploying"
         kube_client.get_platform_status.return_value = deepcopy(status)
 
-        await manager.fail_deployment()
+        await manager.fail_deployment("neuro")
 
         status["phase"] = "Failed"
+        kube_client.update_platform_status.assert_awaited_with(
+            namespace="default",
+            name="neuro",
+            payload=status,
+        )
+
+    @pytest.mark.asyncio
+    async def test_fail_deployment_and_remove_conditions(
+        self,
+        kube_client: mock.AsyncMock,
+        manager: PlatformStatusManager,
+        status: Dict[str, Any],
+    ) -> None:
+        status["phase"] = "Deploying"
+        kube_client.get_platform_status.return_value = deepcopy(status)
+
+        await manager.fail_deployment("neuro", remove_conditions=True)
+
+        status["phase"] = "Failed"
+        status["conditions"] = []
         kube_client.update_platform_status.assert_awaited_with(
             namespace="default",
             name="neuro",
@@ -207,7 +231,7 @@ class TestPlatformStatusManager:
         status["conditions"][-1]["status"] = "False"
         kube_client.get_platform_status.return_value = deepcopy(status)
 
-        await manager.fail_deployment()
+        await manager.fail_deployment("neuro")
 
         status["phase"] = "Failed"
         status["conditions"][-1]["status"] = "Unknown"
@@ -227,7 +251,7 @@ class TestPlatformStatusManager:
     ) -> None:
         kube_client.get_platform_status.return_value = deepcopy(status)
 
-        await manager.start_deletion()
+        await manager.start_deletion("neuro")
 
         status["phase"] = "Deleting"
         kube_client.update_platform_status.assert_awaited_with(

@@ -341,87 +341,77 @@ class PlatformStatus(Dict[str, Any]):
 
 
 class PlatformStatusManager:
-    def __init__(
-        self,
-        kube_client: KubeClient,
-        namespace: str,
-        name: str,
-        logger: Optional[logging.Logger] = None,
-    ) -> None:
+    def __init__(self, kube_client: KubeClient, namespace: str) -> None:
         self._kube_client = kube_client
         self._namespace = namespace
-        self._name = name
-        self._logger = logger or logging.getLogger(__name__)
-        self._status: Optional[PlatformStatus] = None
+        self._status: Dict[str, PlatformStatus] = {}
 
-    async def _load(self) -> None:
-        if self._status:
+    async def _load(self, name: str) -> None:
+        if self._status.get(name):
             return
         payload = await self._kube_client.get_platform_status(
-            namespace=self._namespace, name=self._name
+            namespace=self._namespace, name=name
         )
         payload = payload or {"conditions": []}
-        self._status = PlatformStatus(payload)
+        self._status[name] = PlatformStatus(payload)
 
-    async def _save(self) -> None:
-        assert self._status
+    async def _save(self, name: str) -> None:
         await self._kube_client.update_platform_status(
-            namespace=self._namespace, name=self._name, payload=self._status
+            namespace=self._namespace, name=name, payload=self._status[name]
         )
 
     def _now(self) -> str:
         return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
-    def is_condition_satisfied(self, type: PlatformConditionType) -> bool:
-        assert self._status
-        for condition in self._status.conditions:
+    def is_condition_satisfied(self, name: str, type: PlatformConditionType) -> bool:
+        for condition in self._status[name].conditions:
             if condition["type"] == type.value:
                 return condition["status"] == PlatformConditionStatus.TRUE.value
         return False
 
-    async def start_deployment(self, retry: int = 0) -> None:
-        await self._load()
-        assert self._status
-        self._status.phase = PlatformPhase.DEPLOYING.value
-        self._status.retries = retry
+    async def start_deployment(self, name: str, retry: int = 0) -> None:
+        await self._load(name)
+        self._status[name].phase = PlatformPhase.DEPLOYING.value
+        self._status[name].retries = retry
         if retry == 0:
-            self._status.conditions = []
-        await self._save()
+            self._status[name].conditions = []
+        await self._save(name)
 
-    async def complete_deployment(self) -> None:
-        await self._load()
-        assert self._status
-        self._status.phase = PlatformPhase.DEPLOYED.value
-        await self._save()
+    async def complete_deployment(self, name: str) -> None:
+        await self._load(name)
+        self._status[name].phase = PlatformPhase.DEPLOYED.value
+        await self._save(name)
 
-    async def fail_deployment(self) -> None:
-        await self._load()
+    async def fail_deployment(self, name: str, remove_conditions: bool = False) -> None:
+        await self._load(name)
         assert self._status
-        self._status.phase = PlatformPhase.FAILED.value
-        if self._status.conditions:
-            condition = self._status.conditions[-1]
+        self._status[name].phase = PlatformPhase.FAILED.value
+        if remove_conditions:
+            self._status[name].conditions = []
+        if self._status[name].conditions:
+            condition = self._status[name].conditions[-1]
             if condition["status"] == PlatformConditionStatus.FALSE.value:
                 condition["status"] = PlatformConditionStatus.UNKNOWN.value
                 condition["lastTransitionTime"] = self._now()
-        await self._save()
+        await self._save(name)
 
-    async def start_deletion(self) -> None:
-        await self._load()
-        assert self._status
-        self._status.phase = PlatformPhase.DELETING.value
-        await self._save()
+    async def start_deletion(self, name: str) -> None:
+        await self._load(name)
+        self._status[name].phase = PlatformPhase.DELETING.value
+        await self._save(name)
 
     @asynccontextmanager
-    async def transition(self, type: PlatformConditionType) -> AsyncIterator[None]:
-        assert self._status
+    async def transition(
+        self, name: str, type: PlatformConditionType
+    ) -> AsyncIterator[None]:
         logger.info("Started transition to %s condition", type.value)
-        self._status.conditions.append(PlatformCondition({}))
-        self._status.conditions[-1].type = type.value
-        self._status.conditions[-1].status = PlatformConditionStatus.FALSE.value
-        self._status.conditions[-1].last_transition_time = self._now()
-        await self._save()
+        self._status[name].conditions.append(PlatformCondition({}))
+        self._status[name].conditions[-1].type = type.value
+        self._status[name].conditions[-1].status = PlatformConditionStatus.FALSE.value
+        self._status[name].conditions[-1].last_transition_time = self._now()
+        await self._save(name)
         yield
-        self._status.conditions[-1].status = PlatformConditionStatus.TRUE.value
-        self._status.conditions[-1].last_transition_time = self._now()
-        await self._save()
+        self._status[name].conditions[-1].status = PlatformConditionStatus.TRUE.value
+        self._status[name].conditions[-1].last_transition_time = self._now()
+        await self._save(name)
         logger.info("Transition to %s succeeded", type.value)
