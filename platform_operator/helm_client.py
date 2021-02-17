@@ -150,10 +150,28 @@ class HelmClient:
         if not stdout_text:
             logger.info("Received empty response")
             return None
-        logger.info("Received response %s", stdout_text)
+        logger.debug("Received response %s", stdout_text)
         response_json = json.loads(stdout_text)
         releases = response_json.get("Releases")
         return releases[0] if releases else None
+
+    async def get_release_values(self, release_name: str) -> Optional[Dict[str, Any]]:
+        options = self._global_options.add(output="json")
+        cmd = f"helm get values {release_name} {options!s}"
+        logger.info("Running %s", cmd)
+        process, stdout_text, stderr_text = await self._run(
+            cmd,
+            capture_stdout=True,
+            capture_stderr=True,
+        )
+        if process.returncode != 0:
+            if "not found" in stdout_text:
+                logger.info("Release %s not found", release_name)
+                return None
+            logger.error("Failed to initialize helm: %s", stderr_text.strip())
+            raise HelmException("Failed to initialize helm")
+        logger.debug("Received response %s", stdout_text)
+        return json.loads(stdout_text)
 
     async def upgrade(
         self,

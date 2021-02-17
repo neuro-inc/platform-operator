@@ -32,11 +32,12 @@ class TestHelmClient:
         )
         await helm_client.update_repo()
         release_name = str(uuid.uuid4())
+        values = {"resources": [config_map]}
         try:
             await helm_client.upgrade(
                 release_name,
                 "incubator/raw",
-                values={"resources": [config_map]},
+                values=values,
                 version="0.2.3",
                 namespace=kube_namespace,
                 install=True,
@@ -49,6 +50,11 @@ class TestHelmClient:
             assert release["Chart"] == "raw-0.2.3"
             assert release["Namespace"] == kube_namespace
             assert release["Status"] == "DEPLOYED"
+
+            release_values = await helm_client.get_release_values(release_name)
+
+            assert release_values
+            assert release_values == values
         finally:
             await helm_client.delete(release_name, purge=True)
 
