@@ -8,6 +8,10 @@ from platform_operator.consul_client import ConsulClient, SessionExpiredError
 
 class TestConsulClient:
     @pytest.mark.asyncio
+    async def test_wait_healthy(self, consul_client: ConsulClient) -> None:
+        await asyncio.wait_for(consul_client.wait_healthy(), 5)
+
+    @pytest.mark.asyncio
     async def test_get_key(self, consul_client: ConsulClient) -> None:
         assert await consul_client.put_key("key/1", b"value1")
         result = await consul_client.get_key("key/1")
@@ -21,7 +25,7 @@ class TestConsulClient:
         assert result == b"value2"
 
         result = await consul_client.get_key("key", recurse=True)
-        assert isinstance(result, collections.Sequence)
+        assert isinstance(result, collections.abc.Sequence)
         assert isinstance(result[0], dict)
         assert isinstance(result[1], dict)
         assert result[0]["Value"] == "dmFsdWUx"
@@ -53,7 +57,12 @@ class TestConsulClient:
 
         async def run(delay_s: float) -> None:
             async with consul_client.lock_key(
-                "lock", b"value", ttl_s=10, lock_delay_s=1, sleep_s=0.5, timeout_s=5
+                "lock",
+                b"value",
+                session_ttl_s=10,
+                lock_delay_s=1,
+                sleep_s=0.5,
+                timeout_s=5,
             ):
                 nonlocal i
                 i += 1
@@ -64,9 +73,9 @@ class TestConsulClient:
 
         await asyncio.wait(
             [
-                run(delay_s=1),
-                run(delay_s=0.5),
-                run(delay_s=0),
+                asyncio.create_task(run(delay_s=1)),
+                asyncio.create_task(run(delay_s=0.5)),
+                asyncio.create_task(run(delay_s=0)),
             ]
         )
 
@@ -79,13 +88,13 @@ class TestConsulClient:
         async def run_expired() -> None:
             with pytest.raises(SessionExpiredError):
                 async with consul_client.lock_key(
-                    "lock", b"value", ttl_s=10, lock_delay_s=1
+                    "lock", b"value", session_ttl_s=10, lock_delay_s=1
                 ):
                     await asyncio.sleep(10.1)
 
         async def run() -> None:
             async with consul_client.lock_key(
-                "lock", b"value", ttl_s=10, lock_delay_s=1
+                "lock", b"value", session_ttl_s=10, lock_delay_s=1
             ):
                 pass
 
@@ -100,13 +109,13 @@ class TestConsulClient:
 
         async def run_raise() -> None:
             async with consul_client.lock_key(
-                "lock", b"value", ttl_s=10, lock_delay_s=1
+                "lock", b"value", session_ttl_s=10, lock_delay_s=1
             ):
                 raise Exception("error inside lock")
 
         async def run() -> None:
             async with consul_client.lock_key(
-                "lock", b"value", ttl_s=10, lock_delay_s=1, timeout_s=1.1
+                "lock", b"value", session_ttl_s=10, lock_delay_s=1, timeout_s=1.1
             ):
                 pass
 

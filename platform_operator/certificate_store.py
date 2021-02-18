@@ -27,8 +27,11 @@ class CertificateStore:
                 "traefik/acme/account/object", raw=True
             )
         except ClientResponseError as exc:
-            if exc.status == HTTPNotFound.status_code:
-                return None
+            if exc.status != HTTPNotFound.status_code:
+                logger.warning(
+                    "Error while trying to get ACME account from consul", exc_info=exc
+                )
+            return None
         assert isinstance(value, bytes)
         value_decompressed = gzip.decompress(value)
         return json.loads(value_decompressed.decode())

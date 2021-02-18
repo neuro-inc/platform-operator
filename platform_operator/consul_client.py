@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import time
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
@@ -16,17 +17,13 @@ class SessionExpiredError(Exception):
     pass
 
 
-class LockAcquisitionError(Exception):
-    pass
-
-
 class LockReleaseError(Exception):
     pass
 
 
 class ConsulClient:
-    def __init__(self, url: URL) -> None:
-        self._url = url
+    def __init__(self, url: Union[str, URL]) -> None:
+        self._url = URL(url)
         self._client: Optional[aiohttp.ClientSession] = None
 
     async def _on_request_start(
@@ -72,6 +69,17 @@ class ConsulClient:
     async def close(self) -> None:
         assert self._client
         await self._client.close()
+
+    async def wait_healthy(self, sleep_s: float = 0.1) -> None:
+        assert self._client
+        while True:
+            async with self._client.get(
+                self._url / "v1/status/leader", timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
+                response.raise_for_status()
+                text = await response.text()
+                if re.search(r"\".+\"", text):
+                    return
 
     async def get_key(
         self, key: str, *, recurse: bool = False, raw: bool = False
@@ -161,34 +169,28 @@ class ConsulClient:
         key: str,
         value: bytes,
         *,
-        ttl_s: int,
+        session_ttl_s: int,
         lock_delay_s: Optional[int] = None,
         sleep_s: float = 0.1,
         timeout_s: Optional[float] = None,
     ) -> AsyncIterator[None]:
-        session_id = await self.create_session(ttl_s=ttl_s, lock_delay_s=lock_delay_s)
+        session_id = await self.create_session(
+            ttl_s=session_ttl_s, lock_delay_s=lock_delay_s
+        )
         logger.info("Session %r created", session_id)
 
         try:
-            start_time = time.monotonic()
-            while True:
-                acquired = await self.put_key(key, value, acquire=session_id)
-                if acquired:
-                    break
-                elapsed_s = time.monotonic() - start_time
-                if timeout_s and elapsed_s + sleep_s >= timeout_s:
-                    logger.warning(
-                        "Failed to acquire lock (%r, %r) before timeout",
-                        session_id,
-                        key,
-                    )
-                    raise LockAcquisitionError("Failed to acquire lock before timeout")
-                await asyncio.sleep(sleep_s)
-            logger.info("Lock (%r, %r) acquired", session_id, key)
+            acquire_lock_future = self.acquire_lock(
+                key, value, session_id=session_id, sleep_s=sleep_s
+            )
+            if timeout_s:
+                await asyncio.wait_for(acquire_lock_future, timeout_s)
+            else:
+                await acquire_lock_future
             start_time = time.monotonic()  # lock start time
             yield
             elapsed_s = time.monotonic() - start_time
-            if elapsed_s >= ttl_s:
+            if elapsed_s >= session_ttl_s:
                 logger.warning("Lock (%r, %r) expired", session_id, key)
                 raise SessionExpiredError(f"Session {session_id!r} expired")
             logger.info("Lock (%r, %r) released", session_id, key)
@@ -198,3 +200,19 @@ class ConsulClient:
                 logger.warning("Failed to destroy session %r", session_id)
                 raise LockReleaseError(f"Failed to destroy session {session_id!r}")
             logger.info("Session %r destroyed", session_id)
+
+    async def acquire_lock(
+        self,
+        key: str,
+        value: bytes,
+        *,
+        session_id: str,
+        sleep_s: float = 0.1,
+    ) -> None:
+        while True:
+            acquired = await self.put_key(key, value, acquire=session_id)
+            if acquired:
+                logger.info("Lock (%r, %r) acquired", session_id, key)
+                return
+            logger.info("Lock (%r, %r) was not acquired", session_id, key)
+            await asyncio.sleep(sleep_s)
