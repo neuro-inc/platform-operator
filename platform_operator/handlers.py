@@ -257,7 +257,8 @@ async def watch_config(
 
                 if not obs_csi_driver_deploy_required and not platform_deploy_required:
                     await app.status_manager.complete_deployment(name)
-                    return
+                    await asyncio.sleep(config.platform_config_watch_interval_s)
+                    continue
 
                 logger.info("Platform config update started")
 
