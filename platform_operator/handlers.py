@@ -137,24 +137,28 @@ async def deploy(
         session_ttl_s=15 * 60,
         sleep_s=3,
     ):
-        platform = await get_platform_config(name, body)
+        await _deploy(name, body, logger, retry)
 
-        logger.info("Platform deployment started")
 
-        await app.status_manager.start_deployment(name, retry)
-        await initialize_helm(platform)
+async def _deploy(name: str, body: bodies.Body, logger: Logger, retry: int) -> None:
+    platform = await get_platform_config(name, body)
 
-        if await is_obs_csi_driver_deploy_required(platform, install=True):
-            await upgrade_obs_csi_driver_helm_release(platform)
+    logger.info("Platform deployment started")
 
-        if await is_platform_deploy_required(platform, install=True):
-            await upgrade_platform_helm_release(platform)
+    await app.status_manager.start_deployment(name, retry)
+    await initialize_helm(platform)
 
-        await wait_for_certificated_created(platform)
-        await wait_for_cluster_configured(platform)
-        await app.status_manager.complete_deployment(name)
+    if await is_obs_csi_driver_deploy_required(platform, install=True):
+        await upgrade_obs_csi_driver_helm_release(platform)
 
-        logger.info("Platform deployment succeeded")
+    if await is_platform_deploy_required(platform, install=True):
+        await upgrade_platform_helm_release(platform)
+
+    await wait_for_certificated_created(platform)
+    await wait_for_cluster_configured(platform)
+    await app.status_manager.complete_deployment(name)
+
+    logger.info("Platform deployment succeeded")
 
 
 @kopf.on.delete(
@@ -255,44 +259,7 @@ async def watch_config(
                 session_ttl_s=15 * 60,
                 sleep_s=3,
             ):
-                platform = await get_platform_config(name, body)
-
-                await initialize_helm(platform)
-
-                obs_csi_driver_deploy_required = (
-                    await is_obs_csi_driver_deploy_required(platform)
-                )
-                platform_deploy_required = await is_platform_deploy_required(platform)
-
-                if not obs_csi_driver_deploy_required and not platform_deploy_required:
-                    logger.info("Platform config didn't change")
-                    continue
-
-                logger.info("Platform config update started")
-
-                await app.status_manager.start_deployment(name)
-                await app.config_client.send_notification(
-                    cluster_name=name,
-                    token=body["spec"]["token"],
-                    notification_type=NotificationType.CLUSTER_UPDATING,
-                )
-
-                if obs_csi_driver_deploy_required:
-                    await upgrade_obs_csi_driver_helm_release(platform)
-
-                if platform_deploy_required:
-                    await upgrade_platform_helm_release(platform)
-
-                await wait_for_certificated_created(platform)
-                await wait_for_cluster_configured(platform)
-                await app.status_manager.complete_deployment(name)
-                await app.config_client.send_notification(
-                    cluster_name=name,
-                    token=body["spec"]["token"],
-                    notification_type=NotificationType.CLUSTER_UPDATE_SUCCEEDED,
-                )
-
-                logger.info("Platform config update succeeded")
+                await _update(name, body, logger)
         except Exception as exc:
             logger.error("Platform config update failed", exc_info=exc)
             await app.status_manager.fail_deployment(name)
@@ -301,6 +268,45 @@ async def watch_config(
                 token=body["spec"]["token"],
                 notification_type=NotificationType.CLUSTER_UPDATE_FAILED,
             )
+
+
+async def _update(name: str, body: bodies.Body, logger: Logger) -> None:
+    platform = await get_platform_config(name, body)
+
+    await initialize_helm(platform)
+
+    obs_csi_driver_deploy_required = await is_obs_csi_driver_deploy_required(platform)
+    platform_deploy_required = await is_platform_deploy_required(platform)
+
+    if not obs_csi_driver_deploy_required and not platform_deploy_required:
+        logger.info("Platform config didn't change")
+        return
+
+    logger.info("Platform config update started")
+
+    await app.status_manager.start_deployment(name)
+    await app.config_client.send_notification(
+        cluster_name=name,
+        token=body["spec"]["token"],
+        notification_type=NotificationType.CLUSTER_UPDATING,
+    )
+
+    if obs_csi_driver_deploy_required:
+        await upgrade_obs_csi_driver_helm_release(platform)
+
+    if platform_deploy_required:
+        await upgrade_platform_helm_release(platform)
+
+    await wait_for_certificated_created(platform)
+    await wait_for_cluster_configured(platform)
+    await app.status_manager.complete_deployment(name)
+    await app.config_client.send_notification(
+        cluster_name=name,
+        token=body["spec"]["token"],
+        notification_type=NotificationType.CLUSTER_UPDATE_SUCCEEDED,
+    )
+
+    logger.info("Platform config update succeeded")
 
 
 async def get_platform_config(name: str, body: bodies.Body) -> PlatformConfig:
