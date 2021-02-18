@@ -166,11 +166,18 @@ async def delete(
     if retry == 0:
         await app.status_manager.start_deletion(name)
 
-    platform_token = body["spec"]["token"]
-    cluster = await app.config_client.get_cluster(name, platform_token)
+    async with app.consul_client.lock_key(
+        LOCK_KEY,
+        b"platform-deploying",
+        session_ttl_s=15 * 60,
+        sleep_s=3,
+    ):
+        await _delete(name, body, logger)
 
+
+async def _delete(name: str, body: bodies.Body, logger: Logger) -> None:
     try:
-        platform = app.platform_config_factory.create(body, cluster)
+        platform = await get_platform_config(name, body)
     except Exception:
         # If platform has invalid configuration than there was no deployment
         # and no resources to delete. Platform resource can be safely deleted.
@@ -181,12 +188,10 @@ async def delete(
 
     await app.helm_client.init(client_only=True, skip_refresh=True)
 
-    logger.info("Deleting platform helm chart")
     await app.helm_client.delete(
         config.helm_release_names.platform,
         purge=True,
     )
-    logger.info("platform helm chart deleted")
 
     try:
         # We need first to delete all pods that use storage.
@@ -215,12 +220,10 @@ async def delete(
 
     is_gcp_gcs_platform = platform.gcp and platform.gcp.storage_type == "gcs"
     if is_gcp_gcs_platform:
-        logger.info("Deleting obs-csi-driver helm chart")
         await app.helm_client.delete(
             config.helm_release_names.obs_csi_driver,
             purge=True,
         )
-        logger.info("obs-csi-driver helm chart deleted")
 
 
 @kopf.on.daemon(
@@ -239,10 +242,16 @@ async def watch_config(
         if stopped:
             break
 
+        logger.info(
+            "Platform config will be checked in %d seconds",
+            config.platform_config_watch_interval_s,
+        )
+        await asyncio.sleep(config.platform_config_watch_interval_s)
+
         try:
             async with app.consul_client.lock_key(
                 LOCK_KEY,
-                b"platform-config-updated",
+                b"platform-config-updating",
                 session_ttl_s=15 * 60,
                 sleep_s=3,
             ):
@@ -256,8 +265,7 @@ async def watch_config(
                 platform_deploy_required = await is_platform_deploy_required(platform)
 
                 if not obs_csi_driver_deploy_required and not platform_deploy_required:
-                    await app.status_manager.complete_deployment(name)
-                    await asyncio.sleep(config.platform_config_watch_interval_s)
+                    logger.info("Platform config didn't change")
                     continue
 
                 logger.info("Platform config update started")
@@ -293,8 +301,6 @@ async def watch_config(
                 token=body["spec"]["token"],
                 notification_type=NotificationType.CLUSTER_UPDATE_FAILED,
             )
-
-        await asyncio.sleep(config.platform_config_watch_interval_s)
 
 
 async def get_platform_config(name: str, body: bodies.Body) -> PlatformConfig:

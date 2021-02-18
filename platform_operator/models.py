@@ -172,7 +172,7 @@ class Config:
             platform_ingress_auth_url=URL(env["NP_PLATFORM_INGRESS_AUTH_URL"]),
             platform_config_url=URL(env["NP_PLATFORM_CONFIG_URL"]),
             platform_config_watch_interval_s=float(
-                env.get("NP_PLATFORM_CONFIG_WATCH_INTERVAL_S", "5")
+                env.get("NP_PLATFORM_CONFIG_WATCH_INTERVAL_S", "15")
             ),
             platform_api_url=URL(env["NP_PLATFORM_API_URL"]),
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],

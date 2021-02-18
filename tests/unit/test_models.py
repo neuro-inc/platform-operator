@@ -146,7 +146,7 @@ class TestConfig:
             platform_auth_url=URL("http://platformauthapi:8080"),
             platform_ingress_auth_url=URL("http://platformingressauth:8080"),
             platform_config_url=URL("http://platformconfig:8080"),
-            platform_config_watch_interval_s=5,
+            platform_config_watch_interval_s=15,
             platform_api_url=URL("http://platformapi:8080"),
             platform_namespace="platform",
             consul_url=URL("http://consul:8500"),
