@@ -32,6 +32,7 @@ class App:
     helm_values_factory: HelmValuesFactory = None  # type: ignore
     helm_client: HelmClient = None  # type: ignore
     kube_client: KubeClient = None  # type: ignore
+    status_manager: PlatformStatusManager = None  # type: ignore
     consul_client: ConsulClient = None  # type: ignore
     config_client: ConfigClient = None  # type: ignore
     certificate_store: CertificateStore = None  # type: ignore
@@ -54,6 +55,9 @@ async def startup(settings: kopf.OperatorSettings, **kwargs: Any) -> None:
     app.helm_client = HelmClient(tiller_namespace=config.platform_namespace)
     app.kube_client = await app.exit_stack.enter_async_context(
         KubeClient(config.kube_config)
+    )
+    app.status_manager = PlatformStatusManager(
+        app.kube_client, namespace=config.platform_namespace
     )
     app.config_client = await app.exit_stack.enter_async_context(
         ConfigClient(config.platform_config_url)
@@ -125,19 +129,13 @@ async def deploy(
     retry: int,
     **kwargs: Any,
 ) -> None:
-    status_manager = PlatformStatusManager(
-        app.kube_client,
-        namespace=config.platform_namespace,
-        name=name,
-        logger=logger,
-    )
     if retry > config.retries:
-        await status_manager.fail_deployment()
+        await app.status_manager.fail_deployment(name)
         raise kopf.HandlerRetriesError(
             f"Platform deployment has exceeded {config.retries} retries"
         )
     else:
-        await status_manager.start_deployment(retry)
+        await app.status_manager.start_deployment(name, retry)
 
     platform_token = body["spec"]["token"]
     cluster = await app.config_client.get_cluster(
@@ -147,7 +145,7 @@ async def deploy(
     try:
         platform = app.platform_config_factory.create(body, cluster)
     except Exception as ex:
-        await status_manager.fail_deployment()
+        await app.status_manager.fail_deployment(name)
         raise kopf.PermanentError(f"Invalid platform configuration: {ex!s}")
 
     logger.info("Platform deployment started")
@@ -158,11 +156,11 @@ async def deploy(
     await app.helm_client.update_repo()
 
     is_gcp_gcs_platform = platform.gcp and platform.gcp.storage_type == "gcs"
-    if is_gcp_gcs_platform and not status_manager.is_condition_satisfied(
-        PlatformConditionType.OBS_CSI_DRIVER_DEPLOYED
+    if is_gcp_gcs_platform and not app.status_manager.is_condition_satisfied(
+        name, PlatformConditionType.OBS_CSI_DRIVER_DEPLOYED
     ):
-        async with status_manager.transition(
-            PlatformConditionType.OBS_CSI_DRIVER_DEPLOYED
+        async with app.status_manager.transition(
+            name, PlatformConditionType.OBS_CSI_DRIVER_DEPLOYED
         ):
             await app.helm_client.upgrade(
                 config.helm_release_names.obs_csi_driver,
@@ -175,10 +173,12 @@ async def deploy(
                 timeout=600,
             )
 
-    if not status_manager.is_condition_satisfied(
-        PlatformConditionType.PLATFORM_DEPLOYED
+    if not app.status_manager.is_condition_satisfied(
+        name, PlatformConditionType.PLATFORM_DEPLOYED
     ):
-        async with status_manager.transition(PlatformConditionType.PLATFORM_DEPLOYED):
+        async with app.status_manager.transition(
+            name, PlatformConditionType.PLATFORM_DEPLOYED
+        ):
             await app.kube_client.update_service_account_image_pull_secrets(
                 namespace=platform.namespace,
                 name=platform.service_account_name,
@@ -197,22 +197,26 @@ async def deploy(
 
     if (
         platform.ingress_controller_enabled
-        and not status_manager.is_condition_satisfied(
-            PlatformConditionType.CERTIFICATE_CREATED
+        and not app.status_manager.is_condition_satisfied(
+            name, PlatformConditionType.CERTIFICATE_CREATED
         )
     ):
-        async with status_manager.transition(PlatformConditionType.CERTIFICATE_CREATED):
+        async with app.status_manager.transition(
+            name, PlatformConditionType.CERTIFICATE_CREATED
+        ):
             await asyncio.wait_for(
                 app.certificate_store.wait_till_certificate_created(), 300
             )
 
-    if not status_manager.is_condition_satisfied(
-        PlatformConditionType.CLUSTER_CONFIGURED
+    if not app.status_manager.is_condition_satisfied(
+        name, PlatformConditionType.CLUSTER_CONFIGURED
     ):
-        async with status_manager.transition(PlatformConditionType.CLUSTER_CONFIGURED):
+        async with app.status_manager.transition(
+            name, PlatformConditionType.CLUSTER_CONFIGURED
+        ):
             await configure_cluster(platform)
 
-    await status_manager.complete_deployment()
+    await app.status_manager.complete_deployment(name)
     logger.info("Platform deployment succeeded")
 
 
@@ -226,13 +230,8 @@ async def delete(
     retry: int,
     **kwargs: Any,
 ) -> None:
-    status_manager = PlatformStatusManager(
-        app.kube_client,
-        namespace=config.platform_namespace,
-        name=name,
-    )
     if retry == 0:
-        await status_manager.start_deletion()
+        await app.status_manager.start_deletion(name)
 
     platform_token = body["spec"]["token"]
     cluster = await app.config_client.get_cluster(name, platform_token)

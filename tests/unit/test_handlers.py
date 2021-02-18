@@ -24,10 +24,14 @@ from platform_operator.models import (
 )
 
 
+pytestmark = pytest.mark.usefixtures("setup_app")
+
+
 @pytest.fixture
 def setup_app(
     config: Config,
     kube_client: KubeClient,
+    status_manager: KubeClient,
     config_client: ConfigClient,
     helm_client: HelmClient,
     certificate_store: CertificateStore,
@@ -39,6 +43,7 @@ def setup_app(
 
         with mock.patch("platform_operator.handlers.app", spec=App) as app:
             app.kube_client = kube_client
+            app.status_manager = status_manager
             app.config_client = config_client
             app.helm_client = helm_client
             app.certificate_store = certificate_store
@@ -49,6 +54,11 @@ def setup_app(
 @pytest.fixture
 def kube_client() -> mock.AsyncMock:
     return mock.AsyncMock(KubeClient)
+
+
+@pytest.fixture
+def status_manager() -> mock.AsyncMock:
+    return mock.AsyncMock(PlatformStatusManager)
 
 
 @pytest.fixture
@@ -77,14 +87,6 @@ def configure_cluster() -> Iterator[mock.Mock]:
         "platform_operator.handlers.configure_cluster"
     ) as configure_cluster:
         yield configure_cluster
-
-
-@pytest.fixture
-def status_manager() -> Iterator[mock.Mock]:
-    with mock.patch(
-        "platform_operator.handlers.PlatformStatusManager", spec=PlatformStatusManager
-    ) as manager_class:
-        yield manager_class.return_value
 
 
 @pytest.fixture
@@ -130,7 +132,6 @@ def service_account_secret() -> Dict[str, Any]:
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
 async def test_configure_aws_cluster(
     kube_client: mock.Mock,
     config_client: mock.Mock,
@@ -168,7 +169,6 @@ async def test_configure_aws_cluster(
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
 async def test_configure_cluster(
     gcp_platform_config: PlatformConfig,
     kube_client: mock.Mock,
@@ -204,7 +204,6 @@ async def test_configure_cluster(
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
 async def test_configure_cluster_with_ingress_controller_disabled(
     gcp_platform_config: PlatformConfig,
     kube_client: mock.Mock,
@@ -236,7 +235,6 @@ async def test_configure_cluster_with_ingress_controller_disabled(
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
 async def test_deploy(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -292,15 +290,24 @@ async def test_deploy(
     certificate_store.wait_till_certificate_created.assert_awaited_once()
     configure_cluster.assert_awaited_once_with(gcp_platform_config)
 
-    status_manager.start_deployment.assert_awaited_once_with(0)
-    status_manager.transition.assert_any_call(PlatformConditionType.PLATFORM_DEPLOYED)
-    status_manager.transition.assert_any_call(PlatformConditionType.CERTIFICATE_CREATED)
-    status_manager.transition.assert_any_call(PlatformConditionType.CLUSTER_CONFIGURED)
-    status_manager.complete_deployment.assert_awaited_once()
+    status_manager.start_deployment.assert_awaited_once_with(
+        gcp_platform_config.cluster_name, 0
+    )
+    status_manager.transition.assert_any_call(
+        gcp_platform_config.cluster_name, PlatformConditionType.PLATFORM_DEPLOYED
+    )
+    status_manager.transition.assert_any_call(
+        gcp_platform_config.cluster_name, PlatformConditionType.CERTIFICATE_CREATED
+    )
+    status_manager.transition.assert_any_call(
+        gcp_platform_config.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
+    )
+    status_manager.complete_deployment.assert_awaited_once_with(
+        gcp_platform_config.cluster_name
+    )
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
 async def test_deploy_with_ingress_controller_disabled(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -352,14 +359,21 @@ async def test_deploy_with_ingress_controller_disabled(
     certificate_store.wait_till_certificate_created.assert_not_awaited()
     configure_cluster.assert_awaited_once_with(gcp_platform_config)
 
-    status_manager.start_deployment.assert_awaited_once_with(0)
-    status_manager.transition.assert_any_call(PlatformConditionType.PLATFORM_DEPLOYED)
-    status_manager.transition.assert_any_call(PlatformConditionType.CLUSTER_CONFIGURED)
-    status_manager.complete_deployment.assert_awaited_once()
+    status_manager.start_deployment.assert_awaited_once_with(
+        gcp_platform_config.cluster_name, 0
+    )
+    status_manager.transition.assert_any_call(
+        gcp_platform_config.cluster_name, PlatformConditionType.PLATFORM_DEPLOYED
+    )
+    status_manager.transition.assert_any_call(
+        gcp_platform_config.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
+    )
+    status_manager.complete_deployment.assert_awaited_once_with(
+        gcp_platform_config.cluster_name
+    )
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
 async def test_deploy_gcp_with_gcs_storage(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -395,7 +409,6 @@ async def test_deploy_gcp_with_gcs_storage(
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
 async def test_deploy_with_all_components_deployed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -438,13 +451,16 @@ async def test_deploy_with_all_components_deployed(
     certificate_store.wait_till_certificate_created.assert_not_awaited()
     configure_cluster.assert_not_awaited()
 
-    status_manager.start_deployment.assert_awaited_once_with(0)
-    status_manager.complete_deployment.assert_awaited_once()
+    status_manager.start_deployment.assert_awaited_once_with(
+        gcp_platform_config.cluster_name, 0
+    )
+    status_manager.complete_deployment.assert_awaited_once_with(
+        gcp_platform_config.cluster_name
+    )
     status_manager.transition.assert_not_called()
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
 async def test_deploy_with_retries_exceeded(
     status_manager: mock.AsyncMock,
     logger: logging.Logger,
@@ -462,11 +478,12 @@ async def test_deploy_with_retries_exceeded(
             retry=config.retries + 1,
         )
 
-    status_manager.fail_deployment.assert_awaited_once()
+    status_manager.fail_deployment.assert_awaited_once_with(
+        gcp_platform_config.cluster_name
+    )
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
 async def test_deploy_with_invalid_spec(
     status_manager: mock.AsyncMock,
     logger: logging.Logger,
@@ -486,11 +503,12 @@ async def test_deploy_with_invalid_spec(
             retry=0,
         )
 
-    status_manager.fail_deployment.assert_awaited_once()
+    status_manager.fail_deployment.assert_awaited_once_with(
+        gcp_platform_config.cluster_name
+    )
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
 async def test_delete(
     status_manager: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -524,11 +542,12 @@ async def test_delete(
         ]
     )
 
-    status_manager.start_deletion.assert_awaited_once()
+    status_manager.start_deletion.assert_awaited_once_with(
+        gcp_platform_config.cluster_name
+    )
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
 async def test_delete_gcp_with_gcs_storage(
     status_manager: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -559,7 +578,6 @@ async def test_delete_gcp_with_gcs_storage(
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
 async def test_delete_on_prem(
     status_manager: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -588,7 +606,6 @@ async def test_delete_on_prem(
 
 
 @pytest.mark.asyncio
-@pytest.mark.usefixtures("setup_app")
 async def test_delete_with_invalid_configuration(
     status_manager: mock.AsyncMock,
     logger: logging.Logger,
@@ -607,5 +624,7 @@ async def test_delete_with_invalid_configuration(
         retry=0,
     )
 
-    status_manager.start_deletion.assert_awaited_once()
+    status_manager.start_deletion.assert_awaited_once_with(
+        gcp_platform_config.cluster_name
+    )
     helm_client.init.assert_not_awaited()
