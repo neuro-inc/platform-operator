@@ -53,6 +53,7 @@ def config() -> Config:
         platform_auth_url=URL("https://dev.neu.ro"),
         platform_ingress_auth_url=URL("https://platformingressauth"),
         platform_config_url=URL("https://dev.neu.ro"),
+        platform_config_watch_interval_s=0.1,
         platform_api_url=URL("https://dev.neu.ro"),
         platform_namespace="platform",
         consul_url=URL("http://consul:8500"),

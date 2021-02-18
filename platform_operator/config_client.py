@@ -1,3 +1,4 @@
+import enum
 import logging
 from types import SimpleNamespace
 from typing import Any, Dict, Optional
@@ -9,6 +10,12 @@ from .models import Cluster
 
 
 logger = logging.getLogger(__name__)
+
+
+class NotificationType(str, enum.Enum):
+    CLUSTER_UPDATING = "cluster_updating"
+    CLUSTER_UPDATE_SUCCEEDED = "cluster_update_succeeded"
+    CLUSTER_UPDATE_FAILED = "cluster_update_failed"
 
 
 class ConfigClient:
@@ -80,5 +87,16 @@ class ConfigClient:
             self._base_url / "api/v1/clusters" / cluster_name,
             json=payload,
             headers={"Authorization": f"Bearer {token}"},
+        ) as response:
+            response.raise_for_status()
+
+    async def send_notification(
+        self, cluster_name: str, token: str, notification_type: NotificationType
+    ) -> None:
+        assert self._session
+        async with self._session.post(
+            self._base_url / "api/v1/clusters" / cluster_name / "notifications",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"notification_type": notification_type.value},
         ) as response:
             response.raise_for_status()

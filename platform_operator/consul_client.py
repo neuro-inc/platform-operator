@@ -72,14 +72,26 @@ class ConsulClient:
 
     async def wait_healthy(self, sleep_s: float = 0.1) -> None:
         assert self._client
+        logger.info("Waiting until Consul is healthy")
         while True:
             async with self._client.get(
                 self._url / "v1/status/leader", timeout=aiohttp.ClientTimeout(total=10)
             ) as response:
-                response.raise_for_status()
-                text = await response.text()
-                if re.search(r"\".+\"", text):
-                    return
+                if response.status < 400:
+                    text = await response.text()
+                    if re.search(r"\".+\"", text):
+                        break
+            await asyncio.sleep(sleep_s)
+        # Consul requires node to be registered before creating sessions.
+        # Creating session triggers node registration.
+        while True:
+            try:
+                await self.create_session(ttl_s=10)
+            except Exception:
+                await asyncio.sleep(sleep_s)
+            else:
+                break
+        logger.info("Consul is healthy")
 
     async def get_key(
         self, key: str, *, recurse: bool = False, raw: bool = False
