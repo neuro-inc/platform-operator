@@ -55,9 +55,7 @@ async def end_operator_deployment(
 
     session_id = lock_value_metadata[0].get("Session")
     if session_id:
-        assert await consul_client.release_lock(
-            LOCK_KEY, lock_value, session_id=session_id
-        )
+        await consul_client.release_lock(LOCK_KEY, lock_value, session_id=session_id)
 
 
 def _get_lock_value(release_revision: int) -> bytes:

@@ -205,7 +205,6 @@ class ConsulClient:
             if elapsed_s >= session_ttl_s:
                 logger.warning("Lock (%r, %r) expired", session_id, key)
                 raise SessionExpiredError(f"Session {session_id!r} expired")
-            logger.info("Lock (%r, %r) released", session_id, key)
         finally:
             await self.release_lock(key, value, session_id=session_id)
 
@@ -226,13 +225,17 @@ class ConsulClient:
             await asyncio.sleep(sleep_s)
 
     async def release_lock(self, key: str, value: bytes, *, session_id: str) -> None:
-        released = await self.put_key(key, value, release=session_id)
-        if not released:
-            logger.warning("Failed to release lock (%r, %r)", session_id, key)
-            raise LockReleaseError(f"Failed to release lock ({session_id!r}, {key!r})")
-        logger.info("Lock (%r, %r) released", session_id, key)
-        destroyed = await self.delete_session(session_id)
-        if not destroyed:
-            logger.warning("Failed to destroy session %r", session_id)
-            raise LockReleaseError(f"Failed to destroy session {session_id!r}")
-        logger.info("Session %r destroyed", session_id)
+        try:
+            released = await self.put_key(key, value, release=session_id)
+            if not released:
+                logger.warning("Failed to release lock (%r, %r)", session_id, key)
+                raise LockReleaseError(
+                    f"Failed to release lock ({session_id!r}, {key!r})"
+                )
+            logger.info("Lock (%r, %r) released", session_id, key)
+        finally:
+            destroyed = await self.delete_session(session_id)
+            if not destroyed:
+                logger.warning("Failed to destroy session %r", session_id)
+                raise LockReleaseError(f"Failed to destroy session {session_id!r}")
+            logger.info("Session %r destroyed", session_id)
