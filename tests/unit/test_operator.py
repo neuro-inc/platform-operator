@@ -47,19 +47,21 @@ class TestEndOperatorDeployment:
         consul_client.wait_healthy.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_on_upgrade_session_deleted(
+    async def test_on_upgrade_lock_released(
         self, consul_client: mock.AsyncMock
     ) -> None:
+        lock_value = b"platform-operator-2"
         consul_client.get_key.return_value = [
-            {"Session": "test", "Value": b64encode(b"platform-operator-2").decode()}
+            {"Session": "test", "Value": b64encode(lock_value).decode()}
         ]
-        consul_client.delete_session.return_value = True
 
         await end_operator_deployment(consul_client, 2)
 
         consul_client.wait_healthy.assert_awaited_once()
         consul_client.get_key.assert_awaited_once_with(LOCK_KEY)
-        consul_client.delete_session.assert_awaited_once_with("test")
+        consul_client.release_lock.assert_awaited_once_with(
+            LOCK_KEY, lock_value, session_id="test"
+        )
 
     @pytest.mark.asyncio
     async def test_on_upgrade_expired_session_ignored(
