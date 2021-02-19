@@ -87,6 +87,8 @@ class ConsulClient:
         while True:
             try:
                 await self.create_session(ttl_s=10)
+            except asyncio.CancelledError:
+                raise
             except Exception:
                 await asyncio.sleep(sleep_s)
             else:

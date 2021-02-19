@@ -260,6 +260,8 @@ async def watch_config(
                 sleep_s=3,
             ):
                 await _update(name, body, logger)
+        except asyncio.CancelledError:
+            raise
         except Exception as exc:
             logger.error("Platform config update failed", exc_info=exc)
             await app.status_manager.fail_deployment(name)
