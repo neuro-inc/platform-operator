@@ -6,13 +6,13 @@ from logging import Logger
 from typing import Any, Dict, Optional
 
 import kopf
-from kopf.structs import bodies
+from kopf.structs import bodies, primitives
 
 from platform_operator.consul_client import ConsulClient
 
 from .aws_client import AwsElbClient
 from .certificate_store import CertificateStore
-from .config_client import ConfigClient
+from .config_client import ConfigClient, NotificationType
 from .helm_client import HelmClient
 from .helm_values import HelmValuesFactory
 from .kube_client import (
@@ -24,6 +24,7 @@ from .kube_client import (
     PlatformStatusManager,
 )
 from .models import Config, HelmRepoName, PlatformConfig, PlatformConfigFactory
+from .operator import LOCK_KEY
 
 
 @dataclass
@@ -117,106 +118,46 @@ def login(**kwargs: Any) -> kopf.ConnectionInfo:
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 @kopf.on.update(
-    PLATFORM_GROUP,
-    PLATFORM_API_VERSION,
-    PLATFORM_PLURAL,
-    backoff=config.backoff,
+    PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def deploy(
-    name: str,
-    body: bodies.Body,
-    logger: Logger,
-    retry: int,
-    **kwargs: Any,
+    name: str, body: bodies.Body, logger: Logger, retry: int, **kwargs: Any
 ) -> None:
     if retry > config.retries:
         await app.status_manager.fail_deployment(name)
         raise kopf.HandlerRetriesError(
             f"Platform deployment has exceeded {config.retries} retries"
         )
-    else:
-        await app.status_manager.start_deployment(name, retry)
 
-    platform_token = body["spec"]["token"]
-    cluster = await app.config_client.get_cluster(
-        cluster_name=name, token=platform_token
-    )
+    await app.consul_client.wait_healthy(sleep_s=0.5)
 
-    try:
-        platform = app.platform_config_factory.create(body, cluster)
-    except Exception as ex:
-        await app.status_manager.fail_deployment(name)
-        raise kopf.PermanentError(f"Invalid platform configuration: {ex!s}")
+    async with app.consul_client.lock_key(
+        LOCK_KEY,
+        b"platform-deploying",
+        session_ttl_s=15 * 60,
+        sleep_s=3,
+    ):
+        await _deploy(name, body, logger, retry)
+
+
+async def _deploy(name: str, body: bodies.Body, logger: Logger, retry: int) -> None:
+    platform = await get_platform_config(name, body)
 
     logger.info("Platform deployment started")
 
-    await app.helm_client.init(client_only=True, skip_refresh=True)
-    await app.helm_client.add_repo(config.helm_stable_repo)
-    await app.helm_client.add_repo(platform.helm_repo)
-    await app.helm_client.update_repo()
+    await app.status_manager.start_deployment(name, retry)
+    await initialize_helm(platform)
 
-    is_gcp_gcs_platform = platform.gcp and platform.gcp.storage_type == "gcs"
-    if is_gcp_gcs_platform and not app.status_manager.is_condition_satisfied(
-        name, PlatformConditionType.OBS_CSI_DRIVER_DEPLOYED
-    ):
-        async with app.status_manager.transition(
-            name, PlatformConditionType.OBS_CSI_DRIVER_DEPLOYED
-        ):
-            await app.helm_client.upgrade(
-                config.helm_release_names.obs_csi_driver,
-                f"{HelmRepoName.NEURO}/{config.helm_chart_names.obs_csi_driver}",
-                values=app.helm_values_factory.create_obs_csi_driver_values(platform),
-                version=config.helm_chart_versions.obs_csi_driver,
-                namespace=config.platform_namespace,
-                install=True,
-                wait=True,
-                timeout=600,
-            )
+    if await is_obs_csi_driver_deploy_required(platform, install=True):
+        await upgrade_obs_csi_driver_helm_release(platform)
 
-    if not app.status_manager.is_condition_satisfied(
-        name, PlatformConditionType.PLATFORM_DEPLOYED
-    ):
-        async with app.status_manager.transition(
-            name, PlatformConditionType.PLATFORM_DEPLOYED
-        ):
-            await app.kube_client.update_service_account_image_pull_secrets(
-                namespace=platform.namespace,
-                name=platform.service_account_name,
-                image_pull_secrets=platform.image_pull_secret_names,
-            )
-            await app.helm_client.upgrade(
-                config.helm_release_names.platform,
-                f"{HelmRepoName.NEURO}/{config.helm_chart_names.platform}",
-                values=app.helm_values_factory.create_platform_values(platform),
-                version=config.helm_chart_versions.platform,
-                namespace=config.platform_namespace,
-                install=True,
-                wait=True,
-                timeout=600,
-            )
+    if await is_platform_deploy_required(platform, install=True):
+        await upgrade_platform_helm_release(platform)
 
-    if (
-        platform.ingress_controller_enabled
-        and not app.status_manager.is_condition_satisfied(
-            name, PlatformConditionType.CERTIFICATE_CREATED
-        )
-    ):
-        async with app.status_manager.transition(
-            name, PlatformConditionType.CERTIFICATE_CREATED
-        ):
-            await asyncio.wait_for(
-                app.certificate_store.wait_till_certificate_created(), 300
-            )
-
-    if not app.status_manager.is_condition_satisfied(
-        name, PlatformConditionType.CLUSTER_CONFIGURED
-    ):
-        async with app.status_manager.transition(
-            name, PlatformConditionType.CLUSTER_CONFIGURED
-        ):
-            await configure_cluster(platform)
-
+    await wait_for_certificated_created(platform)
+    await wait_for_cluster_configured(platform)
     await app.status_manager.complete_deployment(name)
+
     logger.info("Platform deployment succeeded")
 
 
@@ -224,20 +165,23 @@ async def deploy(
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def delete(
-    name: str,
-    body: bodies.Body,
-    logger: Logger,
-    retry: int,
-    **kwargs: Any,
+    name: str, body: bodies.Body, logger: Logger, retry: int, **kwargs: Any
 ) -> None:
     if retry == 0:
         await app.status_manager.start_deletion(name)
 
-    platform_token = body["spec"]["token"]
-    cluster = await app.config_client.get_cluster(name, platform_token)
+    async with app.consul_client.lock_key(
+        LOCK_KEY,
+        b"platform-deploying",
+        session_ttl_s=15 * 60,
+        sleep_s=3,
+    ):
+        await _delete(name, body, logger)
 
+
+async def _delete(name: str, body: bodies.Body, logger: Logger) -> None:
     try:
-        platform = app.platform_config_factory.create(body, cluster)
+        platform = await get_platform_config(name, body)
     except Exception:
         # If platform has invalid configuration than there was no deployment
         # and no resources to delete. Platform resource can be safely deleted.
@@ -248,12 +192,10 @@ async def delete(
 
     await app.helm_client.init(client_only=True, skip_refresh=True)
 
-    logger.info("Deleting platform helm chart")
     await app.helm_client.delete(
         config.helm_release_names.platform,
         purge=True,
     )
-    logger.info("platform helm chart deleted")
 
     try:
         # We need first to delete all pods that use storage.
@@ -282,12 +224,233 @@ async def delete(
 
     is_gcp_gcs_platform = platform.gcp and platform.gcp.storage_type == "gcs"
     if is_gcp_gcs_platform:
-        logger.info("Deleting obs-csi-driver helm chart")
         await app.helm_client.delete(
             config.helm_release_names.obs_csi_driver,
             purge=True,
         )
-        logger.info("obs-csi-driver helm chart deleted")
+
+
+@kopf.on.daemon(
+    PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
+)
+async def watch_config(
+    name: str,
+    body: bodies.Body,
+    logger: Logger,
+    stopped: primitives.AsyncDaemonStopperChecker,
+    **kwargs: Any,
+) -> None:
+    await app.consul_client.wait_healthy(sleep_s=0.5)
+
+    while True:
+        if stopped:
+            break
+
+        logger.info(
+            "Platform config will be checked in %d seconds",
+            config.platform_config_watch_interval_s,
+        )
+        await asyncio.sleep(config.platform_config_watch_interval_s)
+
+        try:
+            async with app.consul_client.lock_key(
+                LOCK_KEY,
+                b"platform-config-updating",
+                session_ttl_s=15 * 60,
+                sleep_s=3,
+            ):
+                await _update(name, body, logger)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.error("Platform config update failed", exc_info=exc)
+            await app.status_manager.fail_deployment(name)
+            await app.config_client.send_notification(
+                cluster_name=name,
+                token=body["spec"]["token"],
+                notification_type=NotificationType.CLUSTER_UPDATE_FAILED,
+            )
+
+
+async def _update(name: str, body: bodies.Body, logger: Logger) -> None:
+    platform = await get_platform_config(name, body)
+
+    await initialize_helm(platform)
+
+    obs_csi_driver_deploy_required = await is_obs_csi_driver_deploy_required(platform)
+    platform_deploy_required = await is_platform_deploy_required(platform)
+
+    if not obs_csi_driver_deploy_required and not platform_deploy_required:
+        logger.info("Platform config didn't change")
+        return
+
+    logger.info("Platform config update started")
+
+    await app.status_manager.start_deployment(name)
+    await app.config_client.send_notification(
+        cluster_name=name,
+        token=body["spec"]["token"],
+        notification_type=NotificationType.CLUSTER_UPDATING,
+    )
+
+    if obs_csi_driver_deploy_required:
+        await upgrade_obs_csi_driver_helm_release(platform)
+
+    if platform_deploy_required:
+        await upgrade_platform_helm_release(platform)
+
+    await wait_for_certificated_created(platform)
+    await wait_for_cluster_configured(platform)
+    await app.status_manager.complete_deployment(name)
+    await app.config_client.send_notification(
+        cluster_name=name,
+        token=body["spec"]["token"],
+        notification_type=NotificationType.CLUSTER_UPDATE_SUCCEEDED,
+    )
+
+    logger.info("Platform config update succeeded")
+
+
+async def get_platform_config(name: str, body: bodies.Body) -> PlatformConfig:
+    token = body["spec"]["token"]
+    cluster = await app.config_client.get_cluster(cluster_name=name, token=token)
+
+    try:
+        return app.platform_config_factory.create(body, cluster)
+    except Exception as ex:
+        await app.status_manager.fail_deployment(name, remove_conditions=True)
+        raise kopf.PermanentError(f"Invalid platform configuration: {ex!s}")
+
+
+async def is_obs_csi_driver_deploy_required(
+    platform: PlatformConfig, install: bool = False
+) -> bool:
+    if not platform.gcp or platform.gcp.storage_type != "gcs":
+        return False
+
+    old_release = await app.helm_client.get_release(
+        config.helm_release_names.obs_csi_driver
+    )
+
+    if not old_release:
+        return install
+
+    old_chart = old_release["Chart"]
+    old_release_values = await app.helm_client.get_release_values(
+        config.helm_release_names.obs_csi_driver
+    )
+
+    new_release_values = app.helm_values_factory.create_obs_csi_driver_values(platform)
+    new_chart = (
+        f"{config.helm_chart_names.obs_csi_driver}"
+        f"-{config.helm_chart_versions.obs_csi_driver}"
+    )
+
+    return old_chart != new_chart or old_release_values != new_release_values
+
+
+async def is_platform_deploy_required(
+    platform: PlatformConfig, install: bool = False
+) -> bool:
+    old_release = await app.helm_client.get_release(config.helm_release_names.platform)
+
+    if not old_release:
+        return install
+
+    old_chart = old_release["Chart"]
+    old_release_values = await app.helm_client.get_release_values(
+        config.helm_release_names.platform
+    )
+
+    new_release_values = app.helm_values_factory.create_platform_values(platform)
+    new_chart = (
+        f"{config.helm_chart_names.platform}-{config.helm_chart_versions.platform}"
+    )
+
+    return old_chart != new_chart or old_release_values != new_release_values
+
+
+async def initialize_helm(platform: PlatformConfig) -> None:
+    await app.helm_client.init(client_only=True, skip_refresh=True)
+    await app.helm_client.add_repo(config.helm_stable_repo)
+    await app.helm_client.add_repo(platform.helm_repo)
+    await app.helm_client.update_repo()
+
+
+async def upgrade_obs_csi_driver_helm_release(platform: PlatformConfig) -> None:
+    if app.status_manager.is_condition_satisfied(
+        platform.cluster_name, PlatformConditionType.OBS_CSI_DRIVER_DEPLOYED
+    ):
+        return
+
+    async with app.status_manager.transition(
+        platform.cluster_name, PlatformConditionType.OBS_CSI_DRIVER_DEPLOYED
+    ):
+        await app.helm_client.upgrade(
+            config.helm_release_names.obs_csi_driver,
+            f"{HelmRepoName.NEURO}/{config.helm_chart_names.obs_csi_driver}",
+            values=app.helm_values_factory.create_obs_csi_driver_values(platform),
+            version=config.helm_chart_versions.obs_csi_driver,
+            namespace=config.platform_namespace,
+            install=True,
+            wait=True,
+            timeout=600,
+        )
+
+
+async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
+    if app.status_manager.is_condition_satisfied(
+        platform.cluster_name, PlatformConditionType.PLATFORM_DEPLOYED
+    ):
+        return
+
+    async with app.status_manager.transition(
+        platform.cluster_name, PlatformConditionType.PLATFORM_DEPLOYED
+    ):
+        await app.kube_client.update_service_account_image_pull_secrets(
+            namespace=platform.namespace,
+            name=platform.service_account_name,
+            image_pull_secrets=platform.image_pull_secret_names,
+        )
+        await app.helm_client.upgrade(
+            config.helm_release_names.platform,
+            f"{HelmRepoName.NEURO}/{config.helm_chart_names.platform}",
+            values=app.helm_values_factory.create_platform_values(platform),
+            version=config.helm_chart_versions.platform,
+            namespace=config.platform_namespace,
+            install=True,
+            wait=True,
+            timeout=600,
+        )
+
+
+async def wait_for_certificated_created(platform: PlatformConfig) -> None:
+    if (
+        not platform.ingress_controller_enabled
+        or app.status_manager.is_condition_satisfied(
+            platform.cluster_name, PlatformConditionType.CERTIFICATE_CREATED
+        )
+    ):
+        return
+
+    async with app.status_manager.transition(
+        platform.cluster_name, PlatformConditionType.CERTIFICATE_CREATED
+    ):
+        await asyncio.wait_for(
+            app.certificate_store.wait_till_certificate_created(), 300
+        )
+
+
+async def wait_for_cluster_configured(platform: PlatformConfig) -> None:
+    if app.status_manager.is_condition_satisfied(
+        platform.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
+    ):
+        return
+
+    async with app.status_manager.transition(
+        platform.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
+    ):
+        await configure_cluster(platform)
 
 
 async def configure_cluster(platform: PlatformConfig) -> None:

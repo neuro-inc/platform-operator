@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "platformOperator.fullname" . }}-deployment-end
+  labels: {{ include "platformOperator.labels.standard" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+    "helm.sh/hook-weight": "0"
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: end-deployment
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          command: [python]
+          args:
+            - -c
+            - |
+              import asyncio
+
+              from platform_operator.consul_client import ConsulClient
+              from platform_operator.operator import end_operator_deployment
+
+              async def run():
+                async with ConsulClient({{ include "platformOperator.consul.url" . | quote }}) as consul_client:
+                  await end_operator_deployment(
+                    consul_client,
+                    {{ .Release.Revision }}
+                  )
+
+              loop = asyncio.get_event_loop()
+              loop.run_until_complete(run())
+              loop.close()
