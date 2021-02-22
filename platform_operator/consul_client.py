@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from typing import Any, AsyncIterator, Dict, Optional, Sequence, Union
 
 import aiohttp
+import aiohttp.web
 from yarl import URL
 
 
@@ -14,10 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 class SessionExpiredError(Exception):
-    pass
-
-
-class LockReleaseError(Exception):
     pass
 
 
@@ -82,18 +79,6 @@ class ConsulClient:
                     if re.search(r"\".+\"", text):
                         break
             await asyncio.sleep(sleep_s)
-        # Consul requires node to be registered before creating sessions.
-        # Creating session triggers node registration.
-        while True:
-            try:
-                await self.create_session(ttl_s=10)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                await asyncio.sleep(sleep_s)
-            else:
-                break
-        logger.info("Consul is healthy")
 
     async def get_key(
         self, key: str, *, recurse: bool = False, raw: bool = False
@@ -188,10 +173,17 @@ class ConsulClient:
         sleep_s: float = 0.1,
         timeout_s: Optional[float] = None,
     ) -> AsyncIterator[None]:
-        session_id = await self.create_session(
-            ttl_s=session_ttl_s, lock_delay_s=lock_delay_s
-        )
-        logger.info("Session %r created", session_id)
+        attempt = 0
+        while True:
+            try:
+                session_id = await self.create_session(
+                    ttl_s=session_ttl_s, lock_delay_s=lock_delay_s
+                )
+                logger.info("Session %r created", session_id)
+                break
+            except aiohttp.ClientError:
+                await self._backoff_sleep(attempt)
+            attempt += 1
 
         try:
             acquire_lock_future = self.acquire_lock(
@@ -219,25 +211,51 @@ class ConsulClient:
         sleep_s: float = 0.1,
     ) -> None:
         while True:
-            acquired = await self.put_key(key, value, acquire=session_id)
-            if acquired:
-                logger.info("Lock (%r, %r) acquired", session_id, key)
-                return
-            logger.info("Lock (%r, %r) was not acquired", session_id, key)
+            try:
+                acquired = await self.put_key(key, value, acquire=session_id)
+                if acquired:
+                    logger.info("Lock (%r, %r) acquired", session_id, key)
+                    return
+                logger.info("Lock (%r, %r) was not acquired", session_id, key)
+            except aiohttp.ClientError:
+                pass
             await asyncio.sleep(sleep_s)
 
     async def release_lock(self, key: str, value: bytes, *, session_id: str) -> None:
         try:
-            released = await self.put_key(key, value, release=session_id)
-            if not released:
-                logger.warning("Failed to release lock (%r, %r)", session_id, key)
-                raise LockReleaseError(
-                    f"Failed to release lock ({session_id!r}, {key!r})"
-                )
-            logger.info("Lock (%r, %r) released", session_id, key)
+            attempt = 0
+            while True:
+                try:
+                    # Check lock has already been released
+                    try:
+                        metadata = await self.get_key(key)
+                    except aiohttp.ClientResponseError as exc:
+                        if exc.status != aiohttp.web.HTTPNotFound.status_code:
+                            raise
+                        metadata = [{}]
+                    assert isinstance(metadata[0], dict)
+                    if metadata and metadata[0].get("Session", "") != session_id:
+                        return
+
+                    released = await self.put_key(key, value, release=session_id)
+                    if released:
+                        logger.info("Lock (%r, %r) released", session_id, key)
+                        return
+                except aiohttp.ClientError:
+                    await self._backoff_sleep(attempt)
+                attempt += 1
         finally:
-            destroyed = await self.delete_session(session_id)
-            if not destroyed:
-                logger.warning("Failed to destroy session %r", session_id)
-                raise LockReleaseError(f"Failed to destroy session {session_id!r}")
-            logger.info("Session %r destroyed", session_id)
+            attempt = 0
+            while True:
+                try:
+                    # delete is idempotent, always returns 200
+                    await self.delete_session(session_id)
+                    logger.info("Session %r destroyed", session_id)
+                    return
+                except aiohttp.ClientError:
+                    await self._backoff_sleep(attempt)
+                attempt += 1
+
+    async def _backoff_sleep(self, attempt: int) -> None:
+        delay_s = min(0.1 * 2 ** attempt, 60)
+        await asyncio.sleep(delay_s)
