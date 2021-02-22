@@ -181,7 +181,8 @@ class ConsulClient:
                 )
                 logger.info("Session %r created", session_id)
                 break
-            except aiohttp.ClientError:
+            except aiohttp.ClientError as exc:
+                logger.warning("Consul failed with temporary error", exc_info=exc)
                 await self._backoff_sleep(attempt)
             attempt += 1
 
@@ -217,8 +218,8 @@ class ConsulClient:
                     logger.info("Lock (%r, %r) acquired", session_id, key)
                     return
                 logger.info("Lock (%r, %r) was not acquired", session_id, key)
-            except aiohttp.ClientError:
-                pass
+            except aiohttp.ClientError as exc:
+                logger.warning("Consul failed with temporary error", exc_info=exc)
             await asyncio.sleep(sleep_s)
 
     async def release_lock(self, key: str, value: bytes, *, session_id: str) -> None:
@@ -241,7 +242,8 @@ class ConsulClient:
                     if released:
                         logger.info("Lock (%r, %r) released", session_id, key)
                         return
-                except aiohttp.ClientError:
+                except aiohttp.ClientError as exc:
+                    logger.warning("Consul failed with temporary error", exc_info=exc)
                     await self._backoff_sleep(attempt)
                 attempt += 1
         finally:
@@ -252,7 +254,8 @@ class ConsulClient:
                     await self.delete_session(session_id)
                     logger.info("Session %r destroyed", session_id)
                     return
-                except aiohttp.ClientError:
+                except aiohttp.ClientError as exc:
+                    logger.warning("Consul failed with temporary error", exc_info=exc)
                     await self._backoff_sleep(attempt)
                 attempt += 1
 
