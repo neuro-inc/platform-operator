@@ -1,6 +1,7 @@
 from base64 import b64encode
 from unittest import mock
 
+import aiohttp
 import pytest
 
 from platform_operator.consul_client import ConsulClient
@@ -30,6 +31,20 @@ class TestStartOperatorDeployment:
 
         consul_client.wait_healthy.assert_awaited_once()
         consul_client.create_session.assert_awaited_once()
+        consul_client.acquire_lock.assert_awaited_once_with(
+            LOCK_KEY, b"platform-operator-2", session_id="test", sleep_s=mock.ANY
+        )
+
+    @pytest.mark.asyncio
+    async def test_ignores_errors(self, consul_client: mock.AsyncMock) -> None:
+        consul_client.create_session.side_effect = [aiohttp.ClientError, "test"]
+
+        await start_operator_deployment(consul_client, 2)
+
+        consul_client.wait_healthy.assert_awaited_once()
+        consul_client.create_session.assert_has_awaits(
+            [mock.call(ttl_s=mock.ANY), mock.call(ttl_s=mock.ANY)]
+        )
         consul_client.acquire_lock.assert_awaited_once_with(
             LOCK_KEY, b"platform-operator-2", session_id="test", sleep_s=mock.ANY
         )
@@ -76,3 +91,33 @@ class TestEndOperatorDeployment:
         consul_client.wait_healthy.assert_awaited_once()
         consul_client.get_key.assert_awaited_once_with(LOCK_KEY)
         consul_client.delete_session.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_ignores_errors(self, consul_client: mock.AsyncMock) -> None:
+        lock_value = b"platform-operator-2"
+        consul_client.get_key.side_effect = [
+            aiohttp.ClientError,
+            [{"Session": "test", "Value": b64encode(lock_value).decode()}],
+        ]
+
+        await end_operator_deployment(consul_client, 2)
+
+        consul_client.wait_healthy.assert_awaited_once()
+        consul_client.get_key.assert_has_awaits(
+            [mock.call(LOCK_KEY), mock.call(LOCK_KEY)]
+        )
+        consul_client.release_lock.assert_awaited_once_with(
+            LOCK_KEY, lock_value, session_id="test"
+        )
+
+    @pytest.mark.asyncio
+    async def test_key_not_found(self, consul_client: mock.AsyncMock) -> None:
+        consul_client.get_key.side_effect = aiohttp.ClientResponseError(
+            mock.Mock(), mock.Mock(), status=404
+        )
+
+        await end_operator_deployment(consul_client, 2)
+
+        consul_client.wait_healthy.assert_awaited_once()
+        consul_client.get_key.assert_awaited_once_with(LOCK_KEY)
+        consul_client.release_lock.assert_not_awaited()
