@@ -19,17 +19,19 @@ class HelmException(Exception):
 
 class HelmOptions:
     def __init__(self, **kwargs: Any) -> None:
+        self._options_dict: Dict[str, Any] = {}
         options: List[str] = []
         for key, value in kwargs.items():
+            if value is None:
+                continue
+            self._options_dict[key] = value
             option_name = "--" + key.replace("_", "-")
             if isinstance(value, bool):
                 if value:
                     options.append(option_name)
-            elif value is not None:
+            else:
                 options.extend((option_name, shlex.quote(str(value))))
-        self._options_dict = dict(**kwargs)
         self._options_str = " ".join(options)
-        self._options_str_masked = " ".join(options)
 
     def add(self, **kwargs: Any) -> "HelmOptions":
         new_options = dict(**self._options_dict)
