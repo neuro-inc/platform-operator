@@ -94,7 +94,7 @@ class HelmChartNames:
     platform_secrets: str = "platform-secrets"
     platform_reports: str = "platform-reports"
     platform_disk_api: str = "platform-disk-api"
-    platformapi_poller: str = "platformapi-poller"
+    platformapi_poller: str = "platform-api-poller"
 
 
 @dataclass(frozen=True)
