@@ -39,6 +39,7 @@ jobs:
         curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
         sudo install minikube-linux-amd64 /usr/local/bin/minikube
         sudo minikube start --kubernetes-version="1.16.15" --driver="none"
+        sudo mv /root/.kube /root/.minikube $HOME
         sudo chown -R $USER $HOME/.kube $HOME/.minikube
     - name: Install helm
       run: |
