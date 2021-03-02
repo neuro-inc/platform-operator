@@ -72,6 +72,7 @@ class TestHelmValuesFactory:
             "platform-secrets": mock.ANY,
             "platform-reports": mock.ANY,
             "platform-disk-api": mock.ANY,
+            "platformapi-poller": mock.ANY,
         }
 
     def test_create_gcp_platform_values_with_consul(
@@ -1507,3 +1508,40 @@ class TestHelmValuesFactory:
         result = factory.create_platform_disk_api_values(gcp_platform_config)
 
         assert result["NP_DISK_PROVIDER"] == "gcp"
+
+    def test_create_platform_api_poller_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platformapi_poller_values(gcp_platform_config)
+
+        assert result == {
+            "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
+            "NP_PLATFORM_API_URL": "https://dev.neu.ro/api/v1",
+            "NP_AUTH_URL": "https://dev.neu.ro",
+            "NP_AUTH_PUBLIC_URL": "https://dev.neu.ro/api/v1/users",
+            "NP_JOBS_INGRESS_OAUTH_AUTHORIZE_URL": (
+                "https://platformingressauth/oauth/authorize"
+            ),
+            "NP_PLATFORM_CONFIG_URI": "https://dev.neu.ro",
+            "image": {"repository": "neuro.io/platformapi"},
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "key": "token",
+                            "name": "platform-poller-token",
+                        }
+                    }
+                }
+            },
+            "ingress": {
+                "enabled": True,
+                "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "secrets": [
+                {
+                    "name": "platform-poller-token",
+                    "data": {"token": gcp_platform_config.token},
+                }
+            ],
+        }

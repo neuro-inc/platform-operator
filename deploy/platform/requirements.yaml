@@ -68,6 +68,10 @@ dependencies:
     - gcp
     - aws
     - azure
+  - name: platformapi-poller
+    version: "21.3.2"
+    repository: "@neuro"
+    alias: platform-api-poller
 
   # Deprecated, left for backward compatibility with old clusters
   - name: consul
