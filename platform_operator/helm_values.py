@@ -68,6 +68,9 @@ class HelmValuesFactory:
             self._chart_names.platform_disk_api: (
                 self.create_platform_disk_api_values(platform)
             ),
+            self._chart_names.platformapi_poller: (
+                self.create_platformapi_poller_values(platform)
+            ),
         }
         if platform.docker_config_secret_create:
             result["dockerConfigSecret"] = {
@@ -1197,4 +1200,38 @@ class HelmValuesFactory:
             result["NP_DISK_PROVIDER"] = "azure"
         if platform.gcp:
             result["NP_DISK_PROVIDER"] = "gcp"
+        return result
+
+    def create_platformapi_poller_values(
+        self, platform: PlatformConfig
+    ) -> Dict[str, Any]:
+        docker_server = platform.docker_registry.url.host
+        result: Dict[str, Any] = {
+            "NP_CLUSTER_NAME": platform.cluster_name,
+            "NP_PLATFORM_API_URL": str(platform.api_url / "api/v1"),
+            "NP_AUTH_URL": str(platform.auth_url),
+            "NP_AUTH_PUBLIC_URL": str(platform.auth_url / "api/v1/users"),
+            "NP_JOBS_INGRESS_OAUTH_AUTHORIZE_URL": str(
+                platform.ingress_auth_url / "oauth/authorize"
+            ),
+            "NP_PLATFORM_CONFIG_URI": str(platform.config_url),
+            "image": {"repository": f"{docker_server}/platformapi"},
+            "platform": {
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": f"{self._release_names.platform}-poller-token",
+                            "key": "token",
+                        }
+                    }
+                }
+            },
+            "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
+            "secrets": [
+                {
+                    "name": f"{self._release_names.platform}-poller-token",
+                    "data": {"token": platform.token},
+                }
+            ],
+        }
         return result
