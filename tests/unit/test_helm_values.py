@@ -72,6 +72,7 @@ class TestHelmValuesFactory:
             "platform-secrets": mock.ANY,
             "platform-reports": mock.ANY,
             "platform-disk-api": mock.ANY,
+            "platformapi-poller": mock.ANY,
         }
 
     def test_create_gcp_platform_values_with_consul(
