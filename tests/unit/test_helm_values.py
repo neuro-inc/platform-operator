@@ -1522,7 +1522,7 @@ class TestHelmValuesFactory:
             "NP_JOBS_INGRESS_OAUTH_AUTHORIZE_URL": (
                 "https://platformingressauth/oauth/authorize"
             ),
-            "NP_PLATFORM_CONFIG_URI": "https://dev.neu.ro",
+            "NP_PLATFORM_CONFIG_URI": "https://dev.neu.ro/api/v1",
             "image": {"repository": "neuro.io/platformapi"},
             "platform": {
                 "token": {

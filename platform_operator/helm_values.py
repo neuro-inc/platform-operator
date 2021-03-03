@@ -68,7 +68,7 @@ class HelmValuesFactory:
             self._chart_names.platform_disk_api: (
                 self.create_platform_disk_api_values(platform)
             ),
-            self._chart_names.platformapi_poller: (
+            self._chart_names.platform_api_poller: (
                 self.create_platformapi_poller_values(platform)
             ),
         }
@@ -1214,7 +1214,7 @@ class HelmValuesFactory:
             "NP_JOBS_INGRESS_OAUTH_AUTHORIZE_URL": str(
                 platform.ingress_auth_url / "oauth/authorize"
             ),
-            "NP_PLATFORM_CONFIG_URI": str(platform.config_url),
+            "NP_PLATFORM_CONFIG_URI": str(platform.config_url / "api/v1"),
             "image": {"repository": f"{docker_server}/platformapi"},
             "platform": {
                 "token": {
