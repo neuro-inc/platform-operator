@@ -25,3 +25,8 @@ class TestHelmOptions:
         options = HelmOptions(username="user", password="qwerty78")
 
         assert str(options.masked) == "--username user --password '*****'"
+
+    def test_mask_empty_password(self) -> None:
+        options = HelmOptions(username=None, password=None)
+
+        assert str(options.masked) == ""

@@ -1132,7 +1132,6 @@ async def test_watch_config_not_needed(
 
 @pytest.mark.asyncio
 async def test_watch_config_ignores_error(
-    status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     logger: logging.Logger,
     gcp_platform_body: bodies.Body,
@@ -1152,11 +1151,40 @@ async def test_watch_config_ignores_error(
         stopped=stopped,
     )
 
+
+@pytest.mark.asyncio
+async def test_watch_config_update_failed(
+    status_manager: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    is_platform_deploy_required: mock.AsyncMock,
+    logger: logging.Logger,
+    gcp_cluster: Cluster,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import watch_config
+
+    config_client.get_cluster.return_value = gcp_cluster
+    is_platform_deploy_required.return_value = True
+    status_manager.is_condition_satisfied.return_value = False
+    helm_client.upgrade.side_effect = Exception
+
+    stopped = mock.MagicMock(primitives.AsyncDaemonStopperChecker)
+    stopped.__bool__.side_effect = [False, True]
+
+    await watch_config(
+        name=gcp_platform_config.cluster_name,
+        body=gcp_platform_body,
+        logger=logger,
+        stopped=stopped,
+    )
+
     status_manager.fail_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
     )
 
-    config_client.send_notification.assert_awaited_once_with(
+    config_client.send_notification.assert_awaited_with(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_config.token,
         notification_type=NotificationType.CLUSTER_UPDATE_FAILED,

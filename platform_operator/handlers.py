@@ -263,13 +263,7 @@ async def watch_config(
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            logger.error("Platform config update failed", exc_info=exc)
-            await app.status_manager.fail_deployment(name)
-            await app.config_client.send_notification(
-                cluster_name=name,
-                token=body["spec"]["token"],
-                notification_type=NotificationType.CLUSTER_UPDATE_FAILED,
-            )
+            logger.warning("Watch iteration failed", exc_info=exc)
 
 
 async def _update(name: str, body: bodies.Body, logger: Logger) -> None:
@@ -293,22 +287,33 @@ async def _update(name: str, body: bodies.Body, logger: Logger) -> None:
         notification_type=NotificationType.CLUSTER_UPDATING,
     )
 
-    if obs_csi_driver_deploy_required:
-        await upgrade_obs_csi_driver_helm_release(platform)
+    try:
+        if obs_csi_driver_deploy_required:
+            await upgrade_obs_csi_driver_helm_release(platform)
 
-    if platform_deploy_required:
-        await upgrade_platform_helm_release(platform)
+        if platform_deploy_required:
+            await upgrade_platform_helm_release(platform)
 
-    await wait_for_certificated_created(platform)
-    await wait_for_cluster_configured(platform)
-    await app.status_manager.complete_deployment(name)
-    await app.config_client.send_notification(
-        cluster_name=name,
-        token=body["spec"]["token"],
-        notification_type=NotificationType.CLUSTER_UPDATE_SUCCEEDED,
-    )
+        await wait_for_certificated_created(platform)
+        await wait_for_cluster_configured(platform)
+        await app.status_manager.complete_deployment(name)
+        await app.config_client.send_notification(
+            cluster_name=name,
+            token=body["spec"]["token"],
+            notification_type=NotificationType.CLUSTER_UPDATE_SUCCEEDED,
+        )
 
-    logger.info("Platform config update succeeded")
+        logger.info("Platform config update succeeded")
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        logger.error("Platform config update failed", exc_info=exc)
+        await app.status_manager.fail_deployment(name)
+        await app.config_client.send_notification(
+            cluster_name=name,
+            token=body["spec"]["token"],
+            notification_type=NotificationType.CLUSTER_UPDATE_FAILED,
+        )
 
 
 async def get_platform_config(name: str, body: bodies.Body) -> PlatformConfig:
