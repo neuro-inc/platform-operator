@@ -61,6 +61,7 @@ class TestHelmValuesFactory:
                 "namespace": {"create": True, "name": "platform-jobs"},
                 "label": "platform.neuromation.io/job",
             },
+            "idleJobs": {"image": "google_containers/pause:3.0"},
             "storage": {"type": "nfs", "nfs": {"server": "192.168.0.3", "path": "/"}},
             "traefik": mock.ANY,
             "adjust-inotify": mock.ANY,
@@ -74,6 +75,17 @@ class TestHelmValuesFactory:
             "platform-disk-api": mock.ANY,
             "platform-api-poller": mock.ANY,
         }
+
+    def test_create_gcp_platform_values_without_idle_image(
+        self,
+        gcp_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
+    ) -> None:
+        gcp_platform_config = replace(gcp_platform_config, jobs_idle_image="")
+
+        result = factory.create_platform_values(gcp_platform_config)
+
+        assert result["idleJobs"] == {"image": None}
 
     def test_create_gcp_platform_values_with_consul(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory

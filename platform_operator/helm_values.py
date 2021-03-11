@@ -46,6 +46,7 @@ class HelmValuesFactory:
                 },
                 "label": platform.kubernetes_node_labels.job,
             },
+            "idleJobs": {"image": platform.jobs_idle_image or None},
             self._chart_names.adjust_inotify: self.create_adjust_inotify_values(
                 platform
             ),
