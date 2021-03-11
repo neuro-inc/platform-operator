@@ -1,16 +1,13 @@
 {{- $standardLabels := include "platform.labels.standard" . }}
 {{- $appName := include "platform.name" . }}
-{{- $releaseName := .Release.Name }}
 {{- $priorityClassName := include "platform.idleJobs.priorityClass.name" . }}
 {{- $jobsNamespace := include "platform.jobs.namespace.name" . }}
-{{- $jobsLabel := .Values.jobs.label }}
-{{- $nodePoolLabel := .Values.kubernetes.labels.nodePool }}
 {{- range .Values.kubernetes.nodePools }}
 {{- if gt (.idleSize | int) 0 }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $releaseName }}-idle-jobs-{{ .name | replace "_" "-" }}
+  name: {{ $.Release.Name }}-idle-jobs-{{ .name | replace "_" "-" }}
   labels:
 {{ $standardLabels | indent 4 }}
     component: idle-jobs
@@ -19,7 +16,7 @@ spec:
   selector:
     matchLabels:
       app: {{ $appName }}
-      release: {{ $releaseName }}
+      release: {{ $.Release.Name }}
       component: idle-jobs
   strategy:
     rollingUpdate:
@@ -30,12 +27,12 @@ spec:
     metadata:
       labels:
         app: {{ $appName }}
-        release: {{ $releaseName }}
+        release: {{ $.Release.Name }}
         component: idle-jobs
     spec:
       containers:
       - name: pause
-        image: {{ .Values.pauseImage.repository }}:{{ .Values.pauseImage.tag }}
+        image: {{ $.Values.pauseImage.repository }}:{{ $.Values.pauseImage.tag }}
         resources:
           requests:
 {{- if gt (.gpu | int) 0 }}
@@ -65,7 +62,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
             - matchExpressions:
-              - key: {{ $nodePoolLabel }}
+              - key: {{ $.Values.kubernetes.labels.nodePool }}
                 operator: In
                 values:
                 - {{ .name }}
@@ -73,7 +70,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
               matchExpressions:
-              - key: {{ $jobsLabel }}
+              - key: {{ $.Values.jobs.label }}
                 operator: Exists
             topologyKey: kubernetes.io/hostname
             namespaces:
@@ -87,7 +84,7 @@ spec:
               - key: release
                 operator: In
                 values:
-                - {{ $releaseName }}
+                - {{ $.Release.Name }}
               - key: component
                 operator: In
                 values:
