@@ -147,8 +147,8 @@ def cluster_factory(
                 "job_schedule_timeout_s": 60,
                 "job_schedule_scale_up_timeout_s": 30,
                 "pre_pull_images": ["neuromation/base"],
+                "idle_job_image": "google_containers/pause:3.0",
             },
-            "ssh": {"server": f"ssh-auth.{name}.org.neu.ro"},
             "monitoring": {"url": f"https://{name}.org.neu.ro/api/v1/jobs"},
             "credentials": {
                 "neuro_registry": {
@@ -459,6 +459,7 @@ def gcp_platform_config(
         jobs_service_account_name="platform-jobs",
         jobs_schedule_timeout_s=60,
         jobs_schedule_scale_up_timeout_s=30,
+        jobs_idle_image="google_containers/pause:3.0",
         ingress_url=URL(f"https://{cluster_name}.org.neu.ro"),
         ingress_registry_url=URL(f"https://registry.{cluster_name}.org.neu.ro"),
         ingress_metrics_url=URL(f"https://metrics.{cluster_name}.org.neu.ro"),

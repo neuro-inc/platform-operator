@@ -49,6 +49,9 @@ jobs:
     name: ""
   label: platform.neuromation.io/job
 
+idleJobs:
+  image:
+
 storage:
   size: 10Gi
   storageClassName: ""

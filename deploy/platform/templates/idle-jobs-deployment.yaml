@@ -2,6 +2,7 @@
 {{- $appName := include "platform.name" . }}
 {{- $priorityClassName := include "platform.idleJobs.priorityClass.name" . }}
 {{- $jobsNamespace := include "platform.jobs.namespace.name" . }}
+{{- $pauseImage := printf "%s:%s" .Values.pauseImage.repository .Values.pauseImage.tag }}
 {{- range .Values.kubernetes.nodePools }}
 {{- if gt (.idleSize | int) 0 }}
 apiVersion: apps/v1
@@ -32,7 +33,7 @@ spec:
     spec:
       containers:
       - name: pause
-        image: {{ $.Values.pauseImage.repository }}:{{ $.Values.pauseImage.tag }}
+        image: {{ $.Values.idleJobs.image | default $pauseImage | quote }}
         resources:
           requests:
 {{- if gt (.gpu | int) 0 }}
