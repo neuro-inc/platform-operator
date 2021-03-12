@@ -223,6 +223,11 @@ class HelmValuesFactory:
             "imagePullSecrets": [
                 {"name": name} for name in platform.image_pull_secret_names
             ],
+            "DeploymentUpdate": {
+                "type": "RollingUpdate",
+                "maxUnavailable": 1,
+                "maxSurge": 0,
+            },
             "mode": "standalone",
             "persistence": {
                 "enabled": True,

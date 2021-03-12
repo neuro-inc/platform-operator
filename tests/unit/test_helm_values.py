@@ -296,6 +296,11 @@ class TestHelmValuesFactory:
                 "tag": "RELEASE.2020-03-05T01-04-19Z",
             },
             "imagePullSecrets": [{"name": "platform-docker-config"}],
+            "DeploymentUpdate": {
+                "type": "RollingUpdate",
+                "maxUnavailable": 1,
+                "maxSurge": 0,
+            },
             "mode": "standalone",
             "persistence": {
                 "enabled": True,
