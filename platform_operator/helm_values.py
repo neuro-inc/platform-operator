@@ -21,8 +21,10 @@ class HelmValuesFactory:
             "serviceToken": platform.token,
             "kubernetes": {
                 "nodePools": platform.jobs_node_pools,
-                "labels": {"nodePool": platform.kubernetes_node_labels.node_pool},
-                # NOTE: should images prepulling be configured in config service?
+                "labels": {
+                    "nodePool": platform.kubernetes_node_labels.node_pool,
+                    "job": platform.kubernetes_node_labels.job,
+                },
                 "imagesPrepull": {
                     "refreshInterval": "1h",
                     "images": [{"image": image} for image in platform.pre_pull_images],
@@ -46,7 +48,7 @@ class HelmValuesFactory:
                 },
                 "label": platform.kubernetes_node_labels.job,
             },
-            "idleJobs": {"image": platform.jobs_idle_image or None},
+            "idleJobs": [self._create_idle_job(job) for job in platform.idle_jobs],
             self._chart_names.adjust_inotify: self.create_adjust_inotify_values(
                 platform
             ),
@@ -170,6 +172,26 @@ class HelmValuesFactory:
                 self._chart_names.docker_registry
             ] = self.create_docker_registry_values(platform)
             result[self._chart_names.minio] = self.create_minio_values(platform)
+        return result
+
+    def _create_idle_job(self, job: Dict[str, Any]) -> Dict[str, Any]:
+        resources = job["resources"]
+        result = {
+            "name": job["name"],
+            "count": job["count"],
+            "image": job["image"],
+            "imagePullSecrets": [],
+            "resources": {
+                "cpu": f"{resources['cpu_m']}m",
+                "memory": f"{resources['memory_mb']}Mi",
+            },
+            "env": job.get("env") or {},
+            "nodeSelector": job.get("node_selector") or {},
+        }
+        if "image_pull_secret" in job:
+            result["imagePullSecrets"].append({"name": job["image_pull_secret"]})
+        if "gpu" in resources:
+            result["resources"]["nvidia.com/gpu"] = resources["gpu"]
         return result
 
     def _create_kubernetes_storage_values(

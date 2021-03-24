@@ -2,23 +2,25 @@
 {{- $appName := include "platform.name" . }}
 {{- $priorityClassName := include "platform.idleJobs.priorityClass.name" . }}
 {{- $jobsNamespace := include "platform.jobs.namespace.name" . }}
-{{- $pauseImage := printf "%s:%s" .Values.pauseImage.repository .Values.pauseImage.tag }}
 {{- range .Values.kubernetes.nodePools }}
 {{- if gt (.idleSize | int) 0 }}
+{{- $name := .name | replace "_" "-" | lower }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $.Release.Name }}-idle-jobs-{{ .name | replace "_" "-" | lower }}
+  name: {{ $.Release.Name }}-idle-nodes-{{ $name }}
   labels:
 {{ $standardLabels | indent 4 }}
-    component: idle-jobs
+    component: idle-nodes
+    node-pool: {{ $name | quote }}
 spec:
   replicas: {{ .idleSize }}
   selector:
     matchLabels:
       app: {{ $appName }}
       release: {{ $.Release.Name }}
-      component: idle-jobs
+      component: idle-nodes
+      node-pool: {{ $name | quote }}
   strategy:
     rollingUpdate:
       maxSurge: 0
@@ -29,11 +31,12 @@ spec:
       labels:
         app: {{ $appName }}
         release: {{ $.Release.Name }}
-        component: idle-jobs
+        component: idle-nodes
+        node-pool: {{ $name | quote }}
     spec:
       containers:
       - name: pause
-        image: {{ $.Values.idleJobs.image | default $pauseImage | quote }}
+        image: {{ .Values.pauseImage.repository}}:{{.Values.pauseImage.tag }}
         resources:
           requests:
 {{- if gt (.gpu | int) 0 }}
@@ -89,7 +92,7 @@ spec:
               - key: component
                 operator: In
                 values:
-                - idle-jobs
+                - idle-nodes
             topologyKey: kubernetes.io/hostname
 ---
 {{- end }}
