@@ -1,0 +1,65 @@
+{{- range .Values.idleJobs }}
+{{- if gt (.count | int) 0 }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-idle-jobs-{{ .name | lower }}
+  labels: {{ include "platform.labels.standard" $ | nindent 4 }}
+    component: idle-jobs
+    idle-job: {{ .name | lower | quote }}
+spec:
+  replicas: {{ .count }}
+  selector:
+    matchLabels:
+      app: {{ include "platform.name" $ }}
+      release: {{ $.Release.Name }}
+      component: idle-jobs
+      idle-job: {{ .name | lower | quote }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: {{ .count }}
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: {{ include "platform.name" $ }}
+        release: {{ $.Release.Name }}
+        component: idle-jobs
+        idle-job: {{ .name | lower | quote }}
+    spec:
+      containers:
+      - name: job
+        image: {{ .image | quote }}
+        resources:
+          requests: {{ toYaml .resources | nindent 12 }}
+          limits: {{ toYaml .resources | nindent 12 }}
+        {{- if .env }}
+        envFrom:
+        - secretRef:
+            name: {{ $.Release.Name }}-idle-jobs-secret-{{ .name | lower }}
+        {{- end }}
+      priorityClassName: {{ include "platform.idleJobs.priorityClass.name" $ }}
+      tolerations:
+      - key: ""
+        operator: Exists
+        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: {{ $.Values.kubernetes.labels.job | quote }}
+                operator: Exists
+              {{- range $key, $value := .nodeSelector }}
+              - key: {{ $key | quote }}
+                operator: In
+                values:
+                - {{ $value | quote }}
+              {{- end }}
+      {{- if .imagePullSecrets }}
+      imagePullSecrets: {{ toYaml .imagePullSecrets | nindent 6 }}
+      {{- end }}
+---
+{{- end }}
+{{- end }}

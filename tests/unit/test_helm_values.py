@@ -34,7 +34,10 @@ class TestHelmValuesFactory:
                     "refreshInterval": "1h",
                     "images": [{"image": "neuromation/base"}],
                 },
-                "labels": {"nodePool": "platform.neuromation.io/nodepool"},
+                "labels": {
+                    "nodePool": "platform.neuromation.io/nodepool",
+                    "job": "platform.neuromation.io/job",
+                },
             },
             "standardStorageClass": {
                 "create": True,
@@ -61,7 +64,17 @@ class TestHelmValuesFactory:
                 "namespace": {"create": True, "name": "platform-jobs"},
                 "label": "platform.neuromation.io/job",
             },
-            "idleJobs": {"image": "google_containers/pause:3.0"},
+            "idleJobs": [
+                {
+                    "name": "miner",
+                    "count": 1,
+                    "image": "miner",
+                    "imagePullSecrets": [],
+                    "resources": {"cpu": "1000m", "memory": "1024Mi"},
+                    "env": {},
+                    "nodeSelector": {},
+                }
+            ],
             "storage": {"type": "nfs", "nfs": {"server": "192.168.0.3", "path": "/"}},
             "traefik": mock.ANY,
             "adjust-inotify": mock.ANY,
@@ -76,16 +89,43 @@ class TestHelmValuesFactory:
             "platform-api-poller": mock.ANY,
         }
 
-    def test_create_gcp_platform_values_without_idle_image(
+    def test_create_gcp_platform_values_idle_jobs(
         self,
         gcp_platform_config: PlatformConfig,
         factory: HelmValuesFactory,
     ) -> None:
-        gcp_platform_config = replace(gcp_platform_config, jobs_idle_image="")
+        gcp_platform_config = replace(
+            gcp_platform_config,
+            idle_jobs=[
+                {
+                    "name": "miner",
+                    "count": 1,
+                    "image": "miner",
+                    "image_pull_secret": "secret",
+                    "resources": {
+                        "cpu_m": 1000,
+                        "memory_mb": 1024,
+                        "gpu": 1,
+                    },
+                    "env": {"NAME": "VALUE"},
+                    "node_selector": {"gpu": "nvidia-tesla-k80"},
+                }
+            ],
+        )
 
         result = factory.create_platform_values(gcp_platform_config)
 
-        assert result["idleJobs"] == {"image": None}
+        assert result["idleJobs"] == [
+            {
+                "name": "miner",
+                "count": 1,
+                "image": "miner",
+                "imagePullSecrets": [{"name": "secret"}],
+                "resources": {"cpu": "1000m", "memory": "1024Mi", "nvidia.com/gpu": 1},
+                "env": {"NAME": "VALUE"},
+                "nodeSelector": {"gpu": "nvidia-tesla-k80"},
+            }
+        ]
 
     def test_create_gcp_platform_values_with_consul(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory

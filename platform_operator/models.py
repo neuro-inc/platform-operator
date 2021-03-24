@@ -358,7 +358,7 @@ class PlatformConfig:
     jobs_host_template: str
     jobs_fallback_host: str
     jobs_service_account_name: str
-    jobs_idle_image: str
+    idle_jobs: Sequence[Dict[str, Any]]
     storage_pvc_name: str
     helm_repo: HelmRepo
     docker_registry: DockerRegistry
@@ -599,7 +599,7 @@ class PlatformConfigFactory:
             jobs_host_template=f"{{job_id}}.jobs.{ingress_host}",
             jobs_fallback_host=cluster["orchestrator"]["job_fallback_hostname"],
             jobs_service_account_name=f"{self._config.platform_namespace}-jobs",
-            jobs_idle_image=cluster["orchestrator"].get("idle_job_image", ""),
+            idle_jobs=cluster["orchestrator"].get("idle_jobs", ()),
             monitoring_logs_bucket_name=(
                 monitoring_spec["logs"]["blobStorage"]["bucket"]
             ),
