@@ -440,6 +440,14 @@ class HelmValuesFactory:
             image_tag = "v1.15.7"
         elif platform.kubernetes_version.startswith("1.16"):
             image_tag = "v1.16.6"
+        elif platform.kubernetes_version.startswith("1.17"):
+            image_tag = "v1.17.4"
+        elif platform.kubernetes_version.startswith("1.18"):
+            image_tag = "v1.18.3"
+        elif platform.kubernetes_version.startswith("1.19"):
+            image_tag = "v1.19.1"
+        elif platform.kubernetes_version.startswith("1.20"):
+            image_tag = "v1.20.0"
         else:
             raise ValueError(
                 f"Cluster autoscaler for Kubernetes {platform.kubernetes_version} "

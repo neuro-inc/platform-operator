@@ -567,23 +567,30 @@ class TestHelmValuesFactory:
                 replace(aws_platform_config, kubernetes_version="1.13.8")
             )
 
-    def test_create_cluster_autoscaler_for_kube_1_15(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    @pytest.mark.parametrize(
+        "kubernetes_version,image_tag",
+        [
+            ("1.14.8", "v1.14.8"),
+            ("1.15.7", "v1.15.7"),
+            ("1.16.6", "v1.16.6"),
+            ("1.17.4", "v1.17.4"),
+            ("1.18.3", "v1.18.3"),
+            ("1.19.1", "v1.19.1"),
+            ("1.20.0", "v1.20.0"),
+        ],
+    )
+    def test_create_cluster_autoscaler_image_tag(
+        self,
+        aws_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
+        kubernetes_version: str,
+        image_tag: str,
     ) -> None:
         result = factory.create_cluster_autoscaler_values(
-            replace(aws_platform_config, kubernetes_version="1.15.3")
+            replace(aws_platform_config, kubernetes_version=kubernetes_version)
         )
 
-        assert result["image"]["tag"] == "v1.15.7"
-
-    def test_create_cluster_autoscaler_for_kube_1_16(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_cluster_autoscaler_values(
-            replace(aws_platform_config, kubernetes_version="1.16.13")
-        )
-
-        assert result["image"]["tag"] == "v1.16.6"
+        assert result["image"]["tag"] == image_tag
 
     def test_create_cluster_autoscaler_values_with_role(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
