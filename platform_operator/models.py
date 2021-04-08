@@ -356,8 +356,8 @@ class PlatformConfig:
     jobs_resource_presets: Sequence[Dict[str, Any]]
     jobs_priority_class_name: str
     jobs_host_template: str
+    jobs_internal_host_template: str
     jobs_fallback_host: str
-    jobs_service_account_name: str
     idle_jobs: Sequence[Dict[str, Any]]
     storage_pvc_name: str
     helm_repo: HelmRepo
@@ -442,30 +442,14 @@ class PlatformConfig:
 
     def create_cluster_config(
         self,
-        service_account_secret: Dict[str, Any],
         traefik_service: Optional[Dict[str, Any]] = None,
         aws_traefik_lb: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         result: Dict[str, Any] = {
-            "storage": {
-                "url": str(self.ingress_url / "api/v1/storage"),
-                "pvc": {"name": self.storage_pvc_name},
-            },
             "orchestrator": {
-                "kubernetes": {
-                    "url": str(self.kubernetes_public_url),
-                    "ca_data": service_account_secret["data"]["ca.crt"],
-                    "auth_type": "token",
-                    "token": service_account_secret["data"]["token"],
-                    "namespace": self.jobs_namespace,
-                    "node_label_gpu": self.kubernetes_node_labels.accelerator,
-                    "node_label_preemptible": self.kubernetes_node_labels.preemptible,
-                    "node_label_job": self.kubernetes_node_labels.job,
-                    "node_label_node_pool": self.kubernetes_node_labels.node_pool,
-                    "job_pod_priority_class_name": self.jobs_priority_class_name,
-                },
                 "is_http_ingress_secure": True,
                 "job_hostname_template": self.jobs_host_template,
+                "job_internal_hostname_template": self.jobs_internal_host_template,
                 "job_fallback_hostname": str(self.jobs_fallback_host),
                 "job_schedule_timeout_s": self.jobs_schedule_timeout_s,
                 "job_schedule_scale_up_timeout_s": (
@@ -481,10 +465,6 @@ class PlatformConfig:
         )
         if dns:
             result["dns"] = dns
-        if self.azure:
-            result["orchestrator"]["kubernetes"][
-                "job_pod_preemptible_toleration_key"
-            ] = "kubernetes.azure.com/scalesetpriority"
         return result
 
     def _create_resource_presets(self) -> Sequence[Dict[str, Any]]:
@@ -597,8 +577,8 @@ class PlatformConfigFactory:
             ],
             jobs_priority_class_name=f"{self._config.platform_namespace}-job",
             jobs_host_template=f"{{job_id}}.jobs.{ingress_host}",
+            jobs_internal_host_template=f"{{job_id}}.{jobs_namespace}",
             jobs_fallback_host=cluster["orchestrator"]["job_fallback_hostname"],
-            jobs_service_account_name=f"{self._config.platform_namespace}-jobs",
             idle_jobs=cluster["orchestrator"].get("idle_jobs", ()),
             monitoring_logs_bucket_name=(
                 monitoring_spec["logs"]["blobStorage"]["bucket"]

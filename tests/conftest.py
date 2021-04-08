@@ -129,20 +129,13 @@ def cluster_factory(
     def _factory(name: str) -> Cluster:
         payload = {
             "name": name,
-            "storage": {
-                "url": f"https://{name}.org.neu.ro/api/v1/storage",
-                "pvc": {"name": "platform-storage"},
-            },
-            "registry": {
-                "url": f"https://registry.{name}.org.neu.ro",
-                "email": f"{name}@neuromation.io",
-            },
+            "storage": {"url": f"https://{name}.org.neu.ro/api/v1/storage"},
+            "registry": {"url": f"https://registry.{name}.org.neu.ro"},
             "orchestrator": {
                 "job_hostname_template": f"{{job_id}}.jobs.{name}.org.neu.ro",
                 "is_http_ingress_secure": True,
                 "resource_pool_types": [resource_pool_type_factory()],
                 "resource_presets": [resource_preset_factory()],
-                "kubernetes": {},
                 "job_fallback_hostname": "default.jobs-dev.neu.ro",
                 "job_schedule_timeout_s": 60,
                 "job_schedule_scale_up_timeout_s": 30,
@@ -462,8 +455,8 @@ def gcp_platform_config(
         jobs_resource_presets=[resource_preset_factory()],
         jobs_fallback_host="default.jobs-dev.neu.ro",
         jobs_host_template=f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
+        jobs_internal_host_template="{job_id}.platform-jobs",
         jobs_priority_class_name="platform-job",
-        jobs_service_account_name="platform-jobs",
         jobs_schedule_timeout_s=60,
         jobs_schedule_scale_up_timeout_s=30,
         idle_jobs=[

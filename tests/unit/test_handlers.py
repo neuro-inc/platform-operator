@@ -153,16 +153,6 @@ def aws_traefik_lb() -> Dict[str, Any]:
     }
 
 
-@pytest.fixture
-def service_account() -> Dict[str, Any]:
-    return {"secrets": [{"name": "token"}]}
-
-
-@pytest.fixture
-def service_account_secret() -> Dict[str, Any]:
-    return {"data": {"ca.crt": "cert-authority-data", "token": "token"}}
-
-
 @pytest.mark.asyncio
 async def test_is_obs_csi_driver_deploy_required_on_install_true(
     gcp_platform_config: PlatformConfig,
@@ -415,13 +405,9 @@ async def test_configure_aws_cluster(
     aws_platform_config: PlatformConfig,
     aws_traefik_service: Dict[str, Any],
     aws_traefik_lb: Dict[str, Any],
-    service_account: Dict[str, Any],
-    service_account_secret: Dict[str, Any],
 ) -> None:
     from platform_operator.handlers import configure_cluster as _configure_cluster
 
-    kube_client.get_service_account.return_value = service_account
-    kube_client.get_secret.return_value = service_account_secret
     kube_client.get_service.side_effect = [aws_traefik_service]
     aws_elb_client.get_load_balancer_by_dns_name.side_effect = [aws_traefik_lb]
 
@@ -437,7 +423,6 @@ async def test_configure_aws_cluster(
         cluster_name=aws_platform_config.cluster_name,
         token=aws_platform_config.token,
         payload=aws_platform_config.create_cluster_config(
-            service_account_secret=service_account_secret,
             traefik_service=aws_traefik_service,
             aws_traefik_lb=aws_traefik_lb,
         ),
@@ -449,31 +434,21 @@ async def test_configure_cluster(
     gcp_platform_config: PlatformConfig,
     kube_client: mock.Mock,
     config_client: mock.Mock,
-    service_account: Dict[str, Any],
-    service_account_secret: Dict[str, Any],
     traefik_service: Dict[str, Any],
 ) -> None:
     from platform_operator.handlers import configure_cluster as _configure_cluster
 
     kube_client.get_service.side_effect = [traefik_service]
-    kube_client.get_service_account.return_value = service_account
-    kube_client.get_secret.return_value = service_account_secret
 
     await _configure_cluster(gcp_platform_config)
 
     kube_client.get_service.assert_has_awaits(
         [mock.call(namespace="platform", name="platform-traefik")]
     )
-    kube_client.get_service_account.assert_awaited_with(
-        namespace="platform-jobs",
-        name="platform-jobs",
-    )
-    kube_client.get_secret.assert_awaited_with(namespace="platform-jobs", name="token")
     config_client.patch_cluster.assert_awaited_with(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_config.token,
         payload=gcp_platform_config.create_cluster_config(
-            service_account_secret=service_account_secret,
             traefik_service=traefik_service,
         ),
     )
@@ -482,31 +457,18 @@ async def test_configure_cluster(
 @pytest.mark.asyncio
 async def test_configure_cluster_with_ingress_controller_disabled(
     gcp_platform_config: PlatformConfig,
-    kube_client: mock.Mock,
     config_client: mock.Mock,
-    service_account: Dict[str, Any],
-    service_account_secret: Dict[str, Any],
 ) -> None:
     from platform_operator.handlers import configure_cluster as _configure_cluster
 
     gcp_platform_config = replace(gcp_platform_config, ingress_controller_enabled=False)
 
-    kube_client.get_service_account.return_value = service_account
-    kube_client.get_secret.return_value = service_account_secret
-
     await _configure_cluster(gcp_platform_config)
 
-    kube_client.get_service_account.assert_awaited_with(
-        namespace="platform-jobs",
-        name="platform-jobs",
-    )
-    kube_client.get_secret.assert_awaited_with(namespace="platform-jobs", name="token")
     config_client.patch_cluster.assert_awaited_with(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_config.token,
-        payload=gcp_platform_config.create_cluster_config(
-            service_account_secret=service_account_secret,
-        ),
+        payload=gcp_platform_config.create_cluster_config(),
     )
 
 
