@@ -299,6 +299,15 @@ class TestPlatformConfig:
                 "resource_pool_types": [resource_pool_type_factory("192.168.0.0/16")],
                 "resource_presets": [resource_preset],
                 "pre_pull_images": ["neuromation/base"],
+                "allow_privileged_mode": True,
+                "idle_jobs": [
+                    {
+                        "name": "miner",
+                        "count": 1,
+                        "image": "miner",
+                        "resources": {"cpu_m": 1000, "memory_mb": 1024},
+                    }
+                ],
             },
             "dns": {
                 "zone_id": gcp_platform_config.dns_zone_id,

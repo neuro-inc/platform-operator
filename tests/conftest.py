@@ -140,6 +140,7 @@ def cluster_factory(
                 "job_schedule_timeout_s": 60,
                 "job_schedule_scale_up_timeout_s": 30,
                 "pre_pull_images": ["neuromation/base"],
+                "allow_privileged_mode": True,
                 "idle_jobs": [
                     {
                         "name": "miner",
@@ -459,6 +460,7 @@ def gcp_platform_config(
         jobs_priority_class_name="platform-job",
         jobs_schedule_timeout_s=60,
         jobs_schedule_scale_up_timeout_s=30,
+        jobs_allow_privileged_mode=True,
         idle_jobs=[
             {
                 "name": "miner",

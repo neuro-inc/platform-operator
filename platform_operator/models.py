@@ -358,6 +358,7 @@ class PlatformConfig:
     jobs_host_template: str
     jobs_internal_host_template: str
     jobs_fallback_host: str
+    jobs_allow_privileged_mode: bool
     idle_jobs: Sequence[Dict[str, Any]]
     storage_pvc_name: str
     helm_repo: HelmRepo
@@ -458,6 +459,8 @@ class PlatformConfig:
                 "resource_pool_types": self.jobs_resource_pool_types,
                 "resource_presets": self._create_resource_presets(),
                 "pre_pull_images": self.pre_pull_images,
+                "allow_privileged_mode": self.jobs_allow_privileged_mode,
+                "idle_jobs": self.idle_jobs,
             },
         }
         dns = self.create_dns_config(
@@ -579,6 +582,9 @@ class PlatformConfigFactory:
             jobs_host_template=f"{{job_id}}.jobs.{ingress_host}",
             jobs_internal_host_template=f"{{job_id}}.{jobs_namespace}",
             jobs_fallback_host=cluster["orchestrator"]["job_fallback_hostname"],
+            jobs_allow_privileged_mode=cluster["orchestrator"].get(
+                "allow_privileged_mode", False
+            ),
             idle_jobs=cluster["orchestrator"].get("idle_jobs", ()),
             monitoring_logs_bucket_name=(
                 monitoring_spec["logs"]["blobStorage"]["bucket"]
