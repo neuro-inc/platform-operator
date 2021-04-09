@@ -472,17 +472,7 @@ async def configure_cluster(platform: PlatformConfig) -> None:
                     traefik_service["status"]["loadBalancer"]["ingress"][0]["hostname"]
                 )
 
-    service_account = await app.kube_client.get_service_account(
-        namespace=platform.jobs_namespace,
-        name=platform.jobs_service_account_name,
-    )
-    secret_name = service_account["secrets"][0]["name"]
-    secret = await app.kube_client.get_secret(
-        namespace=platform.jobs_namespace,
-        name=secret_name,
-    )
     cluster_config = platform.create_cluster_config(
-        service_account_secret=secret,
         traefik_service=traefik_service,
         aws_traefik_lb=aws_traefik_lb,
     )

@@ -26,10 +26,6 @@ release: {{ .Release.Name | quote }}
 {{ .Release.Name }}-azure-storage-account
 {{- end -}}
 
-{{- define "platform.jobs.serviceAccountName" -}}
-{{ .Release.Name }}-jobs
-{{- end -}}
-
 {{- define "platform.jobs.namespace.name" -}}
 {{- if .Values.jobs.namespace.name -}}
 {{- .Values.jobs.namespace.name | quote -}}

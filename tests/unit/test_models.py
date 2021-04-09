@@ -197,10 +197,6 @@ class TestPlatformConfig:
             "CanonicalHostedZoneNameID": "/hostedzone/traefik",
         }
 
-    @pytest.fixture
-    def service_account_secret(self) -> Dict[str, Any]:
-        return {"data": {"ca.crt": "cert-authority-data", "token": "token"}}
-
     def test_create_dns_config_from_traefik_service(
         self, gcp_platform_config: PlatformConfig, traefik_service: Dict[str, Any]
     ) -> None:
@@ -280,7 +276,6 @@ class TestPlatformConfig:
         self,
         cluster_name: str,
         gcp_platform_config: PlatformConfig,
-        service_account_secret: Dict[str, Any],
         traefik_service: Dict[str, Any],
         resource_pool_type_factory: Callable[[str], Dict[str, Any]],
         resource_preset_factory: Callable[[], Dict[str, Any]],
@@ -289,37 +284,30 @@ class TestPlatformConfig:
         resource_preset.pop("resource_affinity", None)
 
         result = gcp_platform_config.create_cluster_config(
-            service_account_secret=service_account_secret,
             traefik_service=traefik_service,
         )
         zone_name = gcp_platform_config.dns_zone_name
 
         assert result == {
-            "storage": {
-                "url": f"https://{cluster_name}.org.neu.ro/api/v1/storage",
-                "pvc": {"name": "platform-storage"},
-            },
             "orchestrator": {
-                "kubernetes": {
-                    "url": "https://kubernetes.default",
-                    "ca_data": "cert-authority-data",
-                    "auth_type": "token",
-                    "token": "token",
-                    "namespace": "platform-jobs",
-                    "node_label_gpu": "platform.neuromation.io/accelerator",
-                    "node_label_preemptible": "platform.neuromation.io/preemptible",
-                    "node_label_job": "platform.neuromation.io/job",
-                    "node_label_node_pool": "platform.neuromation.io/nodepool",
-                    "job_pod_priority_class_name": "platform-job",
-                },
                 "is_http_ingress_secure": True,
                 "job_hostname_template": f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
+                "job_internal_hostname_template": "{job_id}.platform-jobs",
                 "job_fallback_hostname": "default.jobs-dev.neu.ro",
                 "job_schedule_timeout_s": 60,
                 "job_schedule_scale_up_timeout_s": 30,
                 "resource_pool_types": [resource_pool_type_factory("192.168.0.0/16")],
                 "resource_presets": [resource_preset],
                 "pre_pull_images": ["neuromation/base"],
+                "allow_privileged_mode": True,
+                "idle_jobs": [
+                    {
+                        "name": "miner",
+                        "count": 1,
+                        "image": "miner",
+                        "resources": {"cpu_m": 1000, "memory_mb": 1024},
+                    }
+                ],
             },
             "dns": {
                 "zone_id": gcp_platform_config.dns_zone_id,
@@ -337,28 +325,10 @@ class TestPlatformConfig:
     def test_create_cluster_config_without_dns(
         self,
         gcp_platform_config: PlatformConfig,
-        service_account_secret: Dict[str, Any],
     ) -> None:
-        result = gcp_platform_config.create_cluster_config(
-            service_account_secret=service_account_secret
-        )
+        result = gcp_platform_config.create_cluster_config()
 
         assert "dns" not in result
-
-    def test_create_azure_cluster_config(
-        self,
-        azure_platform_config: PlatformConfig,
-        service_account_secret: Dict[str, Any],
-        traefik_service: Dict[str, Any],
-    ) -> None:
-        result = azure_platform_config.create_cluster_config(
-            service_account_secret=service_account_secret,
-            traefik_service=traefik_service,
-        )
-        assert (
-            result["orchestrator"]["kubernetes"]["job_pod_preemptible_toleration_key"]
-            == "kubernetes.azure.com/scalesetpriority"
-        )
 
 
 class TestPlatformConfigFactory:
