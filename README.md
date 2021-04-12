@@ -28,8 +28,6 @@ metadata:
   namespace: ${platform_namespace}
 spec:
   token: ${cluster_token}
-  kubernetes:
-    publicUrl: https://66766E0AB5BE8DF2A864102645336E3F.gr7.us-east-1.eks.amazonaws.com
   iam:
     aws:
       roles:

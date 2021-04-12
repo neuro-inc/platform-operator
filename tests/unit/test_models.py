@@ -336,17 +336,6 @@ class TestPlatformConfigFactory:
     def factory(self, config: Config) -> PlatformConfigFactory:
         return PlatformConfigFactory(config)
 
-    def test_platform_config_without_kubernetes_public_url__fails(
-        self,
-        factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
-        gcp_cluster: Cluster,
-    ) -> None:
-        del gcp_platform_body["spec"]["kubernetes"]["publicUrl"]
-
-        with pytest.raises(KeyError):
-            factory.create(gcp_platform_body, gcp_cluster)
-
     def test_platform_config_with_custom_labels(
         self,
         factory: PlatformConfigFactory,
