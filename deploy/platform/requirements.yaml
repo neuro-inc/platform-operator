@@ -69,7 +69,7 @@ dependencies:
     - aws
     - azure
   - name: platformapi-poller
-    version: "21.4.1"
+    version: "21.4.12"
     repository: "@neuro"
     alias: platform-api-poller
 

@@ -1583,10 +1583,21 @@ class TestHelmValuesFactory:
             "NP_PLATFORM_API_URL": "https://dev.neu.ro/api/v1",
             "NP_AUTH_URL": "https://dev.neu.ro",
             "NP_AUTH_PUBLIC_URL": "https://dev.neu.ro/api/v1/users",
-            "NP_JOBS_INGRESS_OAUTH_AUTHORIZE_URL": (
+            "NP_PLATFORM_CONFIG_URI": "https://dev.neu.ro/api/v1",
+            "NP_KUBE_NAMESPACE": "platform-jobs",
+            "NP_KUBE_INGRESS_CLASS": "traefik",
+            "NP_KUBE_INGRESS_OAUTH_AUTHORIZE_URL": (
                 "https://platformingressauth/oauth/authorize"
             ),
-            "NP_PLATFORM_CONFIG_URI": "https://dev.neu.ro/api/v1",
+            "NP_KUBE_NODE_LABEL_JOB": "platform.neuromation.io/job",
+            "NP_KUBE_NODE_LABEL_GPU": "platform.neuromation.io/accelerator",
+            "NP_KUBE_NODE_LABEL_PREEMPTIBLE": "platform.neuromation.io/preemptible",
+            "NP_KUBE_NODE_LABEL_NODE_POOL": "platform.neuromation.io/nodepool",
+            "NP_REGISTRY_URL": (
+                f"https://registry.{gcp_platform_config.cluster_name}.org.neu.ro"
+            ),
+            "NP_STORAGE_TYPE": "pvc",
+            "NP_PVC_NAME": "platform-storage",
             "image": {"repository": "neuro.io/platformapi"},
             "platform": {
                 "token": {
