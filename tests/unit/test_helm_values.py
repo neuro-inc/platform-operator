@@ -1620,3 +1620,13 @@ class TestHelmValuesFactory:
                 }
             ],
         }
+
+    def test_create_azure_platform_api_poller_values(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platformapi_poller_values(azure_platform_config)
+
+        assert (
+            result["NP_KUBE_POD_PREEMPTIBLE_TOLERATION_KEY"]
+            == "kubernetes.azure.com/scalesetpriority"
+        )

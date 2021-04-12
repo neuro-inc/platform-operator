@@ -1281,4 +1281,8 @@ class HelmValuesFactory:
                 }
             ],
         }
+        if platform.azure:
+            result[
+                "NP_KUBE_POD_PREEMPTIBLE_TOLERATION_KEY"
+            ] = "kubernetes.azure.com/scalesetpriority"
         return result
