@@ -289,7 +289,6 @@ def gcp_platform_body(cluster_name: str) -> bodies.Body:
         "spec": {
             "token": "token",
             "kubernetes": {
-                "publicUrl": "https://kubernetes.default",
                 "tpuIPv4CIDR": "192.168.0.0/16",
             },
             "iam": {"gcp": {"serviceAccountKeyBase64": "e30="}},
@@ -311,7 +310,6 @@ def aws_platform_body(cluster_name: str) -> bodies.Body:
         "metadata": {"name": cluster_name},
         "spec": {
             "token": "token",
-            "kubernetes": {"publicUrl": "https://kubernetes.default"},
             "registry": {"aws": {"url": "platform.dkr.ecr.us-east-1.amazonaws.com"}},
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
             "monitoring": {
@@ -331,7 +329,6 @@ def azure_platform_body(cluster_name: str) -> bodies.Body:
         "metadata": {"name": cluster_name},
         "spec": {
             "token": "token",
-            "kubernetes": {"publicUrl": "https://kubernetes.default"},
             "registry": {
                 "azure": {
                     "url": "platform.azurecr.io",
@@ -370,7 +367,6 @@ def on_prem_platform_body(cluster_name: str) -> bodies.Body:
         "spec": {
             "token": "token",
             "kubernetes": {
-                "publicUrl": "https://kubernetes.default",
                 "ingressPublicIPs": ["192.168.0.3"],
                 "standardStorageClassName": "standard",
                 "nodePorts": {"kubelet": 10250, "http": 30080, "https": 30443},
@@ -437,7 +433,6 @@ def gcp_platform_config(
         pre_pull_images=["neuromation/base"],
         standard_storage_class_name="platform-standard-topology-aware",
         kubernetes_version="1.14.9",
-        kubernetes_public_url=URL("https://kubernetes.default"),
         kubernetes_node_labels=LabelsConfig(
             job="platform.neuromation.io/job",
             node_pool="platform.neuromation.io/nodepool",

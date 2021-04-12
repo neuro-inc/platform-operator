@@ -333,7 +333,6 @@ class PlatformConfig:
     pre_pull_images: Sequence[str]
     standard_storage_class_name: str
     kubernetes_version: str
-    kubernetes_public_url: URL
     kubernetes_node_labels: LabelsConfig
     dns_zone_id: str
     dns_zone_name: str
@@ -488,7 +487,7 @@ class PlatformConfigFactory:
         standard_storage_class_name = (
             f"{self._config.platform_namespace}-standard-topology-aware"
         )
-        kubernetes_spec = platform_body["spec"]["kubernetes"]
+        kubernetes_spec = platform_body["spec"].get("kubernetes", {})
         kubernetes_node_labels = kubernetes_spec.get("nodeLabels", {})
         tpu_network = None
         if cluster.cloud_provider_type == "gcp":
@@ -533,7 +532,6 @@ class PlatformConfigFactory:
             pre_pull_images=cluster["orchestrator"].get("pre_pull_images", ()),
             standard_storage_class_name=standard_storage_class_name,
             kubernetes_version=self._config.kube_config.version,
-            kubernetes_public_url=URL(kubernetes_spec["publicUrl"]),
             kubernetes_node_labels=LabelsConfig(
                 job=kubernetes_node_labels.get("job", LabelsConfig.job),
                 node_pool=kubernetes_node_labels.get(
