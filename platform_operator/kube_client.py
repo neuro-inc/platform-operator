@@ -442,7 +442,7 @@ class PlatformStatusManager:
             raise
         except Exception:
             condition.status = PlatformConditionStatus.FALSE
-            logger.info("Transition to %s failed", type.value)
+            logger.exception("Transition to %s failed", type.value)
             raise
         finally:
             condition.last_transition_time = self._now()

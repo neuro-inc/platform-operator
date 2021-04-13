@@ -22,6 +22,7 @@ from .kube_client import (
     PLATFORM_PLURAL,
     KubeClient,
     PlatformConditionType,
+    PlatformPhase,
     PlatformStatusManager,
 )
 from .models import Config, HelmRepoName, PlatformConfig, PlatformConfigFactory
@@ -125,7 +126,7 @@ async def deploy(
     name: str, body: bodies.Body, logger: Logger, retry: int, **_: Any
 ) -> None:
     if retry > config.retries:
-        await app.status_manager.fail_deployment(name)
+        await fail_deployment(name, body)
         raise kopf.HandlerRetriesError(
             f"Platform deployment has exceeded {config.retries} retries"
         )
@@ -149,23 +150,46 @@ async def _deploy(name: str, body: bodies.Body, logger: Logger, retry: int) -> N
     except aiohttp.ClientError:
         raise
     except Exception as ex:
-        await app.status_manager.fail_deployment(name)
+        await fail_deployment(name, body)
         raise kopf.PermanentError(f"Invalid platform configuration: {ex!s}")
+
+    await initialize_helm(platform)
+
+    obs_csi_driver_deploy_failed = await is_obs_csi_driver_deploy_failed()
+    platform_deploy_failed = await is_platform_deploy_failed()
+
+    if obs_csi_driver_deploy_failed or platform_deploy_failed:
+        await fail_deployment(name, body)
+        raise kopf.PermanentError("One of helm releases failed")
+
+    phase = await app.status_manager.get_phase(name)
+    obs_csi_driver_deploy_required = await is_obs_csi_driver_deploy_required(
+        platform, install=True
+    )
+    platform_deploy_required = await is_platform_deploy_required(platform, install=True)
+
+    if (
+        phase == PlatformPhase.DEPLOYED
+        and not obs_csi_driver_deploy_required
+        and not platform_deploy_required
+    ):
+        logger.info("Platform config didn't change, skipping platform deployment")
+        return
 
     logger.info("Platform deployment started")
 
-    await app.status_manager.start_deployment(name, retry)
-    await initialize_helm(platform)
+    await start_deployment(name, body, retry)
 
-    if await is_obs_csi_driver_deploy_required(platform, install=True):
+    if obs_csi_driver_deploy_required:
         await upgrade_obs_csi_driver_helm_release(platform)
 
-    if await is_platform_deploy_required(platform, install=True):
+    if platform_deploy_required:
         await upgrade_platform_helm_release(platform)
 
-    await wait_for_certificated_created(platform)
+    await wait_for_certificate_created(platform)
     await wait_for_cluster_configured(platform)
-    await app.status_manager.complete_deployment(name)
+
+    await complete_deployment(name, body)
 
     logger.info("Platform deployment succeeded")
 
@@ -249,10 +273,11 @@ async def _delete(name: str, body: bodies.Body, logger: Logger) -> None:
 async def watch_config(
     name: str,
     body: bodies.Body,
-    logger: Logger,
     stopped: primitives.AsyncDaemonStopperChecker,
     **_: Any,
 ) -> None:
+    logger = logging.getLogger("watch_config")
+
     await app.consul_client.wait_healthy(sleep_s=0.5)
 
     while True:
@@ -280,25 +305,38 @@ async def watch_config(
 
 
 async def _update(name: str, body: bodies.Body, logger: Logger) -> None:
+    phase = await app.status_manager.get_phase(name)
+
+    if phase == PlatformPhase.DEPLOYING or phase == PlatformPhase.DELETING:
+        logger.info("Cannot update platform while it is in %s phase", phase.value)
+        return
+
     platform = await get_platform_config(name, body)
 
     await initialize_helm(platform)
 
+    obs_csi_driver_deploy_failed = await is_obs_csi_driver_deploy_failed()
+    platform_deploy_failed = await is_platform_deploy_failed()
+
+    if obs_csi_driver_deploy_failed or platform_deploy_failed:
+        await app.status_manager.fail_deployment(name)
+        logger.warning("One of helm releases failed, skipping platform config update")
+        return
+
     obs_csi_driver_deploy_required = await is_obs_csi_driver_deploy_required(platform)
     platform_deploy_required = await is_platform_deploy_required(platform)
 
-    if not obs_csi_driver_deploy_required and not platform_deploy_required:
-        logger.info("Platform config didn't change")
+    if (
+        phase == PlatformPhase.DEPLOYED
+        and not obs_csi_driver_deploy_required
+        and not platform_deploy_required
+    ):
+        logger.info("Platform config didn't change, skipping platform config update")
         return
 
     logger.info("Platform config update started")
 
-    await app.status_manager.start_deployment(name)
-    await app.config_client.send_notification(
-        cluster_name=name,
-        token=body["spec"]["token"],
-        notification_type=NotificationType.CLUSTER_UPDATING,
-    )
+    await start_deployment(name, body)
 
     try:
         if obs_csi_driver_deploy_required:
@@ -307,26 +345,17 @@ async def _update(name: str, body: bodies.Body, logger: Logger) -> None:
         if platform_deploy_required:
             await upgrade_platform_helm_release(platform)
 
-        await wait_for_certificated_created(platform)
+        await wait_for_certificate_created(platform)
         await wait_for_cluster_configured(platform)
-        await app.status_manager.complete_deployment(name)
-        await app.config_client.send_notification(
-            cluster_name=name,
-            token=body["spec"]["token"],
-            notification_type=NotificationType.CLUSTER_UPDATE_SUCCEEDED,
-        )
+
+        await complete_deployment(name, body)
 
         logger.info("Platform config update succeeded")
     except asyncio.CancelledError:
         raise
     except Exception as exc:
         logger.error("Platform config update failed", exc_info=exc)
-        await app.status_manager.fail_deployment(name)
-        await app.config_client.send_notification(
-            cluster_name=name,
-            token=body["spec"]["token"],
-            notification_type=NotificationType.CLUSTER_UPDATE_FAILED,
-        )
+        await fail_deployment(name, body)
 
 
 async def get_platform_config(name: str, body: bodies.Body) -> PlatformConfig:
@@ -342,29 +371,33 @@ async def is_obs_csi_driver_deploy_required(
     if not platform.gcp or platform.gcp.storage_type != "gcs":
         return False
 
-    old_release = await app.helm_client.get_release(
-        config.helm_release_names.obs_csi_driver
+    return await is_helm_deploy_required(
+        release_name=config.helm_release_names.obs_csi_driver,
+        chart_name=config.helm_chart_names.obs_csi_driver,
+        chart_version=config.helm_chart_versions.obs_csi_driver,
+        values=app.helm_values_factory.create_obs_csi_driver_values(platform),
+        install=install,
     )
-
-    if not old_release:
-        return install
-
-    old_chart = old_release["Chart"]
-    old_release_values = await app.helm_client.get_release_values(
-        config.helm_release_names.obs_csi_driver
-    )
-
-    new_release_values = app.helm_values_factory.create_obs_csi_driver_values(platform)
-    new_chart = (
-        f"{config.helm_chart_names.obs_csi_driver}"
-        f"-{config.helm_chart_versions.obs_csi_driver}"
-    )
-
-    return old_chart != new_chart or old_release_values != new_release_values
 
 
 async def is_platform_deploy_required(
     platform: PlatformConfig, install: bool = False
+) -> bool:
+    return await is_helm_deploy_required(
+        release_name=config.helm_release_names.platform,
+        chart_name=config.helm_chart_names.platform,
+        chart_version=config.helm_chart_versions.platform,
+        values=app.helm_values_factory.create_platform_values(platform),
+        install=install,
+    )
+
+
+async def is_helm_deploy_required(
+    release_name: str,
+    chart_name: str,
+    chart_version: str,
+    values: Dict[str, Any],
+    install: bool = False,
 ) -> bool:
     old_release = await app.helm_client.get_release(config.helm_release_names.platform)
 
@@ -372,16 +405,54 @@ async def is_platform_deploy_required(
         return install
 
     old_chart = old_release["Chart"]
-    old_release_values = await app.helm_client.get_release_values(
-        config.helm_release_names.platform
+    old_release_values = await app.helm_client.get_release_values(release_name)
+    new_chart = f"{chart_name}-{chart_version}"
+
+    return old_chart != new_chart or old_release_values != values
+
+
+async def is_obs_csi_driver_deploy_failed() -> bool:
+    return await is_helm_deploy_failed(config.helm_release_names.obs_csi_driver)
+
+
+async def is_platform_deploy_failed() -> bool:
+    return await is_helm_deploy_failed(config.helm_release_names.platform)
+
+
+async def is_helm_deploy_failed(release_name: str) -> bool:
+    release = await app.helm_client.get_release(release_name)
+
+    if not release:
+        return False
+
+    return release["Status"].upper() == "FAILED"
+
+
+async def start_deployment(name: str, body: bodies.Body, retry: int = 0) -> None:
+    await app.status_manager.start_deployment(name, retry)
+    await app.config_client.send_notification(
+        cluster_name=name,
+        token=body["spec"]["token"],
+        notification_type=NotificationType.CLUSTER_UPDATING,
     )
 
-    new_release_values = app.helm_values_factory.create_platform_values(platform)
-    new_chart = (
-        f"{config.helm_chart_names.platform}-{config.helm_chart_versions.platform}"
+
+async def complete_deployment(name: str, body: bodies.Body) -> None:
+    await app.status_manager.complete_deployment(name)
+    await app.config_client.send_notification(
+        cluster_name=name,
+        token=body["spec"]["token"],
+        notification_type=NotificationType.CLUSTER_UPDATE_SUCCEEDED,
     )
 
-    return old_chart != new_chart or old_release_values != new_release_values
+
+async def fail_deployment(name: str, body: bodies.Body) -> None:
+    await app.status_manager.fail_deployment(name)
+    await app.config_client.send_notification(
+        cluster_name=name,
+        token=body["spec"]["token"],
+        notification_type=NotificationType.CLUSTER_UPDATE_FAILED,
+    )
 
 
 async def initialize_helm(platform: PlatformConfig) -> None:
@@ -428,7 +499,7 @@ async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
         )
 
 
-async def wait_for_certificated_created(platform: PlatformConfig) -> None:
+async def wait_for_certificate_created(platform: PlatformConfig) -> None:
     if not platform.ingress_controller_enabled:
         return
 
