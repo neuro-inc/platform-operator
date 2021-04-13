@@ -42,7 +42,7 @@ dependencies:
     repository: "@neuro"
     alias: platform-registry
   - name: platformmonitoringapi
-    version: "21.4.12"
+    version: "21.4.13"
     repository: "@neuro"
     alias: platform-monitoring
   - name: platformobjectstorage
