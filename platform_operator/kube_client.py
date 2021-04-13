@@ -332,12 +332,8 @@ class PlatformStatus(Dict[str, Any]):
         self["retries"] = value
 
     @property
-    def conditions(self) -> List[PlatformCondition]:
+    def conditions(self) -> Dict[str, PlatformCondition]:
         return self["conditions"]
-
-    @conditions.setter
-    def conditions(self, value: List[PlatformCondition]) -> None:
-        self["conditions"] = value
 
 
 class PlatformStatusManager:
@@ -352,29 +348,61 @@ class PlatformStatusManager:
         payload = await self._kube_client.get_platform_status(
             namespace=self._namespace, name=name
         )
-        payload = payload or {"conditions": []}
-        self._status[name] = PlatformStatus(payload)
+        if payload:
+            self._status[name] = PlatformStatus(self._deserialize(payload))
+        else:
+            self._status[name] = PlatformStatus({"conditions": {}})
+
+    def _deserialize(cls, payload: Dict[str, Any]) -> "PlatformStatus":
+        status = {
+            "phase": payload["phase"],
+            "retries": payload["retries"],
+            "conditions": cls._deserialize_conditions(payload["conditions"]),
+        }
+        return PlatformStatus(status)
+
+    def _deserialize_conditions(
+        self, payload: Sequence[Dict[str, Any]]
+    ) -> Dict[str, PlatformCondition]:
+        result: Dict[str, PlatformCondition] = {}
+
+        for p in payload:
+            result[p["type"]] = PlatformCondition(p)
+
+        return result
 
     async def _save(self, name: str) -> None:
         await self._kube_client.update_platform_status(
-            namespace=self._namespace, name=name, payload=self._status[name]
+            namespace=self._namespace,
+            name=name,
+            payload=self._serialize(self._status[name]),
         )
+
+    def _serialize(self, status: PlatformStatus) -> Dict[str, Any]:
+        return {
+            "phase": status.phase,
+            "retries": status.retries,
+            "conditions": self._serialize_conditions(status.conditions),
+        }
+
+    def _serialize_conditions(
+        self, conditions: Dict[str, PlatformCondition]
+    ) -> List[PlatformCondition]:
+        result: List[PlatformCondition] = []
+
+        for type in PlatformConditionType:
+            if type in conditions:
+                result.append(conditions[type])
+
+        return result
 
     def _now(self) -> str:
         return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-
-    def is_condition_satisfied(self, name: str, type: PlatformConditionType) -> bool:
-        for condition in self._status[name].conditions:
-            if condition["type"] == type.value:
-                return condition["status"] == PlatformConditionStatus.TRUE.value
-        return False
 
     async def start_deployment(self, name: str, retry: int = 0) -> None:
         await self._load(name)
         self._status[name].phase = PlatformPhase.DEPLOYING.value
         self._status[name].retries = retry
-        if retry == 0:
-            self._status[name].conditions = []
         await self._save(name)
 
     async def complete_deployment(self, name: str) -> None:
@@ -382,17 +410,10 @@ class PlatformStatusManager:
         self._status[name].phase = PlatformPhase.DEPLOYED.value
         await self._save(name)
 
-    async def fail_deployment(self, name: str, remove_conditions: bool = False) -> None:
+    async def fail_deployment(self, name: str) -> None:
         await self._load(name)
         assert self._status
         self._status[name].phase = PlatformPhase.FAILED.value
-        if remove_conditions:
-            self._status[name].conditions = []
-        if self._status[name].conditions:
-            condition = self._status[name].conditions[-1]
-            if condition["status"] == PlatformConditionStatus.FALSE.value:
-                condition["status"] = PlatformConditionStatus.UNKNOWN.value
-                condition["lastTransitionTime"] = self._now()
         await self._save(name)
 
     async def start_deletion(self, name: str) -> None:
@@ -404,14 +425,29 @@ class PlatformStatusManager:
     async def transition(
         self, name: str, type: PlatformConditionType
     ) -> AsyncIterator[None]:
-        logger.info("Started transition to %s condition", type.value)
-        self._status[name].conditions.append(PlatformCondition({}))
-        self._status[name].conditions[-1].type = type.value
-        self._status[name].conditions[-1].status = PlatformConditionStatus.FALSE.value
-        self._status[name].conditions[-1].last_transition_time = self._now()
-        await self._save(name)
-        yield
-        self._status[name].conditions[-1].status = PlatformConditionStatus.TRUE.value
-        self._status[name].conditions[-1].last_transition_time = self._now()
-        await self._save(name)
-        logger.info("Transition to %s succeeded", type.value)
+        try:
+            logger.info("Started transition to %s condition", type.value)
+            condition = PlatformCondition({})
+            condition.type = type
+            condition.status = PlatformConditionStatus.FALSE
+            condition.last_transition_time = self._now()
+            self._status[name].conditions[type] = condition
+            await self._save(name)
+            yield
+            condition.status = PlatformConditionStatus.TRUE
+            logger.info("Transition to %s succeeded", type.value)
+        except asyncio.CancelledError:
+            condition.status = PlatformConditionStatus.UNKNOWN
+            logger.info("Transition to %s was cancelled", type.value)
+            raise
+        except Exception:
+            condition.status = PlatformConditionStatus.FALSE
+            logger.info("Transition to %s failed", type.value)
+            raise
+        finally:
+            condition.last_transition_time = self._now()
+            await self._save(name)
+
+    async def get_phase(self, name: str) -> PlatformPhase:
+        await self._load(name)
+        return PlatformPhase(self._status[name].phase)

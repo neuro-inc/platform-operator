@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from logging import Logger
 from typing import Any, Dict, Optional
 
+import aiohttp
 import kopf
 from kopf.structs import bodies, primitives
 
@@ -141,7 +142,15 @@ async def deploy(
 
 
 async def _deploy(name: str, body: bodies.Body, logger: Logger, retry: int) -> None:
-    platform = await get_platform_config(name, body)
+    try:
+        platform = await get_platform_config(name, body)
+    except asyncio.CancelledError:
+        raise
+    except aiohttp.ClientError:
+        raise
+    except Exception as ex:
+        await app.status_manager.fail_deployment(name)
+        raise kopf.PermanentError(f"Invalid platform configuration: {ex!s}")
 
     logger.info("Platform deployment started")
 
@@ -182,6 +191,10 @@ async def delete(
 async def _delete(name: str, body: bodies.Body, logger: Logger) -> None:
     try:
         platform = await get_platform_config(name, body)
+    except aiohttp.ClientError:
+        raise
+    except asyncio.CancelledError:
+        raise
     except Exception:
         # If platform has invalid configuration than there was no deployment
         # and no resources to delete. Platform resource can be safely deleted.
@@ -320,11 +333,7 @@ async def get_platform_config(name: str, body: bodies.Body) -> PlatformConfig:
     token = body["spec"]["token"]
     cluster = await app.config_client.get_cluster(cluster_name=name, token=token)
 
-    try:
-        return app.platform_config_factory.create(body, cluster)
-    except Exception as ex:
-        await app.status_manager.fail_deployment(name, remove_conditions=True)
-        raise kopf.PermanentError(f"Invalid platform configuration: {ex!s}")
+    return app.platform_config_factory.create(body, cluster)
 
 
 async def is_obs_csi_driver_deploy_required(
@@ -383,11 +392,6 @@ async def initialize_helm(platform: PlatformConfig) -> None:
 
 
 async def upgrade_obs_csi_driver_helm_release(platform: PlatformConfig) -> None:
-    if app.status_manager.is_condition_satisfied(
-        platform.cluster_name, PlatformConditionType.OBS_CSI_DRIVER_DEPLOYED
-    ):
-        return
-
     async with app.status_manager.transition(
         platform.cluster_name, PlatformConditionType.OBS_CSI_DRIVER_DEPLOYED
     ):
@@ -404,11 +408,6 @@ async def upgrade_obs_csi_driver_helm_release(platform: PlatformConfig) -> None:
 
 
 async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
-    if app.status_manager.is_condition_satisfied(
-        platform.cluster_name, PlatformConditionType.PLATFORM_DEPLOYED
-    ):
-        return
-
     async with app.status_manager.transition(
         platform.cluster_name, PlatformConditionType.PLATFORM_DEPLOYED
     ):
@@ -430,12 +429,7 @@ async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
 
 
 async def wait_for_certificated_created(platform: PlatformConfig) -> None:
-    if (
-        not platform.ingress_controller_enabled
-        or app.status_manager.is_condition_satisfied(
-            platform.cluster_name, PlatformConditionType.CERTIFICATE_CREATED
-        )
-    ):
+    if not platform.ingress_controller_enabled:
         return
 
     async with app.status_manager.transition(
@@ -447,11 +441,6 @@ async def wait_for_certificated_created(platform: PlatformConfig) -> None:
 
 
 async def wait_for_cluster_configured(platform: PlatformConfig) -> None:
-    if app.status_manager.is_condition_satisfied(
-        platform.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
-    ):
-        return
-
     async with app.status_manager.transition(
         platform.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
     ):

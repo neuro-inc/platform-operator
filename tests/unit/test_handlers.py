@@ -153,6 +153,13 @@ def aws_traefik_lb() -> Dict[str, Any]:
     }
 
 
+@pytest.fixture
+def stopped() -> primitives.AsyncDaemonStopperChecker:
+    stopped = mock.MagicMock(primitives.AsyncDaemonStopperChecker)
+    stopped.__bool__.side_effect = [False, True]
+    return stopped
+
+
 @pytest.mark.asyncio
 async def test_is_obs_csi_driver_deploy_required_on_install_true(
     gcp_platform_config: PlatformConfig,
@@ -491,7 +498,6 @@ async def test_deploy(
     from platform_operator.handlers import deploy
 
     is_platform_deploy_required.return_value = True
-    status_manager.is_condition_satisfied.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
 
     await deploy(
@@ -570,7 +576,6 @@ async def test_deploy_with_ingress_controller_disabled(
     gcp_platform_config = replace(gcp_platform_config, ingress_controller_enabled=False)
 
     is_platform_deploy_required.return_value = True
-    status_manager.is_condition_satisfied.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
 
     await deploy(
@@ -632,7 +637,6 @@ async def test_deploy_gcp_with_gcs_storage(
     from platform_operator.handlers import deploy
 
     is_obs_csi_driver_deploy_required.return_value = True
-    status_manager.is_condition_satisfied.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
     gcp_platform_body["spec"]["storage"] = {"gcs": {"bucket": "storage"}}
 
@@ -656,7 +660,7 @@ async def test_deploy_gcp_with_gcs_storage(
 
 
 @pytest.mark.asyncio
-async def test_deploy_with_all_components_deployed(
+async def test_deploy_all_charts_deployed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
@@ -673,9 +677,8 @@ async def test_deploy_with_all_components_deployed(
 ) -> None:
     from platform_operator.handlers import deploy
 
-    is_obs_csi_driver_deploy_required.return_value = True
-    is_platform_deploy_required.return_value = True
-    status_manager.is_condition_satisfied.return_value = True
+    is_obs_csi_driver_deploy_required.return_value = False
+    is_platform_deploy_required.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
 
     await deploy(
@@ -699,8 +702,8 @@ async def test_deploy_with_all_components_deployed(
     helm_client.update_repo.assert_awaited_once()
     helm_client.upgrade.assert_not_awaited()
 
-    certificate_store.wait_till_certificate_created.assert_not_awaited()
-    configure_cluster.assert_not_awaited()
+    certificate_store.wait_till_certificate_created.assert_awaited_once()
+    configure_cluster.assert_awaited_once_with(gcp_platform_config)
 
     status_manager.start_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name, 0
@@ -708,7 +711,12 @@ async def test_deploy_with_all_components_deployed(
     status_manager.complete_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
     )
-    status_manager.transition.assert_not_called()
+    status_manager.transition.assert_any_call(
+        gcp_platform_config.cluster_name, PlatformConditionType.CERTIFICATE_CREATED
+    )
+    status_manager.transition.assert_any_call(
+        gcp_platform_config.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
+    )
 
 
 @pytest.mark.asyncio
@@ -754,7 +762,7 @@ async def test_deploy_with_invalid_spec(
         )
 
     status_manager.fail_deployment.assert_awaited_once_with(
-        gcp_platform_config.cluster_name, remove_conditions=True
+        gcp_platform_config.cluster_name
     )
 
 
@@ -778,7 +786,6 @@ async def test_deploy_not_needed(
 
     is_obs_csi_driver_deploy_required.return_value = False
     is_platform_deploy_required.return_value = False
-    status_manager.is_condition_satisfied.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
 
     await deploy(
@@ -940,6 +947,7 @@ async def test_watch_config(
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
+    stopped: primitives.AsyncDaemonStopperChecker,
     certificate_store: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
@@ -954,11 +962,7 @@ async def test_watch_config(
 
     is_obs_csi_driver_deploy_required.return_value = True
     is_platform_deploy_required.return_value = True
-    status_manager.is_condition_satisfied.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
-
-    stopped = mock.MagicMock(primitives.AsyncDaemonStopperChecker)
-    stopped.__bool__.side_effect = [False, True]
 
     await watch_config(
         name=gcp_platform_config.cluster_name,
@@ -1052,6 +1056,7 @@ async def test_watch_config_not_needed(
     consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
+    stopped: primitives.AsyncDaemonStopperChecker,
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
@@ -1065,9 +1070,6 @@ async def test_watch_config_not_needed(
     is_obs_csi_driver_deploy_required.return_value = False
     is_platform_deploy_required.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
-
-    stopped = mock.MagicMock(primitives.AsyncDaemonStopperChecker)
-    stopped.__bool__.side_effect = [False, True]
 
     await watch_config(
         name=gcp_platform_config.cluster_name,
@@ -1096,15 +1098,13 @@ async def test_watch_config_not_needed(
 async def test_watch_config_ignores_error(
     config_client: mock.AsyncMock,
     logger: logging.Logger,
+    stopped: primitives.AsyncDaemonStopperChecker,
     gcp_platform_body: bodies.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import watch_config
 
     config_client.get_cluster.side_effect = Exception
-
-    stopped = mock.MagicMock(primitives.AsyncDaemonStopperChecker)
-    stopped.__bool__.side_effect = [False, True]
 
     await watch_config(
         name=gcp_platform_config.cluster_name,
@@ -1119,8 +1119,9 @@ async def test_watch_config_update_failed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
+    stopped: primitives.AsyncDaemonStopperChecker,
+    is_platform_deploy_required: mock.AsyncMock,
     gcp_cluster: Cluster,
     gcp_platform_body: bodies.Body,
     gcp_platform_config: PlatformConfig,
@@ -1129,11 +1130,7 @@ async def test_watch_config_update_failed(
 
     config_client.get_cluster.return_value = gcp_cluster
     is_platform_deploy_required.return_value = True
-    status_manager.is_condition_satisfied.return_value = False
     helm_client.upgrade.side_effect = Exception
-
-    stopped = mock.MagicMock(primitives.AsyncDaemonStopperChecker)
-    stopped.__bool__.side_effect = [False, True]
 
     await watch_config(
         name=gcp_platform_config.cluster_name,
