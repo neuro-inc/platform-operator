@@ -48,7 +48,7 @@ app = App()
 
 
 @kopf.on.startup()
-async def startup(settings: kopf.OperatorSettings, **kwargs: Any) -> None:
+async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
     app.helm_values_factory = HelmValuesFactory(
         config.helm_release_names, config.helm_chart_names
     )
@@ -84,12 +84,12 @@ async def startup(settings: kopf.OperatorSettings, **kwargs: Any) -> None:
 
 
 @kopf.on.cleanup()
-async def cleanup(**kwargs: Any) -> None:
+async def cleanup(**_: Any) -> None:
     await app.close()
 
 
 @kopf.on.login()
-def login(**kwargs: Any) -> kopf.ConnectionInfo:
+def login(**_: Any) -> kopf.ConnectionInfo:
     ca_path = None
     if config.kube_config.cert_authority_path:
         ca_path = str(config.kube_config.cert_authority_path)
@@ -121,7 +121,7 @@ def login(**kwargs: Any) -> kopf.ConnectionInfo:
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def deploy(
-    name: str, body: bodies.Body, logger: Logger, retry: int, **kwargs: Any
+    name: str, body: bodies.Body, logger: Logger, retry: int, **_: Any
 ) -> None:
     if retry > config.retries:
         await app.status_manager.fail_deployment(name)
@@ -165,7 +165,7 @@ async def _deploy(name: str, body: bodies.Body, logger: Logger, retry: int) -> N
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def delete(
-    name: str, body: bodies.Body, logger: Logger, retry: int, **kwargs: Any
+    name: str, body: bodies.Body, logger: Logger, retry: int, **_: Any
 ) -> None:
     if retry == 0:
         await app.status_manager.start_deletion(name)
@@ -238,7 +238,7 @@ async def watch_config(
     body: bodies.Body,
     logger: Logger,
     stopped: primitives.AsyncDaemonStopperChecker,
-    **kwargs: Any,
+    **_: Any,
 ) -> None:
     await app.consul_client.wait_healthy(sleep_s=0.5)
 
@@ -472,17 +472,7 @@ async def configure_cluster(platform: PlatformConfig) -> None:
                     traefik_service["status"]["loadBalancer"]["ingress"][0]["hostname"]
                 )
 
-    service_account = await app.kube_client.get_service_account(
-        namespace=platform.jobs_namespace,
-        name=platform.jobs_service_account_name,
-    )
-    secret_name = service_account["secrets"][0]["name"]
-    secret = await app.kube_client.get_secret(
-        namespace=platform.jobs_namespace,
-        name=secret_name,
-    )
     cluster_config = platform.create_cluster_config(
-        service_account_secret=secret,
         traefik_service=traefik_service,
         aws_traefik_lb=aws_traefik_lb,
     )

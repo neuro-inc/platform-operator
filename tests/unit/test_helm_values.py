@@ -567,23 +567,30 @@ class TestHelmValuesFactory:
                 replace(aws_platform_config, kubernetes_version="1.13.8")
             )
 
-    def test_create_cluster_autoscaler_for_kube_1_15(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    @pytest.mark.parametrize(
+        "kubernetes_version,image_tag",
+        [
+            ("1.14.8", "v1.14.8"),
+            ("1.15.7", "v1.15.7"),
+            ("1.16.6", "v1.16.6"),
+            ("1.17.4", "v1.17.4"),
+            ("1.18.3", "v1.18.3"),
+            ("1.19.1", "v1.19.1"),
+            ("1.20.0", "v1.20.0"),
+        ],
+    )
+    def test_create_cluster_autoscaler_image_tag(
+        self,
+        aws_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
+        kubernetes_version: str,
+        image_tag: str,
     ) -> None:
         result = factory.create_cluster_autoscaler_values(
-            replace(aws_platform_config, kubernetes_version="1.15.3")
+            replace(aws_platform_config, kubernetes_version=kubernetes_version)
         )
 
-        assert result["image"]["tag"] == "v1.15.7"
-
-    def test_create_cluster_autoscaler_for_kube_1_16(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_cluster_autoscaler_values(
-            replace(aws_platform_config, kubernetes_version="1.16.13")
-        )
-
-        assert result["image"]["tag"] == "v1.16.6"
+        assert result["image"]["tag"] == image_tag
 
     def test_create_cluster_autoscaler_values_with_role(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -1576,10 +1583,21 @@ class TestHelmValuesFactory:
             "NP_PLATFORM_API_URL": "https://dev.neu.ro/api/v1",
             "NP_AUTH_URL": "https://dev.neu.ro",
             "NP_AUTH_PUBLIC_URL": "https://dev.neu.ro/api/v1/users",
-            "NP_JOBS_INGRESS_OAUTH_AUTHORIZE_URL": (
+            "NP_PLATFORM_CONFIG_URI": "https://dev.neu.ro/api/v1",
+            "NP_KUBE_NAMESPACE": "platform-jobs",
+            "NP_KUBE_INGRESS_CLASS": "traefik",
+            "NP_KUBE_INGRESS_OAUTH_AUTHORIZE_URL": (
                 "https://platformingressauth/oauth/authorize"
             ),
-            "NP_PLATFORM_CONFIG_URI": "https://dev.neu.ro/api/v1",
+            "NP_KUBE_NODE_LABEL_JOB": "platform.neuromation.io/job",
+            "NP_KUBE_NODE_LABEL_GPU": "platform.neuromation.io/accelerator",
+            "NP_KUBE_NODE_LABEL_PREEMPTIBLE": "platform.neuromation.io/preemptible",
+            "NP_KUBE_NODE_LABEL_NODE_POOL": "platform.neuromation.io/nodepool",
+            "NP_REGISTRY_URL": (
+                f"https://registry.{gcp_platform_config.cluster_name}.org.neu.ro"
+            ),
+            "NP_STORAGE_TYPE": "pvc",
+            "NP_PVC_NAME": "platform-storage",
             "image": {"repository": "neuro.io/platformapi"},
             "platform": {
                 "token": {
@@ -1602,3 +1620,13 @@ class TestHelmValuesFactory:
                 }
             ],
         }
+
+    def test_create_azure_platform_api_poller_values(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platformapi_poller_values(azure_platform_config)
+
+        assert (
+            result["NP_KUBE_POD_PREEMPTIBLE_TOLERATION_KEY"]
+            == "kubernetes.azure.com/scalesetpriority"
+        )

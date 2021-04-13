@@ -32,7 +32,7 @@ spec:
         - -c
         - |
           mkdir -p /etc/docker/certs.d/{{ .Values.ingress.registryHost }}
-          wget -O /etc/docker/certs.d/{{ .Values.ingress.registryHost }}/ca.crt https://letsencrypt.org/certs/fakelerootx1.pem
+          wget -O /etc/docker/certs.d/{{ .Values.ingress.registryHost }}/ca.crt https://letsencrypt.org/certs/staging/letsencrypt-stg-root-x1.pem
           echo "Letsencrypt staging certificate installed"
         volumeMounts:
         - mountPath: /etc/docker/certs.d

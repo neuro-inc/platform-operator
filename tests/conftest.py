@@ -129,24 +129,18 @@ def cluster_factory(
     def _factory(name: str) -> Cluster:
         payload = {
             "name": name,
-            "storage": {
-                "url": f"https://{name}.org.neu.ro/api/v1/storage",
-                "pvc": {"name": "platform-storage"},
-            },
-            "registry": {
-                "url": f"https://registry.{name}.org.neu.ro",
-                "email": f"{name}@neuromation.io",
-            },
+            "storage": {"url": f"https://{name}.org.neu.ro/api/v1/storage"},
+            "registry": {"url": f"https://registry.{name}.org.neu.ro"},
             "orchestrator": {
                 "job_hostname_template": f"{{job_id}}.jobs.{name}.org.neu.ro",
                 "is_http_ingress_secure": True,
                 "resource_pool_types": [resource_pool_type_factory()],
                 "resource_presets": [resource_preset_factory()],
-                "kubernetes": {},
                 "job_fallback_hostname": "default.jobs-dev.neu.ro",
                 "job_schedule_timeout_s": 60,
                 "job_schedule_scale_up_timeout_s": 30,
                 "pre_pull_images": ["neuromation/base"],
+                "allow_privileged_mode": True,
                 "idle_jobs": [
                     {
                         "name": "miner",
@@ -295,7 +289,6 @@ def gcp_platform_body(cluster_name: str) -> bodies.Body:
         "spec": {
             "token": "token",
             "kubernetes": {
-                "publicUrl": "https://kubernetes.default",
                 "tpuIPv4CIDR": "192.168.0.0/16",
             },
             "iam": {"gcp": {"serviceAccountKeyBase64": "e30="}},
@@ -317,7 +310,6 @@ def aws_platform_body(cluster_name: str) -> bodies.Body:
         "metadata": {"name": cluster_name},
         "spec": {
             "token": "token",
-            "kubernetes": {"publicUrl": "https://kubernetes.default"},
             "registry": {"aws": {"url": "platform.dkr.ecr.us-east-1.amazonaws.com"}},
             "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
             "monitoring": {
@@ -337,7 +329,6 @@ def azure_platform_body(cluster_name: str) -> bodies.Body:
         "metadata": {"name": cluster_name},
         "spec": {
             "token": "token",
-            "kubernetes": {"publicUrl": "https://kubernetes.default"},
             "registry": {
                 "azure": {
                     "url": "platform.azurecr.io",
@@ -376,7 +367,6 @@ def on_prem_platform_body(cluster_name: str) -> bodies.Body:
         "spec": {
             "token": "token",
             "kubernetes": {
-                "publicUrl": "https://kubernetes.default",
                 "ingressPublicIPs": ["192.168.0.3"],
                 "standardStorageClassName": "standard",
                 "nodePorts": {"kubelet": 10250, "http": 30080, "https": 30443},
@@ -443,7 +433,6 @@ def gcp_platform_config(
         pre_pull_images=["neuromation/base"],
         standard_storage_class_name="platform-standard-topology-aware",
         kubernetes_version="1.14.9",
-        kubernetes_public_url=URL("https://kubernetes.default"),
         kubernetes_node_labels=LabelsConfig(
             job="platform.neuromation.io/job",
             node_pool="platform.neuromation.io/nodepool",
@@ -462,10 +451,11 @@ def gcp_platform_config(
         jobs_resource_presets=[resource_preset_factory()],
         jobs_fallback_host="default.jobs-dev.neu.ro",
         jobs_host_template=f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
+        jobs_internal_host_template="{job_id}.platform-jobs",
         jobs_priority_class_name="platform-job",
-        jobs_service_account_name="platform-jobs",
         jobs_schedule_timeout_s=60,
         jobs_schedule_scale_up_timeout_s=30,
+        jobs_allow_privileged_mode=True,
         idle_jobs=[
             {
                 "name": "miner",

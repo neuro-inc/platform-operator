@@ -440,6 +440,14 @@ class HelmValuesFactory:
             image_tag = "v1.15.7"
         elif platform.kubernetes_version.startswith("1.16"):
             image_tag = "v1.16.6"
+        elif platform.kubernetes_version.startswith("1.17"):
+            image_tag = "v1.17.4"
+        elif platform.kubernetes_version.startswith("1.18"):
+            image_tag = "v1.18.3"
+        elif platform.kubernetes_version.startswith("1.19"):
+            image_tag = "v1.19.1"
+        elif platform.kubernetes_version.startswith("1.20"):
+            image_tag = "v1.20.0"
         else:
             raise ValueError(
                 f"Cluster autoscaler for Kubernetes {platform.kubernetes_version} "
@@ -1239,10 +1247,21 @@ class HelmValuesFactory:
             "NP_PLATFORM_API_URL": str(platform.api_url / "api/v1"),
             "NP_AUTH_URL": str(platform.auth_url),
             "NP_AUTH_PUBLIC_URL": str(platform.auth_url / "api/v1/users"),
-            "NP_JOBS_INGRESS_OAUTH_AUTHORIZE_URL": str(
+            "NP_PLATFORM_CONFIG_URI": str(platform.config_url / "api/v1"),
+            "NP_KUBE_NAMESPACE": platform.jobs_namespace,
+            "NP_KUBE_INGRESS_CLASS": "traefik",
+            "NP_KUBE_INGRESS_OAUTH_AUTHORIZE_URL": str(
                 platform.ingress_auth_url / "oauth/authorize"
             ),
-            "NP_PLATFORM_CONFIG_URI": str(platform.config_url / "api/v1"),
+            "NP_KUBE_NODE_LABEL_JOB": platform.kubernetes_node_labels.job,
+            "NP_KUBE_NODE_LABEL_GPU": platform.kubernetes_node_labels.accelerator,
+            "NP_KUBE_NODE_LABEL_PREEMPTIBLE": (
+                platform.kubernetes_node_labels.preemptible
+            ),
+            "NP_KUBE_NODE_LABEL_NODE_POOL": platform.kubernetes_node_labels.node_pool,
+            "NP_REGISTRY_URL": str(platform.ingress_registry_url),
+            "NP_STORAGE_TYPE": "pvc",
+            "NP_PVC_NAME": platform.storage_pvc_name,
             "image": {"repository": f"{docker_server}/platformapi"},
             "platform": {
                 "token": {
@@ -1262,4 +1281,8 @@ class HelmValuesFactory:
                 }
             ],
         }
+        if platform.azure:
+            result[
+                "NP_KUBE_POD_PREEMPTIBLE_TOLERATION_KEY"
+            ] = "kubernetes.azure.com/scalesetpriority"
         return result

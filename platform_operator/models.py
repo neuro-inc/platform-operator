@@ -333,7 +333,6 @@ class PlatformConfig:
     pre_pull_images: Sequence[str]
     standard_storage_class_name: str
     kubernetes_version: str
-    kubernetes_public_url: URL
     kubernetes_node_labels: LabelsConfig
     dns_zone_id: str
     dns_zone_name: str
@@ -356,8 +355,9 @@ class PlatformConfig:
     jobs_resource_presets: Sequence[Dict[str, Any]]
     jobs_priority_class_name: str
     jobs_host_template: str
+    jobs_internal_host_template: str
     jobs_fallback_host: str
-    jobs_service_account_name: str
+    jobs_allow_privileged_mode: bool
     idle_jobs: Sequence[Dict[str, Any]]
     storage_pvc_name: str
     helm_repo: HelmRepo
@@ -442,30 +442,14 @@ class PlatformConfig:
 
     def create_cluster_config(
         self,
-        service_account_secret: Dict[str, Any],
         traefik_service: Optional[Dict[str, Any]] = None,
         aws_traefik_lb: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         result: Dict[str, Any] = {
-            "storage": {
-                "url": str(self.ingress_url / "api/v1/storage"),
-                "pvc": {"name": self.storage_pvc_name},
-            },
             "orchestrator": {
-                "kubernetes": {
-                    "url": str(self.kubernetes_public_url),
-                    "ca_data": service_account_secret["data"]["ca.crt"],
-                    "auth_type": "token",
-                    "token": service_account_secret["data"]["token"],
-                    "namespace": self.jobs_namespace,
-                    "node_label_gpu": self.kubernetes_node_labels.accelerator,
-                    "node_label_preemptible": self.kubernetes_node_labels.preemptible,
-                    "node_label_job": self.kubernetes_node_labels.job,
-                    "node_label_node_pool": self.kubernetes_node_labels.node_pool,
-                    "job_pod_priority_class_name": self.jobs_priority_class_name,
-                },
                 "is_http_ingress_secure": True,
                 "job_hostname_template": self.jobs_host_template,
+                "job_internal_hostname_template": self.jobs_internal_host_template,
                 "job_fallback_hostname": str(self.jobs_fallback_host),
                 "job_schedule_timeout_s": self.jobs_schedule_timeout_s,
                 "job_schedule_scale_up_timeout_s": (
@@ -474,6 +458,8 @@ class PlatformConfig:
                 "resource_pool_types": self.jobs_resource_pool_types,
                 "resource_presets": self._create_resource_presets(),
                 "pre_pull_images": self.pre_pull_images,
+                "allow_privileged_mode": self.jobs_allow_privileged_mode,
+                "idle_jobs": self.idle_jobs,
             },
         }
         dns = self.create_dns_config(
@@ -481,10 +467,6 @@ class PlatformConfig:
         )
         if dns:
             result["dns"] = dns
-        if self.azure:
-            result["orchestrator"]["kubernetes"][
-                "job_pod_preemptible_toleration_key"
-            ] = "kubernetes.azure.com/scalesetpriority"
         return result
 
     def _create_resource_presets(self) -> Sequence[Dict[str, Any]]:
@@ -505,7 +487,7 @@ class PlatformConfigFactory:
         standard_storage_class_name = (
             f"{self._config.platform_namespace}-standard-topology-aware"
         )
-        kubernetes_spec = platform_body["spec"]["kubernetes"]
+        kubernetes_spec = platform_body["spec"].get("kubernetes", {})
         kubernetes_node_labels = kubernetes_spec.get("nodeLabels", {})
         tpu_network = None
         if cluster.cloud_provider_type == "gcp":
@@ -550,7 +532,6 @@ class PlatformConfigFactory:
             pre_pull_images=cluster["orchestrator"].get("pre_pull_images", ()),
             standard_storage_class_name=standard_storage_class_name,
             kubernetes_version=self._config.kube_config.version,
-            kubernetes_public_url=URL(kubernetes_spec["publicUrl"]),
             kubernetes_node_labels=LabelsConfig(
                 job=kubernetes_node_labels.get("job", LabelsConfig.job),
                 node_pool=kubernetes_node_labels.get(
@@ -597,8 +578,11 @@ class PlatformConfigFactory:
             ],
             jobs_priority_class_name=f"{self._config.platform_namespace}-job",
             jobs_host_template=f"{{job_id}}.jobs.{ingress_host}",
+            jobs_internal_host_template=f"{{job_id}}.{jobs_namespace}",
             jobs_fallback_host=cluster["orchestrator"]["job_fallback_hostname"],
-            jobs_service_account_name=f"{self._config.platform_namespace}-jobs",
+            jobs_allow_privileged_mode=cluster["orchestrator"].get(
+                "allow_privileged_mode", False
+            ),
             idle_jobs=cluster["orchestrator"].get("idle_jobs", ()),
             monitoring_logs_bucket_name=(
                 monitoring_spec["logs"]["blobStorage"]["bucket"]

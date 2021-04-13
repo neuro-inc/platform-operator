@@ -1,14 +1,11 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ .Release.Name }}-jobs-admin
+  name: {{ .Release.Name }}-admin
   namespace: {{ include "platform.jobs.namespace.name" . }}
   labels:
 {{ include "platform.labels.standard" . | indent 4 }}
 subjects:
-- kind: ServiceAccount
-  name: {{ include "platform.jobs.serviceAccountName" . }}
-  namespace: {{ include "platform.jobs.namespace.name" . }}
 - kind: ServiceAccount
   name: default
   namespace: {{ .Release.Namespace }}

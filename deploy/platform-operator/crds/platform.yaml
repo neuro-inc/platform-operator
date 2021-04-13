@@ -86,11 +86,7 @@ spec:
               type: string
             kubernetes:
               type: object
-              required:
-              - publicUrl
               properties:
-                publicUrl:
-                  type: string
                 standardStorageClassName:
                   type: string
                 tpuIPv4CIDR:
