@@ -16,6 +16,7 @@ from platform_operator.helm_values import HelmValuesFactory
 from platform_operator.kube_client import (
     KubeClient,
     PlatformConditionType,
+    PlatformPhase,
     PlatformStatusManager,
 )
 from platform_operator.models import (
@@ -26,7 +27,7 @@ from platform_operator.models import (
 )
 
 
-pytestmark = pytest.mark.usefixtures("setup_app")
+pytestmark = [pytest.mark.asyncio, pytest.mark.usefixtures("setup_app")]
 
 
 @pytest.fixture
@@ -95,6 +96,24 @@ def certificate_store() -> mock.Mock:
 @pytest.fixture
 def helm_values_factory() -> mock.Mock:
     return mock.AsyncMock(HelmValuesFactory)
+
+
+@pytest.fixture
+def is_obs_csi_driver_deploy_failed() -> Iterator[mock.Mock]:
+    with mock.patch(
+        "platform_operator.handlers.is_obs_csi_driver_deploy_failed"
+    ) as is_obs_csi_driver_deploy_failed:
+        is_obs_csi_driver_deploy_failed.return_value = False
+        yield is_obs_csi_driver_deploy_failed
+
+
+@pytest.fixture
+def is_platform_deploy_failed() -> Iterator[mock.Mock]:
+    with mock.patch(
+        "platform_operator.handlers.is_platform_deploy_failed"
+    ) as is_platform_deploy_failed:
+        is_platform_deploy_failed.return_value = False
+        yield is_platform_deploy_failed
 
 
 @pytest.fixture
@@ -488,6 +507,7 @@ async def test_deploy(
     helm_client: mock.AsyncMock,
     certificate_store: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
+    is_platform_deploy_failed: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     config: Config,
@@ -497,6 +517,7 @@ async def test_deploy(
 ) -> None:
     from platform_operator.handlers import deploy
 
+    is_platform_deploy_failed.return_value = False
     is_platform_deploy_required.return_value = True
     config_client.get_cluster.return_value = gcp_cluster
 
@@ -507,11 +528,29 @@ async def test_deploy(
         retry=0,
     )
 
+    is_platform_deploy_required.assert_awaited_once_with(
+        gcp_platform_config, install=True
+    )
+
     consul_client.wait_healthy.assert_called_once()
 
     config_client.get_cluster.assert_awaited_once_with(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_body["spec"]["token"],
+    )
+    config_client.send_notification.assert_has_awaits(
+        [
+            mock.call(
+                cluster_name=gcp_platform_config.cluster_name,
+                token=gcp_platform_config.token,
+                notification_type=NotificationType.CLUSTER_UPDATING,
+            ),
+            mock.call(
+                cluster_name=gcp_platform_config.cluster_name,
+                token=gcp_platform_config.token,
+                notification_type=NotificationType.CLUSTER_UPDATE_SUCCEEDED,
+            ),
+        ]
     )
 
     kube_client.update_service_account_image_pull_secrets.assert_awaited_once_with(
@@ -618,6 +657,7 @@ async def test_deploy_with_ingress_controller_disabled(
     status_manager.transition.assert_any_call(
         gcp_platform_config.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
     )
+    assert status_manager.transition.call_count == 2
     status_manager.complete_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
     )
@@ -625,9 +665,9 @@ async def test_deploy_with_ingress_controller_disabled(
 
 @pytest.mark.asyncio
 async def test_deploy_gcp_with_gcs_storage(
-    status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
+    is_obs_csi_driver_deploy_failed: mock.AsyncMock,
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
@@ -636,15 +676,30 @@ async def test_deploy_gcp_with_gcs_storage(
 ) -> None:
     from platform_operator.handlers import deploy
 
+    is_obs_csi_driver_deploy_failed.return_value = False
     is_obs_csi_driver_deploy_required.return_value = True
     config_client.get_cluster.return_value = gcp_cluster
     gcp_platform_body["spec"]["storage"] = {"gcs": {"bucket": "storage"}}
+    gcp_platform_config = replace(
+        gcp_platform_config,
+        gcp=replace(
+            gcp_platform_config.gcp,
+            storage_type="gcs",
+            storage_nfs_server="",
+            storage_nfs_path="/",
+            storage_gcs_bucket_name="storage",
+        ),
+    )
 
     await deploy(
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
         retry=0,
+    )
+
+    is_obs_csi_driver_deploy_required.assert_awaited_once_with(
+        gcp_platform_config, install=True
     )
 
     helm_client.upgrade.assert_any_await(
@@ -722,6 +777,7 @@ async def test_deploy_all_charts_deployed(
 @pytest.mark.asyncio
 async def test_deploy_with_retries_exceeded(
     status_manager: mock.AsyncMock,
+    config_client: mock.AsyncMock,
     logger: logging.Logger,
     config: Config,
     gcp_platform_body: bodies.Body,
@@ -739,6 +795,11 @@ async def test_deploy_with_retries_exceeded(
 
     status_manager.fail_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
+    )
+    config_client.send_notification.assert_any_await(
+        cluster_name=gcp_platform_config.cluster_name,
+        token=gcp_platform_config.token,
+        notification_type=NotificationType.CLUSTER_UPDATE_FAILED,
     )
 
 
@@ -767,7 +828,7 @@ async def test_deploy_with_invalid_spec(
 
 
 @pytest.mark.asyncio
-async def test_deploy_not_needed(
+async def test_deploy_no_changes(
     status_manager: mock.AsyncMock,
     consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -784,6 +845,7 @@ async def test_deploy_not_needed(
 ) -> None:
     from platform_operator.handlers import deploy
 
+    status_manager.get_phase.return_value = PlatformPhase.DEPLOYED
     is_obs_csi_driver_deploy_required.return_value = False
     is_platform_deploy_required.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
@@ -809,15 +871,53 @@ async def test_deploy_not_needed(
     helm_client.update_repo.assert_awaited_once()
     helm_client.upgrade.assert_not_awaited()
 
-    certificate_store.wait_till_certificate_created.assert_awaited_once()
-    configure_cluster.assert_awaited_once_with(gcp_platform_config)
+    certificate_store.wait_till_certificate_created.assert_not_awaited()
+    configure_cluster.assert_not_awaited()
 
-    status_manager.start_deployment.assert_awaited_once_with(
-        gcp_platform_config.cluster_name, 0
+    status_manager.start_deployment.assert_not_awaited()
+    status_manager.complete_deployment.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "obs_csi_driver_deploy_failed,platform_deploy_failed",
+    [(True, True), (False, True), (True, False)],
+)
+async def test_deploy_helm_release_failed(
+    status_manager: mock.AsyncMock,
+    consul_client: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    is_obs_csi_driver_deploy_failed: mock.AsyncMock,
+    is_platform_deploy_failed: mock.AsyncMock,
+    logger: logging.Logger,
+    gcp_cluster: Cluster,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+    obs_csi_driver_deploy_failed: bool,
+    platform_deploy_failed: bool,
+) -> None:
+    from platform_operator.handlers import deploy
+
+    status_manager.get_phase.return_value = PlatformPhase.DEPLOYED
+    is_obs_csi_driver_deploy_failed.return_value = obs_csi_driver_deploy_failed
+    is_platform_deploy_failed.return_value = platform_deploy_failed
+    config_client.get_cluster.return_value = gcp_cluster
+
+    with pytest.raises(kopf.PermanentError, match="One of helm releases failed"):
+        await deploy(
+            name=gcp_platform_config.cluster_name,
+            body=gcp_platform_body,
+            logger=logger,
+            retry=0,
+        )
+
+    consul_client.wait_healthy.assert_called_once()
+
+    config_client.get_cluster.assert_awaited_once_with(
+        cluster_name=gcp_platform_config.cluster_name,
+        token=gcp_platform_config.token,
     )
-    status_manager.complete_deployment.assert_awaited_once_with(
-        gcp_platform_config.cluster_name
-    )
+
+    status_manager.start_deployment.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -950,6 +1050,8 @@ async def test_watch_config(
     stopped: primitives.AsyncDaemonStopperChecker,
     certificate_store: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
+    is_obs_csi_driver_deploy_failed: mock.AsyncMock,
+    is_platform_deploy_failed: mock.AsyncMock,
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
@@ -992,6 +1094,10 @@ async def test_watch_config(
         ]
     )
 
+    is_obs_csi_driver_deploy_failed.assert_awaited_once_with()
+    is_platform_deploy_failed.assert_awaited_once_with()
+
+    is_obs_csi_driver_deploy_required.assert_awaited_once_with(gcp_platform_config)
     is_platform_deploy_required.assert_awaited_once_with(gcp_platform_config)
 
     kube_client.update_service_account_image_pull_secrets.assert_awaited_once_with(
@@ -1034,7 +1140,7 @@ async def test_watch_config(
     configure_cluster.assert_awaited_once_with(gcp_platform_config)
 
     status_manager.start_deployment.assert_awaited_once_with(
-        gcp_platform_config.cluster_name
+        gcp_platform_config.cluster_name, 0
     )
     status_manager.transition.assert_any_call(
         gcp_platform_config.cluster_name, PlatformConditionType.PLATFORM_DEPLOYED
@@ -1050,8 +1156,67 @@ async def test_watch_config(
     )
 
 
-@pytest.mark.asyncio
-async def test_watch_config_not_needed(
+async def test_watch_config_all_charts_deployed(
+    status_manager: mock.AsyncMock,
+    consul_client: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    stopped: primitives.AsyncDaemonStopperChecker,
+    certificate_store: mock.AsyncMock,
+    configure_cluster: mock.AsyncMock,
+    is_obs_csi_driver_deploy_required: mock.AsyncMock,
+    is_platform_deploy_required: mock.AsyncMock,
+    logger: logging.Logger,
+    config: Config,
+    gcp_cluster: Cluster,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import watch_config
+
+    is_obs_csi_driver_deploy_required.return_value = False
+    is_platform_deploy_required.return_value = False
+    config_client.get_cluster.return_value = gcp_cluster
+
+    await watch_config(
+        name=gcp_platform_config.cluster_name,
+        body=gcp_platform_body,
+        logger=logger,
+        stopped=stopped,
+    )
+
+    consul_client.wait_healthy.assert_called_once()
+
+    config_client.get_cluster.assert_awaited_once_with(
+        cluster_name=gcp_platform_config.cluster_name,
+        token=gcp_platform_config.token,
+    )
+
+    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
+    helm_client.add_repo.assert_has_awaits(
+        [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
+    )
+    helm_client.update_repo.assert_awaited_once()
+    helm_client.upgrade.assert_not_awaited()
+
+    certificate_store.wait_till_certificate_created.assert_awaited_once()
+    configure_cluster.assert_awaited_once_with(gcp_platform_config)
+
+    status_manager.start_deployment.assert_awaited_once_with(
+        gcp_platform_config.cluster_name, 0
+    )
+    status_manager.complete_deployment.assert_awaited_once_with(
+        gcp_platform_config.cluster_name
+    )
+    status_manager.transition.assert_any_call(
+        gcp_platform_config.cluster_name, PlatformConditionType.CERTIFICATE_CREATED
+    )
+    status_manager.transition.assert_any_call(
+        gcp_platform_config.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
+    )
+
+
+async def test_watch_config_no_changes(
     status_manager: mock.AsyncMock,
     consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -1067,8 +1232,91 @@ async def test_watch_config_not_needed(
 ) -> None:
     from platform_operator.handlers import watch_config
 
+    status_manager.get_phase.return_value = PlatformPhase.DEPLOYED
     is_obs_csi_driver_deploy_required.return_value = False
     is_platform_deploy_required.return_value = False
+    config_client.get_cluster.return_value = gcp_cluster
+
+    await watch_config(
+        name=gcp_platform_config.cluster_name,
+        body=gcp_platform_body,
+        logger=logger,
+        stopped=stopped,
+    )
+
+    consul_client.wait_healthy.assert_called_once()
+
+    config_client.get_cluster.assert_awaited_once_with(
+        cluster_name=gcp_platform_config.cluster_name,
+        token=gcp_platform_config.token,
+    )
+
+    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
+    helm_client.add_repo.assert_has_awaits(
+        [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
+    )
+    helm_client.update_repo.assert_awaited_once()
+
+    status_manager.start_deployment.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "platform_phase", [PlatformPhase.DEPLOYING, PlatformPhase.DELETING]
+)
+async def test_watch_config_platform_deploying_deleting(
+    status_manager: mock.AsyncMock,
+    consul_client: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    stopped: primitives.AsyncDaemonStopperChecker,
+    logger: logging.Logger,
+    gcp_cluster: Cluster,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+    platform_phase: PlatformPhase,
+) -> None:
+    from platform_operator.handlers import watch_config
+
+    status_manager.get_phase.return_value = platform_phase
+    config_client.get_cluster.return_value = gcp_cluster
+
+    await watch_config(
+        name=gcp_platform_config.cluster_name,
+        body=gcp_platform_body,
+        logger=logger,
+        stopped=stopped,
+    )
+
+    consul_client.wait_healthy.assert_called_once()
+    helm_client.init.assert_not_awaited()
+    status_manager.start_deployment.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "obs_csi_driver_deploy_failed,platform_deploy_failed",
+    [(True, True), (False, True), (True, False)],
+)
+async def test_watch_config_helm_release_failed(
+    status_manager: mock.AsyncMock,
+    consul_client: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    stopped: primitives.AsyncDaemonStopperChecker,
+    is_obs_csi_driver_deploy_failed: mock.AsyncMock,
+    is_platform_deploy_failed: mock.AsyncMock,
+    logger: logging.Logger,
+    config: Config,
+    gcp_cluster: Cluster,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+    obs_csi_driver_deploy_failed: bool,
+    platform_deploy_failed: bool,
+) -> None:
+    from platform_operator.handlers import watch_config
+
+    status_manager.get_phase.return_value = PlatformPhase.DEPLOYED
+    is_obs_csi_driver_deploy_failed.return_value = obs_csi_driver_deploy_failed
+    is_platform_deploy_failed.return_value = platform_deploy_failed
     config_client.get_cluster.return_value = gcp_cluster
 
     await watch_config(
