@@ -1261,6 +1261,38 @@ async def test_watch_config_no_changes(
 
 
 @pytest.mark.parametrize(
+    "platform_phase", [PlatformPhase.DEPLOYING, PlatformPhase.DELETING]
+)
+async def test_watch_config_platform_deploying_deleting(
+    status_manager: mock.AsyncMock,
+    consul_client: mock.AsyncMock,
+    config_client: mock.AsyncMock,
+    helm_client: mock.AsyncMock,
+    stopped: primitives.AsyncDaemonStopperChecker,
+    logger: logging.Logger,
+    gcp_cluster: Cluster,
+    gcp_platform_body: bodies.Body,
+    gcp_platform_config: PlatformConfig,
+    platform_phase: PlatformPhase,
+) -> None:
+    from platform_operator.handlers import watch_config
+
+    status_manager.get_phase.return_value = platform_phase
+    config_client.get_cluster.return_value = gcp_cluster
+
+    await watch_config(
+        name=gcp_platform_config.cluster_name,
+        body=gcp_platform_body,
+        logger=logger,
+        stopped=stopped,
+    )
+
+    consul_client.wait_healthy.assert_called_once()
+    helm_client.init.assert_not_awaited()
+    status_manager.start_deployment.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
     "obs_csi_driver_deploy_failed,platform_deploy_failed",
     [(True, True), (False, True), (True, False)],
 )
