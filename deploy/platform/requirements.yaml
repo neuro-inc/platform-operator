@@ -54,7 +54,7 @@ dependencies:
     - aws
     - azure
   - name: platformsecrets
-    version: "21.3.31"
+    version: "21.4.23"
     repository: "@neuro"
     alias: platform-secrets
   - name: platform-reports
