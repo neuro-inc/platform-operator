@@ -540,6 +540,30 @@ class TestPlatformConfigFactory:
 
         assert result.image_pull_secret_names == ["secret", "platform-docker-config"]
 
+    def test_gcp_platform_config_without_tracing(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+    ) -> None:
+        del gcp_cluster["credentials"]["sentry"]
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result.sentry_dsn == URL("")
+        assert result.sentry_sample_rate is None
+
+    def test_gcp_platform_config_without_tracing_sample_rate(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+    ) -> None:
+        del gcp_cluster["credentials"]["sentry"]["sample_rate"]
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result.sentry_dsn
+        assert result.sentry_sample_rate is None
+
     def test_aws_platform_config(
         self,
         factory: PlatformConfigFactory,

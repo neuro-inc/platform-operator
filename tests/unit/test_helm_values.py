@@ -2,6 +2,7 @@ from dataclasses import replace
 from unittest import mock
 
 import pytest
+from yarl import URL
 
 from platform_operator.helm_values import HelmValuesFactory
 from platform_operator.models import Config, LabelsConfig, PlatformConfig
@@ -662,6 +663,32 @@ class TestHelmValuesFactory:
                 }
             },
             "secrets": [{"name": "platform-storage-token", "data": {"token": "token"}}],
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
+            },
+        }
+
+    def test_create_platform_storage_without_tracing_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        gcp_platform_config = replace(gcp_platform_config, sentry_dsn=URL(""))
+
+        result = factory.create_platform_storage_values(gcp_platform_config)
+
+        assert "sentry" not in result
+
+    def test_create_platform_storage_without_tracing_sample_rate_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        gcp_platform_config = replace(gcp_platform_config, sentry_sample_rate=None)
+
+        result = factory.create_platform_storage_values(gcp_platform_config)
+
+        assert result["sentry"] == {
+            "dsn": "https://sentry",
+            "clusterName": gcp_platform_config.cluster_name,
         }
 
     def test_create_gcp_platform_object_storage_values(
@@ -703,6 +730,11 @@ class TestHelmValuesFactory:
                     "data": {"key.json": "{}"},
                 },
             ],
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
+            },
         }
 
     def test_create_aws_platform_object_storage_values(
@@ -737,6 +769,7 @@ class TestHelmValuesFactory:
             "secrets": [
                 {"name": "platform-object-storage-token", "data": {"token": "token"}}
             ],
+            "sentry": mock.ANY,
         }
 
     def test_create_aws_platform_object_storage_values_with_role(
@@ -812,6 +845,7 @@ class TestHelmValuesFactory:
                     },
                 },
             ],
+            "sentry": mock.ANY,
         }
 
     def test_create_gcp_platform_registry_values(
@@ -875,6 +909,11 @@ class TestHelmValuesFactory:
                 "type": "oauth",
                 "url": "https://gcr.io",
             },
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
+            },
         }
 
     def test_create_aws_platform_registry_values(
@@ -913,6 +952,7 @@ class TestHelmValuesFactory:
                 "maxCatalogEntries": 1000,
                 "project": "neuro",
             },
+            "sentry": mock.ANY,
         }
 
     def test_create_aws_platform_registry_values_with_role(
@@ -988,6 +1028,7 @@ class TestHelmValuesFactory:
                 "type": "oauth",
                 "url": "https://platform.azurecr.io",
             },
+            "sentry": mock.ANY,
         }
 
     def test_create_on_prem_platform_registry_values(
@@ -1050,6 +1091,7 @@ class TestHelmValuesFactory:
                     }
                 },
             },
+            "sentry": mock.ANY,
         }
 
     def test_create_gcp_platform_monitoring_values(
@@ -1118,6 +1160,11 @@ class TestHelmValuesFactory:
                         "serviceAccountKeyBase64": "e30=",
                     },
                 }
+            },
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
             },
         }
 
@@ -1217,6 +1264,11 @@ class TestHelmValuesFactory:
                     "data": {"token": gcp_platform_config.token},
                 }
             ],
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
+            },
         }
 
     def test_create_gcp_platform_reports_values(
@@ -1262,6 +1314,11 @@ class TestHelmValuesFactory:
                     "data": {"key.json": "{}"},
                 },
             ],
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
+            },
             "platformJobs": {"namespace": "platform-jobs"},
             "grafanaProxy": {
                 "ingress": {
@@ -1550,6 +1607,11 @@ class TestHelmValuesFactory:
                     "data": {"token": gcp_platform_config.token},
                 }
             ],
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
+            },
         }
 
     def test_create_aws_platform_disk_api_values(
@@ -1619,6 +1681,11 @@ class TestHelmValuesFactory:
                     "data": {"token": gcp_platform_config.token},
                 }
             ],
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
+            },
         }
 
     def test_create_azure_platform_api_poller_values(

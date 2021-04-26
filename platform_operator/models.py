@@ -370,6 +370,8 @@ class PlatformConfig:
     monitoring_metrics_bucket_name: str = ""
     monitoring_metrics_storage_class_name: str = ""
     monitoring_metrics_storage_size: str = ""
+    sentry_dsn: URL = URL("")
+    sentry_sample_rate: Optional[float] = None
     gcp: Optional[GcpConfig] = None
     aws: Optional[AwsConfig] = None
     azure: Optional[AzureConfig] = None
@@ -607,6 +609,10 @@ class PlatformConfigFactory:
             grafana_password=cluster["credentials"]["grafana"]["password"],
             consul_url=self._config.consul_url,
             consul_install=not self._config.consul_installed,
+            sentry_dsn=URL(cluster["credentials"].get("sentry", {}).get("dsn", "")),
+            sentry_sample_rate=(
+                cluster["credentials"].get("sentry", {}).get("sample_rate")
+            ),
             gcp=(
                 self._create_gcp(platform_body["spec"], cluster)
                 if cluster.cloud_provider_type == "gcp"

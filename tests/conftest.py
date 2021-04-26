@@ -168,6 +168,7 @@ def cluster_factory(
                     "url": "https://dev.neu.ro",
                 },
                 "grafana": {"username": "admin", "password": "grafana_password"},
+                "sentry": {"dsn": "https://sentry", "sample_rate": 0.1},
             },
             "dns": {
                 "zone_id": "/hostedzone/id",
@@ -495,6 +496,8 @@ def gcp_platform_config(
         grafana_password="grafana_password",
         consul_url=URL("http://consul:8500"),
         consul_install=False,
+        sentry_dsn=URL("https://sentry"),
+        sentry_sample_rate=0.1,
         gcp=GcpConfig(
             project="project",
             region="us-central1",
