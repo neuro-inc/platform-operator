@@ -1428,7 +1428,7 @@ class TestHelmValuesFactory:
                 },
                 "initChownData": {
                     "image": {
-                        "repository": "neuro.io/grafana/grafana",
+                        "repository": "neuro.io/busybox",
                         "pullSecrets": ["platform-docker-config"],
                     }
                 },

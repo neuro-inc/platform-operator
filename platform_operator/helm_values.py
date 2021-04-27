@@ -1115,7 +1115,7 @@ class HelmValuesFactory:
                 },
                 "initChownData": {
                     "image": {
-                        "repository": f"{docker_server}/grafana/grafana",
+                        "repository": f"{docker_server}/busybox",
                         "pullSecrets": platform.image_pull_secret_names,
                     }
                 },
