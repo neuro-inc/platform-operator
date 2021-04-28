@@ -34,19 +34,19 @@ dependencies:
     tags:
     - on_prem
   - name: platformstorageapi
-    version: "21.2.8"
+    version: "21.4.26"
     repository: "@neuro"
     alias: platform-storage
   - name: platformregistryapi
-    version: "21.2.11"
+    version: "21.4.26"
     repository: "@neuro"
     alias: platform-registry
   - name: platformmonitoringapi
-    version: "21.4.13"
+    version: "21.4.26"
     repository: "@neuro"
     alias: platform-monitoring
   - name: platformobjectstorage
-    version: "21.1.13"
+    version: "21.4.26"
     repository: "@neuro"
     alias: platform-object-storage
     tags:
@@ -54,14 +54,14 @@ dependencies:
     - aws
     - azure
   - name: platformsecrets
-    version: "21.4.23"
+    version: "21.4.26"
     repository: "@neuro"
     alias: platform-secrets
   - name: platform-reports
-    version: "21.4.12"
+    version: "21.4.26"
     repository: "@neuro"
   - name: platformdiskapi
-    version: "21.3.31"
+    version: "21.4.26"
     repository: "@neuro"
     alias: platform-disk-api
     tags:
@@ -69,7 +69,7 @@ dependencies:
     - aws
     - azure
   - name: platformapi-poller
-    version: "21.4.12"
+    version: "21.4.26"
     repository: "@neuro"
     alias: platform-api-poller
 

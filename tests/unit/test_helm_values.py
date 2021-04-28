@@ -55,7 +55,6 @@ class TestHelmValuesFactory:
                 },
             },
             "ingress": {
-                "host": f"{cluster_name}.org.neu.ro",
                 "jobFallbackHost": "default.jobs-dev.neu.ro",
                 "registryHost": f"registry.{cluster_name}.org.neu.ro",
             },
