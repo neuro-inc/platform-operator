@@ -35,7 +35,6 @@ class HelmValuesFactory:
                 "name": platform.standard_storage_class_name,
             },
             "ingress": {
-                "host": platform.ingress_url.host,
                 "jobFallbackHost": str(platform.jobs_fallback_host),
                 "registryHost": platform.ingress_registry_url.host,
             },

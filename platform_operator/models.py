@@ -200,8 +200,8 @@ class Cluster(Dict[str, Any]):
         return self["ingress"]["acme_environment"]
 
     @property
-    def dns_zone_name(self) -> str:
-        return self["dns"]["zone_name"]
+    def dns_name(self) -> str:
+        return self["dns"]["name"]
 
 
 class StorageSpec(Dict[str, Any]):
@@ -334,9 +334,7 @@ class PlatformConfig:
     standard_storage_class_name: str
     kubernetes_version: str
     kubernetes_node_labels: LabelsConfig
-    dns_zone_id: str
-    dns_zone_name: str
-    dns_zone_name_servers: Sequence[str]
+    dns_name: str
     ingress_url: URL
     ingress_registry_url: URL
     ingress_metrics_url: URL
@@ -384,20 +382,15 @@ class PlatformConfig:
     ) -> Optional[Dict[str, Any]]:
         if not traefik_service and not self.ingress_public_ips:
             return None
-        result: Dict[str, Any] = {
-            "zone_id": self.dns_zone_id,
-            "zone_name": self.dns_zone_name,
-            "name_servers": self.dns_zone_name_servers,
-            "a_records": [],
-        }
+        result: Dict[str, Any] = {"name": self.dns_name, "a_records": []}
         if self.ingress_public_ips:
             ips = [str(ip) for ip in self.ingress_public_ips]
             result["a_records"].extend(
                 (
-                    {"name": self.dns_zone_name, "ips": ips},
-                    {"name": f"*.jobs.{self.dns_zone_name}", "ips": ips},
-                    {"name": f"registry.{self.dns_zone_name}", "ips": ips},
-                    {"name": f"metrics.{self.dns_zone_name}", "ips": ips},
+                    {"name": f"{self.dns_name}.", "ips": ips},
+                    {"name": f"*.jobs.{self.dns_name}.", "ips": ips},
+                    {"name": f"registry.{self.dns_name}.", "ips": ips},
+                    {"name": f"metrics.{self.dns_name}.", "ips": ips},
                 )
             )
         elif self.aws and traefik_service:
@@ -409,22 +402,22 @@ class PlatformConfig:
             result["a_records"].extend(
                 (
                     {
-                        "name": self.dns_zone_name,
+                        "name": f"{self.dns_name}.",
                         "dns_name": traefik_host,
                         "zone_id": traefik_zone_id,
                     },
                     {
-                        "name": f"*.jobs.{self.dns_zone_name}",
+                        "name": f"*.jobs.{self.dns_name}.",
                         "dns_name": traefik_host,
                         "zone_id": traefik_zone_id,
                     },
                     {
-                        "name": f"registry.{self.dns_zone_name}",
+                        "name": f"registry.{self.dns_name}.",
                         "dns_name": traefik_host,
                         "zone_id": traefik_zone_id,
                     },
                     {
-                        "name": f"metrics.{self.dns_zone_name}",
+                        "name": f"metrics.{self.dns_name}.",
                         "dns_name": traefik_host,
                         "zone_id": traefik_zone_id,
                     },
@@ -434,10 +427,10 @@ class PlatformConfig:
             traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0]["ip"]
             result["a_records"].extend(
                 (
-                    {"name": self.dns_zone_name, "ips": [traefik_host]},
-                    {"name": f"*.jobs.{self.dns_zone_name}", "ips": [traefik_host]},
-                    {"name": f"registry.{self.dns_zone_name}", "ips": [traefik_host]},
-                    {"name": f"metrics.{self.dns_zone_name}", "ips": [traefik_host]},
+                    {"name": f"{self.dns_name}.", "ips": [traefik_host]},
+                    {"name": f"*.jobs.{self.dns_name}.", "ips": [traefik_host]},
+                    {"name": f"registry.{self.dns_name}.", "ips": [traefik_host]},
+                    {"name": f"metrics.{self.dns_name}.", "ips": [traefik_host]},
                 )
             )
         return result
@@ -485,7 +478,7 @@ class PlatformConfigFactory:
         self._config = config
 
     def create(self, platform_body: bodies.Body, cluster: Cluster) -> "PlatformConfig":
-        ingress_host = cluster["dns"]["zone_name"].strip(".")
+        ingress_host = cluster.dns_name
         standard_storage_class_name = (
             f"{self._config.platform_namespace}-standard-topology-aware"
         )
@@ -546,9 +539,7 @@ class PlatformConfigFactory:
                     "preemptible", LabelsConfig.preemptible
                 ),
             ),
-            dns_zone_id=cluster["dns"]["zone_id"],
-            dns_zone_name=cluster["dns"]["zone_name"],
-            dns_zone_name_servers=cluster["dns"]["name_servers"],
+            dns_name=cluster.dns_name,
             ingress_url=URL(f"https://{ingress_host}"),
             ingress_registry_url=URL(f"https://registry.{ingress_host}"),
             ingress_metrics_url=URL(f"https://metrics.{ingress_host}"),

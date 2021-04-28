@@ -34,7 +34,6 @@ standardStorageClass:
   name: ""
 
 ingress: {}
-  # host: default.org.neu.ro
   # jobFallbackHost: default.jobs-dev.neu.ro
   # registryHost: registry.default.org.neu.ro
 
