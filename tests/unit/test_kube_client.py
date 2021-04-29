@@ -7,6 +7,7 @@ import pytest
 from platform_operator.kube_client import (
     KubeClient,
     PlatformConditionType,
+    PlatformPhase,
     PlatformStatusManager,
 )
 
@@ -36,6 +37,17 @@ class TestPlatformStatusManager:
                 }
             ],
         }
+
+    async def test_get_pending_phase(
+        self,
+        kube_client: mock.AsyncMock,
+        manager: PlatformStatusManager,
+    ) -> None:
+        kube_client.get_platform_status.return_value = None
+
+        phase = await manager.get_phase("neuro")
+
+        assert phase == PlatformPhase.PENDING
 
     async def test_start_new_deployment(
         self,

@@ -21,6 +21,7 @@ spec:
 {{- else if eq .Values.storage.type "azureFile" }}
   azureFile:
     secretName: {{ include "platform.azure.storageAccount.secretName" . }}
+    secretNamespace: {{ .Release.Namespace }}
     shareName: {{ .Values.storage.azureFile.shareName }}
     readOnly: false
   mountOptions:
