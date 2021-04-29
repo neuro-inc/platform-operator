@@ -307,6 +307,10 @@ async def watch_config(
 async def _update(name: str, body: bodies.Body, logger: Logger) -> None:
     phase = await app.status_manager.get_phase(name)
 
+    if phase == PlatformPhase.PENDING:
+        logger.info("Platform has not been installed yet, nothing to update")
+        return
+
     if phase == PlatformPhase.DEPLOYING or phase == PlatformPhase.DELETING:
         logger.info("Cannot update platform while it is in %s phase", phase.value)
         return

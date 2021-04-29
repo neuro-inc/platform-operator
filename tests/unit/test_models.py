@@ -170,10 +170,10 @@ class TestCluster:
 
         assert cluster.acme_environment == "staging"
 
-    def test_dns_zone_name(self) -> None:
-        cluster = Cluster({"dns": {"zone_name": "test.org.neu.ro."}})
+    def test_dns_name(self) -> None:
+        cluster = Cluster({"dns": {"name": "test.org.neu.ro"}})
 
-        assert cluster.dns_zone_name == "test.org.neu.ro."
+        assert cluster.dns_name == "test.org.neu.ro"
 
 
 class TestPlatformConfig:
@@ -201,17 +201,15 @@ class TestPlatformConfig:
         self, gcp_platform_config: PlatformConfig, traefik_service: Dict[str, Any]
     ) -> None:
         result = gcp_platform_config.create_dns_config(traefik_service=traefik_service)
-        zone_name = gcp_platform_config.dns_zone_name
+        dns_name = gcp_platform_config.dns_name
 
         assert result == {
-            "zone_id": gcp_platform_config.dns_zone_id,
-            "zone_name": gcp_platform_config.dns_zone_name,
-            "name_servers": gcp_platform_config.dns_zone_name_servers,
+            "name": gcp_platform_config.dns_name,
             "a_records": [
-                {"name": zone_name, "ips": ["192.168.0.1"]},
-                {"name": f"*.jobs.{zone_name}", "ips": ["192.168.0.1"]},
-                {"name": f"registry.{zone_name}", "ips": ["192.168.0.1"]},
-                {"name": f"metrics.{zone_name}", "ips": ["192.168.0.1"]},
+                {"name": f"{dns_name}.", "ips": ["192.168.0.1"]},
+                {"name": f"*.jobs.{dns_name}.", "ips": ["192.168.0.1"]},
+                {"name": f"registry.{dns_name}.", "ips": ["192.168.0.1"]},
+                {"name": f"metrics.{dns_name}.", "ips": ["192.168.0.1"]},
             ],
         }
 
@@ -219,17 +217,15 @@ class TestPlatformConfig:
         self, on_prem_platform_config: PlatformConfig
     ) -> None:
         result = on_prem_platform_config.create_dns_config()
-        zone_name = on_prem_platform_config.dns_zone_name
+        dns_name = on_prem_platform_config.dns_name
 
         assert result == {
-            "zone_id": on_prem_platform_config.dns_zone_id,
-            "zone_name": on_prem_platform_config.dns_zone_name,
-            "name_servers": on_prem_platform_config.dns_zone_name_servers,
+            "name": on_prem_platform_config.dns_name,
             "a_records": [
-                {"name": zone_name, "ips": ["192.168.0.3"]},
-                {"name": f"*.jobs.{zone_name}", "ips": ["192.168.0.3"]},
-                {"name": f"registry.{zone_name}", "ips": ["192.168.0.3"]},
-                {"name": f"metrics.{zone_name}", "ips": ["192.168.0.3"]},
+                {"name": f"{dns_name}.", "ips": ["192.168.0.3"]},
+                {"name": f"*.jobs.{dns_name}.", "ips": ["192.168.0.3"]},
+                {"name": f"registry.{dns_name}.", "ips": ["192.168.0.3"]},
+                {"name": f"metrics.{dns_name}.", "ips": ["192.168.0.3"]},
             ],
         }
 
@@ -242,30 +238,28 @@ class TestPlatformConfig:
         result = aws_platform_config.create_dns_config(
             traefik_service=aws_traefik_service, aws_traefik_lb=aws_traefik_lb
         )
-        zone_name = aws_platform_config.dns_zone_name
+        dns_name = aws_platform_config.dns_name
 
         assert result == {
-            "zone_id": aws_platform_config.dns_zone_id,
-            "zone_name": aws_platform_config.dns_zone_name,
-            "name_servers": aws_platform_config.dns_zone_name_servers,
+            "name": aws_platform_config.dns_name,
             "a_records": [
                 {
-                    "name": zone_name,
+                    "name": f"{dns_name}.",
                     "dns_name": "traefik",
                     "zone_id": "/hostedzone/traefik",
                 },
                 {
-                    "name": f"*.jobs.{zone_name}",
+                    "name": f"*.jobs.{dns_name}.",
                     "dns_name": "traefik",
                     "zone_id": "/hostedzone/traefik",
                 },
                 {
-                    "name": f"registry.{zone_name}",
+                    "name": f"registry.{dns_name}.",
                     "dns_name": "traefik",
                     "zone_id": "/hostedzone/traefik",
                 },
                 {
-                    "name": f"metrics.{zone_name}",
+                    "name": f"metrics.{dns_name}.",
                     "dns_name": "traefik",
                     "zone_id": "/hostedzone/traefik",
                 },
@@ -286,7 +280,7 @@ class TestPlatformConfig:
         result = gcp_platform_config.create_cluster_config(
             traefik_service=traefik_service,
         )
-        zone_name = gcp_platform_config.dns_zone_name
+        dns_name = gcp_platform_config.dns_name
 
         assert result == {
             "orchestrator": {
@@ -310,14 +304,12 @@ class TestPlatformConfig:
                 ],
             },
             "dns": {
-                "zone_id": gcp_platform_config.dns_zone_id,
-                "zone_name": gcp_platform_config.dns_zone_name,
-                "name_servers": gcp_platform_config.dns_zone_name_servers,
+                "name": gcp_platform_config.dns_name,
                 "a_records": [
-                    {"name": zone_name, "ips": ["192.168.0.1"]},
-                    {"name": f"*.jobs.{zone_name}", "ips": ["192.168.0.1"]},
-                    {"name": f"registry.{zone_name}", "ips": ["192.168.0.1"]},
-                    {"name": f"metrics.{zone_name}", "ips": ["192.168.0.1"]},
+                    {"name": f"{dns_name}.", "ips": ["192.168.0.1"]},
+                    {"name": f"*.jobs.{dns_name}.", "ips": ["192.168.0.1"]},
+                    {"name": f"registry.{dns_name}.", "ips": ["192.168.0.1"]},
+                    {"name": f"metrics.{dns_name}.", "ips": ["192.168.0.1"]},
                 ],
             },
         }
@@ -539,6 +531,30 @@ class TestPlatformConfigFactory:
         result = factory.create(gcp_platform_body, gcp_cluster)
 
         assert result.image_pull_secret_names == ["secret", "platform-docker-config"]
+
+    def test_gcp_platform_config_without_tracing(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+    ) -> None:
+        del gcp_cluster["credentials"]["sentry"]
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result.sentry_dsn == URL("")
+        assert result.sentry_sample_rate is None
+
+    def test_gcp_platform_config_without_tracing_sample_rate(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: bodies.Body,
+        gcp_cluster: Cluster,
+    ) -> None:
+        del gcp_cluster["credentials"]["sentry"]["sample_rate"]
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result.sentry_dsn
+        assert result.sentry_sample_rate is None
 
     def test_aws_platform_config(
         self,

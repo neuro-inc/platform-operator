@@ -168,12 +168,9 @@ def cluster_factory(
                     "url": "https://dev.neu.ro",
                 },
                 "grafana": {"username": "admin", "password": "grafana_password"},
+                "sentry": {"dsn": "https://sentry", "sample_rate": 0.1},
             },
-            "dns": {
-                "zone_id": "/hostedzone/id",
-                "zone_name": f"{name}.org.neu.ro.",
-                "name_servers": ["192.168.0.2"],
-            },
+            "dns": {"name": f"{name}.org.neu.ro"},
             "disks": {"storage_limit_per_user_gb": 10240},
             "ingress": {
                 "acme_environment": "staging",
@@ -439,9 +436,7 @@ def gcp_platform_config(
             accelerator="platform.neuromation.io/accelerator",
             preemptible="platform.neuromation.io/preemptible",
         ),
-        dns_zone_id="/hostedzone/id",
-        dns_zone_name=f"{cluster_name}.org.neu.ro.",
-        dns_zone_name_servers=["192.168.0.2"],
+        dns_name=f"{cluster_name}.org.neu.ro",
         jobs_namespace_create=True,
         jobs_namespace="platform-jobs",
         jobs_node_pools=[
@@ -495,6 +490,8 @@ def gcp_platform_config(
         grafana_password="grafana_password",
         consul_url=URL("http://consul:8500"),
         consul_install=False,
+        sentry_dsn=URL("https://sentry"),
+        sentry_sample_rate=0.1,
         gcp=GcpConfig(
             project="project",
             region="us-central1",

@@ -35,7 +35,6 @@ class HelmValuesFactory:
                 "name": platform.standard_storage_class_name,
             },
             "ingress": {
-                "host": platform.ingress_url.host,
                 "jobFallbackHost": str(platform.jobs_fallback_host),
                 "registryHost": platform.ingress_registry_url.host,
             },
@@ -506,11 +505,27 @@ class HelmValuesFactory:
             "gpuNodeLabel": platform.kubernetes_node_labels.accelerator,
         }
 
+    def _create_tracing_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+        if not platform.sentry_dsn:
+            return {}
+
+        result: Dict[str, Any] = {
+            "sentry": {
+                "dsn": str(platform.sentry_dsn),
+                "clusterName": platform.cluster_name,
+            }
+        }
+
+        if platform.sentry_sample_rate is not None:
+            result["sentry"]["sampleRate"] = platform.sentry_sample_rate
+
+        return result
+
     def create_platform_storage_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
         docker_server = platform.docker_registry.url.host
-        return {
+        result = {
             "NP_CLUSTER_NAME": platform.cluster_name,
             "NP_STORAGE_AUTH_URL": str(platform.auth_url),
             "NP_STORAGE_PVC_CLAIM_NAME": f"{self._release_names.platform}-storage",
@@ -534,6 +549,8 @@ class HelmValuesFactory:
                 }
             ],
         }
+        result.update(**self._create_tracing_values(platform))
+        return result
 
     def create_platform_object_storage_values(
         self, platform: PlatformConfig
@@ -564,6 +581,7 @@ class HelmValuesFactory:
                 }
             ],
         }
+        result.update(**self._create_tracing_values(platform))
         if platform.gcp:
             result["objectStorage"] = {
                 "provider": "gcp",
@@ -657,6 +675,7 @@ class HelmValuesFactory:
                 }
             ],
         }
+        result.update(**self._create_tracing_values(platform))
         if platform.gcp:
             gcp_key_secret_name = f"{self._release_names.platform}-registry-gcp-key"
             result["upstreamRegistry"] = {
@@ -825,6 +844,7 @@ class HelmValuesFactory:
                 }
             ],
         }
+        result.update(**self._create_tracing_values(platform))
         if platform.gcp:
             result["logs"] = {
                 "persistence": {
@@ -912,6 +932,7 @@ class HelmValuesFactory:
                 }
             ],
         }
+        result.update(**self._create_tracing_values(platform))
         return result
 
     def create_platform_reports_values(
@@ -1093,7 +1114,7 @@ class HelmValuesFactory:
                 },
                 "initChownData": {
                     "image": {
-                        "repository": f"{docker_server}/grafana/grafana",
+                        "repository": f"{docker_server}/busybox",
                         "pullSecrets": platform.image_pull_secret_names,
                     }
                 },
@@ -1107,6 +1128,7 @@ class HelmValuesFactory:
                 "adminPassword": platform.grafana_password,
             },
         }
+        result.update(**self._create_tracing_values(platform))
         prometheus_spec = result["prometheus-operator"]["prometheus"]["prometheusSpec"]
         if platform.gcp:
             result["thanos"]["objstore"] = {
@@ -1230,6 +1252,7 @@ class HelmValuesFactory:
                 }
             ],
         }
+        result.update(**self._create_tracing_values(platform))
         if platform.aws:
             result["NP_DISK_PROVIDER"] = "aws"
         if platform.azure:
@@ -1281,6 +1304,7 @@ class HelmValuesFactory:
                 }
             ],
         }
+        result.update(**self._create_tracing_values(platform))
         if platform.azure:
             result[
                 "NP_KUBE_POD_PREEMPTIBLE_TOLERATION_KEY"
