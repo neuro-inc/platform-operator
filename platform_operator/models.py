@@ -600,7 +600,9 @@ class PlatformConfigFactory:
             grafana_password=cluster["credentials"]["grafana"]["password"],
             consul_url=self._config.consul_url,
             consul_install=not self._config.consul_installed,
-            sentry_dsn=URL(cluster["credentials"].get("sentry", {}).get("dsn", "")),
+            sentry_dsn=URL(
+                cluster["credentials"].get("sentry", {}).get("public_dsn", "")
+            ),
             sentry_sample_rate=(
                 cluster["credentials"].get("sentry", {}).get("sample_rate")
             ),
