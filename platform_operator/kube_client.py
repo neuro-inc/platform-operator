@@ -23,6 +23,7 @@ PLATFORM_PLURAL = "platforms"
 
 
 class PlatformPhase(str, Enum):
+    PENDING = "Pending"
     DEPLOYING = "Deploying"
     DELETING = "Deleting"
     DEPLOYED = "Deployed"
@@ -351,7 +352,13 @@ class PlatformStatusManager:
         if payload:
             self._status[name] = PlatformStatus(self._deserialize(payload))
         else:
-            self._status[name] = PlatformStatus({"conditions": {}})
+            self._status[name] = PlatformStatus(
+                {
+                    "phase": PlatformPhase.PENDING.value,
+                    "retries": 0,
+                    "conditions": {},
+                }
+            )
 
     def _deserialize(cls, payload: Dict[str, Any]) -> "PlatformStatus":
         status = {

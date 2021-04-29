@@ -1261,7 +1261,8 @@ async def test_watch_config_no_changes(
 
 
 @pytest.mark.parametrize(
-    "platform_phase", [PlatformPhase.DEPLOYING, PlatformPhase.DELETING]
+    "platform_phase",
+    [PlatformPhase.PENDING, PlatformPhase.DEPLOYING, PlatformPhase.DELETING],
 )
 async def test_watch_config_platform_deploying_deleting(
     status_manager: mock.AsyncMock,
