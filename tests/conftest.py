@@ -168,7 +168,7 @@ def cluster_factory(
                     "url": "https://dev.neu.ro",
                 },
                 "grafana": {"username": "admin", "password": "grafana_password"},
-                "sentry": {"dsn": "https://sentry", "sample_rate": 0.1},
+                "sentry": {"public_dsn": "https://sentry", "sample_rate": 0.1},
             },
             "dns": {"name": f"{name}.org.neu.ro"},
             "disks": {"storage_limit_per_user_gb": 10240},
