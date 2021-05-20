@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 install_requires = (
     "kopf==1.30.1",
-    "aiohttp==3.7.4",
+    "aiohttp==3.7.4.post0",
     "pyyaml==5.4.1",
     "aiobotocore==1.3.0",
 )
