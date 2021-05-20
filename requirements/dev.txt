@@ -1,5 +1,5 @@
 -e .
-black==21.4b2
+black==21.5b1
 flake8==3.9.2
 flake8-isort==4.0.0
 moto[server]==2.0.7
