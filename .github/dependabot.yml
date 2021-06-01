@@ -8,7 +8,7 @@ registries:
 
 updates:
 - package-ecosystem: pip
-  directory: "/"
+  directory: /
   schedule:
     interval: daily
     time: "03:00"
@@ -17,7 +17,7 @@ updates:
   registries:
   - python-index-devpi-dev-neu-ro-testuser-dev
 - package-ecosystem: github-actions
-  directory: "/"
+  directory: /
   schedule:
     interval: daily
     time: "03:00"
