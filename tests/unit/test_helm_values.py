@@ -364,6 +364,15 @@ class TestHelmValuesFactory:
                 "create": True,
                 "gcpServiceAccountKeyBase64": "e30=",
             },
+            "imagePullSecret": {
+                "create": True,
+                "credentials": {
+                    "url": "https://neuro.io",
+                    "email": f"{gcp_platform_config.cluster_name}@neuromation.io",
+                    "username": gcp_platform_config.cluster_name,
+                    "password": "password",
+                },
+            },
         }
 
     def test_create_consul_values(

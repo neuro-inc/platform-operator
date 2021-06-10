@@ -214,6 +214,15 @@ class HelmValuesFactory:
                 "create": True,
                 "gcpServiceAccountKeyBase64": platform.gcp.service_account_key_base64,
             },
+            "imagePullSecret": {
+                "create": True,
+                "credentials": {
+                    "url": str(platform.docker_registry.url),
+                    "email": platform.docker_registry.email,
+                    "username": platform.docker_registry.username,
+                    "password": platform.docker_registry.password,
+                },
+            },
         }
 
     def create_docker_registry_values(self, platform: PlatformConfig) -> Dict[str, Any]:
