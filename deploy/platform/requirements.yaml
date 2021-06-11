@@ -58,7 +58,7 @@ dependencies:
     repository: "@neuro"
     alias: platform-secrets
   - name: platform-reports
-    version: "21.5.18"
+    version: "21.6.11"
     repository: "@neuro"
   - name: platformdiskapi
     version: "21.5.14"
