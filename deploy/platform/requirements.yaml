@@ -54,14 +54,14 @@ dependencies:
     - aws
     - azure
   - name: platformsecrets
-    version: "21.4.26"
+    version: "21.6.15"
     repository: "@neuro"
     alias: platform-secrets
   - name: platform-reports
     version: "21.6.11"
     repository: "@neuro"
   - name: platformdiskapi
-    version: "21.5.14"
+    version: "21.6.16"
     repository: "@neuro"
     alias: platform-disk-api
     tags:
