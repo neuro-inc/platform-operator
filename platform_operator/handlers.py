@@ -266,16 +266,16 @@ async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def watch_config(
-    name: str,
-    body: kopf.Body,
-    stopped: kopf.AsyncDaemonStopperChecker,
-    **_: Any,
+    name: str, body: kopf.Body, stopped: kopf.DaemonStopped, **_: Any
 ) -> None:
     logger = logging.getLogger("watch_config")
 
     await app.consul_client.wait_healthy(sleep_s=0.5)
 
     while True:
+        # Async daemons do not need the `stopped` signal.
+        # They can rely on `asyncio.CancelledError` raised.
+        # Used in tests.
         if stopped:
             break
 

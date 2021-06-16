@@ -172,8 +172,8 @@ def aws_traefik_lb() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def stopped() -> kopf.AsyncDaemonStopperChecker:
-    stopped = mock.MagicMock(kopf.AsyncDaemonStopperChecker)
+def stopped() -> kopf.DaemonStopped:
+    stopped = mock.MagicMock()
     stopped.__bool__.side_effect = [False, True]
     return stopped
 
@@ -1046,7 +1046,7 @@ async def test_watch_config(
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    stopped: kopf.AsyncDaemonStopperChecker,
+    stopped: kopf.DaemonStopped,
     certificate_store: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     is_obs_csi_driver_deploy_failed: mock.AsyncMock,
@@ -1160,7 +1160,7 @@ async def test_watch_config_all_charts_deployed(
     consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    stopped: kopf.AsyncDaemonStopperChecker,
+    stopped: kopf.DaemonStopped,
     certificate_store: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
@@ -1220,7 +1220,7 @@ async def test_watch_config_no_changes(
     consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    stopped: kopf.AsyncDaemonStopperChecker,
+    stopped: kopf.DaemonStopped,
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
@@ -1268,7 +1268,7 @@ async def test_watch_config_platform_deploying_deleting(
     consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    stopped: kopf.AsyncDaemonStopperChecker,
+    stopped: kopf.DaemonStopped,
     logger: logging.Logger,
     gcp_cluster: Cluster,
     gcp_platform_body: kopf.Body,
@@ -1301,7 +1301,7 @@ async def test_watch_config_helm_release_failed(
     consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    stopped: kopf.AsyncDaemonStopperChecker,
+    stopped: kopf.DaemonStopped,
     is_obs_csi_driver_deploy_failed: mock.AsyncMock,
     is_platform_deploy_failed: mock.AsyncMock,
     logger: logging.Logger,
@@ -1346,7 +1346,7 @@ async def test_watch_config_helm_release_failed(
 async def test_watch_config_ignores_error(
     config_client: mock.AsyncMock,
     logger: logging.Logger,
-    stopped: kopf.AsyncDaemonStopperChecker,
+    stopped: kopf.DaemonStopped,
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
@@ -1368,7 +1368,7 @@ async def test_watch_config_update_failed(
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
     logger: logging.Logger,
-    stopped: kopf.AsyncDaemonStopperChecker,
+    stopped: kopf.DaemonStopped,
     is_platform_deploy_required: mock.AsyncMock,
     gcp_cluster: Cluster,
     gcp_platform_body: kopf.Body,
