@@ -37,5 +37,13 @@ consul:
   server:
     enabled: true
 
+    resources:
+      requests:
+        cpu: "2"
+        memory: "4Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+
   ui:
     enabled: true
