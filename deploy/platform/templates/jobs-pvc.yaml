@@ -13,4 +13,6 @@ spec:
     requests:
       storage: {{ .Values.storage.size }}
   storageClassName: {{ .Values.storage.storageClassName | default "" | quote }}
+  {{- if ne .Values.storage.type "kubernetes" }}
   volumeName: {{ include "platform.storage.jobsPvName" . }}
+  {{- end }}

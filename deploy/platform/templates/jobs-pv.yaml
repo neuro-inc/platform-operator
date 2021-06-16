@@ -12,7 +12,6 @@ spec:
   - ReadWriteMany
   volumeMode: Filesystem
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: {{ .Values.storage.storageClassName | default "" | quote }}
 {{- if eq .Values.storage.type "nfs" }}
   nfs:
     server: {{ .Values.storage.nfs.server }}
