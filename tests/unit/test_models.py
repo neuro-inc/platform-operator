@@ -2,8 +2,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable, Dict
 
+import kopf
 import pytest
-from kopf.structs import bodies
 from yarl import URL
 
 from platform_operator.models import (
@@ -331,7 +331,7 @@ class TestPlatformConfigFactory:
     def test_platform_config_with_custom_labels(
         self,
         factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
         gcp_platform_body["spec"]["kubernetes"]["nodeLabels"] = {
@@ -353,7 +353,7 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config(
         self,
         factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
@@ -364,7 +364,7 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_without_tpu(
         self,
         factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
         resource_pool_type_factory: Callable[[], Dict[str, Any]],
@@ -383,7 +383,7 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_without_service_account_key_in_spec(
         self,
         factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
@@ -407,7 +407,7 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_without_service_account_key___fails(
         self,
         factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
         del gcp_platform_body["spec"]["iam"]["gcp"]["serviceAccountKeyBase64"]
@@ -419,7 +419,7 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_with_kubernetes_storage(
         self,
         factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
@@ -445,7 +445,7 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_with_gcs_storage(
         self,
         factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
@@ -466,7 +466,7 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_without_storage___fails(
         self,
         factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
         gcp_platform_body["spec"]["storage"] = {}
@@ -477,7 +477,7 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_with_ingress_controller_disabled(
         self,
         factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
@@ -491,7 +491,7 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_with_custom_jobs_namespace(
         self,
         factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
         gcp_platform_body["spec"]["kubernetes"]["jobsNamespace"] = {
@@ -506,7 +506,7 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_with_custom_docker_config_secret(
         self,
         factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
         gcp_platform_body["spec"]["kubernetes"]["dockerConfigSecret"] = {
@@ -522,7 +522,7 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_with_service_account_image_pull_secrets(
         self,
         factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
         gcp_platform_body["spec"]["kubernetes"]["serviceAccount"] = {
@@ -535,7 +535,7 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_without_tracing(
         self,
         factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
         del gcp_cluster["credentials"]["sentry"]
@@ -547,7 +547,7 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_without_tracing_sample_rate(
         self,
         factory: PlatformConfigFactory,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
         del gcp_cluster["credentials"]["sentry"]["sample_rate"]
@@ -559,7 +559,7 @@ class TestPlatformConfigFactory:
     def test_aws_platform_config(
         self,
         factory: PlatformConfigFactory,
-        aws_platform_body: bodies.Body,
+        aws_platform_body: kopf.Body,
         aws_cluster: Cluster,
         aws_platform_config: PlatformConfig,
     ) -> None:
@@ -570,7 +570,7 @@ class TestPlatformConfigFactory:
     def test_aws_platform_config_with_roles(
         self,
         factory: PlatformConfigFactory,
-        aws_platform_body: bodies.Body,
+        aws_platform_body: kopf.Body,
         aws_cluster: Cluster,
         aws_platform_config: PlatformConfig,
     ) -> None:
@@ -588,7 +588,7 @@ class TestPlatformConfigFactory:
     def test_aws_platform_config_without_registry__fails(
         self,
         factory: PlatformConfigFactory,
-        aws_platform_body: bodies.Body,
+        aws_platform_body: kopf.Body,
         aws_cluster: Cluster,
     ) -> None:
         del aws_platform_body["spec"]["registry"]
@@ -599,7 +599,7 @@ class TestPlatformConfigFactory:
     def test_aws_platform_config_with_kubernetes_storage(
         self,
         factory: PlatformConfigFactory,
-        aws_platform_body: bodies.Body,
+        aws_platform_body: kopf.Body,
         aws_cluster: Cluster,
         aws_platform_config: PlatformConfig,
     ) -> None:
@@ -625,7 +625,7 @@ class TestPlatformConfigFactory:
     def test_aws_platform_config_without_storage__fails(
         self,
         factory: PlatformConfigFactory,
-        aws_platform_body: bodies.Body,
+        aws_platform_body: kopf.Body,
         aws_cluster: Cluster,
     ) -> None:
         aws_platform_body["spec"]["storage"] = {}
@@ -636,7 +636,7 @@ class TestPlatformConfigFactory:
     def test_azure_platform_config(
         self,
         factory: PlatformConfigFactory,
-        azure_platform_body: bodies.Body,
+        azure_platform_body: kopf.Body,
         azure_cluster: Cluster,
         azure_platform_config: PlatformConfig,
     ) -> None:
@@ -647,7 +647,7 @@ class TestPlatformConfigFactory:
     def test_azure_platform_config_without_registry__fails(
         self,
         factory: PlatformConfigFactory,
-        azure_platform_body: bodies.Body,
+        azure_platform_body: kopf.Body,
         azure_cluster: Cluster,
     ) -> None:
         azure_platform_body["spec"]["registry"] = {}
@@ -658,7 +658,7 @@ class TestPlatformConfigFactory:
     def test_azure_platform_config_with_kubernetes_storage(
         self,
         factory: PlatformConfigFactory,
-        azure_platform_body: bodies.Body,
+        azure_platform_body: kopf.Body,
         azure_cluster: Cluster,
         azure_platform_config: PlatformConfig,
     ) -> None:
@@ -687,7 +687,7 @@ class TestPlatformConfigFactory:
     def test_azure_platform_config_with_nfs_storage(
         self,
         factory: PlatformConfigFactory,
-        azure_platform_body: bodies.Body,
+        azure_platform_body: kopf.Body,
         azure_cluster: Cluster,
         azure_platform_config: PlatformConfig,
     ) -> None:
@@ -712,7 +712,7 @@ class TestPlatformConfigFactory:
     def test_azure_platform_config_without_storage__fails(
         self,
         factory: PlatformConfigFactory,
-        azure_platform_body: bodies.Body,
+        azure_platform_body: kopf.Body,
         azure_cluster: Cluster,
     ) -> None:
         azure_platform_body["spec"]["storage"] = {}
@@ -723,7 +723,7 @@ class TestPlatformConfigFactory:
     def test_azure_platform_config_without_blob_storage__fails(
         self,
         factory: PlatformConfigFactory,
-        azure_platform_body: bodies.Body,
+        azure_platform_body: kopf.Body,
         azure_cluster: Cluster,
         azure_platform_config: PlatformConfig,
     ) -> None:
@@ -735,7 +735,7 @@ class TestPlatformConfigFactory:
     def test_on_prem_platform_config(
         self,
         factory: PlatformConfigFactory,
-        on_prem_platform_body: bodies.Body,
+        on_prem_platform_body: kopf.Body,
         on_prem_cluster: Cluster,
         on_prem_platform_config: PlatformConfig,
     ) -> None:
@@ -746,7 +746,7 @@ class TestPlatformConfigFactory:
     def test_on_prem_platform_config_with_default_persistence_sizes(
         self,
         factory: PlatformConfigFactory,
-        on_prem_platform_body: bodies.Body,
+        on_prem_platform_body: kopf.Body,
         on_prem_cluster: Cluster,
     ) -> None:
         del on_prem_platform_body["spec"]["registry"]["kubernetes"]["persistence"][
@@ -763,7 +763,7 @@ class TestPlatformConfigFactory:
     def test_on_prem_platform_config_with_nfs_storage(
         self,
         factory: PlatformConfigFactory,
-        on_prem_platform_body: bodies.Body,
+        on_prem_platform_body: kopf.Body,
         on_prem_cluster: Cluster,
         on_prem_platform_config: PlatformConfig,
     ) -> None:
@@ -787,7 +787,7 @@ class TestPlatformConfigFactory:
     def test_on_prem_platform_config_without_node_ports__fails(
         self,
         factory: PlatformConfigFactory,
-        on_prem_platform_body: bodies.Body,
+        on_prem_platform_body: kopf.Body,
         on_prem_cluster: Cluster,
         on_prem_platform_config: PlatformConfig,
     ) -> None:

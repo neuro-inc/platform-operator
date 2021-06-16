@@ -5,7 +5,6 @@ from unittest import mock
 
 import kopf
 import pytest
-from kopf.structs import bodies, primitives
 
 from platform_operator.aws_client import AwsElbClient
 from platform_operator.certificate_store import CertificateStore
@@ -173,8 +172,8 @@ def aws_traefik_lb() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def stopped() -> primitives.AsyncDaemonStopperChecker:
-    stopped = mock.MagicMock(primitives.AsyncDaemonStopperChecker)
+def stopped() -> kopf.AsyncDaemonStopperChecker:
+    stopped = mock.MagicMock(kopf.AsyncDaemonStopperChecker)
     stopped.__bool__.side_effect = [False, True]
     return stopped
 
@@ -512,7 +511,7 @@ async def test_deploy(
     logger: logging.Logger,
     config: Config,
     gcp_cluster: Cluster,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import deploy
@@ -521,7 +520,7 @@ async def test_deploy(
     is_platform_deploy_required.return_value = True
     config_client.get_cluster.return_value = gcp_cluster
 
-    await deploy(
+    await deploy(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -606,7 +605,7 @@ async def test_deploy_with_ingress_controller_disabled(
     logger: logging.Logger,
     config: Config,
     gcp_cluster: Cluster,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import deploy
@@ -617,7 +616,7 @@ async def test_deploy_with_ingress_controller_disabled(
     is_platform_deploy_required.return_value = True
     config_client.get_cluster.return_value = gcp_cluster
 
-    await deploy(
+    await deploy(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -671,7 +670,7 @@ async def test_deploy_gcp_with_gcs_storage(
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import deploy
@@ -691,7 +690,7 @@ async def test_deploy_gcp_with_gcs_storage(
         ),
     )
 
-    await deploy(
+    await deploy(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -727,7 +726,7 @@ async def test_deploy_all_charts_deployed(
     logger: logging.Logger,
     config: Config,
     gcp_cluster: Cluster,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import deploy
@@ -736,7 +735,7 @@ async def test_deploy_all_charts_deployed(
     is_platform_deploy_required.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
 
-    await deploy(
+    await deploy(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -780,13 +779,13 @@ async def test_deploy_with_retries_exceeded(
     config_client: mock.AsyncMock,
     logger: logging.Logger,
     config: Config,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import deploy
 
     with pytest.raises(kopf.HandlerRetriesError):
-        await deploy(
+        await deploy(  # type: ignore
             name=gcp_platform_config.cluster_name,
             body=gcp_platform_body,
             logger=logger,
@@ -807,7 +806,7 @@ async def test_deploy_with_retries_exceeded(
 async def test_deploy_with_invalid_spec(
     status_manager: mock.AsyncMock,
     logger: logging.Logger,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import deploy
@@ -815,7 +814,7 @@ async def test_deploy_with_invalid_spec(
     del gcp_platform_body["spec"]["storage"]
 
     with pytest.raises(kopf.PermanentError, match="Invalid platform configuration"):
-        await deploy(
+        await deploy(  # type: ignore
             name=gcp_platform_config.cluster_name,
             body=gcp_platform_body,
             logger=logger,
@@ -840,7 +839,7 @@ async def test_deploy_no_changes(
     logger: logging.Logger,
     config: Config,
     gcp_cluster: Cluster,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import deploy
@@ -850,7 +849,7 @@ async def test_deploy_no_changes(
     is_platform_deploy_required.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
 
-    await deploy(
+    await deploy(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -890,7 +889,7 @@ async def test_deploy_helm_release_failed(
     is_platform_deploy_failed: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
     obs_csi_driver_deploy_failed: bool,
     platform_deploy_failed: bool,
@@ -903,7 +902,7 @@ async def test_deploy_helm_release_failed(
     config_client.get_cluster.return_value = gcp_cluster
 
     with pytest.raises(kopf.PermanentError, match="One of helm releases failed"):
-        await deploy(
+        await deploy(  # type: ignore
             name=gcp_platform_config.cluster_name,
             body=gcp_platform_body,
             logger=logger,
@@ -928,14 +927,14 @@ async def test_delete(
     kube_client: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import delete
 
     config_client.get_cluster.return_value = gcp_cluster
 
-    await delete(
+    await delete(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -965,7 +964,7 @@ async def test_delete_gcp_with_gcs_storage(
     config_client: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import delete
@@ -973,7 +972,7 @@ async def test_delete_gcp_with_gcs_storage(
     config_client.get_cluster.return_value = gcp_cluster
     gcp_platform_body["spec"]["storage"] = {"gcs": {"bucket": "storage"}}
 
-    await delete(
+    await delete(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -994,14 +993,14 @@ async def test_delete_on_prem(
     config_client: mock.AsyncMock,
     logger: logging.Logger,
     on_prem_cluster: Cluster,
-    on_prem_platform_body: bodies.Body,
+    on_prem_platform_body: kopf.Body,
     on_prem_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import delete
 
     config_client.get_cluster.return_value = on_prem_cluster
 
-    await delete(
+    await delete(  # type: ignore
         name=on_prem_platform_config.cluster_name,
         body=on_prem_platform_body,
         logger=logger,
@@ -1020,14 +1019,14 @@ async def test_delete_with_invalid_configuration(
     status_manager: mock.AsyncMock,
     logger: logging.Logger,
     helm_client: mock.AsyncMock,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import delete
 
     del gcp_platform_body["spec"]["storage"]
 
-    await delete(
+    await delete(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -1047,7 +1046,7 @@ async def test_watch_config(
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    stopped: primitives.AsyncDaemonStopperChecker,
+    stopped: kopf.AsyncDaemonStopperChecker,
     certificate_store: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     is_obs_csi_driver_deploy_failed: mock.AsyncMock,
@@ -1057,7 +1056,7 @@ async def test_watch_config(
     logger: logging.Logger,
     config: Config,
     gcp_cluster: Cluster,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import watch_config
@@ -1066,7 +1065,7 @@ async def test_watch_config(
     is_platform_deploy_required.return_value = True
     config_client.get_cluster.return_value = gcp_cluster
 
-    await watch_config(
+    await watch_config(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -1161,7 +1160,7 @@ async def test_watch_config_all_charts_deployed(
     consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    stopped: primitives.AsyncDaemonStopperChecker,
+    stopped: kopf.AsyncDaemonStopperChecker,
     certificate_store: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
@@ -1169,7 +1168,7 @@ async def test_watch_config_all_charts_deployed(
     logger: logging.Logger,
     config: Config,
     gcp_cluster: Cluster,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import watch_config
@@ -1178,7 +1177,7 @@ async def test_watch_config_all_charts_deployed(
     is_platform_deploy_required.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
 
-    await watch_config(
+    await watch_config(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -1221,13 +1220,13 @@ async def test_watch_config_no_changes(
     consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    stopped: primitives.AsyncDaemonStopperChecker,
+    stopped: kopf.AsyncDaemonStopperChecker,
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     config: Config,
     gcp_cluster: Cluster,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import watch_config
@@ -1237,7 +1236,7 @@ async def test_watch_config_no_changes(
     is_platform_deploy_required.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
 
-    await watch_config(
+    await watch_config(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -1269,10 +1268,10 @@ async def test_watch_config_platform_deploying_deleting(
     consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    stopped: primitives.AsyncDaemonStopperChecker,
+    stopped: kopf.AsyncDaemonStopperChecker,
     logger: logging.Logger,
     gcp_cluster: Cluster,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
     platform_phase: PlatformPhase,
 ) -> None:
@@ -1281,7 +1280,7 @@ async def test_watch_config_platform_deploying_deleting(
     status_manager.get_phase.return_value = platform_phase
     config_client.get_cluster.return_value = gcp_cluster
 
-    await watch_config(
+    await watch_config(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -1302,13 +1301,13 @@ async def test_watch_config_helm_release_failed(
     consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    stopped: primitives.AsyncDaemonStopperChecker,
+    stopped: kopf.AsyncDaemonStopperChecker,
     is_obs_csi_driver_deploy_failed: mock.AsyncMock,
     is_platform_deploy_failed: mock.AsyncMock,
     logger: logging.Logger,
     config: Config,
     gcp_cluster: Cluster,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
     obs_csi_driver_deploy_failed: bool,
     platform_deploy_failed: bool,
@@ -1320,7 +1319,7 @@ async def test_watch_config_helm_release_failed(
     is_platform_deploy_failed.return_value = platform_deploy_failed
     config_client.get_cluster.return_value = gcp_cluster
 
-    await watch_config(
+    await watch_config(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -1347,15 +1346,15 @@ async def test_watch_config_helm_release_failed(
 async def test_watch_config_ignores_error(
     config_client: mock.AsyncMock,
     logger: logging.Logger,
-    stopped: primitives.AsyncDaemonStopperChecker,
-    gcp_platform_body: bodies.Body,
+    stopped: kopf.AsyncDaemonStopperChecker,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import watch_config
 
     config_client.get_cluster.side_effect = Exception
 
-    await watch_config(
+    await watch_config(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -1369,10 +1368,10 @@ async def test_watch_config_update_failed(
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
     logger: logging.Logger,
-    stopped: primitives.AsyncDaemonStopperChecker,
+    stopped: kopf.AsyncDaemonStopperChecker,
     is_platform_deploy_required: mock.AsyncMock,
     gcp_cluster: Cluster,
-    gcp_platform_body: bodies.Body,
+    gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import watch_config
@@ -1381,7 +1380,7 @@ async def test_watch_config_update_failed(
     is_platform_deploy_required.return_value = True
     helm_client.upgrade.side_effect = Exception
 
-    await watch_config(
+    await watch_config(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,

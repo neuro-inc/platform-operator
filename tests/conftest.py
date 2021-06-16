@@ -3,8 +3,8 @@ from dataclasses import replace
 from ipaddress import IPv4Address
 from typing import Any, Callable, Dict
 
+import kopf
 import pytest
-from kopf.structs import bodies
 from yarl import URL
 
 from platform_operator.models import (
@@ -278,7 +278,7 @@ def on_prem_cluster(
 
 
 @pytest.fixture
-def gcp_platform_body(cluster_name: str) -> bodies.Body:
+def gcp_platform_body(cluster_name: str) -> kopf.Body:
     payload = {
         "apiVersion": "neuromation.io/v1",
         "kind": "Platform",
@@ -296,11 +296,11 @@ def gcp_platform_body(cluster_name: str) -> bodies.Body:
             },
         },
     }
-    return bodies.Body(payload)
+    return kopf.Body(payload)
 
 
 @pytest.fixture
-def aws_platform_body(cluster_name: str) -> bodies.Body:
+def aws_platform_body(cluster_name: str) -> kopf.Body:
     payload = {
         "apiVersion": "neuromation.io/v1",
         "kind": "Platform",
@@ -315,11 +315,11 @@ def aws_platform_body(cluster_name: str) -> bodies.Body:
             },
         },
     }
-    return bodies.Body(payload)
+    return kopf.Body(payload)
 
 
 @pytest.fixture
-def azure_platform_body(cluster_name: str) -> bodies.Body:
+def azure_platform_body(cluster_name: str) -> kopf.Body:
     payload = {
         "apiVersion": "neuromation.io/v1",
         "kind": "Platform",
@@ -352,11 +352,11 @@ def azure_platform_body(cluster_name: str) -> bodies.Body:
             },
         },
     }
-    return bodies.Body(payload)
+    return kopf.Body(payload)
 
 
 @pytest.fixture
-def on_prem_platform_body(cluster_name: str) -> bodies.Body:
+def on_prem_platform_body(cluster_name: str) -> kopf.Body:
     payload = {
         "apiVersion": "neuromation.io/v1",
         "kind": "Platform",
@@ -405,7 +405,7 @@ def on_prem_platform_body(cluster_name: str) -> bodies.Body:
             },
         },
     }
-    return bodies.Body(payload)
+    return kopf.Body(payload)
 
 
 @pytest.fixture

@@ -2,8 +2,8 @@ import asyncio
 from typing import Any, AsyncIterator, Dict
 
 import aiohttp
+import kopf
 import pytest
-from kopf.structs import bodies
 
 from platform_operator.kube_client import KubeClient
 
@@ -14,7 +14,7 @@ class TestKubeClient:
         self,
         kube_client: KubeClient,
         kube_namespace: str,
-        gcp_platform_body: bodies.Body,
+        gcp_platform_body: kopf.Body,
     ) -> AsyncIterator[Dict[str, Any]]:
         payload = dict(**gcp_platform_body)
         await kube_client.create_platform(kube_namespace, payload)

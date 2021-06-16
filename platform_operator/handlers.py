@@ -7,7 +7,6 @@ from typing import Any, Dict, Optional
 
 import aiohttp
 import kopf
-from kopf.structs import bodies, primitives
 
 from platform_operator.consul_client import ConsulClient
 
@@ -71,12 +70,8 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
     app.certificate_store = CertificateStore(app.consul_client)
 
     settings.posting.level = logging.getLevelName(config.log_level)
-    settings.persistence.progress_storage = (
-        kopf.storage.progress.AnnotationsProgressStorage()
-    )
-    settings.persistence.diffbase_storage = (
-        kopf.storage.diffbase.AnnotationsDiffBaseStorage()
-    )
+    settings.persistence.progress_storage = kopf.AnnotationsProgressStorage()
+    settings.persistence.diffbase_storage = kopf.AnnotationsDiffBaseStorage()
 
     # https://github.com/nolar/kopf/issues/232
     settings.watching.server_timeout = 5 * 60
@@ -116,14 +111,14 @@ def login(**_: Any) -> kopf.ConnectionInfo:
     )
 
 
-@kopf.on.create(
+@kopf.on.create(  # type: ignore
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 @kopf.on.update(
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def deploy(
-    name: str, body: bodies.Body, logger: Logger, retry: int, **_: Any
+    name: str, body: kopf.Body, logger: Logger, retry: int, **_: Any
 ) -> None:
     if retry > config.retries:
         await fail_deployment(name, body)
@@ -142,7 +137,7 @@ async def deploy(
         await _deploy(name, body, logger, retry)
 
 
-async def _deploy(name: str, body: bodies.Body, logger: Logger, retry: int) -> None:
+async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> None:
     try:
         platform = await get_platform_config(name, body)
     except asyncio.CancelledError:
@@ -194,11 +189,11 @@ async def _deploy(name: str, body: bodies.Body, logger: Logger, retry: int) -> N
     logger.info("Platform deployment succeeded")
 
 
-@kopf.on.delete(
+@kopf.on.delete(  # type: ignore
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def delete(
-    name: str, body: bodies.Body, logger: Logger, retry: int, **_: Any
+    name: str, body: kopf.Body, logger: Logger, retry: int, **_: Any
 ) -> None:
     if retry == 0:
         await app.status_manager.start_deletion(name)
@@ -212,7 +207,7 @@ async def delete(
         await _delete(name, body, logger)
 
 
-async def _delete(name: str, body: bodies.Body, logger: Logger) -> None:
+async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
     try:
         platform = await get_platform_config(name, body)
     except aiohttp.ClientError:
@@ -267,13 +262,13 @@ async def _delete(name: str, body: bodies.Body, logger: Logger) -> None:
         )
 
 
-@kopf.on.daemon(
+@kopf.on.daemon(  # type: ignore
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def watch_config(
     name: str,
-    body: bodies.Body,
-    stopped: primitives.AsyncDaemonStopperChecker,
+    body: kopf.Body,
+    stopped: kopf.AsyncDaemonStopperChecker,
     **_: Any,
 ) -> None:
     logger = logging.getLogger("watch_config")
@@ -304,7 +299,7 @@ async def watch_config(
             logger.warning("Watch iteration failed", exc_info=exc)
 
 
-async def _update(name: str, body: bodies.Body, logger: Logger) -> None:
+async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
     phase = await app.status_manager.get_phase(name)
 
     if phase == PlatformPhase.PENDING:
@@ -362,7 +357,7 @@ async def _update(name: str, body: bodies.Body, logger: Logger) -> None:
         await fail_deployment(name, body)
 
 
-async def get_platform_config(name: str, body: bodies.Body) -> PlatformConfig:
+async def get_platform_config(name: str, body: kopf.Body) -> PlatformConfig:
     token = body["spec"]["token"]
     cluster = await app.config_client.get_cluster(cluster_name=name, token=token)
 
@@ -432,7 +427,7 @@ async def is_helm_deploy_failed(release_name: str) -> bool:
     return release["Status"].upper() == "FAILED"
 
 
-async def start_deployment(name: str, body: bodies.Body, retry: int = 0) -> None:
+async def start_deployment(name: str, body: kopf.Body, retry: int = 0) -> None:
     await app.status_manager.start_deployment(name, retry)
     await app.config_client.send_notification(
         cluster_name=name,
@@ -441,7 +436,7 @@ async def start_deployment(name: str, body: bodies.Body, retry: int = 0) -> None
     )
 
 
-async def complete_deployment(name: str, body: bodies.Body) -> None:
+async def complete_deployment(name: str, body: kopf.Body) -> None:
     await app.status_manager.complete_deployment(name)
     await app.config_client.send_notification(
         cluster_name=name,
@@ -450,7 +445,7 @@ async def complete_deployment(name: str, body: bodies.Body) -> None:
     )
 
 
-async def fail_deployment(name: str, body: bodies.Body) -> None:
+async def fail_deployment(name: str, body: kopf.Body) -> None:
     await app.status_manager.fail_deployment(name)
     await app.config_client.send_notification(
         cluster_name=name,

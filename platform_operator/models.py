@@ -10,7 +10,7 @@ from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence
 
-from kopf.structs import bodies
+import kopf
 from yarl import URL
 
 
@@ -477,7 +477,7 @@ class PlatformConfigFactory:
     def __init__(self, config: Config) -> None:
         self._config = config
 
-    def create(self, platform_body: bodies.Body, cluster: Cluster) -> "PlatformConfig":
+    def create(self, platform_body: kopf.Body, cluster: Cluster) -> "PlatformConfig":
         ingress_host = cluster.dns_name
         standard_storage_class_name = (
             f"{self._config.platform_namespace}-standard-topology-aware"
@@ -649,7 +649,7 @@ class PlatformConfigFactory:
         )
 
     @classmethod
-    def _create_gcp(cls, spec: bodies.Spec, cluster: Cluster) -> GcpConfig:
+    def _create_gcp(cls, spec: kopf.Spec, cluster: Cluster) -> GcpConfig:
         cloud_provider = cluster["cloud_provider"]
         iam_gcp_spec = spec.get("iam", {}).get("gcp")
         service_account_key = cls._base64_decode(
@@ -675,7 +675,7 @@ class PlatformConfigFactory:
         )
 
     @classmethod
-    def _create_aws(cls, spec: bodies.Spec, cluster: Cluster) -> "AwsConfig":
+    def _create_aws(cls, spec: kopf.Spec, cluster: Cluster) -> "AwsConfig":
         registry_url = URL(spec["registry"]["aws"]["url"])
         if not registry_url.scheme:
             registry_url = URL(f"https://{registry_url!s}")
@@ -694,7 +694,7 @@ class PlatformConfigFactory:
         )
 
     @classmethod
-    def _create_azure(cls, spec: bodies.Spec, cluster: Cluster) -> AzureConfig:
+    def _create_azure(cls, spec: kopf.Spec, cluster: Cluster) -> AzureConfig:
         registry_url = URL(spec["registry"]["azure"]["url"])
         if not registry_url.scheme:
             registry_url = URL(f"https://{registry_url!s}")
@@ -721,7 +721,7 @@ class PlatformConfigFactory:
         )
 
     @classmethod
-    def _create_on_prem(cls, spec: bodies.Spec) -> OnPremConfig:
+    def _create_on_prem(cls, spec: kopf.Spec) -> OnPremConfig:
         kubernetes_spec = spec["kubernetes"]
         storage_spec = StorageSpec(spec["storage"])
         storage_type = storage_spec.get_storage_type("kubernetes", "nfs")
