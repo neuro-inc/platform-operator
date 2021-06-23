@@ -157,6 +157,7 @@ class HelmValuesFactory:
                 }
             }
         if platform.on_prem:
+            result["tags"] = {"on_prem": True}
             if platform.on_prem.storage_type == "kubernetes":
                 result["storage"] = self._create_kubernetes_storage_values(
                     storage_class_name=platform.on_prem.storage_class_name,

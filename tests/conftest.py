@@ -278,6 +278,20 @@ def on_prem_cluster(
 
 
 @pytest.fixture
+def vcd_cluster(
+    cluster_name: str,
+    cluster_factory: Callable[[str], Cluster],
+    node_pool_factory: Callable[[str], Dict[str, Any]],
+) -> Cluster:
+    cluster = cluster_factory(cluster_name)
+    cluster["cloud_provider"] = {
+        "type": "vcd_mts",
+        "node_pools": [node_pool_factory("gpu")],
+    }
+    return cluster
+
+
+@pytest.fixture
 def gcp_platform_body(cluster_name: str) -> kopf.Body:
     payload = {
         "apiVersion": "neuromation.io/v1",
@@ -406,6 +420,11 @@ def on_prem_platform_body(cluster_name: str) -> kopf.Body:
         },
     }
     return kopf.Body(payload)
+
+
+@pytest.fixture
+def vcd_platform_body(on_prem_platform_body: kopf.Body) -> kopf.Body:
+    return on_prem_platform_body
 
 
 @pytest.fixture
@@ -587,3 +606,8 @@ def on_prem_platform_config(
             https_node_port=30443,
         ),
     )
+
+
+@pytest.fixture
+def vcd_platform_config(on_prem_platform_config: PlatformConfig) -> PlatformConfig:
+    return replace(on_prem_platform_config, cloud_provider="vcd_mts")
