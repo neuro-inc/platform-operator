@@ -196,6 +196,13 @@ class Cluster(Dict[str, Any]):
         return self["cloud_provider"]["type"]
 
     @property
+    def is_on_prem(self) -> bool:
+        return (
+            self.cloud_provider_type == "on_prem"
+            or self.cloud_provider_type.startswith("vcd_")
+        )
+
+    @property
     def acme_environment(self) -> str:
         return self["ingress"]["acme_environment"]
 
@@ -491,12 +498,12 @@ class PlatformConfigFactory:
                 if "tpuIPv4CIDR" in kubernetes_spec
                 else None
             )
-        if cluster.cloud_provider_type == "on_prem":
+        if cluster.is_on_prem:
             standard_storage_class_name = kubernetes_spec["standardStorageClassName"]
         monitoring_spec = platform_body["spec"]["monitoring"]
         monitoring_metrics_spec = platform_body["spec"]["monitoring"].get("metrics", {})
         monitoring_metrics_default_storage_size = ""
-        if cluster.cloud_provider_type == "on_prem":
+        if cluster.is_on_prem:
             monitoring_metrics_default_storage_size = "10Gi"
         docker_config_secret_spec = kubernetes_spec.get("dockerConfigSecret", {})
         docker_config_secret_name = docker_config_secret_spec.get(
@@ -623,7 +630,7 @@ class PlatformConfigFactory:
             ),
             on_prem=(
                 self._create_on_prem(platform_body["spec"])
-                if cluster.cloud_provider_type == "on_prem"
+                if cluster.is_on_prem
                 else None
             ),
         )

@@ -304,6 +304,13 @@ class TestHelmValuesFactory:
         assert "nvidia-gpu-driver" in result
         assert "platform-object-storage" not in result
 
+    def test_create_vcd_platform_values(
+        self, vcd_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(vcd_platform_config)
+
+        assert result["tags"] == {"on_prem": True}
+
     def test_create_docker_registry_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:

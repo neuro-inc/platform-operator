@@ -795,3 +795,14 @@ class TestPlatformConfigFactory:
 
         with pytest.raises(KeyError):
             factory.create(on_prem_platform_body, on_prem_cluster)
+
+    def test_vcd_platform_config(
+        self,
+        factory: PlatformConfigFactory,
+        vcd_platform_body: kopf.Body,
+        vcd_cluster: Cluster,
+        vcd_platform_config: PlatformConfig,
+    ) -> None:
+        result = factory.create(vcd_platform_body, vcd_cluster)
+
+        assert result == vcd_platform_config
