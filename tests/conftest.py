@@ -169,6 +169,12 @@ def cluster_factory(
                 },
                 "grafana": {"username": "admin", "password": "grafana_password"},
                 "sentry": {"public_dsn": "https://sentry", "sample_rate": 0.1},
+                "docker_hub": {
+                    "username": name,
+                    "password": "password",
+                    "url": "https://index.docker.io/v1/",
+                    "email": f"{name}@neuromation.io",
+                },
             },
             "dns": {"name": f"{name}.org.neu.ro"},
             "disks": {"storage_limit_per_user_gb": 10240},
@@ -519,6 +525,13 @@ def gcp_platform_config(
             storage_type="nfs",
             storage_nfs_server="192.168.0.3",
             storage_nfs_path="/",
+        ),
+        docker_hub_config_secret_name="platform-docker-hub-config",
+        docker_hub_registry=DockerRegistry(
+            url=URL("https://index.docker.io/v1/"),
+            email=f"{cluster_name}@neuromation.io",
+            username=cluster_name,
+            password="password",
         ),
     )
 

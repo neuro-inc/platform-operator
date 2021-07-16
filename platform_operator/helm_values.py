@@ -87,6 +87,19 @@ class HelmValuesFactory:
             }
         else:
             result["dockerConfigSecret"] = {"create": False}
+        if platform.docker_hub_registry:
+            result["dockerHubConfigSecret"] = {
+                "create": True,
+                "name": platform.docker_hub_config_secret_name,
+                "credentials": {
+                    "url": str(platform.docker_hub_registry.url),
+                    "email": platform.docker_hub_registry.email,
+                    "username": platform.docker_hub_registry.username,
+                    "password": platform.docker_hub_registry.password,
+                },
+            }
+        else:
+            result["dockerHubConfigSecret"] = {"create": False}
         if platform.consul_install:
             result[self._chart_names.consul] = self.create_consul_values(platform)
         if not platform.on_prem:
@@ -1319,4 +1332,6 @@ class HelmValuesFactory:
             result[
                 "NP_KUBE_POD_PREEMPTIBLE_TOLERATION_KEY"
             ] = "kubernetes.azure.com/scalesetpriority"
+        if platform.docker_hub_registry:
+            result["NP_KUBE_IMAGE_PULL_SECRET"] = platform.docker_hub_config_secret_name
         return result

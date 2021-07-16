@@ -556,6 +556,17 @@ class TestPlatformConfigFactory:
         assert result.sentry_dsn
         assert result.sentry_sample_rate is None
 
+    def test_gcp_platform_config_without_docker_hub(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: kopf.Body,
+        gcp_cluster: Cluster,
+    ) -> None:
+        del gcp_cluster["credentials"]["docker_hub"]
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result.docker_hub_registry is None
+
     def test_aws_platform_config(
         self,
         factory: PlatformConfigFactory,

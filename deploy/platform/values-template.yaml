@@ -29,6 +29,17 @@ dockerConfigSecret:
   #   username: username
   #   password: password
 
+
+dockerHubConfigSecret:
+  create: false
+  name: ""
+  # credentials:
+  #   url: https://index.docker.io/v1/
+  #   email: username@email.com
+  #   username: username
+  #   password: password
+
+
 standardStorageClass:
   create: true
   name: ""
