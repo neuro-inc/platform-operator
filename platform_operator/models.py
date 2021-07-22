@@ -377,6 +377,8 @@ class PlatformConfig:
     monitoring_metrics_storage_size: str = ""
     sentry_dsn: URL = URL("")
     sentry_sample_rate: Optional[float] = None
+    docker_hub_config_secret_name: str = ""
+    docker_hub_registry: Optional[DockerRegistry] = None
     gcp: Optional[GcpConfig] = None
     aws: Optional[AwsConfig] = None
     azure: Optional[AzureConfig] = None
@@ -602,7 +604,7 @@ class PlatformConfigFactory:
             ),
             storage_pvc_name=f"{self._config.platform_namespace}-storage",
             helm_repo=self._create_helm_repo(cluster),
-            docker_registry=self._create_docker_registry(cluster),
+            docker_registry=self._create_neuro_docker_registry(cluster),
             grafana_username=cluster["credentials"]["grafana"]["username"],
             grafana_password=cluster["credentials"]["grafana"]["password"],
             consul_url=self._config.consul_url,
@@ -613,6 +615,10 @@ class PlatformConfigFactory:
             sentry_sample_rate=(
                 cluster["credentials"].get("sentry", {}).get("sample_rate")
             ),
+            docker_hub_config_secret_name=(
+                f"{self._config.platform_namespace}-docker-hub-config"
+            ),
+            docker_hub_registry=self._create_docker_hub_registry(cluster),
             gcp=(
                 self._create_gcp(platform_body["spec"], cluster)
                 if cluster.cloud_provider_type == "gcp"
@@ -646,13 +652,23 @@ class PlatformConfigFactory:
         )
 
     @classmethod
-    def _create_docker_registry(cls, cluster: Cluster) -> DockerRegistry:
-        neuro_registry = cluster["credentials"]["neuro_registry"]
+    def _create_neuro_docker_registry(cls, cluster: Cluster) -> DockerRegistry:
+        return cls._create_docker_registry(cluster["credentials"]["neuro_registry"])
+
+    @classmethod
+    def _create_docker_hub_registry(cls, cluster: Cluster) -> Optional[DockerRegistry]:
+        docker_hub_data = cluster["credentials"].get("docker_hub")
+        if docker_hub_data is None:
+            return None
+        return cls._create_docker_registry(docker_hub_data)
+
+    @classmethod
+    def _create_docker_registry(cls, data: Mapping[str, Any]) -> DockerRegistry:
         return DockerRegistry(
-            url=URL(neuro_registry["url"]),
-            email=neuro_registry["email"],
-            username=neuro_registry["username"],
-            password=neuro_registry["password"],
+            url=URL(data["url"]),
+            email=data["email"],
+            username=data["username"],
+            password=data["password"],
         )
 
     @classmethod

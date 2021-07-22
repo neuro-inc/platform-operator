@@ -54,6 +54,16 @@ class TestHelmValuesFactory:
                     "password": "password",
                 },
             },
+            "dockerHubConfigSecret": {
+                "create": True,
+                "name": "platform-docker-hub-config",
+                "credentials": {
+                    "url": "https://index.docker.io/v1/",
+                    "email": f"{cluster_name}@neuromation.io",
+                    "username": cluster_name,
+                    "password": "password",
+                },
+            },
             "ingress": {
                 "jobFallbackHost": "default.jobs-dev.neu.ro",
                 "registryHost": f"registry.{cluster_name}.org.neu.ro",
@@ -196,6 +206,15 @@ class TestHelmValuesFactory:
         )
 
         assert result["dockerConfigSecret"] == {"create": False}
+
+    def test_create_gcp_platform_values_without_docker_hub_config_secret(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(gcp_platform_config, docker_hub_registry=None)
+        )
+
+        assert result["dockerHubConfigSecret"] == {"create": False}
 
     def test_create_aws_platform_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -1670,6 +1689,7 @@ class TestHelmValuesFactory:
             "NP_KUBE_NODE_LABEL_GPU": "platform.neuromation.io/accelerator",
             "NP_KUBE_NODE_LABEL_PREEMPTIBLE": "platform.neuromation.io/preemptible",
             "NP_KUBE_NODE_LABEL_NODE_POOL": "platform.neuromation.io/nodepool",
+            "NP_KUBE_IMAGE_PULL_SECRET": "platform-docker-hub-config",
             "NP_REGISTRY_URL": (
                 f"https://registry.{gcp_platform_config.cluster_name}.org.neu.ro"
             ),
