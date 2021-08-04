@@ -1219,6 +1219,14 @@ class HelmValuesFactory:
             result["prometheusProxy"] = {
                 "prometheus": {"host": "prometheus-prometheus", "port": 9090}
             }
+            prometheus_spec["retention"] = (
+                platform.monitoring_metrics_retention_time or "15d"
+            )  # 15d is default prometheus retention time
+            if platform.monitoring_metrics_storage_size:
+                prometheus_spec["retentionSize"] = (
+                    platform.monitoring_metrics_storage_size.replace("i", "")
+                    + "B"  # Gi -> GB
+                )
             prometheus_spec["storageSpec"]["volumeClaimTemplate"]["spec"] = {
                 "storageClassName": platform.monitoring_metrics_storage_class_name,
                 "resources": {

@@ -1604,10 +1604,36 @@ class TestHelmValuesFactory:
             "prometheus": {"host": "prometheus-prometheus", "port": 9090}
         }
         assert (
+            result["prometheus-operator"]["prometheus"]["prometheusSpec"]["retention"]
+            == "15d"
+        )
+        assert (
             result["prometheus-operator"]["prometheus"]["prometheusSpec"]["thanos"]
             == ""
         )
         assert "cloudProvider" not in result
+
+    def test_create_on_prem_platform_reports_values_with_retention(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        on_prem_platform_config = replace(
+            on_prem_platform_config,
+            monitoring_metrics_retention_time="1d",
+            monitoring_metrics_storage_size="10Gi",
+        )
+
+        result = factory.create_platform_reports_values(on_prem_platform_config)
+
+        assert (
+            result["prometheus-operator"]["prometheus"]["prometheusSpec"]["retention"]
+            == "1d"
+        )
+        assert (
+            result["prometheus-operator"]["prometheus"]["prometheusSpec"][
+                "retentionSize"
+            ]
+            == "10GB"
+        )
 
     def test_create_platform_disk_api_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory

@@ -375,6 +375,7 @@ class PlatformConfig:
     monitoring_metrics_bucket_name: str = ""
     monitoring_metrics_storage_class_name: str = ""
     monitoring_metrics_storage_size: str = ""
+    monitoring_metrics_retention_time: str = ""
     sentry_dsn: URL = URL("")
     sentry_sample_rate: Optional[float] = None
     docker_hub_config_secret_name: str = ""
@@ -601,6 +602,9 @@ class PlatformConfigFactory:
                 monitoring_metrics_spec.get("kubernetes", {})
                 .get("persistence", {})
                 .get("size", monitoring_metrics_default_storage_size)
+            ),
+            monitoring_metrics_retention_time=(
+                monitoring_metrics_spec.get("retentionTime", "")
             ),
             storage_pvc_name=f"{self._config.platform_namespace}-storage",
             helm_repo=self._create_helm_repo(cluster),
