@@ -766,10 +766,15 @@ class TestPlatformConfigFactory:
         del on_prem_platform_body["spec"]["storage"]["kubernetes"]["persistence"][
             "size"
         ]
+        del on_prem_platform_body["spec"]["monitoring"]["metrics"]["kubernetes"][
+            "persistence"
+        ]["size"]
         result = factory.create(on_prem_platform_body, on_prem_cluster)
 
         assert result.on_prem
         assert result.on_prem.registry_storage_size == "10Gi"
+        assert result.on_prem.storage_size == "10Gi"
+        assert result.monitoring_metrics_storage_size == "10Gi"
 
     def test_on_prem_platform_config_with_nfs_storage(
         self,
@@ -800,12 +805,23 @@ class TestPlatformConfigFactory:
         factory: PlatformConfigFactory,
         on_prem_platform_body: kopf.Body,
         on_prem_cluster: Cluster,
-        on_prem_platform_config: PlatformConfig,
     ) -> None:
         del on_prem_platform_body["spec"]["kubernetes"]["nodePorts"]
 
         with pytest.raises(KeyError):
             factory.create(on_prem_platform_body, on_prem_cluster)
+
+    def test_on_prem_platform_config_with_metrics_retention_time(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: kopf.Body,
+        on_prem_cluster: Cluster,
+    ) -> None:
+        on_prem_platform_body["spec"]["monitoring"]["metrics"]["retentionTime"] = "1d"
+
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result.monitoring_metrics_retention_time == "1d"
 
     def test_vcd_platform_config(
         self,
