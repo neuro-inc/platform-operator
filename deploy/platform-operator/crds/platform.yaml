@@ -342,6 +342,8 @@ spec:
                 metrics:
                   type: object
                   properties:
+                    retentionTime:
+                      type: string
                     blobStorage:
                       type: object
                       required:
