@@ -398,7 +398,7 @@ async def is_helm_deploy_required(
     values: Dict[str, Any],
     install: bool = False,
 ) -> bool:
-    old_release = await app.helm_client.get_release(config.helm_release_names.platform)
+    old_release = await app.helm_client.get_release(release_name)
 
     if not old_release:
         return install

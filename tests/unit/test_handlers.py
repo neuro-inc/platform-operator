@@ -180,6 +180,7 @@ def stopped() -> kopf.DaemonStopped:
 
 @pytest.mark.asyncio
 async def test_is_obs_csi_driver_deploy_required_on_install_true(
+    config: Config,
     gcp_platform_config: PlatformConfig,
     helm_client: mock.AsyncMock,
 ) -> None:
@@ -194,6 +195,9 @@ async def test_is_obs_csi_driver_deploy_required_on_install_true(
 
     result = await _is_obs_csi_driver_deploy_required(gcp_platform_config, install=True)
 
+    helm_client.get_release.assert_awaited_with(
+        config.helm_release_names.obs_csi_driver
+    )
     assert result is True
 
 
@@ -317,6 +321,7 @@ async def test_is_obs_csi_driver_deploy_required_for_nfs_false(
 
 @pytest.mark.asyncio
 async def test_is_platform_deploy_required_on_install_true(
+    config: Config,
     gcp_platform_config: PlatformConfig,
     helm_client: mock.AsyncMock,
 ) -> None:
@@ -328,6 +333,7 @@ async def test_is_platform_deploy_required_on_install_true(
 
     result = await _is_platform_deploy_required(gcp_platform_config, install=True)
 
+    helm_client.get_release.assert_awaited_with(config.helm_release_names.platform)
     assert result is True
 
 
