@@ -61,6 +61,9 @@ class HelmValuesFactory:
             self._chart_names.platform_monitoring: (
                 self.create_platform_monitoring_values(platform)
             ),
+            self._chart_names.platform_container_runtime: (
+                self.create_platform_container_runtime_values(platform)
+            ),
             self._chart_names.platform_secrets: (
                 self.create_platform_secrets_values(platform)
             ),
@@ -926,6 +929,29 @@ class HelmValuesFactory:
             }
             result["NP_MONITORING_K8S_KUBELET_PORT"] = platform.on_prem.kubelet_port
         return result
+
+    def create_platform_container_runtime_values(
+        self, platform: PlatformConfig
+    ) -> Dict[str, Any]:
+        return {
+            "affinity": {
+                "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                        "nodeSelectorTerms": [
+                            {
+                                "matchExpressions": [
+                                    {
+                                        "key": platform.kubernetes_node_labels.job,
+                                        "operator": "Exists",
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            **self._create_tracing_values(platform),
+        }
 
     def create_platform_secrets_values(
         self, platform: PlatformConfig

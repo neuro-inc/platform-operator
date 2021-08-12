@@ -91,6 +91,7 @@ class HelmChartNames:
     platform_object_storage: str = "platform-object-storage"
     platform_registry: str = "platform-registry"
     platform_monitoring: str = "platform-monitoring"
+    platform_container_runtime: str = "platform-container-runtime"
     platform_secrets: str = "platform-secrets"
     platform_reports: str = "platform-reports"
     platform_disk_api: str = "platform-disk-api"
