@@ -45,14 +45,6 @@ dependencies:
     version: "21.8.4"
     repository: "@neuro"
     alias: platform-monitoring
-  - name: platformobjectstorage
-    version: "21.8.4"
-    repository: "@neuro"
-    alias: platform-object-storage
-    tags:
-    - gcp
-    - aws
-    - azure
   - name: platformsecrets
     version: "21.8.4"
     repository: "@neuro"
@@ -72,6 +64,12 @@ dependencies:
     version: "21.8.4"
     repository: "@neuro"
     alias: platform-api-poller
+  - name: platformbucketsapi
+    version: "21.8.13"
+    repository: "@neuro"
+    alias: platform-buckets-api
+    tags:
+      - aws
 
   # Deprecated, left for backward compatibility with old clusters
   - name: consul

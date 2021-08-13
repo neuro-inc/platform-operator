@@ -88,13 +88,13 @@ class HelmChartNames:
     nvidia_gpu_driver_gcp: str = "nvidia-gpu-driver-gcp"
     platform: str = "platform"
     platform_storage: str = "platform-storage"
-    platform_object_storage: str = "platform-object-storage"
     platform_registry: str = "platform-registry"
     platform_monitoring: str = "platform-monitoring"
     platform_secrets: str = "platform-secrets"
     platform_reports: str = "platform-reports"
     platform_disk_api: str = "platform-disk-api"
     platform_api_poller: str = "platform-api-poller"
+    platform_bucket_api: str = "platform-bucket-api"
 
 
 @dataclass(frozen=True)
