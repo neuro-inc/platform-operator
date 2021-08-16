@@ -92,6 +92,7 @@ class TestHelmValuesFactory:
             "platform-storage": mock.ANY,
             "platform-registry": mock.ANY,
             "platform-monitoring": mock.ANY,
+            "platform-container-runtime": mock.ANY,
             "platform-object-storage": mock.ANY,
             "platform-secrets": mock.ANY,
             "platform-reports": mock.ANY,
@@ -1262,6 +1263,35 @@ class TestHelmValuesFactory:
                     "region": "minio",
                     "bucket": "job-logs",
                 },
+            },
+        }
+
+    def test_create_gcp_platform_container_runtime_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_container_runtime_values(gcp_platform_config)
+
+        assert result == {
+            "affinity": {
+                "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                        "nodeSelectorTerms": [
+                            {
+                                "matchExpressions": [
+                                    {
+                                        "key": "platform.neuromation.io/job",
+                                        "operator": "Exists",
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
             },
         }
 
