@@ -64,13 +64,9 @@ dependencies:
     version: "21.8.4"
     repository: "@neuro"
   - name: platformdiskapi
-    version: "21.8.4"
+    version: "21.8.17"
     repository: "@neuro"
     alias: platform-disk-api
-    tags:
-    - gcp
-    - aws
-    - azure
   - name: platformapi-poller
     version: "21.8.4"
     repository: "@neuro"

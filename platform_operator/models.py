@@ -377,6 +377,7 @@ class PlatformConfig:
     monitoring_metrics_storage_class_name: str = ""
     monitoring_metrics_storage_size: str = ""
     monitoring_metrics_retention_time: str = ""
+    disks_storage_class_name: str = ""
     sentry_dsn: URL = URL("")
     sentry_sample_rate: Optional[float] = None
     docker_hub_config_secret_name: str = ""
@@ -522,6 +523,14 @@ class PlatformConfigFactory:
         jobs_namespace = jobs_namespace_spec.get(
             "name", self._config.platform_namespace + "-jobs"
         )
+        disks_storage_class_name = f"{self._config.platform_namespace}-disk"
+        disks_spec = platform_body["spec"].get("disks", {})
+        if cluster.is_on_prem:
+            disks_storage_class_name = (
+                disks_spec.get("kubernetes", {})
+                .get("persistence", {})
+                .get("storageClassName", "")
+            )
         return PlatformConfig(
             auth_url=self._config.platform_auth_url,
             ingress_auth_url=self._config.platform_ingress_auth_url,
@@ -562,9 +571,6 @@ class PlatformConfigFactory:
                 IPv4Address(ip) for ip in kubernetes_spec.get("ingressPublicIPs", [])
             ],
             ingress_cors_origins=cluster["ingress"].get("cors_origins", ()),
-            disks_storage_limit_per_user_gb=cluster["disks"][
-                "storage_limit_per_user_gb"
-            ],
             service_traefik_name=f"{self._config.platform_namespace}-traefik",
             jobs_namespace_create=jobs_namespace_spec.get("create", True),
             jobs_namespace=jobs_namespace,
@@ -607,6 +613,10 @@ class PlatformConfigFactory:
             monitoring_metrics_retention_time=(
                 monitoring_metrics_spec.get("retentionTime", "")
             ),
+            disks_storage_limit_per_user_gb=cluster["disks"][
+                "storage_limit_per_user_gb"
+            ],
+            disks_storage_class_name=disks_storage_class_name,
             storage_pvc_name=f"{self._config.platform_namespace}-storage",
             helm_repo=self._create_helm_repo(cluster),
             docker_registry=self._create_neuro_docker_registry(cluster),

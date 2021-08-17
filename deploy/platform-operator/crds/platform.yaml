@@ -374,3 +374,16 @@ spec:
                       kubernetes: {}
                     required:
                     - kubernetes
+            disks:
+              type: object
+              properties:
+                kubernetes:
+                  type: object
+                  properties:
+                    persistence:
+                      type: object
+                      required:
+                      - storageClassName
+                      properties:
+                        storageClassName:
+                          type: string

@@ -823,6 +823,18 @@ class TestPlatformConfigFactory:
 
         assert result.monitoring_metrics_retention_time == "1d"
 
+    def test_on_prem_platform_config_without_disks_storage_class_name(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: kopf.Body,
+        on_prem_cluster: Cluster,
+    ) -> None:
+        del on_prem_platform_body["spec"]["disks"]
+
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result.disks_storage_class_name == ""
+
     def test_vcd_platform_config(
         self,
         factory: PlatformConfigFactory,
