@@ -738,7 +738,7 @@ class TestHelmValuesFactory:
                 "aws": {"region_name": "us-east-1", "s3_role_arn": ""},
             },
             "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
-            "image": {"repository": "neuro.io/platformbucketapi"},
+            "image": {"repository": "neuro.io/platformbucketsapi"},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{aws_platform_config.cluster_name}.org.neu.ro"],

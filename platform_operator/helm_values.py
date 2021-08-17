@@ -1282,7 +1282,7 @@ class HelmValuesFactory:
     ) -> Dict[str, Any]:
         docker_server = platform.docker_registry.url.host
         result: Dict[str, Any] = {
-            "image": {"repository": f"{docker_server}/platformbucketapi"},
+            "image": {"repository": f"{docker_server}/platformbucketsapi"},
             "NP_BUCKETS_API_K8S_NS": platform.jobs_namespace,
             "platform": {
                 "cluster_name": platform.cluster_name,
