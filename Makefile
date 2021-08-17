@@ -64,6 +64,8 @@ helm_install:
 	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v $(HELM_VERSION)
 	helm init --client-only
 	helm plugin install https://github.com/belitre/helm-push-artifactory-plugin
+
+helm_repo_add:
 	helm repo add hashicorp https://helm.releases.hashicorp.com
 	@helm repo add neuro https://neuro.jfrog.io/artifactory/helm-virtual-public \
 		--username ${ARTIFACTORY_USERNAME} \
