@@ -94,7 +94,6 @@ class TestHelmValuesFactory:
             "platform-registry": mock.ANY,
             "platform-monitoring": mock.ANY,
             "platform-container-runtime": mock.ANY,
-            "platform-object-storage": mock.ANY,
             "platform-secrets": mock.ANY,
             "platform-reports": mock.ANY,
             "platform-disk-api": mock.ANY,
@@ -727,91 +726,44 @@ class TestHelmValuesFactory:
             "clusterName": gcp_platform_config.cluster_name,
         }
 
-    def test_create_gcp_platform_object_storage_values(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_object_storage_values(gcp_platform_config)
-
-        assert result == {
-            "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
-            "NP_OBSTORAGE_AUTH_URL": "https://dev.neu.ro",
-            "image": {"repository": "neuro.io/platformobjectstorage"},
-            "minio": {"image": {"repository": "neuro.io/minio/minio"}},
-            "ingress": {
-                "enabled": True,
-                "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
-            },
-            "objectStorage": {
-                "provider": "gcp",
-                "location": "us-central1",
-                "gcp": {
-                    "project": "project",
-                    "keySecret": {"name": "platform-object-storage-gcp-key"},
-                },
-            },
-            "platform": {
-                "token": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": "platform-object-storage-token",
-                            "key": "token",
-                        }
-                    }
-                }
-            },
-            "secrets": [
-                {"name": "platform-object-storage-token", "data": {"token": "token"}},
-                {
-                    "name": "platform-object-storage-gcp-key",
-                    "data": {"key.json": "{}"},
-                },
-            ],
-            "sentry": {
-                "dsn": "https://sentry",
-                "clusterName": gcp_platform_config.cluster_name,
-                "sampleRate": 0.1,
-            },
-        }
-
-    def test_create_aws_platform_object_storage_values(
+    def test_create_aws_buckets_api_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_object_storage_values(aws_platform_config)
+        result = factory.create_platform_buckets_api_values(aws_platform_config)
 
         assert result == {
-            "NP_CLUSTER_NAME": aws_platform_config.cluster_name,
-            "NP_OBSTORAGE_AUTH_URL": "https://dev.neu.ro",
-            "image": {"repository": "neuro.io/platformobjectstorage"},
-            "minio": {"image": {"repository": "neuro.io/minio/minio"}},
+            "NP_BUCKETS_API_K8S_NS": "platform-jobs",
+            "bucket_provider": {
+                "provider": "aws",
+                "aws": {"region_name": "us-east-1", "s3_role_arn": "test-s3-role"},
+            },
+            "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
+            "image": {"repository": "neuro.io/platformbucketapi"},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{aws_platform_config.cluster_name}.org.neu.ro"],
             },
-            "objectStorage": {
-                "provider": "aws",
-                "location": "us-east-1",
-                "aws": {"accessKey": {"value": ""}, "secretKey": {"value": ""}},
-            },
             "platform": {
+                "cluster_name": aws_platform_config.cluster_name,
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": "platform-object-storage-token",
                             "key": "token",
+                            "name": "platform-buckets-api-token",
                         }
                     }
-                }
+                },
             },
             "secrets": [
-                {"name": "platform-object-storage-token", "data": {"token": "token"}}
+                {"data": {"token": "token"}, "name": "platform-buckets-api-token"}
             ],
             "sentry": mock.ANY,
         }
 
-    def test_create_aws_platform_object_storage_values_with_role(
+    def test_create_aws_platform_buckets_api_values_with_role(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_object_storage_values(
+        result = factory.create_platform_buckets_api_values(
             replace(
                 aws_platform_config,
                 aws=replace(aws_platform_config.aws, role_arn="s3_role"),
@@ -819,70 +771,6 @@ class TestHelmValuesFactory:
         )
 
         assert result["annotations"] == {"iam.amazonaws.com/role": "s3_role"}
-
-    def test_create_azure_platform_object_storage_values(
-        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_object_storage_values(azure_platform_config)
-
-        assert azure_platform_config.azure
-        assert result == {
-            "NP_CLUSTER_NAME": azure_platform_config.cluster_name,
-            "NP_OBSTORAGE_AUTH_URL": "https://dev.neu.ro",
-            "image": {"repository": "neuro.io/platformobjectstorage"},
-            "minio": {"image": {"repository": "neuro.io/minio/minio"}},
-            "ingress": {
-                "enabled": True,
-                "hosts": [f"{azure_platform_config.cluster_name}.org.neu.ro"],
-            },
-            "objectStorage": {
-                "provider": "azure",
-                "location": "westus",
-                "azure": {
-                    "accountName": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": "platform-object-storage-azure-credentials",
-                                "key": "account_name",
-                            }
-                        }
-                    },
-                    "accountKey": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": "platform-object-storage-azure-credentials",
-                                "key": "account_key",
-                            }
-                        }
-                    },
-                },
-            },
-            "platform": {
-                "token": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": "platform-object-storage-token",
-                            "key": "token",
-                        }
-                    }
-                }
-            },
-            "secrets": [
-                {"name": "platform-object-storage-token", "data": {"token": "token"}},
-                {
-                    "name": "platform-object-storage-azure-credentials",
-                    "data": {
-                        "account_name": (
-                            azure_platform_config.azure.blob_storage_account_name
-                        ),
-                        "account_key": (
-                            azure_platform_config.azure.blob_storage_account_key
-                        ),
-                    },
-                },
-            ],
-            "sentry": mock.ANY,
-        }
 
     def test_create_gcp_platform_registry_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory

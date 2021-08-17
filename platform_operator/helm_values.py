@@ -111,10 +111,6 @@ class HelmValuesFactory:
             result["dockerHubConfigSecret"] = {"create": False}
         if platform.consul_install:
             result[self._chart_names.consul] = self.create_consul_values(platform)
-        if not platform.on_prem:
-            result[
-                self._chart_names.platform_object_storage
-            ] = self.create_platform_object_storage_values(platform)
         if platform.gcp:
             result[
                 self._chart_names.nvidia_gpu_driver_gcp
@@ -194,6 +190,10 @@ class HelmValuesFactory:
                 self._chart_names.docker_registry
             ] = self.create_docker_registry_values(platform)
             result[self._chart_names.minio] = self.create_minio_values(platform)
+        if platform.aws:
+            result[
+                self._chart_names.platform_bucket_api
+            ] = self.create_platform_buckets_api_values(platform)
         return result
 
     def _create_idle_job(self, job: Dict[str, Any]) -> Dict[str, Any]:
@@ -582,103 +582,6 @@ class HelmValuesFactory:
             ],
         }
         result.update(**self._create_tracing_values(platform))
-        return result
-
-    def create_platform_object_storage_values(
-        self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
-        docker_server = platform.docker_registry.url.host
-        result: Dict[str, Any] = {
-            "image": {"repository": f"{docker_server}/platformobjectstorage"},
-            "minio": {"image": {"repository": f"{docker_server}/minio/minio"}},
-            "NP_CLUSTER_NAME": platform.cluster_name,
-            "NP_OBSTORAGE_AUTH_URL": str(platform.auth_url),
-            "platform": {
-                "token": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": (
-                                f"{self._release_names.platform}-object-storage-token"
-                            ),
-                            "key": "token",
-                        }
-                    }
-                }
-            },
-            "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
-            "secrets": [
-                {
-                    "name": f"{self._release_names.platform}-object-storage-token",
-                    "data": {"token": platform.token},
-                }
-            ],
-        }
-        result.update(**self._create_tracing_values(platform))
-        if platform.gcp:
-            result["objectStorage"] = {
-                "provider": "gcp",
-                "location": platform.gcp.region,
-                "gcp": {
-                    "project": platform.gcp.project,
-                    "keySecret": {
-                        "name": f"{self._release_names.platform}-object-storage-gcp-key"
-                    },
-                },
-            }
-            result["secrets"].append(
-                {
-                    "name": f"{self._release_names.platform}-object-storage-gcp-key",
-                    "data": {"key.json": platform.gcp.service_account_key},
-                }
-            )
-        if platform.aws:
-            result["objectStorage"] = {
-                "provider": "aws",
-                "location": platform.aws.region,
-                "aws": {
-                    "accessKey": {"value": ""},
-                    "secretKey": {"value": ""},
-                },
-            }
-            if platform.aws.role_arn:
-                result["annotations"] = {
-                    "iam.amazonaws.com/role": platform.aws.role_arn
-                }
-        if platform.azure:
-            azure_object_storage_secret_name = (
-                f"{self._release_names.platform}-object-storage-azure-credentials"
-            )
-            result["objectStorage"] = {
-                "provider": "azure",
-                "location": platform.azure.region,
-                "azure": {
-                    "accountName": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": azure_object_storage_secret_name,
-                                "key": "account_name",
-                            }
-                        }
-                    },
-                    "accountKey": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": azure_object_storage_secret_name,
-                                "key": "account_key",
-                            }
-                        }
-                    },
-                },
-            }
-            result["secrets"].append(
-                {
-                    "name": azure_object_storage_secret_name,
-                    "data": {
-                        "account_name": platform.azure.blob_storage_account_name,
-                        "account_key": platform.azure.blob_storage_account_key,
-                    },
-                }
-            )
         return result
 
     def create_platform_registry_values(
@@ -1372,4 +1275,48 @@ class HelmValuesFactory:
             ] = "kubernetes.azure.com/scalesetpriority"
         if platform.docker_hub_registry:
             result["NP_KUBE_IMAGE_PULL_SECRET"] = platform.docker_hub_config_secret_name
+        return result
+
+    def create_platform_buckets_api_values(
+        self, platform: PlatformConfig
+    ) -> Dict[str, Any]:
+        docker_server = platform.docker_registry.url.host
+        result: Dict[str, Any] = {
+            "image": {"repository": f"{docker_server}/platformbucketapi"},
+            "NP_BUCKETS_API_K8S_NS": platform.jobs_namespace,
+            "platform": {
+                "cluster_name": platform.cluster_name,
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": (
+                                f"{self._release_names.platform}-buckets-api-token"
+                            ),
+                            "key": "token",
+                        }
+                    }
+                },
+            },
+            "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
+            "secrets": [
+                {
+                    "name": f"{self._release_names.platform}-buckets-api-token",
+                    "data": {"token": platform.token},
+                }
+            ],
+            "corsOrigins": ",".join(platform.ingress_cors_origins),
+        }
+        result.update(**self._create_tracing_values(platform))
+        if platform.aws:
+            result["bucket_provider"] = {
+                "provider": "aws",
+                "aws": {
+                    "region_name": platform.aws.region,
+                    "s3_role_arn": platform.aws.s3_role_arn,
+                },
+            }
+            if platform.aws.role_arn:
+                result["annotations"] = {
+                    "iam.amazonaws.com/role": platform.aws.role_arn
+                }
         return result

@@ -88,7 +88,6 @@ class HelmChartNames:
     nvidia_gpu_driver_gcp: str = "nvidia-gpu-driver-gcp"
     platform: str = "platform"
     platform_storage: str = "platform-storage"
-    platform_object_storage: str = "platform-object-storage"
     platform_registry: str = "platform-registry"
     platform_monitoring: str = "platform-monitoring"
     platform_container_runtime: str = "platform-container-runtime"
@@ -96,6 +95,7 @@ class HelmChartNames:
     platform_reports: str = "platform-reports"
     platform_disk_api: str = "platform-disk-api"
     platform_api_poller: str = "platform-api-poller"
+    platform_bucket_api: str = "platform-bucket-api"
 
 
 @dataclass(frozen=True)
@@ -285,6 +285,7 @@ class AwsConfig:
     storage_nfs_server: str = ""
     storage_nfs_path: str = "/"
     role_arn: str = ""
+    s3_role_arn: str = ""
 
 
 @dataclass(frozen=True)
@@ -723,6 +724,7 @@ class PlatformConfigFactory:
         return AwsConfig(
             region=cluster["cloud_provider"]["region"],
             role_arn=spec.get("iam", {}).get("aws", {}).get("roleArn", ""),
+            s3_role_arn=spec.get("iam", {}).get("aws", {}).get("s3RoleArn", ""),
             registry_url=registry_url,
             storage_type=storage_type,
             storage_size=storage_spec.storage_size,
