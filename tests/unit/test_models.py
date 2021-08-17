@@ -585,7 +585,9 @@ class TestPlatformConfigFactory:
         aws_cluster: Cluster,
         aws_platform_config: PlatformConfig,
     ) -> None:
-        aws_platform_body["spec"]["iam"] = {"aws": {"roleArn": "role_arn"}}
+        aws_platform_body["spec"]["iam"] = {
+            "aws": {"roleArn": "role_arn", "s3RoleArn": "s3-role-arn"}
+        }
         result = factory.create(aws_platform_body, aws_cluster)
 
         assert result == replace(
@@ -593,6 +595,7 @@ class TestPlatformConfigFactory:
             aws=replace(
                 aws_platform_config.aws,
                 role_arn="role_arn",
+                s3_role_arn="s3-role-arn",
             ),
         )
 
@@ -625,6 +628,7 @@ class TestPlatformConfigFactory:
             aws_platform_config,
             aws=replace(
                 aws_platform_config.aws,
+                s3_role_arn="",
                 storage_type="kubernetes",
                 storage_class_name="storage-class",
                 storage_size="100Gi",

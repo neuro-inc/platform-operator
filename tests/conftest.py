@@ -563,7 +563,7 @@ def aws_platform_config(
             storage_type="nfs",
             storage_nfs_server="192.168.0.3",
             storage_nfs_path="/",
-            s3_role_arn="test-s3-role",
+            s3_role_arn="",
         ),
     )
 
