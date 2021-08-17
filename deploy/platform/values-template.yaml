@@ -79,6 +79,11 @@ storage:
   # gcs:
   #   bucketName: bucket
 
+disks:
+  storageClass:
+    create: true
+    name: ""
+
 tags:
   gcp: false
   aws: false
