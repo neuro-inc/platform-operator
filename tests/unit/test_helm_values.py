@@ -85,6 +85,7 @@ class TestHelmValuesFactory:
                     "nodeSelector": {},
                 }
             ],
+            "disks": {"storageClass": {"create": True, "name": "platform-disk"}},
             "storage": {"type": "nfs", "nfs": {"server": "192.168.0.3", "path": "/"}},
             "traefik": mock.ANY,
             "adjust-inotify": mock.ANY,
@@ -92,6 +93,7 @@ class TestHelmValuesFactory:
             "platform-storage": mock.ANY,
             "platform-registry": mock.ANY,
             "platform-monitoring": mock.ANY,
+            "platform-container-runtime": mock.ANY,
             "platform-secrets": mock.ANY,
             "platform-reports": mock.ANY,
             "platform-disk-api": mock.ANY,
@@ -1153,6 +1155,35 @@ class TestHelmValuesFactory:
             },
         }
 
+    def test_create_gcp_platform_container_runtime_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_container_runtime_values(gcp_platform_config)
+
+        assert result == {
+            "affinity": {
+                "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                        "nodeSelectorTerms": [
+                            {
+                                "matchExpressions": [
+                                    {
+                                        "key": "platform.neuromation.io/job",
+                                        "operator": "Exists",
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
+            },
+        }
+
     def test_create_platform_secrets_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -1529,21 +1560,26 @@ class TestHelmValuesFactory:
         result = factory.create_platform_disk_api_values(gcp_platform_config)
 
         assert result == {
-            "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
-            "NP_DISK_API_K8S_NS": "platform-jobs",
-            "NP_DISK_API_PLATFORM_AUTH_URL": "https://dev.neu.ro",
-            "NP_DISK_API_STORAGE_LIMIT_PER_USER": "10995116277760",
-            "NP_CORS_ORIGINS": (
-                "https://release--neuro-web.netlify.app,https://app.neu.ro"
-            ),
-            "NP_DISK_PROVIDER": "gcp",
             "image": {"repository": "neuro.io/platformdiskapi"},
+            "disks": {
+                "namespace": "platform-jobs",
+                "limitPerUser": "10995116277760",
+                "storageClassName": "platform-disk",
+            },
             "platform": {
+                "clusterName": gcp_platform_config.cluster_name,
+                "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {"key": "token", "name": "platform-disks-token"}
                     }
-                }
+                },
+            },
+            "cors": {
+                "origins": [
+                    "https://release--neuro-web.netlify.app",
+                    "https://app.neu.ro",
+                ]
             },
             "ingress": {
                 "enabled": True,
@@ -1562,26 +1598,23 @@ class TestHelmValuesFactory:
             },
         }
 
-    def test_create_aws_platform_disk_api_values(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    def test_create_platform_disk_api_values_without_storage_class(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_disk_api_values(aws_platform_config)
+        result = factory.create_platform_disk_api_values(
+            replace(on_prem_platform_config, disks_storage_class_name="")
+        )
 
-        assert result["NP_DISK_PROVIDER"] == "aws"
+        assert "storageClassName" not in result["disks"]
 
-    def test_create_azure_platform_disk_api_values(
-        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
+    def test_create_on_prem_platform_disk_api_values_with_storage_class(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_disk_api_values(azure_platform_config)
+        result = factory.create_platform_disk_api_values(
+            replace(on_prem_platform_config, disks_storage_class_name="openebs-cstor")
+        )
 
-        assert result["NP_DISK_PROVIDER"] == "azure"
-
-    def test_create_gcp_platform_disk_api_values(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_disk_api_values(gcp_platform_config)
-
-        assert result["NP_DISK_PROVIDER"] == "gcp"
+        assert result["disks"]["storageClassName"] == "openebs-cstor"
 
     def test_create_platform_api_poller_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory

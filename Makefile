@@ -1,12 +1,19 @@
 ARTIFACTORY_DOCKER_REPO ?= neuro-docker-local-anonymous.jfrog.io
 
-TAG ?= latest
-
-IMAGE_NAME = platform-operator-controller
-IMAGE = $(IMAGE_NAME):$(TAG)
-
 ARTIFACTORY_IMAGE_REPO = $(ARTIFACTORY_DOCKER_REPO)/$(IMAGE_NAME)
 ARTIFACTORY_IMAGE = $(ARTIFACTORY_IMAGE_REPO):$(TAG)
+
+IMAGE_REPO_gke         = $(GKE_DOCKER_REGISTRY)/$(GKE_PROJECT_ID)
+IMAGE_REPO_aws         = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+IMAGE_REPO_azure       = $(AZURE_ACR_NAME).azurecr.io
+IMAGE_REPO_artifactory = $(ARTIFACTORY_DOCKER_REPO)
+
+IMAGE_REGISTRY ?= artifactory
+
+IMAGE_NAME = platform-operator-controller
+IMAGE_REPO = $(IMAGE_REPO_$(IMAGE_REGISTRY))/$(IMAGE_NAME)
+
+TAG ?= latest
 
 PLATFORM_HELM_CHART = platform
 HELM_CHART = platform-operator
@@ -44,11 +51,14 @@ test_integration:
 	exit $$exit_code
 
 docker_build:
-	docker build -t $(IMAGE) .
+	docker build -t $(IMAGE_NAME):latest .
 
-artifactory_docker_push: docker_build
-	docker tag $(IMAGE) $(ARTIFACTORY_IMAGE)
-	docker push $(ARTIFACTORY_IMAGE)
+docker_push: docker_build
+	docker tag $(IMAGE_NAME):latest $(IMAGE_REPO):$(TAG)
+	docker push $(IMAGE_REPO):$(TAG)
+
+	docker tag $(IMAGE_NAME):latest $(IMAGE_REPO):latest
+	docker push $(IMAGE_REPO):latest
 
 helm_install:
 	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v $(HELM_VERSION)

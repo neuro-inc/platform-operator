@@ -423,6 +423,13 @@ def on_prem_platform_body(cluster_name: str) -> kopf.Body:
                     }
                 },
             },
+            "disks": {
+                "kubernetes": {
+                    "persistence": {
+                        "storageClassName": "openebs-cstor",
+                    }
+                }
+            },
         },
     }
     return kopf.Body(payload)
@@ -495,6 +502,7 @@ def gcp_platform_config(
             "https://app.neu.ro",
         ],
         disks_storage_limit_per_user_gb=10240,
+        disks_storage_class_name="platform-disk",
         service_traefik_name="platform-traefik",
         monitoring_logs_bucket_name="job-logs",
         monitoring_metrics_bucket_name="job-metrics",
@@ -604,6 +612,7 @@ def on_prem_platform_config(
         monitoring_metrics_bucket_name="",
         monitoring_metrics_storage_class_name="metrics-standard",
         monitoring_metrics_storage_size="100Gi",
+        disks_storage_class_name="openebs-cstor",
         on_prem=OnPremConfig(
             registry_storage_class_name="registry-standard",
             registry_storage_size="100Gi",

@@ -48,6 +48,12 @@ class HelmValuesFactory:
                 "label": platform.kubernetes_node_labels.job,
             },
             "idleJobs": [self._create_idle_job(job) for job in platform.idle_jobs],
+            "disks": {
+                "storageClass": {
+                    "create": not platform.on_prem,
+                    "name": platform.disks_storage_class_name,
+                }
+            },
             self._chart_names.adjust_inotify: self.create_adjust_inotify_values(
                 platform
             ),
@@ -60,6 +66,9 @@ class HelmValuesFactory:
             ),
             self._chart_names.platform_monitoring: (
                 self.create_platform_monitoring_values(platform)
+            ),
+            self._chart_names.platform_container_runtime: (
+                self.create_platform_container_runtime_values(platform)
             ),
             self._chart_names.platform_secrets: (
                 self.create_platform_secrets_values(platform)
@@ -830,6 +839,29 @@ class HelmValuesFactory:
             result["NP_MONITORING_K8S_KUBELET_PORT"] = platform.on_prem.kubelet_port
         return result
 
+    def create_platform_container_runtime_values(
+        self, platform: PlatformConfig
+    ) -> Dict[str, Any]:
+        return {
+            "affinity": {
+                "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                        "nodeSelectorTerms": [
+                            {
+                                "matchExpressions": [
+                                    {
+                                        "key": platform.kubernetes_node_labels.job,
+                                        "operator": "Exists",
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            **self._create_tracing_values(platform),
+        }
+
     def create_platform_secrets_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
@@ -1160,15 +1192,16 @@ class HelmValuesFactory:
     ) -> Dict[str, Any]:
         docker_server = platform.docker_registry.url.host
         result: Dict[str, Any] = {
-            "NP_CLUSTER_NAME": platform.cluster_name,
-            "NP_DISK_API_K8S_NS": platform.jobs_namespace,
-            "NP_DISK_API_PLATFORM_AUTH_URL": str(platform.auth_url),
-            "NP_DISK_API_STORAGE_LIMIT_PER_USER": str(
-                platform.disks_storage_limit_per_user_gb * 1024 ** 3
-            ),
-            "NP_CORS_ORIGINS": ",".join(platform.ingress_cors_origins),
             "image": {"repository": f"{docker_server}/platformdiskapi"},
+            "disks": {
+                "namespace": platform.jobs_namespace,
+                "limitPerUser": str(
+                    platform.disks_storage_limit_per_user_gb * 1024 ** 3
+                ),
+            },
             "platform": {
+                "clusterName": platform.cluster_name,
+                "authUrl": str(platform.auth_url),
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -1176,8 +1209,9 @@ class HelmValuesFactory:
                             "key": "token",
                         }
                     }
-                }
+                },
             },
+            "cors": {"origins": platform.ingress_cors_origins},
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
             "secrets": [
                 {
@@ -1186,13 +1220,9 @@ class HelmValuesFactory:
                 }
             ],
         }
+        if platform.disks_storage_class_name:
+            result["disks"]["storageClassName"] = platform.disks_storage_class_name
         result.update(**self._create_tracing_values(platform))
-        if platform.aws:
-            result["NP_DISK_PROVIDER"] = "aws"
-        if platform.azure:
-            result["NP_DISK_PROVIDER"] = "azure"
-        if platform.gcp:
-            result["NP_DISK_PROVIDER"] = "gcp"
         return result
 
     def create_platformapi_poller_values(
