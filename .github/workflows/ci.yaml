@@ -71,11 +71,9 @@ jobs:
         password: ${{ secrets.ARTIFACTORY_PASSWORD }}
     - name: Set env
       run: echo "TAG=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-    - name: Push image to Artifactory
-      run: make artifactory_docker_push
+    - name: Push image
+      run: make docker_push
     - name: Install helm
-      run: |
-        make helm_install
-        make helm_repo_add
+      run: make helm_install
     - name: Push chart to Artifactory
       run: make artifactory_helm_push
