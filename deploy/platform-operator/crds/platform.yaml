@@ -163,6 +163,8 @@ spec:
                   properties:
                     roleArn:
                       type: string
+                    s3RoleArn:
+                      type: string
               oneOf:
               - properties:
                   gcp: {}

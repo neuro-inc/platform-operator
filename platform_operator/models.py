@@ -284,6 +284,7 @@ class AwsConfig:
     storage_nfs_server: str = ""
     storage_nfs_path: str = "/"
     role_arn: str = ""
+    s3_role_arn: str = ""
 
 
 @dataclass(frozen=True)
@@ -712,6 +713,7 @@ class PlatformConfigFactory:
         return AwsConfig(
             region=cluster["cloud_provider"]["region"],
             role_arn=spec.get("iam", {}).get("aws", {}).get("roleArn", ""),
+            s3_role_arn=spec.get("iam", {}).get("aws", {}).get("s3RoleArn", ""),
             registry_url=registry_url,
             storage_type=storage_type,
             storage_size=storage_spec.storage_size,

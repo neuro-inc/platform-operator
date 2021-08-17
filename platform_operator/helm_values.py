@@ -1282,6 +1282,7 @@ class HelmValuesFactory:
                 "provider": "aws",
                 "aws": {
                     "region_name": platform.aws.region,
+                    "s3_role_arn": platform.aws.s3_role_arn,
                 },
             }
             if platform.aws.role_arn:
