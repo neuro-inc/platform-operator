@@ -1309,7 +1309,7 @@ class HelmValuesFactory:
         result.update(**self._create_tracing_values(platform))
         if platform.aws:
             result["bucket_provider"] = {
-                "provider": "aws",
+                "type": "aws",
                 "aws": {
                     "region_name": platform.aws.region,
                     "s3_role_arn": platform.aws.s3_role_arn,

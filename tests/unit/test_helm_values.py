@@ -734,7 +734,7 @@ class TestHelmValuesFactory:
         assert result == {
             "NP_BUCKETS_API_K8S_NS": "platform-jobs",
             "bucket_provider": {
-                "provider": "aws",
+                "type": "aws",
                 "aws": {"region_name": "us-east-1", "s3_role_arn": ""},
             },
             "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
