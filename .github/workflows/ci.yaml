@@ -13,6 +13,9 @@ jobs:
     name: Run tests
     runs-on: ubuntu-latest
     env:
+      ARTIFACTORY_DOCKER_REPO: ${{ secrets.ARTIFACTORY_ANONYMOUS_DOCKER_REPO }}
+      ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+      ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
       HELM_VERSION: ${{ secrets.HELM_VERSION }}
     steps:
     - name: Checkout commit
