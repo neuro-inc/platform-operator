@@ -95,7 +95,7 @@ class HelmChartNames:
     platform_reports: str = "platform-reports"
     platform_disk_api: str = "platform-disk-api"
     platform_api_poller: str = "platform-api-poller"
-    platform_bucket_api: str = "platform-bucket-api"
+    platform_bucket_api: str = "platform-buckets-api"
 
 
 @dataclass(frozen=True)
