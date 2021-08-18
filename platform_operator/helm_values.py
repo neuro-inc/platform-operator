@@ -1284,8 +1284,9 @@ class HelmValuesFactory:
         result: Dict[str, Any] = {
             "image": {"repository": f"{docker_server}/platformbucketsapi"},
             "NP_BUCKETS_API_K8S_NS": platform.jobs_namespace,
+            "authUrl": str(platform.auth_url),
             "platform": {
-                "cluster_name": platform.cluster_name,
+                "clusterName": platform.cluster_name,
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -1311,8 +1312,8 @@ class HelmValuesFactory:
             result["bucketProvider"] = {
                 "type": "aws",
                 "aws": {
-                    "region_name": platform.aws.region,
-                    "s3_role_arn": platform.aws.s3_role_arn,
+                    "regionName": platform.aws.region,
+                    "s3RoleArn": platform.aws.s3_role_arn,
                 },
             }
             if platform.aws.role_arn:

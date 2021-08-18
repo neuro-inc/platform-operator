@@ -735,8 +735,9 @@ class TestHelmValuesFactory:
             "NP_BUCKETS_API_K8S_NS": "platform-jobs",
             "bucketProvider": {
                 "type": "aws",
-                "aws": {"region_name": "us-east-1", "s3_role_arn": ""},
+                "aws": {"regionName": "us-east-1", "s3RoleArn": ""},
             },
+            "authUrl": "https://dev.neu.ro",
             "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
             "image": {"repository": "neuro.io/platformbucketsapi"},
             "ingress": {
@@ -744,7 +745,7 @@ class TestHelmValuesFactory:
                 "hosts": [f"{aws_platform_config.cluster_name}.org.neu.ro"],
             },
             "platform": {
-                "cluster_name": aws_platform_config.cluster_name,
+                "clusterName": aws_platform_config.cluster_name,
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
