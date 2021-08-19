@@ -54,7 +54,7 @@ dependencies:
     version: "21.8.19"
     repository: "@neuro"
   - name: platformdiskapi
-    version: "21.8.17"
+    version: "21.8.19"
     repository: "@neuro"
     alias: platform-disk-api
   - name: platformapi-poller
