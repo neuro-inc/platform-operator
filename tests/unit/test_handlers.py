@@ -492,7 +492,7 @@ async def test_configure_cluster_with_ingress_controller_disabled(
 ) -> None:
     from platform_operator.handlers import configure_cluster as _configure_cluster
 
-    gcp_platform_config = replace(gcp_platform_config, ingress_controller_enabled=False)
+    gcp_platform_config = replace(gcp_platform_config, ingress_controller_install=False)
 
     await _configure_cluster(gcp_platform_config)
 
@@ -617,7 +617,7 @@ async def test_deploy_with_ingress_controller_disabled(
     from platform_operator.handlers import deploy
 
     gcp_platform_body["spec"]["kubernetes"]["ingressController"] = {"enabled": False}
-    gcp_platform_config = replace(gcp_platform_config, ingress_controller_enabled=False)
+    gcp_platform_config = replace(gcp_platform_config, ingress_controller_install=False)
 
     is_platform_deploy_required.return_value = True
     config_client.get_cluster.return_value = gcp_cluster

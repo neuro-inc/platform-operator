@@ -499,7 +499,7 @@ async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
 
 
 async def wait_for_certificate_created(platform: PlatformConfig) -> None:
-    if not platform.ingress_controller_enabled:
+    if not platform.ingress_controller_install:
         return
 
     async with app.status_manager.transition(
@@ -521,7 +521,7 @@ async def configure_cluster(platform: PlatformConfig) -> None:
     traefik_service: Optional[Dict[str, Any]] = None
     aws_traefik_lb: Optional[Dict[str, Any]] = None
 
-    if platform.ingress_controller_enabled:
+    if platform.ingress_controller_install:
         traefik_service = await app.kube_client.get_service(
             namespace=platform.namespace, name=platform.service_traefik_name
         )

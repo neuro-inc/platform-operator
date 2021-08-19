@@ -48,11 +48,6 @@ ingress: {}
   # jobFallbackHost: default.jobs-dev.neu.ro
   # registryHost: registry.default.org.neu.ro
 
-ingressController:
-  enabled: true
-
-consulEnabled: false
-
 jobs:
   namespace:
     create: true
@@ -83,6 +78,11 @@ disks:
   storageClass:
     create: true
     name: ""
+
+traefikEnabled: true
+consulEnabled: false
+dockerRegistryEnabled: false
+minioEnabled: false
 
 tags:
   gcp: false
