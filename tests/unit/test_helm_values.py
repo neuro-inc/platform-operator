@@ -23,6 +23,8 @@ class TestHelmValuesFactory:
 
         assert result == {
             "tags": {"gcp": True},
+            "traefikEnabled": True,
+            "consulEnabled": False,
             "dockerImage": {"repository": "neuro.io/docker"},
             "alpineImage": {"repository": "neuro.io/alpine"},
             "pauseImage": {"repository": "neuro.io/google_containers/pause"},
@@ -68,8 +70,6 @@ class TestHelmValuesFactory:
                 "jobFallbackHost": "default.jobs-dev.neu.ro",
                 "registryHost": f"registry.{cluster_name}.org.neu.ro",
             },
-            "ingressController": {"enabled": True},
-            "consulEnabled": False,
             "jobs": {
                 "namespace": {"create": True, "name": "platform-jobs"},
                 "label": "platform.neuromation.io/job",
@@ -319,10 +319,40 @@ class TestHelmValuesFactory:
             "storageClassName": "storage-standard",
             "size": "1000Gi",
         }
+        assert result["dockerRegistryEnabled"] is True
         assert "docker-registry" in result
+        assert result["minioEnabled"] is True
         assert "minio" in result
         assert "nvidia-gpu-driver" in result
         assert "platform-object-storage" not in result
+
+    def test_create_on_prem_platform_values_without_docker_registry(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(
+                on_prem_platform_config,
+                on_prem=replace(
+                    on_prem_platform_config.on_prem, docker_registry_install=False
+                ),
+            )
+        )
+
+        assert result["dockerRegistryEnabled"] is False
+        assert "docker-registry" not in result
+
+    def test_create_on_prem_platform_values_without_minio(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(
+                on_prem_platform_config,
+                on_prem=replace(on_prem_platform_config.on_prem, minio_install=False),
+            )
+        )
+
+        assert result["minioEnabled"] is False
+        assert "minio" not in result
 
     def test_create_vcd_platform_values(
         self, vcd_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -344,13 +374,9 @@ class TestHelmValuesFactory:
                 "storageClass": "registry-standard",
                 "size": "100Gi",
             },
-            "secrets": {
-                "haSharedSecret": (
-                    f"{on_prem_platform_config.docker_registry.username}:"
-                    f"{on_prem_platform_config.docker_registry.password}"
-                )
-            },
+            "secrets": {"haSharedSecret": mock.ANY},
         }
+        assert result["secrets"]["haSharedSecret"]
 
     def test_create_minio_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -989,8 +1015,8 @@ class TestHelmValuesFactory:
                 {
                     "name": "platform-docker-registry",
                     "data": {
-                        "username": on_prem_platform_config.docker_registry.username,
-                        "password": on_prem_platform_config.docker_registry.password,
+                        "username": "",
+                        "password": "",
                     },
                 },
             ],

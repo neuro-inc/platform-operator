@@ -2,7 +2,7 @@ dependencies:
   - name: traefik
     version: "1.85.1"
     repository: "@stable"
-    condition: ingressController.enabled
+    condition: traefikEnabled
   - name: cluster-autoscaler
     version: "6.2.0"
     repository: "@stable"
@@ -26,13 +26,11 @@ dependencies:
   - name: docker-registry
     version: "1.9.2"
     repository: "@stable"
-    tags:
-    - on_prem
+    condition: dockerRegistryEnabled
   - name: minio
     version: "5.0.33"
     repository: "@stable"
-    tags:
-    - on_prem
+    condition: minioEnabled
   - name: platformstorageapi
     version: "21.8.4"
     repository: "@neuro"
@@ -53,7 +51,7 @@ dependencies:
     repository: "@neuro"
     alias: platform-secrets
   - name: platform-reports
-    version: "21.8.4"
+    version: "21.8.19"
     repository: "@neuro"
   - name: platformdiskapi
     version: "21.8.17"

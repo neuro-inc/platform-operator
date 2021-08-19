@@ -197,6 +197,17 @@ spec:
                   properties:
                     url:
                       type: string
+                docker:
+                  type: object
+                  required:
+                  - url
+                  properties:
+                    url:
+                      type: string
+                    username:
+                      type: string
+                    password:
+                      type: string
                 kubernetes:
                   type: object
                   required:
@@ -224,6 +235,10 @@ spec:
                   kubernetes: {}
                 required:
                 - kubernetes
+              - properties:
+                  docker: {}
+                required:
+                - docker
             storage:
               type: object
               properties:
@@ -300,6 +315,22 @@ spec:
                       type: string
                     storageAccountKey:
                       type: string
+                s3:
+                  type: object
+                  required:
+                  - url
+                  - region
+                  - accessKey
+                  - secretKey
+                  properties:
+                    url:
+                      type: string
+                    region:
+                      type: string
+                    accessKey:
+                      type: string
+                    secretKey:
+                      type: string
                 kubernetes:
                   type: object
                   required:
@@ -323,6 +354,10 @@ spec:
                   kubernetes: {}
                 required:
                 - kubernetes
+              - properties:
+                  s3: {}
+                required:
+                - s3
             monitoring:
               type: object
               required:

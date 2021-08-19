@@ -486,7 +486,7 @@ class TestPlatformConfigFactory:
         }
         result = factory.create(gcp_platform_body, gcp_cluster)
 
-        assert result == replace(gcp_platform_config, ingress_controller_enabled=False)
+        assert result == replace(gcp_platform_config, ingress_controller_install=False)
 
     def test_gcp_platform_config_with_custom_jobs_namespace(
         self,
@@ -838,6 +838,70 @@ class TestPlatformConfigFactory:
         result = factory.create(on_prem_platform_body, on_prem_cluster)
 
         assert result.disks_storage_class_name == ""
+
+    def test_on_prem_platform_config_with_docker_registry(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: kopf.Body,
+        on_prem_cluster: Cluster,
+    ) -> None:
+        on_prem_platform_body["spec"]["registry"] = {
+            "docker": {
+                "url": "http://docker-registry",
+                "username": "docker_username",
+                "password": "docker_password",
+            }
+        }
+
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result.on_prem
+        assert result.on_prem.docker_registry_install is False
+        assert result.on_prem.registry_url == URL("http://docker-registry")
+        assert result.on_prem.registry_username == "docker_username"
+        assert result.on_prem.registry_password == "docker_password"
+
+    def test_on_prem_platform_config_with_unprotected_docker_registry(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: kopf.Body,
+        on_prem_cluster: Cluster,
+    ) -> None:
+        on_prem_platform_body["spec"]["registry"] = {
+            "docker": {"url": "http://docker-registry"}
+        }
+
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result.on_prem
+        assert result.on_prem.docker_registry_install is False
+        assert result.on_prem.registry_url == URL("http://docker-registry")
+        assert result.on_prem.registry_username == ""
+        assert result.on_prem.registry_password == ""
+
+    def test_on_prem_platform_config_with_s3(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: kopf.Body,
+        on_prem_cluster: Cluster,
+    ) -> None:
+        on_prem_platform_body["spec"]["blobStorage"] = {
+            "s3": {
+                "url": "http://minio",
+                "region": "minio_region",
+                "accessKey": "minio_access_key",
+                "secretKey": "minio_secret_key",
+            }
+        }
+
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result.on_prem
+        assert result.on_prem.minio_install is False
+        assert result.on_prem.blob_storage_url == URL("http://minio")
+        assert result.on_prem.blob_storage_region == "minio_region"
+        assert result.on_prem.blob_storage_access_key == "minio_access_key"
+        assert result.on_prem.blob_storage_secret_key == "minio_secret_key"
 
     def test_vcd_platform_config(
         self,

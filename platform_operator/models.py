@@ -308,8 +308,14 @@ class AzureConfig:
 
 @dataclass(frozen=True)
 class OnPremConfig:
+    docker_registry_install: bool
+    registry_url: URL
+    registry_username: str
+    registry_password: str
     registry_storage_class_name: str
     registry_storage_size: str
+    minio_install: bool
+    blob_storage_url: URL
     blob_storage_region: str
     blob_storage_access_key: str
     blob_storage_secret_key: str
@@ -348,7 +354,7 @@ class PlatformConfig:
     ingress_registry_url: URL
     ingress_metrics_url: URL
     ingress_acme_environment: str
-    ingress_controller_enabled: bool
+    ingress_controller_install: bool
     ingress_public_ips: Sequence[IPv4Address]
     ingress_cors_origins: Sequence[str]
     disks_storage_limit_per_user_gb: int
@@ -565,7 +571,7 @@ class PlatformConfigFactory:
             ingress_registry_url=URL(f"https://registry.{ingress_host}"),
             ingress_metrics_url=URL(f"https://metrics.{ingress_host}"),
             ingress_acme_environment=cluster.acme_environment,
-            ingress_controller_enabled=kubernetes_spec.get("ingressController", {}).get(
+            ingress_controller_install=kubernetes_spec.get("ingressController", {}).get(
                 "enabled", True
             ),
             ingress_public_ips=[
@@ -687,16 +693,15 @@ class PlatformConfigFactory:
             password=data["password"],
         )
 
-    @classmethod
-    def _create_gcp(cls, spec: kopf.Spec, cluster: Cluster) -> GcpConfig:
+    def _create_gcp(self, spec: kopf.Spec, cluster: Cluster) -> GcpConfig:
         cloud_provider = cluster["cloud_provider"]
         iam_gcp_spec = spec.get("iam", {}).get("gcp")
-        service_account_key = cls._base64_decode(
+        service_account_key = self._base64_decode(
             iam_gcp_spec.get("serviceAccountKeyBase64")
         ) or json.dumps(cloud_provider["credentials"])
         service_account_key_base64 = iam_gcp_spec.get(
             "serviceAccountKeyBase64"
-        ) or cls._base64_encode(json.dumps(cloud_provider["credentials"]))
+        ) or self._base64_encode(json.dumps(cloud_provider["credentials"]))
         storage_spec = StorageSpec(spec["storage"])
         storage_type = storage_spec.get_storage_type("kubernetes", "nfs", "gcs")
         assert storage_type, "Invalid storage type"
@@ -713,8 +718,7 @@ class PlatformConfigFactory:
             storage_gcs_bucket_name=storage_spec.gcs_bucket_name,
         )
 
-    @classmethod
-    def _create_aws(cls, spec: kopf.Spec, cluster: Cluster) -> "AwsConfig":
+    def _create_aws(self, spec: kopf.Spec, cluster: Cluster) -> "AwsConfig":
         registry_url = URL(spec["registry"]["aws"]["url"])
         if not registry_url.scheme:
             registry_url = URL(f"https://{registry_url!s}")
@@ -733,8 +737,7 @@ class PlatformConfigFactory:
             storage_nfs_path=storage_spec.nfs_path,
         )
 
-    @classmethod
-    def _create_azure(cls, spec: kopf.Spec, cluster: Cluster) -> AzureConfig:
+    def _create_azure(self, spec: kopf.Spec, cluster: Cluster) -> AzureConfig:
         registry_url = URL(spec["registry"]["azure"]["url"])
         if not registry_url.scheme:
             registry_url = URL(f"https://{registry_url!s}")
@@ -760,27 +763,79 @@ class PlatformConfigFactory:
             blob_storage_account_key=spec["blobStorage"]["azure"]["storageAccountKey"],
         )
 
-    @classmethod
-    def _create_on_prem(cls, spec: kopf.Spec) -> OnPremConfig:
+    def _create_on_prem(self, spec: kopf.Spec) -> OnPremConfig:
         kubernetes_spec = spec["kubernetes"]
         storage_spec = StorageSpec(spec["storage"])
         storage_type = storage_spec.get_storage_type("kubernetes", "nfs")
         assert storage_type, "Invalid storage type"
-        registry_persistence = spec["registry"]["kubernetes"]["persistence"]
-        blob_storage_persistence = spec["blobStorage"]["kubernetes"]["persistence"]
+
+        if "kubernetes" in spec["registry"]:
+            registry_persistence = spec["registry"]["kubernetes"]["persistence"]
+            docker_registry_install = True
+            registry_url = URL.build(
+                scheme="http",
+                host=f"{self._config.helm_release_names.platform}-docker-registry",
+                port=5000,
+            )
+            # Credentials are not important as we don't expose
+            # service outside of the network.
+            registry_username = ""
+            registry_password = ""
+            registry_storage_class_name = registry_persistence["storageClassName"]
+            registry_storage_size = registry_persistence.get("size") or "10Gi"
+
+        if "docker" in spec["registry"]:
+            docker_registry_install = False
+            registry_url = URL(spec["registry"]["docker"]["url"])
+            registry_username = spec["registry"]["docker"].get("username", "")
+            registry_password = spec["registry"]["docker"].get("password", "")
+            registry_storage_class_name = ""
+            registry_storage_size = ""
+
+        if "kubernetes" in spec["blobStorage"]:
+            blob_storage_persistence = spec["blobStorage"]["kubernetes"]["persistence"]
+            minio_install = True
+            blob_storage_url = URL.build(
+                scheme="http",
+                host=f"{self._config.helm_release_names.platform}-minio",
+                port=9000,
+            )
+            blob_storage_region = "minio"
+            # Credentials are not important as we don't expose
+            # service outside of the network.
+            blob_storage_access_key = "minio_access_key"
+            blob_storage_secret_key = "minio_secret_key"
+            blob_storage_class_name = blob_storage_persistence["storageClassName"]
+            blob_storage_size = blob_storage_persistence.get("size") or "10Gi"
+
+        if "s3" in spec["blobStorage"]:
+            minio_install = False
+            blob_storage_url = URL(spec["blobStorage"]["s3"]["url"])
+            blob_storage_region = spec["blobStorage"]["s3"]["region"]
+            blob_storage_access_key = spec["blobStorage"]["s3"]["accessKey"]
+            blob_storage_secret_key = spec["blobStorage"]["s3"]["secretKey"]
+            blob_storage_class_name = ""
+            blob_storage_size = ""
+
         return OnPremConfig(
-            registry_storage_class_name=registry_persistence["storageClassName"],
-            registry_storage_size=registry_persistence.get("size") or "10Gi",
+            docker_registry_install=docker_registry_install,
+            registry_url=registry_url,
+            registry_username=registry_username,
+            registry_password=registry_password,
+            registry_storage_class_name=registry_storage_class_name,
+            registry_storage_size=registry_storage_size,
             storage_type=storage_type,
             storage_class_name=storage_spec.storage_class_name,
             storage_size=storage_spec.storage_size or "10Gi",
             storage_nfs_server=storage_spec.nfs_server,
             storage_nfs_path=storage_spec.nfs_path,
-            blob_storage_region="minio",
-            blob_storage_access_key="minio_access_key",
-            blob_storage_secret_key="minio_secret_key",
-            blob_storage_class_name=blob_storage_persistence["storageClassName"],
-            blob_storage_size=blob_storage_persistence.get("size") or "10Gi",
+            minio_install=minio_install,
+            blob_storage_url=blob_storage_url,
+            blob_storage_region=blob_storage_region,
+            blob_storage_access_key=blob_storage_access_key,
+            blob_storage_secret_key=blob_storage_secret_key,
+            blob_storage_class_name=blob_storage_class_name,
+            blob_storage_size=blob_storage_size,
             kubelet_port=int(kubernetes_spec["nodePorts"]["kubelet"]),
             http_node_port=int(kubernetes_spec["nodePorts"]["http"]),
             https_node_port=int(kubernetes_spec["nodePorts"]["https"]),

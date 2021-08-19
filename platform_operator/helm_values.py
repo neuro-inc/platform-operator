@@ -1,5 +1,8 @@
 from base64 import b64decode
+from hashlib import sha256
 from typing import Any, Dict, Optional
+
+import bcrypt
 
 from .models import HelmChartNames, HelmReleaseNames, LabelsConfig, PlatformConfig
 
@@ -15,6 +18,8 @@ class HelmValuesFactory:
         docker_server = platform.docker_registry.url.host
         result: Dict[str, Any] = {
             "tags": {platform.cloud_provider: True},
+            "traefikEnabled": platform.ingress_controller_install,
+            "consulEnabled": platform.consul_install,
             "dockerImage": {"repository": f"{docker_server}/docker"},
             "alpineImage": {"repository": f"{docker_server}/alpine"},
             "pauseImage": {"repository": f"{docker_server}/google_containers/pause"},
@@ -38,8 +43,6 @@ class HelmValuesFactory:
                 "jobFallbackHost": str(platform.jobs_fallback_host),
                 "registryHost": platform.ingress_registry_url.host,
             },
-            "ingressController": {"enabled": platform.ingress_controller_enabled},
-            "consulEnabled": platform.consul_install,
             "jobs": {
                 "namespace": {
                     "create": platform.jobs_namespace_create,
@@ -148,6 +151,9 @@ class HelmValuesFactory:
             result[
                 self._chart_names.cluster_autoscaler
             ] = self.create_cluster_autoscaler_values(platform)
+            result[
+                self._chart_names.platform_bucket_api
+            ] = self.create_platform_buckets_api_values(platform)
         if platform.azure:
             if platform.azure.storage_type == "kubernetes":
                 result["storage"] = self._create_kubernetes_storage_values(
@@ -176,6 +182,8 @@ class HelmValuesFactory:
             }
         if platform.on_prem:
             result["tags"] = {"on_prem": True}
+            result["dockerRegistryEnabled"] = platform.on_prem.docker_registry_install
+            result["minioEnabled"] = platform.on_prem.minio_install
             if platform.on_prem.storage_type == "kubernetes":
                 result["storage"] = self._create_kubernetes_storage_values(
                     storage_class_name=platform.on_prem.storage_class_name,
@@ -186,14 +194,12 @@ class HelmValuesFactory:
                     server=platform.on_prem.storage_nfs_server,
                     path=platform.on_prem.storage_nfs_path,
                 )
-            result[
-                self._chart_names.docker_registry
-            ] = self.create_docker_registry_values(platform)
-            result[self._chart_names.minio] = self.create_minio_values(platform)
-        if platform.aws:
-            result[
-                self._chart_names.platform_bucket_api
-            ] = self.create_platform_buckets_api_values(platform)
+            if platform.on_prem.docker_registry_install:
+                result[
+                    self._chart_names.docker_registry
+                ] = self.create_docker_registry_values(platform)
+            if platform.on_prem.minio_install:
+                result[self._chart_names.minio] = self.create_minio_values(platform)
         return result
 
     def _create_idle_job(self, job: Dict[str, Any]) -> Dict[str, Any]:
@@ -250,9 +256,8 @@ class HelmValuesFactory:
 
     def create_docker_registry_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         assert platform.on_prem
-        docker_registry = platform.docker_registry
-        return {
-            "image": {"repository": f"{docker_registry.url.host}/registry"},
+        result: Dict[str, Any] = {
+            "image": {"repository": f"{platform.docker_registry.url.host}/registry"},
             "ingress": {"enabled": False},
             "persistence": {
                 "enabled": True,
@@ -260,11 +265,16 @@ class HelmValuesFactory:
                 "size": platform.on_prem.registry_storage_size,
             },
             "secrets": {
-                "haSharedSecret": (
-                    f"{docker_registry.username}:{docker_registry.password}"
-                )
+                "haSharedSecret": sha256(platform.cluster_name.encode()).hexdigest()
             },
         }
+        if platform.on_prem.registry_username and platform.on_prem.registry_password:
+            username = platform.on_prem.registry_username
+            password_hash = bcrypt.hashpw(
+                platform.on_prem.registry_password.encode(), bcrypt.gensalt(rounds=10)
+            ).decode()
+            result["secrets"]["htpasswd"] = f"{username}:{password_hash}"
+        return result
 
     def create_minio_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         assert platform.on_prem
@@ -701,7 +711,7 @@ class HelmValuesFactory:
             )
             result["upstreamRegistry"] = {
                 "type": "basic",
-                "url": f"http://{self._release_names.platform}-docker-registry:5000",
+                "url": str(platform.on_prem.registry_url),
                 "basicUsername": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -725,8 +735,8 @@ class HelmValuesFactory:
                 {
                     "name": docker_registry_credentials_secret_name,
                     "data": {
-                        "username": platform.docker_registry.username,
-                        "password": platform.docker_registry.password,
+                        "username": platform.on_prem.registry_username,
+                        "password": platform.on_prem.registry_password,
                     },
                 }
             )
@@ -828,7 +838,7 @@ class HelmValuesFactory:
                 "persistence": {
                     "type": "minio",
                     "minio": {
-                        "url": f"http://{self._release_names.platform}-minio:9000",
+                        "url": str(platform.on_prem.blob_storage_url),
                         "accessKey": platform.on_prem.blob_storage_access_key,
                         "secretKey": platform.on_prem.blob_storage_secret_key,
                         "region": platform.on_prem.blob_storage_region,
