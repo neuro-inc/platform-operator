@@ -1221,7 +1221,6 @@ class HelmValuesFactory:
                     }
                 },
             },
-            "cors": {"origins": platform.ingress_cors_origins},
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
             "secrets": [
                 {
@@ -1230,6 +1229,8 @@ class HelmValuesFactory:
                 }
             ],
         }
+        if platform.ingress_cors_origins:
+            result["cors"] = {"origins": platform.ingress_cors_origins}
         if platform.disks_storage_class_name:
             result["disks"]["storageClassName"] = platform.disks_storage_class_name
         result.update(**self._create_tracing_values(platform))

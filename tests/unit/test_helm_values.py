@@ -1643,6 +1643,15 @@ class TestHelmValuesFactory:
 
         assert result["disks"]["storageClassName"] == "openebs-cstor"
 
+    def test_create_on_prem_platform_disk_api_values_without_cors_origins(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_disk_api_values(
+            replace(on_prem_platform_config, ingress_cors_origins=())
+        )
+
+        assert "cors" not in result
+
     def test_create_platform_api_poller_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
