@@ -799,6 +799,46 @@ class TestHelmValuesFactory:
 
         assert result["annotations"] == {"iam.amazonaws.com/role": "s3_role"}
 
+    def test_create_on_prem_buckets_api_values(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_buckets_api_values(on_prem_platform_config)
+
+        assert result == {
+            "NP_BUCKETS_API_K8S_NS": "platform-jobs",
+            "bucketProvider": {
+                "type": "minio",
+                "minio": {
+                    "accessKeyId": "minio_access_key",
+                    "regionName": "minio",
+                    "secretAccessKey": "minio_secret_key",
+                    "url": "http://platform-minio:9000",
+                },
+            },
+            "authUrl": "https://dev.neu.ro",
+            "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
+            "image": {"repository": "neuro.io/platformbucketsapi"},
+            "ingress": {
+                "enabled": True,
+                "hosts": [f"{on_prem_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "platform": {
+                "clusterName": on_prem_platform_config.cluster_name,
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "key": "token",
+                            "name": "platform-buckets-api-token",
+                        }
+                    }
+                },
+            },
+            "secrets": [
+                {"data": {"token": "token"}, "name": "platform-buckets-api-token"}
+            ],
+            "sentry": mock.ANY,
+        }
+
     def test_create_gcp_platform_registry_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:

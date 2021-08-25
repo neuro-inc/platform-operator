@@ -200,6 +200,9 @@ class HelmValuesFactory:
                 ] = self.create_docker_registry_values(platform)
             if platform.on_prem.minio_install:
                 result[self._chart_names.minio] = self.create_minio_values(platform)
+            result[
+                self._chart_names.platform_bucket_api
+            ] = self.create_platform_buckets_api_values(platform)
         return result
 
     def _create_idle_job(self, job: Dict[str, Any]) -> Dict[str, Any]:
@@ -1331,4 +1334,14 @@ class HelmValuesFactory:
                 result["annotations"] = {
                     "iam.amazonaws.com/role": platform.aws.role_arn
                 }
+        if platform.on_prem:
+            result["bucketProvider"] = {
+                "type": "minio",
+                "minio": {
+                    "url": str(platform.on_prem.blob_storage_url),
+                    "accessKeyId": platform.on_prem.blob_storage_access_key,
+                    "secretAccessKey": platform.on_prem.blob_storage_secret_key,
+                    "regionName": platform.on_prem.blob_storage_region,
+                },
+            }
         return result
