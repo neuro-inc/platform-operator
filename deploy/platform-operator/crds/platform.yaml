@@ -315,7 +315,7 @@ spec:
                       type: string
                     storageAccountKey:
                       type: string
-                s3:
+                minio:
                   type: object
                   required:
                   - url
@@ -323,6 +323,8 @@ spec:
                   - accessKey
                   - secretKey
                   properties:
+                    public_url:
+                      type: string
                     url:
                       type: string
                     region:
@@ -355,9 +357,9 @@ spec:
                 required:
                 - kubernetes
               - properties:
-                  s3: {}
+                  minio: {}
                 required:
-                - s3
+                - minio
             monitoring:
               type: object
               required:

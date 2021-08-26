@@ -280,6 +280,10 @@ def on_prem_cluster(
         "credentials": {"token": "kubernetes-token", "ca_data": "kubernetes-ca-data"},
         "node_pools": [node_pool_factory("gpu")],
     }
+    cluster["credentials"]["minio"] = {
+        "username": "username",
+        "password": "password",
+    }
     return cluster
 
 
@@ -293,6 +297,10 @@ def vcd_cluster(
     cluster["cloud_provider"] = {
         "type": "vcd_mts",
         "node_pools": [node_pool_factory("gpu")],
+    }
+    cluster["credentials"]["minio"] = {
+        "username": "username",
+        "password": "password",
     }
     return cluster
 
@@ -600,6 +608,7 @@ def azure_platform_config(
 def on_prem_platform_config(
     gcp_platform_config: PlatformConfig,
     resource_pool_type_factory: Callable[[], Dict[str, Any]],
+    cluster_name: str,
 ) -> PlatformConfig:
     return replace(
         gcp_platform_config,
@@ -624,10 +633,11 @@ def on_prem_platform_config(
             storage_class_name="storage-standard",
             storage_size="1000Gi",
             minio_install=True,
+            blob_storage_public_url=URL(f"https://blob.{cluster_name}.org.neu.ro"),
             blob_storage_url=URL("http://platform-minio:9000"),
             blob_storage_region="minio",
-            blob_storage_access_key="minio_access_key",
-            blob_storage_secret_key="minio_secret_key",
+            blob_storage_access_key="username",
+            blob_storage_secret_key="password",
             blob_storage_class_name="blob-storage-standard",
             blob_storage_size="10Gi",
             kubelet_port=10250,

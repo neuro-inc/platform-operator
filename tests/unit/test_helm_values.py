@@ -400,9 +400,17 @@ class TestHelmValuesFactory:
                 "storageClass": "blob-storage-standard",
                 "size": "10Gi",
             },
-            "accessKey": "minio_access_key",
-            "secretKey": "minio_secret_key",
+            "accessKey": "username",
+            "secretKey": "password",
             "environment": {"MINIO_REGION_NAME": "minio"},
+            "ingress": {
+                "enabled": True,
+                "annotations": {
+                    "kubernetes.io/ingress.class": "traefik",
+                    "traefik.frontend.rule.type": "PathPrefix",
+                },
+                "hosts": [f"blob.{on_prem_platform_config.cluster_name}.org.neu.ro"],
+            },
         }
 
     def test_create_obs_csi_driver_values(
@@ -803,16 +811,18 @@ class TestHelmValuesFactory:
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_buckets_api_values(on_prem_platform_config)
+        cluster_name = on_prem_platform_config.cluster_name
 
         assert result == {
             "NP_BUCKETS_API_K8S_NS": "platform-jobs",
             "bucketProvider": {
                 "type": "minio",
                 "minio": {
-                    "accessKeyId": "minio_access_key",
+                    "accessKeyId": "username",
                     "regionName": "minio",
-                    "secretAccessKey": "minio_secret_key",
+                    "secretAccessKey": "password",
                     "url": "http://platform-minio:9000",
+                    "publicUrl": f"https://blob.{cluster_name}.org.neu.ro",
                 },
             },
             "authUrl": "https://dev.neu.ro",
@@ -820,10 +830,10 @@ class TestHelmValuesFactory:
             "image": {"repository": "neuro.io/platformbucketsapi"},
             "ingress": {
                 "enabled": True,
-                "hosts": [f"{on_prem_platform_config.cluster_name}.org.neu.ro"],
+                "hosts": [f"{cluster_name}.org.neu.ro"],
             },
             "platform": {
-                "clusterName": on_prem_platform_config.cluster_name,
+                "clusterName": cluster_name,
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -1214,8 +1224,8 @@ class TestHelmValuesFactory:
                 "type": "minio",
                 "minio": {
                     "url": "http://platform-minio:9000",
-                    "accessKey": "minio_access_key",
-                    "secretKey": "minio_secret_key",
+                    "accessKey": "username",
+                    "secretKey": "password",
                     "region": "minio",
                     "bucket": "job-logs",
                 },

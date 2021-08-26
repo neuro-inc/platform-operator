@@ -316,6 +316,7 @@ class OnPremConfig:
     registry_storage_size: str
     minio_install: bool
     blob_storage_url: URL
+    blob_storage_public_url: URL
     blob_storage_region: str
     blob_storage_access_key: str
     blob_storage_secret_key: str
@@ -412,6 +413,10 @@ class PlatformConfig:
                     {"name": f"metrics.{self.dns_name}.", "ips": ips},
                 )
             )
+            if self.on_prem and self.on_prem.minio_install:
+                result["a_records"].extend(
+                    ({"name": f"blob.{self.dns_name}.", "ips": ips},)
+                )
         elif self.aws and traefik_service:
             traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0][
                 "hostname"
@@ -452,6 +457,10 @@ class PlatformConfig:
                     {"name": f"metrics.{self.dns_name}.", "ips": [traefik_host]},
                 )
             )
+            if self.on_prem and self.on_prem.minio_install:
+                result["a_records"].extend(
+                    ({"name": f"blob.{self.dns_name}.", "ips": [traefik_host]},)
+                )
         return result
 
     def create_cluster_config(
@@ -657,7 +666,7 @@ class PlatformConfigFactory:
                 else None
             ),
             on_prem=(
-                self._create_on_prem(platform_body["spec"])
+                self._create_on_prem(platform_body["spec"], cluster)
                 if cluster.is_on_prem
                 else None
             ),
@@ -763,7 +772,7 @@ class PlatformConfigFactory:
             blob_storage_account_key=spec["blobStorage"]["azure"]["storageAccountKey"],
         )
 
-    def _create_on_prem(self, spec: kopf.Spec) -> OnPremConfig:
+    def _create_on_prem(self, spec: kopf.Spec, cluster: Cluster) -> OnPremConfig:
         kubernetes_spec = spec["kubernetes"]
         storage_spec = StorageSpec(spec["storage"])
         storage_type = storage_spec.get_storage_type("kubernetes", "nfs")
@@ -803,17 +812,24 @@ class PlatformConfigFactory:
             blob_storage_region = "minio"
             # Credentials are not important as we don't expose
             # service outside of the network.
-            blob_storage_access_key = "minio_access_key"
-            blob_storage_secret_key = "minio_secret_key"
+            blob_storage_public_url = URL(f"https://blob.{cluster.dns_name}")
+            blob_storage_access_key = cluster["credentials"]["minio"]["username"]
+            blob_storage_secret_key = cluster["credentials"]["minio"]["password"]
             blob_storage_class_name = blob_storage_persistence["storageClassName"]
             blob_storage_size = blob_storage_persistence.get("size") or "10Gi"
 
-        if "s3" in spec["blobStorage"]:
+        if "minio" in spec["blobStorage"]:
             minio_install = False
-            blob_storage_url = URL(spec["blobStorage"]["s3"]["url"])
-            blob_storage_region = spec["blobStorage"]["s3"]["region"]
-            blob_storage_access_key = spec["blobStorage"]["s3"]["accessKey"]
-            blob_storage_secret_key = spec["blobStorage"]["s3"]["secretKey"]
+            blob_storage_url = URL(spec["blobStorage"]["minio"]["url"])
+            try:
+                blob_storage_public_url = URL(
+                    spec["blobStorage"]["minio"]["public_url"]
+                )
+            except KeyError:
+                blob_storage_public_url = blob_storage_url
+            blob_storage_region = spec["blobStorage"]["minio"]["region"]
+            blob_storage_access_key = spec["blobStorage"]["minio"]["accessKey"]
+            blob_storage_secret_key = spec["blobStorage"]["minio"]["secretKey"]
             blob_storage_class_name = ""
             blob_storage_size = ""
 
@@ -831,6 +847,7 @@ class PlatformConfigFactory:
             storage_nfs_path=storage_spec.nfs_path,
             minio_install=minio_install,
             blob_storage_url=blob_storage_url,
+            blob_storage_public_url=blob_storage_public_url,
             blob_storage_region=blob_storage_region,
             blob_storage_access_key=blob_storage_access_key,
             blob_storage_secret_key=blob_storage_secret_key,
