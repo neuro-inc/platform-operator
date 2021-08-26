@@ -885,11 +885,11 @@ class TestPlatformConfigFactory:
         factory: PlatformConfigFactory,
         on_prem_platform_body: kopf.Body,
         on_prem_cluster: Cluster,
+        cluster_name: str,
     ) -> None:
         on_prem_platform_body["spec"]["blobStorage"] = {
             "minio": {
                 "url": "http://minio",
-                "public_url": "http://minio-public",
                 "region": "minio_region",
                 "accessKey": "minio_access_key",
                 "secretKey": "minio_secret_key",
@@ -901,7 +901,9 @@ class TestPlatformConfigFactory:
         assert result.on_prem
         assert result.on_prem.minio_install is False
         assert result.on_prem.blob_storage_url == URL("http://minio")
-        assert result.on_prem.blob_storage_public_url == URL("http://minio-public")
+        assert result.on_prem.blob_storage_public_url == URL(
+            f"https://blob.{cluster_name}.org.neu.ro"
+        )
         assert result.on_prem.blob_storage_region == "minio_region"
         assert result.on_prem.blob_storage_access_key == "minio_access_key"
         assert result.on_prem.blob_storage_secret_key == "minio_secret_key"

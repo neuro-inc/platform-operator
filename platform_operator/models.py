@@ -413,7 +413,7 @@ class PlatformConfig:
                     {"name": f"metrics.{self.dns_name}.", "ips": ips},
                 )
             )
-            if self.on_prem and self.on_prem.minio_install:
+            if self.on_prem:
                 result["a_records"].extend(
                     ({"name": f"blob.{self.dns_name}.", "ips": ips},)
                 )
@@ -457,7 +457,7 @@ class PlatformConfig:
                     {"name": f"metrics.{self.dns_name}.", "ips": [traefik_host]},
                 )
             )
-            if self.on_prem and self.on_prem.minio_install:
+            if self.on_prem:
                 result["a_records"].extend(
                     ({"name": f"blob.{self.dns_name}.", "ips": [traefik_host]},)
                 )
@@ -821,12 +821,8 @@ class PlatformConfigFactory:
         if "minio" in spec["blobStorage"]:
             minio_install = False
             blob_storage_url = URL(spec["blobStorage"]["minio"]["url"])
-            try:
-                blob_storage_public_url = URL(
-                    spec["blobStorage"]["minio"]["public_url"]
-                )
-            except KeyError:
-                blob_storage_public_url = blob_storage_url
+            # Ingress should be manually in this case
+            blob_storage_public_url = URL(f"https://blob.{cluster.dns_name}")
             blob_storage_region = spec["blobStorage"]["minio"]["region"]
             blob_storage_access_key = spec["blobStorage"]["minio"]["accessKey"]
             blob_storage_secret_key = spec["blobStorage"]["minio"]["secretKey"]
