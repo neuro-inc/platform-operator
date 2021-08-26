@@ -1,7 +1,3 @@
-dockerImage:
-  repository: $DOCKER_SERVER/docker
-  tag: 19.03.8
-
 pauseImage:
   repository: $DOCKER_SERVER/google_containers/pause
   tag: "3.0"
@@ -9,6 +5,10 @@ pauseImage:
 alpineImage:
   repository: $DOCKER_SERVER/alpine
   tag: latest
+
+crictlImage:
+  repository: $DOCKER_SERVER/crictl
+  tag: 1.22.0
 
 serviceToken: ""
 

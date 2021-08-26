@@ -2,6 +2,7 @@
 {{- $appName := include "platform.name" . }}
 {{- $priorityClassName := include "platform.idleJobs.priorityClass.name" . }}
 {{- $jobsNamespace := include "platform.jobs.namespace.name" . }}
+{{- $imagesPrepull := .Values.kubernetes.imagesPrepull }}
 {{- range .Values.kubernetes.nodePools }}
 {{- if gt (.idleSize | int) 0 }}
 {{- $name := .name | replace "_" "-" | lower }}
@@ -35,8 +36,47 @@ spec:
         node-pool: {{ $name | quote }}
     spec:
       containers:
+      {{- if $imagesPrepull }}
+      {{- if gt (len $imagesPrepull.images) 0 }}
+      - name: images-prepull
+        image: {{ $.Values.crictlImage.repository }}:{{ $.Values.crictlImage.tag }}
+        command: [bash]
+        args:
+          - -c
+          - |
+            if [[ -f /run/dockershim.sock ]]
+            then
+              RUNTIME_ENDPOINT=unix:///run/dockershim.sock
+            fi
+
+            if [[ -f /run/containerd/containerd.sock ]]
+            then
+              RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock
+            fi
+
+            if [[ -f /run/crio/crio.sock ]]
+            then
+              RUNTIME_ENDPOINT=unix:///run/crio/crio.sock
+            fi
+
+            echo "pull interval: {{ $imagesPrepull.refreshInterval }}"
+
+            while true
+            do
+              echo
+              {{- range $imagesPrepull.images }}
+              echo "$(date) - pulling image: {{ .image }}"
+              crictl -r $RUNTIME_ENDPOINT pull {{ .image }} || true
+              echo "$(date) - pulled image: {{ .image }}"
+              {{- end }}
+
+              sleep {{ $imagesPrepull.refreshInterval }}
+            done
+      {{- end }}
+      {{- else }}
       - name: pause
         image: {{ $.Values.pauseImage.repository}}:{{ $.Values.pauseImage.tag }}
+      {{- end }}
         resources:
           requests:
 {{- if gt (.gpu | int) 0 }}
@@ -56,10 +96,16 @@ spec:
             cpu: {{ .cpu | quote }}
             memory: 1Gi
 {{- end }}
+        volumeMounts:
+          - name: host-run
+            mountPath: /run
+      volumes:
+      - name: host-run
+        hostPath:
+          path: /run
       priorityClassName: {{ $priorityClassName }}
       tolerations:
-      - key: ""
-        operator: Exists
+      - operator: Exists
         effect: NoSchedule
       affinity:
         nodeAffinity:
