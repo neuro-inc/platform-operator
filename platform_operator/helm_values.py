@@ -302,6 +302,14 @@ class HelmValuesFactory:
             },
             "accessKey": platform.on_prem.blob_storage_access_key,
             "secretKey": platform.on_prem.blob_storage_secret_key,
+            "ingress": {
+                "enabled": True,
+                "annotations": {
+                    "kubernetes.io/ingress.class": "traefik",
+                    "traefik.frontend.rule.type": "PathPrefix",
+                },
+                "hosts": [platform.on_prem.blob_storage_public_url.host],
+            },
             "environment": {"MINIO_REGION_NAME": platform.on_prem.blob_storage_region},
         }
 
@@ -1339,6 +1347,7 @@ class HelmValuesFactory:
                 "type": "minio",
                 "minio": {
                     "url": str(platform.on_prem.blob_storage_url),
+                    "publicUrl": str(platform.on_prem.blob_storage_public_url),
                     "accessKeyId": platform.on_prem.blob_storage_access_key,
                     "secretAccessKey": platform.on_prem.blob_storage_secret_key,
                     "regionName": platform.on_prem.blob_storage_region,
