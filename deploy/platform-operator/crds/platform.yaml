@@ -323,8 +323,6 @@ spec:
                   - accessKey
                   - secretKey
                   properties:
-                    public_url:
-                      type: string
                     url:
                       type: string
                     region:
