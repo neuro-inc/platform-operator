@@ -25,9 +25,9 @@ class TestHelmValuesFactory:
             "tags": {"gcp": True},
             "traefikEnabled": True,
             "consulEnabled": False,
-            "dockerImage": {"repository": "neuro.io/docker"},
             "alpineImage": {"repository": "neuro.io/alpine"},
             "pauseImage": {"repository": "neuro.io/google_containers/pause"},
+            "crictlImage": {"repository": "neuro.io/crictl"},
             "serviceToken": "token",
             "kubernetes": {
                 "nodePools": [

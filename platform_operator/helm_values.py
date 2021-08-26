@@ -20,9 +20,9 @@ class HelmValuesFactory:
             "tags": {platform.cloud_provider: True},
             "traefikEnabled": platform.ingress_controller_install,
             "consulEnabled": platform.consul_install,
-            "dockerImage": {"repository": f"{docker_server}/docker"},
             "alpineImage": {"repository": f"{docker_server}/alpine"},
             "pauseImage": {"repository": f"{docker_server}/google_containers/pause"},
+            "crictlImage": {"repository": f"{docker_server}/crictl"},
             "serviceToken": platform.token,
             "kubernetes": {
                 "nodePools": platform.jobs_node_pools,
