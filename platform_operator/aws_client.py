@@ -34,7 +34,7 @@ class AwsElbClient:
         return self
 
     async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
-        await self._client.close()
+        await self._client.__aexit__(*args, **kwargs)
 
     async def create_load_balancer(self, **kwargs: Any) -> Dict[str, str]:
         return await self._client.create_load_balancer(**kwargs)
