@@ -44,17 +44,17 @@ spec:
         args:
           - -c
           - |
-            if [[ -f /run/dockershim.sock ]]
+            if [[ -S /run/dockershim.sock ]]
             then
               RUNTIME_ENDPOINT=unix:///run/dockershim.sock
             fi
 
-            if [[ -f /run/containerd/containerd.sock ]]
+            if [[ -S /run/containerd/containerd.sock ]]
             then
               RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock
             fi
 
-            if [[ -f /run/crio/crio.sock ]]
+            if [[ -S /run/crio/crio.sock ]]
             then
               RUNTIME_ENDPOINT=unix:///run/crio/crio.sock
             fi
