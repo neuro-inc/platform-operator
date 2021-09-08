@@ -62,12 +62,9 @@ dependencies:
     repository: "@neuro"
     alias: platform-api-poller
   - name: platformbucketsapi
-    version: "21.8.26"
+    version: "21.9.8"
     repository: "@neuro"
     alias: platform-buckets-api
-    tags:
-      - aws
-      - on_prem
 
   # Deprecated, left for backward compatibility with old clusters
   - name: consul

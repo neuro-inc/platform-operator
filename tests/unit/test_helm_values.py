@@ -98,6 +98,7 @@ class TestHelmValuesFactory:
             "platform-reports": mock.ANY,
             "platform-disk-api": mock.ANY,
             "platform-api-poller": mock.ANY,
+            "platform-buckets-api": mock.ANY,
         }
 
     def test_create_gcp_platform_values_idle_jobs(
@@ -845,6 +846,100 @@ class TestHelmValuesFactory:
             },
             "secrets": [
                 {"data": {"token": "token"}, "name": "platform-buckets-api-token"}
+            ],
+            "sentry": mock.ANY,
+        }
+
+    def test_create_gcp_buckets_api_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_buckets_api_values(gcp_platform_config)
+
+        assert result == {
+            "NP_BUCKETS_API_K8S_NS": "platform-jobs",
+            "bucketProvider": {
+                "type": "gcp",
+                "gcp": {
+                    "SAKeyJsonB64": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "key": "SAKeyB64",
+                                "name": "platform-buckets-gcp-sa-key",
+                            }
+                        }
+                    }
+                },
+            },
+            "authUrl": "https://dev.neu.ro",
+            "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
+            "image": {"repository": "neuro.io/platformbucketsapi"},
+            "ingress": {
+                "enabled": True,
+                "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "platform": {
+                "clusterName": gcp_platform_config.cluster_name,
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "key": "token",
+                            "name": "platform-buckets-api-token",
+                        }
+                    }
+                },
+            },
+            "secrets": [
+                {"data": {"token": "token"}, "name": "platform-buckets-api-token"},
+                {"data": {"SAKeyB64": "e30="}, "name": "platform-buckets-gcp-sa-key"},
+            ],
+            "sentry": mock.ANY,
+        }
+
+    def test_create_azure_buckets_api_values(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_buckets_api_values(azure_platform_config)
+
+        assert result == {
+            "NP_BUCKETS_API_K8S_NS": "platform-jobs",
+            "bucketProvider": {
+                "type": "azure",
+                "azure": {
+                    "credential": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "key": "token",
+                                "name": "platform-buckets-azure-storage-account-key",
+                            }
+                        }
+                    },
+                    "url": "https://accountName2.blob.core.windows.net",
+                },
+            },
+            "authUrl": "https://dev.neu.ro",
+            "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
+            "image": {"repository": "neuro.io/platformbucketsapi"},
+            "ingress": {
+                "enabled": True,
+                "hosts": [f"{azure_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "platform": {
+                "clusterName": azure_platform_config.cluster_name,
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "key": "token",
+                            "name": "platform-buckets-api-token",
+                        }
+                    }
+                },
+            },
+            "secrets": [
+                {"data": {"token": "token"}, "name": "platform-buckets-api-token"},
+                {
+                    "data": {"key": "accountKey2"},
+                    "name": "platform-buckets-azure-storage-account-key",
+                },
             ],
             "sentry": mock.ANY,
         }
