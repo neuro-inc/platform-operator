@@ -12,7 +12,7 @@ install_requires = (
 setup(
     name="platform_operator",
     version="1.0.0",
-    url="https://github.com/neuromation/platform-operator",
+    url="https://github.com/neuro-inc/platform-operator",
     packages=find_packages(),
     install_requires=install_requires,
     zip_safe=False,
