@@ -1,5 +1,7 @@
 FROM python:3.9-buster
 
+LABEL org.opencontainers.image.source = "https://github.com/neuro-inc/platform-operator"
+
 RUN curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v v2.17.0
 
 WORKDIR /neuromation
