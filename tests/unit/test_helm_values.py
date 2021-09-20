@@ -386,7 +386,7 @@ class TestHelmValuesFactory:
         assert result == {
             "image": {
                 "repository": "neuro.io/minio/minio",
-                "tag": "RELEASE.2021-08-25T00-41-18Z ",
+                "tag": "RELEASE.2021-08-25T00-41-18Z",
             },
             "imagePullSecrets": [{"name": "platform-docker-config"}],
             "DeploymentUpdate": {
