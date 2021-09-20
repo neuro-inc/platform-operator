@@ -284,7 +284,7 @@ class HelmValuesFactory:
         return {
             "image": {
                 "repository": f"{platform.docker_registry.url.host}/minio/minio",
-                "tag": "RELEASE.2021-08-25T00-41-18Z ",
+                "tag": "RELEASE.2021-08-25T00-41-18Z",
             },
             "imagePullSecrets": [
                 {"name": name} for name in platform.image_pull_secret_names
