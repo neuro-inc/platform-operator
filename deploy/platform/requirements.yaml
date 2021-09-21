@@ -44,7 +44,7 @@ dependencies:
     repository: "@neuro"
     alias: platform-monitoring
   - name: platform-container-runtime
-    version: "21.9.17"
+    version: "21.9.18"
     repository: "@neuro"
   - name: platformsecrets
     version: "21.8.4"
