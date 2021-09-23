@@ -9,10 +9,14 @@ from .models import HelmChartNames, HelmReleaseNames, LabelsConfig, PlatformConf
 
 class HelmValuesFactory:
     def __init__(
-        self, helm_release_names: HelmReleaseNames, helm_chart_names: HelmChartNames
+        self,
+        helm_release_names: HelmReleaseNames,
+        helm_chart_names: HelmChartNames,
+        container_runtime: str,
     ) -> None:
         self._release_names = helm_release_names
         self._chart_names = helm_chart_names
+        self._container_runtime = container_runtime
 
     def create_platform_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         docker_server = platform.docker_registry.url.host
@@ -781,7 +785,7 @@ class HelmValuesFactory:
                 }
             },
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
-            "dockerEngine": {"image": {"repository": f"{docker_server}/nginx"}},
+            "containerRuntime": {"name": self._container_runtime},
             "fluentbit": {
                 "image": {"repository": f"{docker_server}/fluent/fluent-bit"}
             },

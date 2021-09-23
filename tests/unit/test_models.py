@@ -24,6 +24,7 @@ from platform_operator.models import (
 class TestConfig:
     def test_config(self) -> None:
         env = {
+            "NP_NODE_NAME": "minikube",
             "NP_PLATFORM_AUTH_URL": "http://platformauthapi:8080",
             "NP_PLATFORM_INGRESS_AUTH_URL": "http://platformingressauth:8080",
             "NP_PLATFORM_CONFIG_URL": "http://platformconfig:8080",
@@ -57,6 +58,7 @@ class TestConfig:
             "NP_CONSUL_INSTALLED": "true",
         }
         assert Config.load_from_env(env) == Config(
+            node_name="minikube",
             log_level="DEBUG",
             retries=5,
             backoff=120,
@@ -98,6 +100,7 @@ class TestConfig:
 
     def test_config_defaults(self) -> None:
         env = {
+            "NP_NODE_NAME": "minikube",
             "NP_PLATFORM_AUTH_URL": "http://platformauthapi:8080",
             "NP_PLATFORM_INGRESS_AUTH_URL": "http://platformingressauth:8080",
             "NP_PLATFORM_CONFIG_URL": "http://platformconfig:8080",
@@ -120,6 +123,7 @@ class TestConfig:
             "NP_CONSUL_URL": "http://consul:8500",
         }
         assert Config.load_from_env(env) == Config(
+            node_name="minikube",
             log_level="INFO",
             retries=3,
             backoff=60,

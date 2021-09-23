@@ -33,6 +33,7 @@ pytest_plugins = ["tests.integration.kube", "tests.integration.aws"]
 @pytest.fixture
 def config() -> Config:
     return Config(
+        node_name="minikube",
         log_level="DEBUG",
         retries=3,
         backoff=60,

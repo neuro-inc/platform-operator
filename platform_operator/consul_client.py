@@ -3,8 +3,7 @@ import logging
 import re
 import time
 from contextlib import asynccontextmanager
-from types import SimpleNamespace
-from typing import Any, AsyncIterator, Dict, Optional, Sequence, Union
+from typing import Any, AsyncIterator, Dict, List, Optional, Sequence, Union
 
 import aiohttp
 import aiohttp.web
@@ -19,45 +18,17 @@ class SessionExpiredError(Exception):
 
 
 class ConsulClient:
-    def __init__(self, url: Union[str, URL]) -> None:
+    def __init__(
+        self,
+        url: Union[str, URL],
+        trace_configs: Optional[List[aiohttp.TraceConfig]] = None,
+    ) -> None:
         self._url = URL(url)
+        self._trace_configs = trace_configs
         self._client: Optional[aiohttp.ClientSession] = None
 
-    async def _on_request_start(
-        self,
-        session: aiohttp.ClientSession,
-        trace_config_ctx: SimpleNamespace,
-        params: aiohttp.TraceRequestStartParams,
-    ) -> None:
-        logger.info("Sending %s %s", params.method, params.url)
-
-    async def _on_request_end(
-        self,
-        session: aiohttp.ClientSession,
-        trace_config_ctx: SimpleNamespace,
-        params: aiohttp.TraceRequestEndParams,
-    ) -> None:
-        if 400 <= params.response.status:
-            logger.warning(
-                "Received %s %s %s\n%s",
-                params.method,
-                params.response.status,
-                params.url,
-                await params.response.text(),
-            )
-        else:
-            logger.info(
-                "Received %s %s %s",
-                params.method,
-                params.response.status,
-                params.url,
-            )
-
     async def __aenter__(self) -> "ConsulClient":
-        trace_config = aiohttp.TraceConfig()
-        trace_config.on_request_start.append(self._on_request_start)
-        trace_config.on_request_end.append(self._on_request_end)
-        self._client = aiohttp.ClientSession(trace_configs=[trace_config])
+        self._client = aiohttp.ClientSession(trace_configs=self._trace_configs)
         return self
 
     async def __aexit__(self, *args: Any, **kwargs: Any) -> None:

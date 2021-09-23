@@ -6,7 +6,6 @@ from base64 import b64decode
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from enum import Enum
-from types import SimpleNamespace
 from typing import Any, AsyncIterator, Dict, List, Optional, Sequence
 
 import aiohttp
@@ -45,10 +44,77 @@ class PlatformConditionStatus(str, Enum):
     UNKNOWN = "Unknown"
 
 
+class Endpoints:
+    def __init__(self, url: URL) -> None:
+        self._url = url
+
+    @property
+    def nodes(self) -> URL:
+        return self._url / "api/v1/nodes"
+
+    def node(self, name: str) -> URL:
+        return self.nodes / name
+
+    @property
+    def namespaces(self) -> URL:
+        return self._url / "api/v1/namespaces"
+
+    def namespace(self, name: str) -> URL:
+        return self.namespaces / name
+
+    def services(self, namespace: str) -> URL:
+        return self.namespace(namespace) / "services"
+
+    def service(self, namespace: str, name: str) -> URL:
+        return self.services(namespace) / name
+
+    def service_accounts(self, namespace: str) -> URL:
+        return self.namespace(namespace) / "serviceaccounts"
+
+    def service_account(self, namespace: str, name: str) -> URL:
+        return self.service_accounts(namespace) / name
+
+    def secrets(self, namespace: str) -> URL:
+        return self.namespace(namespace) / "secrets"
+
+    def secret(self, namespace: str, name: str) -> URL:
+        return self.secrets(namespace) / name
+
+    def pods(self, namespace: str) -> URL:
+        return self.namespace(namespace) / "pods"
+
+    def platforms(self, namespace: str) -> URL:
+        return (
+            self._url
+            / f"apis/{PLATFORM_GROUP}/{PLATFORM_API_VERSION}/namespaces"
+            / f"{namespace}/{PLATFORM_PLURAL}"
+        )
+
+    def platform(self, namespace: str, name: str) -> URL:
+        return self.platforms(namespace) / name
+
+
+class Node:
+    def __init__(self, payload: Dict[str, Any]) -> None:
+        self._payload = payload
+
+    @property
+    def container_runtime(self) -> str:
+        version = self._payload["status"]["nodeInfo"]["containerRuntimeVersion"]
+        end = version.find("://")
+        return version[0:end]
+
+
 class KubeClient:
-    def __init__(self, config: KubeConfig) -> None:
+    def __init__(
+        self,
+        config: KubeConfig,
+        trace_configs: Optional[List[aiohttp.TraceConfig]] = None,
+    ) -> None:
         self._config = config
+        self._trace_configs = trace_configs
         self._session: Optional[aiohttp.ClientSession] = None
+        self._endpoints = Endpoints(config.url)
 
     @property
     def _is_ssl(self) -> bool:
@@ -72,36 +138,6 @@ class KubeClient:
             )
         return ssl_context
 
-    async def _on_request_start(
-        self,
-        session: aiohttp.ClientSession,
-        trace_config_ctx: SimpleNamespace,
-        params: aiohttp.TraceRequestStartParams,
-    ) -> None:
-        logger.info("Sending %s %s", params.method, params.url)
-
-    async def _on_request_end(
-        self,
-        session: aiohttp.ClientSession,
-        trace_config_ctx: SimpleNamespace,
-        params: aiohttp.TraceRequestEndParams,
-    ) -> None:
-        if 400 <= params.response.status:
-            logger.warning(
-                "Received %s %s %s\n%s",
-                params.method,
-                params.response.status,
-                params.url,
-                await params.response.text(),
-            )
-        else:
-            logger.info(
-                "Received %s %s %s",
-                params.method,
-                params.response.status,
-                params.url,
-            )
-
     async def __aenter__(self) -> "KubeClient":
         headers = {}
         if self._config.auth_type == KubeClientAuthType.TOKEN:
@@ -119,13 +155,10 @@ class KubeClient:
         timeout = aiohttp.ClientTimeout(
             connect=self._config.conn_timeout_s, total=self._config.read_timeout_s
         )
-        trace_config = aiohttp.TraceConfig()
-        trace_config.on_request_start.append(self._on_request_start)
-        trace_config.on_request_end.append(self._on_request_end)
         self._session = aiohttp.ClientSession(
             connector=connector,
             timeout=timeout,
-            trace_configs=[trace_config],
+            trace_configs=self._trace_configs,
             headers=headers,
         )
         return self
@@ -135,30 +168,31 @@ class KubeClient:
         await self._session.close()
         self._session = None
 
-    def _get_namespace_url(self, namespace: str = "") -> URL:
-        base_url = self._config.url / "api/v1/namespaces"
-        return base_url / namespace if namespace else base_url
+    async def get_node(self, name: str) -> Node:
+        assert self._session
+        async with self._session.get(self._endpoints.node(name)) as response:
+            response.raise_for_status()
+            payload = await response.json()
+            return Node(payload)
 
     async def create_namespace(self, name: str) -> None:
         assert self._session
         async with self._session.post(
-            self._get_namespace_url(),
-            json={"metadata": {"name": name}},
+            self._endpoints.namespaces, json={"metadata": {"name": name}}
         ) as response:
             response.raise_for_status()
 
     async def delete_namespace(self, name: str) -> None:
         assert self._session
         async with self._session.delete(
-            self._get_namespace_url(name),
-            json={"propagationPolicy": "Background"},
+            self._endpoints.namespace(name), json={"propagationPolicy": "Background"}
         ) as response:
             response.raise_for_status()
 
     async def get_service(self, namespace: str, name: str) -> Dict[str, Any]:
         assert self._session
         async with self._session.get(
-            self._get_namespace_url(namespace) / "services" / name
+            self._endpoints.service(namespace, name)
         ) as response:
             response.raise_for_status()
             payload = await response.json()
@@ -167,7 +201,7 @@ class KubeClient:
     async def get_service_account(self, namespace: str, name: str) -> Dict[str, Any]:
         assert self._session
         async with self._session.get(
-            self._get_namespace_url(namespace) / "serviceaccounts" / name
+            self._endpoints.service_account(namespace, name)
         ) as response:
             response.raise_for_status()
             payload = await response.json()
@@ -178,7 +212,7 @@ class KubeClient:
     ) -> None:
         assert self._session
         async with self._session.patch(
-            self._get_namespace_url(namespace) / "serviceaccounts" / name,
+            self._endpoints.service_account(namespace, name),
             headers={"Content-Type": "application/merge-patch+json"},
             data=json.dumps(
                 {"imagePullSecrets": [{"name": name} for name in image_pull_secrets]}
@@ -189,7 +223,7 @@ class KubeClient:
     async def get_secret(self, namespace: str, name: str) -> Dict[str, Any]:
         assert self._session
         async with self._session.get(
-            self._get_namespace_url(namespace) / "secrets" / name
+            self._endpoints.secret(namespace, name)
         ) as response:
             response.raise_for_status()
             payload = await response.json()
@@ -217,7 +251,7 @@ class KubeClient:
             )
         assert self._session
         async with self._session.get(
-            (self._get_namespace_url(namespace) / "pods").with_query(**query)
+            self._endpoints.pods(namespace).with_query(**query)
         ) as response:
             response.raise_for_status()
             payload = await response.json()
@@ -235,25 +269,17 @@ class KubeClient:
                 break
             await asyncio.sleep(interval_secs)
 
-    def _get_platform_url(self, namespace: str, name: str = "") -> URL:
-        base_url = (
-            self._config.url
-            / f"apis/{PLATFORM_GROUP}/{PLATFORM_API_VERSION}/namespaces"
-            / f"{namespace}/{PLATFORM_PLURAL}"
-        )
-        return base_url / name if name else base_url
-
     async def create_platform(self, namespace: str, payload: Dict[str, Any]) -> None:
         assert self._session
         async with self._session.post(
-            self._get_platform_url(namespace=namespace), json=payload
+            self._endpoints.platforms(namespace=namespace), json=payload
         ) as response:
             response.raise_for_status()
 
     async def delete_platform(self, namespace: str, name: str) -> None:
         assert self._session
         async with self._session.delete(
-            self._get_platform_url(namespace=namespace, name=name)
+            self._endpoints.platform(namespace, name)
         ) as response:
             response.raise_for_status()
 
@@ -262,7 +288,7 @@ class KubeClient:
     ) -> Optional[Dict[str, Any]]:
         assert self._session
         async with self._session.get(
-            self._get_platform_url(namespace=namespace, name=name) / "status"
+            self._endpoints.platform(namespace, name) / "status"
         ) as response:
             response.raise_for_status()
             payload = await response.json()
@@ -276,7 +302,7 @@ class KubeClient:
     ) -> None:
         assert self._session
         async with self._session.patch(
-            self._get_platform_url(namespace=namespace, name=name) / "status",
+            self._endpoints.platform(namespace, name) / "status",
             headers={"Content-Type": "application/merge-patch+json"},
             data=json.dumps({"status": payload}),
         ) as response:
