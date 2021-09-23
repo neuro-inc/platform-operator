@@ -7,6 +7,7 @@ install_requires = (
     "pyyaml==5.4.1",
     "aiobotocore==1.4.1",
     "bcrypt==3.2.0",
+    "neuro-logging==21.8.4.1",
 )
 
 setup(

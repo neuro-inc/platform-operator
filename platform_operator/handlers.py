@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 
 import aiohttp
 import kopf
+from neuro_logging import make_request_logging_trace_config
 
 from platform_operator.consul_client import ConsulClient
 
@@ -50,22 +51,27 @@ app = App()
 
 @kopf.on.startup()
 async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
-    app.helm_values_factory = HelmValuesFactory(
-        config.helm_release_names, config.helm_chart_names
-    )
+    trace_configs = [make_request_logging_trace_config()]
+
     app.platform_config_factory = PlatformConfigFactory(config)
     app.helm_client = HelmClient(tiller_namespace=config.platform_namespace)
     app.kube_client = await app.exit_stack.enter_async_context(
-        KubeClient(config.kube_config)
+        KubeClient(config.kube_config, trace_configs),
+    )
+    node = await app.kube_client.get_node(config.node_name)
+    app.helm_values_factory = HelmValuesFactory(
+        config.helm_release_names,
+        config.helm_chart_names,
+        container_runtime=node.container_runtime,
     )
     app.status_manager = PlatformStatusManager(
         app.kube_client, namespace=config.platform_namespace
     )
     app.config_client = await app.exit_stack.enter_async_context(
-        ConfigClient(config.platform_config_url)
+        ConfigClient(config.platform_config_url, trace_configs)
     )
     app.consul_client = await app.exit_stack.enter_async_context(
-        ConsulClient(config.consul_url)
+        ConsulClient(config.consul_url, trace_configs)
     )
     app.certificate_store = CertificateStore(app.consul_client)
 

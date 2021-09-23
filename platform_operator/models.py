@@ -114,6 +114,7 @@ class DockerRegistry:
 
 @dataclass(frozen=True)
 class Config:
+    node_name: str
     log_level: str
     retries: int
     backoff: int
@@ -137,6 +138,7 @@ class Config:
         env = env or os.environ
         platform_release_name = "platform"
         return cls(
+            node_name=env["NP_NODE_NAME"],
             log_level=(env.get("NP_CONTROLLER_LOG_LEVEL") or "INFO").upper(),
             retries=int(env.get("NP_CONTROLLER_RETRIES") or "3"),
             backoff=int(env.get("NP_CONTROLLER_BACKOFF") or "60"),

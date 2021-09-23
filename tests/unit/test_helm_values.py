@@ -11,7 +11,11 @@ from platform_operator.models import Config, LabelsConfig, PlatformConfig
 class TestHelmValuesFactory:
     @pytest.fixture
     def factory(self, config: Config) -> HelmValuesFactory:
-        return HelmValuesFactory(config.helm_release_names, config.helm_chart_names)
+        return HelmValuesFactory(
+            config.helm_release_names,
+            config.helm_chart_names,
+            container_runtime="docker",
+        )
 
     def test_create_gcp_platform_values_with_nfs_storage(
         self,
@@ -1137,9 +1141,7 @@ class TestHelmValuesFactory:
                     "name": "platform-monitoring-token",
                 }
             ],
-            "dockerEngine": {
-                "image": {"repository": "neuro.io/nginx"},
-            },
+            "containerRuntime": {"name": "docker"},
             "fluentbit": {
                 "image": {"repository": "neuro.io/fluent/fluent-bit"},
             },

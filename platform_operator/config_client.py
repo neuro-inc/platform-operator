@@ -1,7 +1,6 @@
 import enum
 import logging
-from types import SimpleNamespace
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import aiohttp
 from yarl import URL
@@ -19,45 +18,15 @@ class NotificationType(str, enum.Enum):
 
 
 class ConfigClient:
-    def __init__(self, url: URL) -> None:
+    def __init__(
+        self, url: URL, trace_configs: Optional[List[aiohttp.TraceConfig]] = None
+    ) -> None:
         self._base_url = url
+        self._trace_configs = trace_configs
         self._session: Optional[aiohttp.ClientSession] = None
 
-    async def _on_request_start(
-        self,
-        session: aiohttp.ClientSession,
-        trace_config_ctx: SimpleNamespace,
-        params: aiohttp.TraceRequestStartParams,
-    ) -> None:
-        logger.info("Sending %s %s", params.method, params.url)
-
-    async def _on_request_end(
-        self,
-        session: aiohttp.ClientSession,
-        trace_config_ctx: SimpleNamespace,
-        params: aiohttp.TraceRequestEndParams,
-    ) -> None:
-        if 400 <= params.response.status:
-            logger.warning(
-                "Received %s %s %s\n%s",
-                params.method,
-                params.response.status,
-                params.url,
-                await params.response.text(),
-            )
-        else:
-            logger.info(
-                "Received %s %s %s",
-                params.method,
-                params.response.status,
-                params.url,
-            )
-
     async def __aenter__(self) -> "ConfigClient":
-        trace_config = aiohttp.TraceConfig()
-        trace_config.on_request_start.append(self._on_request_start)
-        trace_config.on_request_end.append(self._on_request_end)
-        self._session = aiohttp.ClientSession(trace_configs=[trace_config])
+        self._session = aiohttp.ClientSession(trace_configs=self._trace_configs)
         return self
 
     async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
