@@ -89,6 +89,9 @@ class HelmValuesFactory:
             self._chart_names.platform_api_poller: (
                 self.create_platformapi_poller_values(platform)
             ),
+            self._chart_names.platform_bucket_api: (
+                self.create_platform_buckets_api_values(platform)
+            ),
         }
         if platform.docker_config_secret_create:
             result["dockerConfigSecret"] = {
@@ -155,9 +158,6 @@ class HelmValuesFactory:
             result[
                 self._chart_names.cluster_autoscaler
             ] = self.create_cluster_autoscaler_values(platform)
-            result[
-                self._chart_names.platform_bucket_api
-            ] = self.create_platform_buckets_api_values(platform)
         if platform.azure:
             if platform.azure.storage_type == "kubernetes":
                 result["storage"] = self._create_kubernetes_storage_values(
@@ -204,9 +204,6 @@ class HelmValuesFactory:
                 ] = self.create_docker_registry_values(platform)
             if platform.on_prem.minio_install:
                 result[self._chart_names.minio] = self.create_minio_values(platform)
-            result[
-                self._chart_names.platform_bucket_api
-            ] = self.create_platform_buckets_api_values(platform)
         return result
 
     def _create_idle_job(self, job: Dict[str, Any]) -> Dict[str, Any]:
@@ -1355,6 +1352,54 @@ class HelmValuesFactory:
                     "accessKeyId": platform.on_prem.blob_storage_access_key,
                     "secretAccessKey": platform.on_prem.blob_storage_secret_key,
                     "regionName": platform.on_prem.blob_storage_region,
+                },
+            }
+        if platform.azure:
+            secret_name = (
+                f"{self._release_names.platform}-buckets-azure-storage-account-key"
+            )
+            result["secrets"].append(
+                {
+                    "name": secret_name,
+                    "data": {"key": platform.azure.blob_storage_account_key},
+                }
+            )
+            result["bucketProvider"] = {
+                "type": "azure",
+                "azure": {
+                    "url": (
+                        f"https://{platform.azure.blob_storage_account_name}"
+                        f".blob.core.windows.net"
+                    ),
+                    "credential": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": secret_name,
+                                "key": "token",
+                            }
+                        }
+                    },
+                },
+            }
+        if platform.gcp:
+            secret_name = f"{self._release_names.platform}-buckets-gcp-sa-key"
+            result["secrets"].append(
+                {
+                    "name": secret_name,
+                    "data": {"SAKeyB64": platform.gcp.service_account_key_base64},
+                }
+            )
+            result["bucketProvider"] = {
+                "type": "gcp",
+                "gcp": {
+                    "SAKeyJsonB64": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": secret_name,
+                                "key": "SAKeyB64",
+                            }
+                        }
+                    }
                 },
             }
         return result
