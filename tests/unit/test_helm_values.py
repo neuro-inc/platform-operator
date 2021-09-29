@@ -812,6 +812,53 @@ class TestHelmValuesFactory:
 
         assert result["annotations"] == {"iam.amazonaws.com/role": "s3_role"}
 
+    def test_create_emc_ecs_buckets_api_values(
+        self,
+        on_prem_platform_config_with_emc_ecs: PlatformConfig,
+        factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_platform_buckets_api_values(
+            on_prem_platform_config_with_emc_ecs
+        )
+
+        assert result == {
+            "NP_BUCKETS_API_K8S_NS": "platform-jobs",
+            "bucketProvider": {
+                "type": "emc_ecs",
+                "emc_ecs": {
+                    "accessKeyId": "access-key",
+                    "managementEndpointUrl": "https://emc-ecs.management",
+                    "s3EndpointUrl": "https://emc-ecs.s3",
+                    "s3RoleArn": "s3-role",
+                    "secretAccessKey": "secret-key",
+                },
+            },
+            "authUrl": "https://dev.neu.ro",
+            "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
+            "image": {"repository": "neuro.io/platformbucketsapi"},
+            "ingress": {
+                "enabled": True,
+                "hosts": [
+                    f"{on_prem_platform_config_with_emc_ecs.cluster_name}.org.neu.ro"
+                ],
+            },
+            "platform": {
+                "clusterName": on_prem_platform_config_with_emc_ecs.cluster_name,
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "key": "token",
+                            "name": "platform-buckets-api-token",
+                        }
+                    }
+                },
+            },
+            "secrets": [
+                {"data": {"token": "token"}, "name": "platform-buckets-api-token"}
+            ],
+            "sentry": mock.ANY,
+        }
+
     def test_create_on_prem_buckets_api_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:

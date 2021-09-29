@@ -13,6 +13,7 @@ from platform_operator.models import (
     Cluster,
     Config,
     DockerRegistry,
+    EMCECSCredentials,
     GcpConfig,
     HelmChartNames,
     HelmChartVersions,
@@ -644,6 +645,24 @@ def on_prem_platform_config(
             kubelet_port=10250,
             http_node_port=30080,
             https_node_port=30443,
+        ),
+    )
+
+
+@pytest.fixture
+def on_prem_platform_config_with_emc_ecs(
+    on_prem_platform_config: PlatformConfig,
+    resource_pool_type_factory: Callable[[], Dict[str, Any]],
+    cluster_name: str,
+) -> PlatformConfig:
+    return replace(
+        on_prem_platform_config,
+        emc_ecs_credentials=EMCECSCredentials(
+            access_key_id="access-key",
+            secret_access_key="secret-key",
+            s3_endpoint=URL("https://emc-ecs.s3"),
+            management_endpoint=URL("https://emc-ecs.management"),
+            s3_assumable_role="s3-role",
         ),
     )
 

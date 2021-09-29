@@ -335,6 +335,19 @@ class OnPremConfig:
 
 
 @dataclass(frozen=True)
+class EMCECSCredentials:
+    """
+    Credentials to EMC ECS (blob storage engine developed by vmware creators)
+    """
+
+    access_key_id: str
+    secret_access_key: str
+    s3_endpoint: URL
+    management_endpoint: URL
+    s3_assumable_role: str
+
+
+@dataclass(frozen=True)
 class PlatformConfig:
     auth_url: URL
     ingress_auth_url: URL
@@ -392,6 +405,7 @@ class PlatformConfig:
     sentry_sample_rate: Optional[float] = None
     docker_hub_config_secret_name: str = ""
     docker_hub_registry: Optional[DockerRegistry] = None
+    emc_ecs_credentials: Optional[EMCECSCredentials] = None
     gcp: Optional[GcpConfig] = None
     aws: Optional[AwsConfig] = None
     azure: Optional[AzureConfig] = None
@@ -549,6 +563,17 @@ class PlatformConfigFactory:
                 .get("persistence", {})
                 .get("storageClassName", "")
             )
+        emc_ecs_data = cluster["credentials"].get("emc_ecs")
+        emc_ecs_credentials: Optional[EMCECSCredentials] = None
+        if emc_ecs_data:
+            emc_ecs_credentials = EMCECSCredentials(
+                access_key_id=emc_ecs_data["access_key_id"],
+                secret_access_key=emc_ecs_data["secret_access_key"],
+                s3_endpoint=URL(emc_ecs_data["s3_endpoint"]),
+                management_endpoint=URL(emc_ecs_data["management_endpoint"]),
+                s3_assumable_role=emc_ecs_data["s3_assumable_role"],
+            )
+
         return PlatformConfig(
             auth_url=self._config.platform_auth_url,
             ingress_auth_url=self._config.platform_ingress_auth_url,
@@ -652,6 +677,7 @@ class PlatformConfigFactory:
                 f"{self._config.platform_namespace}-docker-hub-config"
             ),
             docker_hub_registry=self._create_docker_hub_registry(cluster),
+            emc_ecs_credentials=emc_ecs_credentials,
             gcp=(
                 self._create_gcp(platform_body["spec"], cluster)
                 if cluster.cloud_provider_type == "gcp"

@@ -1343,7 +1343,20 @@ class HelmValuesFactory:
                 result["annotations"] = {
                     "iam.amazonaws.com/role": platform.aws.role_arn
                 }
-        if platform.on_prem:
+        elif platform.emc_ecs_credentials:
+            result["bucketProvider"] = {
+                "type": "emc_ecs",
+                "emc_ecs": {
+                    "s3RoleArn": platform.emc_ecs_credentials.s3_assumable_role,
+                    "accessKeyId": platform.emc_ecs_credentials.access_key_id,
+                    "secretAccessKey": platform.emc_ecs_credentials.secret_access_key,
+                    "s3EndpointUrl": str(platform.emc_ecs_credentials.s3_endpoint),
+                    "managementEndpointUrl": str(
+                        platform.emc_ecs_credentials.management_endpoint
+                    ),
+                },
+            }
+        elif platform.on_prem:
             result["bucketProvider"] = {
                 "type": "minio",
                 "minio": {
@@ -1354,7 +1367,7 @@ class HelmValuesFactory:
                     "regionName": platform.on_prem.blob_storage_region,
                 },
             }
-        if platform.azure:
+        elif platform.azure:
             secret_name = (
                 f"{self._release_names.platform}-buckets-azure-storage-account-key"
             )
@@ -1381,7 +1394,7 @@ class HelmValuesFactory:
                     },
                 },
             }
-        if platform.gcp:
+        elif platform.gcp:
             secret_name = f"{self._release_names.platform}-buckets-gcp-sa-key"
             result["secrets"].append(
                 {
@@ -1402,4 +1415,6 @@ class HelmValuesFactory:
                     }
                 },
             }
+        else:
+            assert False, "was unable to construct bucket provider"
         return result
