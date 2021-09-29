@@ -9,6 +9,7 @@ from yarl import URL
 from platform_operator.models import (
     Cluster,
     Config,
+    EMCECSCredentials,
     HelmChartNames,
     HelmChartVersions,
     HelmReleaseNames,
@@ -911,6 +912,31 @@ class TestPlatformConfigFactory:
         assert result.on_prem.blob_storage_region == "minio_region"
         assert result.on_prem.blob_storage_access_key == "minio_access_key"
         assert result.on_prem.blob_storage_secret_key == "minio_secret_key"
+
+    def test_on_prem_platform_config_with_emc_ecs(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: kopf.Body,
+        on_prem_cluster: Cluster,
+        cluster_name: str,
+    ) -> None:
+        on_prem_cluster["credentials"]["emc_ecs"] = {
+            "access_key_id": "key_id",
+            "secret_access_key": "secret_key",
+            "s3_endpoint": "https://emc-ecs.s3",
+            "management_endpoint": "https://emc-ecs.management",
+            "s3_assumable_role": "s3-role",
+        }
+
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result.emc_ecs_credentials == EMCECSCredentials(
+            access_key_id="key_id",
+            secret_access_key="secret_key",
+            s3_endpoint=URL("https://emc-ecs.s3"),
+            management_endpoint=URL("https://emc-ecs.management"),
+            s3_assumable_role="s3-role",
+        )
 
     def test_vcd_platform_config(
         self,
