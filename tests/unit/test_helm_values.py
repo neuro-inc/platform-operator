@@ -826,11 +826,25 @@ class TestHelmValuesFactory:
             "bucketProvider": {
                 "type": "emc_ecs",
                 "emc_ecs": {
-                    "accessKeyId": "access-key",
+                    "accessKeyId": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "key": "key",
+                                "name": "platform-buckets-emc-ecs-key",
+                            }
+                        }
+                    },
                     "managementEndpointUrl": "https://emc-ecs.management",
                     "s3EndpointUrl": "https://emc-ecs.s3",
                     "s3RoleArn": "s3-role",
-                    "secretAccessKey": "secret-key",
+                    "secretAccessKey": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "key": "secret",
+                                "name": "platform-buckets-emc-ecs-key",
+                            }
+                        },
+                    },
                 },
             },
             "authUrl": "https://dev.neu.ro",
@@ -854,7 +868,11 @@ class TestHelmValuesFactory:
                 },
             },
             "secrets": [
-                {"data": {"token": "token"}, "name": "platform-buckets-api-token"}
+                {"data": {"token": "token"}, "name": "platform-buckets-api-token"},
+                {
+                    "data": {"key": "access-key", "secret": "secret-key"},
+                    "name": "platform-buckets-emc-ecs-key",
+                },
             ],
             "sentry": mock.ANY,
         }

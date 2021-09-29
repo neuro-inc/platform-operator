@@ -1344,12 +1344,36 @@ class HelmValuesFactory:
                     "iam.amazonaws.com/role": platform.aws.role_arn
                 }
         elif platform.emc_ecs_credentials:
+            secret_name = f"{self._release_names.platform}-buckets-emc-ecs-key"
+            result["secrets"].append(
+                {
+                    "name": secret_name,
+                    "data": {
+                        "key": platform.emc_ecs_credentials.access_key_id,
+                        "secret": platform.emc_ecs_credentials.secret_access_key,
+                    },
+                }
+            )
             result["bucketProvider"] = {
                 "type": "emc_ecs",
                 "emc_ecs": {
                     "s3RoleArn": platform.emc_ecs_credentials.s3_assumable_role,
-                    "accessKeyId": platform.emc_ecs_credentials.access_key_id,
-                    "secretAccessKey": platform.emc_ecs_credentials.secret_access_key,
+                    "accessKeyId": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": secret_name,
+                                "key": "key",
+                            }
+                        }
+                    },
+                    "secretAccessKey": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": secret_name,
+                                "key": "secret",
+                            }
+                        }
+                    },
                     "s3EndpointUrl": str(platform.emc_ecs_credentials.s3_endpoint),
                     "managementEndpointUrl": str(
                         platform.emc_ecs_credentials.management_endpoint
