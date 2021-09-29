@@ -836,7 +836,7 @@ class TestHelmValuesFactory:
                     },
                     "managementEndpointUrl": "https://emc-ecs.management",
                     "s3EndpointUrl": "https://emc-ecs.s3",
-                    "s3RoleAUn": "s3-role",
+                    "s3RoleUrn": "s3-role",
                     "secretAccessKey": {
                         "valueFrom": {
                             "secretKeyRef": {
