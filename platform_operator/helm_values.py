@@ -1357,7 +1357,7 @@ class HelmValuesFactory:
             result["bucketProvider"] = {
                 "type": "emc_ecs",
                 "emc_ecs": {
-                    "s3RoleArn": platform.emc_ecs_credentials.s3_assumable_role,
+                    "s3RoleUrn": platform.emc_ecs_credentials.s3_assumable_role,
                     "accessKeyId": {
                         "valueFrom": {
                             "secretKeyRef": {
