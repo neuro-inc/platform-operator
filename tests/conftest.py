@@ -24,6 +24,7 @@ from platform_operator.models import (
     KubeConfig,
     LabelsConfig,
     OnPremConfig,
+    OpenStackCredentials,
     PlatformConfig,
 )
 
@@ -663,6 +664,24 @@ def on_prem_platform_config_with_emc_ecs(
             s3_endpoint=URL("https://emc-ecs.s3"),
             management_endpoint=URL("https://emc-ecs.management"),
             s3_assumable_role="s3-role",
+        ),
+    )
+
+
+@pytest.fixture
+def on_prem_platform_config_with_open_stack(
+    on_prem_platform_config: PlatformConfig,
+    resource_pool_type_factory: Callable[[], Dict[str, Any]],
+    cluster_name: str,
+) -> PlatformConfig:
+    return replace(
+        on_prem_platform_config,
+        open_stack_credentials=OpenStackCredentials(
+            account_id="account_id",
+            password="password",
+            s3_endpoint=URL("https://os.s3"),
+            endpoint=URL("https://os.management"),
+            region_name="region",
         ),
     )
 

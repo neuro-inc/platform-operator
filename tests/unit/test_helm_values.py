@@ -877,6 +877,71 @@ class TestHelmValuesFactory:
             "sentry": mock.ANY,
         }
 
+    def test_create_open_stack_buckets_api_values(
+        self,
+        on_prem_platform_config_with_open_stack: PlatformConfig,
+        factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_platform_buckets_api_values(
+            on_prem_platform_config_with_open_stack
+        )
+
+        assert result == {
+            "NP_BUCKETS_API_K8S_NS": "platform-jobs",
+            "bucketProvider": {
+                "type": "open_stack",
+                "open_stack": {
+                    "accountId": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "key": "accountId",
+                                "name": "platform-buckets-open-stack-key",
+                            }
+                        }
+                    },
+                    "endpointUrl": "https://os.management",
+                    "s3EndpointUrl": "https://os.s3",
+                    "regionName": "region",
+                    "password": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "key": "password",
+                                "name": "platform-buckets-open-stack-key",
+                            }
+                        },
+                    },
+                },
+            },
+            "authUrl": "https://dev.neu.ro",
+            "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
+            "image": {"repository": "neuro.io/platformbucketsapi"},
+            "ingress": {
+                "enabled": True,
+                "hosts": [
+                    f"{on_prem_platform_config_with_open_stack.cluster_name}.org.neu.ro"
+                ],
+            },
+            "platform": {
+                "clusterName": on_prem_platform_config_with_open_stack.cluster_name,
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "key": "token",
+                            "name": "platform-buckets-api-token",
+                        }
+                    }
+                },
+            },
+            "secrets": [
+                {"data": {"token": "token"}, "name": "platform-buckets-api-token"},
+                {
+                    "data": {"accountId": "account_id", "password": "password"},
+                    "name": "platform-buckets-open-stack-key",
+                },
+            ],
+            "sentry": mock.ANY,
+        }
+
     def test_create_on_prem_buckets_api_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
