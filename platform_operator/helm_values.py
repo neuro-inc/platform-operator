@@ -1329,6 +1329,7 @@ class HelmValuesFactory:
                 }
             ],
             "corsOrigins": ",".join(platform.ingress_cors_origins),
+            "disableCreation": platform.buckets_disable_creation,
         }
         result.update(**self._create_tracing_values(platform))
         if platform.aws:

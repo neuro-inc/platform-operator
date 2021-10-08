@@ -188,6 +188,7 @@ def cluster_factory(
                     "https://app.neu.ro",
                 ],
             },
+            "buckets": {"disable_creation": False},
         }
         return Cluster(payload)
 

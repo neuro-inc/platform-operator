@@ -416,6 +416,7 @@ class PlatformConfig:
     docker_hub_registry: Optional[DockerRegistry] = None
     emc_ecs_credentials: Optional[EMCECSCredentials] = None
     open_stack_credentials: Optional[OpenStackCredentials] = None
+    buckets_disable_creation: bool = False
     gcp: Optional[GcpConfig] = None
     aws: Optional[AwsConfig] = None
     azure: Optional[AzureConfig] = None
@@ -699,6 +700,7 @@ class PlatformConfigFactory:
             docker_hub_registry=self._create_docker_hub_registry(cluster),
             emc_ecs_credentials=emc_ecs_credentials,
             open_stack_credentials=open_stack_credentials,
+            buckets_disable_creation=cluster["buckets"].get("disable_creation", False),
             gcp=(
                 self._create_gcp(platform_body["spec"], cluster)
                 if cluster.cloud_provider_type == "gcp"

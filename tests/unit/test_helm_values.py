@@ -798,6 +798,7 @@ class TestHelmValuesFactory:
                 {"data": {"token": "token"}, "name": "platform-buckets-api-token"}
             ],
             "sentry": mock.ANY,
+            "disableCreation": False,
         }
 
     def test_create_aws_platform_buckets_api_values_with_role(
@@ -875,6 +876,7 @@ class TestHelmValuesFactory:
                 },
             ],
             "sentry": mock.ANY,
+            "disableCreation": False,
         }
 
     def test_create_open_stack_buckets_api_values(
@@ -940,6 +942,7 @@ class TestHelmValuesFactory:
                 },
             ],
             "sentry": mock.ANY,
+            "disableCreation": False,
         }
 
     def test_create_on_prem_buckets_api_values(
@@ -982,6 +985,7 @@ class TestHelmValuesFactory:
                 {"data": {"token": "token"}, "name": "platform-buckets-api-token"}
             ],
             "sentry": mock.ANY,
+            "disableCreation": False,
         }
 
     def test_create_gcp_buckets_api_values(
@@ -1027,6 +1031,7 @@ class TestHelmValuesFactory:
                 {"data": {"SAKeyB64": "e30="}, "name": "platform-buckets-gcp-sa-key"},
             ],
             "sentry": mock.ANY,
+            "disableCreation": False,
         }
 
     def test_create_azure_buckets_api_values(
@@ -1076,6 +1081,7 @@ class TestHelmValuesFactory:
                 },
             ],
             "sentry": mock.ANY,
+            "disableCreation": False,
         }
 
     def test_create_gcp_platform_registry_values(
