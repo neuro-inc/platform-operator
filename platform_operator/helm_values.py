@@ -1380,6 +1380,41 @@ class HelmValuesFactory:
                     ),
                 },
             }
+        elif platform.open_stack_credentials:
+            secret_name = f"{self._release_names.platform}-buckets-open-stack-key"
+            result["secrets"].append(
+                {
+                    "name": secret_name,
+                    "data": {
+                        "accountId": platform.open_stack_credentials.account_id,
+                        "password": platform.open_stack_credentials.password,
+                    },
+                }
+            )
+            result["bucketProvider"] = {
+                "type": "open_stack",
+                "open_stack": {
+                    "regionName": platform.open_stack_credentials.region_name,
+                    "accountId": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": secret_name,
+                                "key": "accountId",
+                            }
+                        }
+                    },
+                    "password": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": secret_name,
+                                "key": "password",
+                            }
+                        }
+                    },
+                    "s3EndpointUrl": str(platform.open_stack_credentials.s3_endpoint),
+                    "endpointUrl": str(platform.open_stack_credentials.endpoint),
+                },
+            }
         elif platform.on_prem:
             result["bucketProvider"] = {
                 "type": "minio",

@@ -17,6 +17,7 @@ from platform_operator.models import (
     KubeClientAuthType,
     KubeConfig,
     LabelsConfig,
+    OpenStackCredentials,
     PlatformConfig,
     PlatformConfigFactory,
 )
@@ -936,6 +937,31 @@ class TestPlatformConfigFactory:
             s3_endpoint=URL("https://emc-ecs.s3"),
             management_endpoint=URL("https://emc-ecs.management"),
             s3_assumable_role="s3-role",
+        )
+
+    def test_on_prem_platform_config_with_open_stack(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: kopf.Body,
+        on_prem_cluster: Cluster,
+        cluster_name: str,
+    ) -> None:
+        on_prem_cluster["credentials"]["open_stack"] = {
+            "account_id": "account_id",
+            "password": "password",
+            "s3_endpoint": "https://os.s3",
+            "endpoint": "https://os.management",
+            "region_name": "region",
+        }
+
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result.open_stack_credentials == OpenStackCredentials(
+            account_id="account_id",
+            password="password",
+            s3_endpoint=URL("https://os.s3"),
+            endpoint=URL("https://os.management"),
+            region_name="region",
         )
 
     def test_vcd_platform_config(

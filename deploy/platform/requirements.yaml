@@ -62,7 +62,7 @@ dependencies:
     repository: "@neuro"
     alias: platform-api-poller
   - name: platformbucketsapi
-    version: "21.9.13"
+    version: "21.10.0"
     repository: "@neuro"
     alias: platform-buckets-api
 

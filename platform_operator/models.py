@@ -348,6 +348,15 @@ class EMCECSCredentials:
 
 
 @dataclass(frozen=True)
+class OpenStackCredentials:
+    account_id: str
+    password: str
+    endpoint: URL
+    s3_endpoint: URL
+    region_name: str
+
+
+@dataclass(frozen=True)
 class PlatformConfig:
     auth_url: URL
     ingress_auth_url: URL
@@ -406,6 +415,7 @@ class PlatformConfig:
     docker_hub_config_secret_name: str = ""
     docker_hub_registry: Optional[DockerRegistry] = None
     emc_ecs_credentials: Optional[EMCECSCredentials] = None
+    open_stack_credentials: Optional[OpenStackCredentials] = None
     gcp: Optional[GcpConfig] = None
     aws: Optional[AwsConfig] = None
     azure: Optional[AzureConfig] = None
@@ -573,6 +583,16 @@ class PlatformConfigFactory:
                 management_endpoint=URL(emc_ecs_data["management_endpoint"]),
                 s3_assumable_role=emc_ecs_data["s3_assumable_role"],
             )
+        open_stack_data = cluster["credentials"].get("open_stack")
+        open_stack_credentials: Optional[OpenStackCredentials] = None
+        if open_stack_data:
+            open_stack_credentials = OpenStackCredentials(
+                account_id=open_stack_data["account_id"],
+                password=open_stack_data["password"],
+                endpoint=URL(open_stack_data["endpoint"]),
+                s3_endpoint=URL(open_stack_data["s3_endpoint"]),
+                region_name=open_stack_data["region_name"],
+            )
 
         return PlatformConfig(
             auth_url=self._config.platform_auth_url,
@@ -678,6 +698,7 @@ class PlatformConfigFactory:
             ),
             docker_hub_registry=self._create_docker_hub_registry(cluster),
             emc_ecs_credentials=emc_ecs_credentials,
+            open_stack_credentials=open_stack_credentials,
             gcp=(
                 self._create_gcp(platform_body["spec"], cluster)
                 if cluster.cloud_provider_type == "gcp"
