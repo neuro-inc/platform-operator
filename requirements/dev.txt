@@ -1,6 +1,6 @@
 -e .
 black==21.9b0
-flake8==3.9.2
+flake8==4.0.0
 flake8-isort==4.0.0
 moto[server]==2.2.8
 mypy==0.910
