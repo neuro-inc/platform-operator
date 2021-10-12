@@ -20,7 +20,7 @@ spec:
   {{- else if eq .type "azureFile" }}
   azureFile:
     secretName: {{ $.Release.Name }}-{{ include "platform.azure.storageAccount.secretNameSuffix" .path }}
-    secretNamespace: {{ .Release.Namespace }}
+    secretNamespace: {{ $.Release.Namespace }}
     shareName: {{ .azureFile.shareName }}
     readOnly: false
   mountOptions:
