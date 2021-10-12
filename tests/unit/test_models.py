@@ -20,6 +20,8 @@ from platform_operator.models import (
     OpenStackCredentials,
     PlatformConfig,
     PlatformConfigFactory,
+    StorageConfig,
+    StorageType,
 )
 
 
@@ -430,23 +432,27 @@ class TestPlatformConfigFactory:
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
-        gcp_platform_body["spec"]["storage"] = {
-            "kubernetes": {
-                "persistence": {"storageClassName": "storage-class", "size": "100Gi"}
+        gcp_platform_body["spec"]["storages"] = [
+            {
+                "kubernetes": {
+                    "persistence": {
+                        "storageClassName": "storage-class",
+                        "size": "100Gi",
+                    }
+                }
             }
-        }
+        ]
         result = factory.create(gcp_platform_body, gcp_cluster)
 
         assert result == replace(
             gcp_platform_config,
-            gcp=replace(
-                gcp_platform_config.gcp,
-                storage_type="kubernetes",
-                storage_class_name="storage-class",
-                storage_size="100Gi",
-                storage_nfs_server="",
-                storage_nfs_path="/",
-            ),
+            storages=[
+                StorageConfig(
+                    type=StorageType.KUBERNETES,
+                    storage_size="100Gi",
+                    storage_class_name="storage-class",
+                )
+            ],
         )
 
     def test_gcp_platform_config_with_gcs_storage(
@@ -456,30 +462,20 @@ class TestPlatformConfigFactory:
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
-        gcp_platform_body["spec"]["storage"] = {"gcs": {"bucket": "platform-storage"}}
+        gcp_platform_body["spec"]["storages"] = [
+            {"gcs": {"bucket": "platform-storage"}}
+        ]
         result = factory.create(gcp_platform_body, gcp_cluster)
 
         assert result == replace(
             gcp_platform_config,
-            gcp=replace(
-                gcp_platform_config.gcp,
-                storage_type="gcs",
-                storage_gcs_bucket_name="platform-storage",
-                storage_nfs_server="",
-                storage_nfs_path="/",
-            ),
+            storages=[
+                StorageConfig(
+                    type=StorageType.GCS,
+                    gcs_bucket_name="platform-storage",
+                )
+            ],
         )
-
-    def test_gcp_platform_config_without_storage___fails(
-        self,
-        factory: PlatformConfigFactory,
-        gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
-    ) -> None:
-        gcp_platform_body["spec"]["storage"] = {}
-
-        with pytest.raises(AssertionError, match="Invalid storage type"):
-            factory.create(gcp_platform_body, gcp_cluster)
 
     def test_gcp_platform_config_with_ingress_controller_disabled(
         self,
@@ -624,36 +620,28 @@ class TestPlatformConfigFactory:
         aws_cluster: Cluster,
         aws_platform_config: PlatformConfig,
     ) -> None:
-        aws_platform_body["spec"]["storage"] = {
-            "kubernetes": {
-                "persistence": {"storageClassName": "storage-class", "size": "100Gi"}
+        aws_platform_body["spec"]["storages"] = [
+            {
+                "kubernetes": {
+                    "persistence": {
+                        "storageClassName": "storage-class",
+                        "size": "100Gi",
+                    }
+                }
             }
-        }
+        ]
         result = factory.create(aws_platform_body, aws_cluster)
 
         assert result == replace(
             aws_platform_config,
-            aws=replace(
-                aws_platform_config.aws,
-                s3_role_arn="",
-                storage_type="kubernetes",
-                storage_class_name="storage-class",
-                storage_size="100Gi",
-                storage_nfs_server="",
-                storage_nfs_path="/",
-            ),
+            storages=[
+                StorageConfig(
+                    type=StorageType.KUBERNETES,
+                    storage_size="100Gi",
+                    storage_class_name="storage-class",
+                )
+            ],
         )
-
-    def test_aws_platform_config_without_storage__fails(
-        self,
-        factory: PlatformConfigFactory,
-        aws_platform_body: kopf.Body,
-        aws_cluster: Cluster,
-    ) -> None:
-        aws_platform_body["spec"]["storage"] = {}
-
-        with pytest.raises(AssertionError, match="Invalid storage type"):
-            factory.create(aws_platform_body, aws_cluster)
 
     def test_azure_platform_config(
         self,
@@ -684,26 +672,27 @@ class TestPlatformConfigFactory:
         azure_cluster: Cluster,
         azure_platform_config: PlatformConfig,
     ) -> None:
-        azure_platform_body["spec"]["storage"] = {
-            "kubernetes": {
-                "persistence": {"storageClassName": "storage-class", "size": "100Gi"}
+        azure_platform_body["spec"]["storages"] = [
+            {
+                "kubernetes": {
+                    "persistence": {
+                        "storageClassName": "storage-class",
+                        "size": "100Gi",
+                    }
+                }
             }
-        }
+        ]
         result = factory.create(azure_platform_body, azure_cluster)
 
         assert result == replace(
             azure_platform_config,
-            azure=replace(
-                azure_platform_config.azure,
-                storage_type="kubernetes",
-                storage_class_name="storage-class",
-                storage_size="100Gi",
-                storage_nfs_server="",
-                storage_nfs_path="/",
-                storage_account_name="",
-                storage_account_key="",
-                storage_share_name="",
-            ),
+            storages=[
+                StorageConfig(
+                    type=StorageType.KUBERNETES,
+                    storage_size="100Gi",
+                    storage_class_name="storage-class",
+                )
+            ],
         )
 
     def test_azure_platform_config_with_nfs_storage(
@@ -713,41 +702,27 @@ class TestPlatformConfigFactory:
         azure_cluster: Cluster,
         azure_platform_config: PlatformConfig,
     ) -> None:
-        azure_platform_body["spec"]["storage"] = {
-            "nfs": {"server": "nfs-server", "path": "/path"}
-        }
+        azure_platform_body["spec"]["storages"] = [
+            {"nfs": {"server": "nfs-server", "path": "/path"}}
+        ]
         result = factory.create(azure_platform_body, azure_cluster)
 
         assert result == replace(
             azure_platform_config,
-            azure=replace(
-                azure_platform_config.azure,
-                storage_type="nfs",
-                storage_nfs_server="nfs-server",
-                storage_nfs_path="/path",
-                storage_account_name="",
-                storage_account_key="",
-                storage_share_name="",
-            ),
+            storages=[
+                StorageConfig(
+                    type=StorageType.NFS,
+                    nfs_server="nfs-server",
+                    nfs_export_path="/path",
+                )
+            ],
         )
-
-    def test_azure_platform_config_without_storage__fails(
-        self,
-        factory: PlatformConfigFactory,
-        azure_platform_body: kopf.Body,
-        azure_cluster: Cluster,
-    ) -> None:
-        azure_platform_body["spec"]["storage"] = {}
-
-        with pytest.raises(AssertionError, match="Invalid storage type"):
-            factory.create(azure_platform_body, azure_cluster)
 
     def test_azure_platform_config_without_blob_storage__fails(
         self,
         factory: PlatformConfigFactory,
         azure_platform_body: kopf.Body,
         azure_cluster: Cluster,
-        azure_platform_config: PlatformConfig,
     ) -> None:
         azure_platform_body["spec"]["blobStorage"] = {}
 
@@ -765,28 +740,6 @@ class TestPlatformConfigFactory:
 
         assert result == on_prem_platform_config
 
-    def test_on_prem_platform_config_with_default_persistence_sizes(
-        self,
-        factory: PlatformConfigFactory,
-        on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
-    ) -> None:
-        del on_prem_platform_body["spec"]["registry"]["kubernetes"]["persistence"][
-            "size"
-        ]
-        del on_prem_platform_body["spec"]["storage"]["kubernetes"]["persistence"][
-            "size"
-        ]
-        del on_prem_platform_body["spec"]["monitoring"]["metrics"]["kubernetes"][
-            "persistence"
-        ]["size"]
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
-
-        assert result.on_prem
-        assert result.on_prem.registry_storage_size == "10Gi"
-        assert result.on_prem.storage_size == "10Gi"
-        assert result.monitoring_metrics_storage_size == "10Gi"
-
     def test_on_prem_platform_config_with_nfs_storage(
         self,
         factory: PlatformConfigFactory,
@@ -794,21 +747,20 @@ class TestPlatformConfigFactory:
         on_prem_cluster: Cluster,
         on_prem_platform_config: PlatformConfig,
     ) -> None:
-        on_prem_platform_body["spec"]["storage"] = {
-            "nfs": {"server": "nfs-server", "path": "/path"}
-        }
+        on_prem_platform_body["spec"]["storages"] = [
+            {"nfs": {"server": "nfs-server", "path": "/path"}}
+        ]
         result = factory.create(on_prem_platform_body, on_prem_cluster)
 
         assert result == replace(
             on_prem_platform_config,
-            on_prem=replace(
-                on_prem_platform_config.on_prem,
-                storage_type="nfs",
-                storage_nfs_server="nfs-server",
-                storage_nfs_path="/path",
-                storage_class_name="",
-                storage_size="10Gi",
-            ),
+            storages=[
+                StorageConfig(
+                    type=StorageType.NFS,
+                    nfs_server="nfs-server",
+                    nfs_export_path="/path",
+                )
+            ],
         )
 
     def test_on_prem_platform_config_without_node_ports__fails(

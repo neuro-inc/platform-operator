@@ -1,18 +1,19 @@
+{{- range .Values.storages }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ .Release.Name }}-storage
-  namespace: {{ include "platform.jobs.namespace.name" . }}
-  labels:
-{{ include "platform.labels.standard" . | indent 4 }}
+  name: {{ $.Release.Name }}-{{ include "platform.storage.claimNameSuffix" .path }}
+  namespace: {{ include "platform.jobs.namespace.name" $ }}
+  labels: {{ include "platform.labels.standard" $ | nindent 4 }}
 spec:
   accessModes:
   - ReadWriteMany
   volumeMode: Filesystem
   resources:
     requests:
-      storage: {{ .Values.storage.size }}
-  storageClassName: {{ .Values.storage.storageClassName | default "" | quote }}
-  {{- if ne .Values.storage.type "kubernetes" }}
-  volumeName: {{ include "platform.storage.jobsPvName" . }}
+      storage: {{ .size }}
+  storageClassName: {{ .storageClassName | default "" | quote }}
+  {{- if ne .type "kubernetes" }}
+  volumeName: {{ $.Release.Name }}-{{ include "platform.storage.jobsVolumeNameSuffix" .path }}
   {{- end }}
+{{- end }}

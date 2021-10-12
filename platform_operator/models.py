@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import kopf
 from yarl import URL
@@ -224,11 +224,9 @@ class StorageSpec(Dict[str, Any]):
     def _default_factory(cls) -> Dict[str, Any]:
         return defaultdict(cls._default_factory)
 
-    def get_storage_type(self, *supported_types: str) -> str:
-        try:
-            return next(t for t in supported_types if t in self)
-        except StopIteration:
-            return ""
+    @property
+    def path(self) -> str:
+        return self._spec.get("path", "")
 
     @property
     def storage_size(self) -> str:
@@ -243,7 +241,7 @@ class StorageSpec(Dict[str, Any]):
         return self._spec["nfs"].get("server", "")
 
     @property
-    def nfs_path(self) -> str:
+    def nfs_export_path(self) -> str:
         return self._spec["nfs"].get("path", "/")
 
     @property
@@ -251,16 +249,37 @@ class StorageSpec(Dict[str, Any]):
         return self._spec["gcs"].get("bucket", "")
 
     @property
-    def azure_file_storage_account_name(self) -> str:
+    def azure_storage_account_name(self) -> str:
         return self._spec["azureFile"].get("storageAccountName", "")
 
     @property
-    def azure_file_storage_account_key(self) -> str:
+    def azure_storage_account_key(self) -> str:
         return self._spec["azureFile"].get("storageAccountKey", "")
 
     @property
-    def azure_file_share_name(self) -> str:
+    def azure_share_name(self) -> str:
         return self._spec["azureFile"].get("shareName", "")
+
+
+class StorageType(str, Enum):
+    KUBERNETES = "kubernetes"
+    NFS = "nfs"
+    GCS = "gcs"
+    AZURE_fILE = "azureFile"
+
+
+@dataclass(frozen=True)
+class StorageConfig:
+    type: StorageType
+    path: str = ""
+    storage_size: str = "10Gi"
+    storage_class_name: str = ""
+    nfs_export_path: str = ""
+    nfs_server: str = ""
+    azure_storage_account_name: str = ""
+    azure_storage_account_key: str = ""
+    azure_share_name: str = ""
+    gcs_bucket_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -269,23 +288,12 @@ class GcpConfig:
     region: str
     service_account_key: str
     service_account_key_base64: str
-    storage_type: str
-    storage_size: str = ""
-    storage_class_name: str = ""
-    storage_nfs_server: str = ""
-    storage_nfs_path: str = "/"
-    storage_gcs_bucket_name: str = ""
 
 
 @dataclass(frozen=True)
 class AwsConfig:
     region: str
     registry_url: URL
-    storage_type: str
-    storage_size: str = ""
-    storage_class_name: str = ""
-    storage_nfs_server: str = ""
-    storage_nfs_path: str = "/"
     role_arn: str = ""
     s3_role_arn: str = ""
 
@@ -296,16 +304,8 @@ class AzureConfig:
     registry_url: URL
     registry_username: str
     registry_password: str
-    storage_share_name: str
     blob_storage_account_name: str
     blob_storage_account_key: str
-    storage_type: str
-    storage_size: str = ""
-    storage_class_name: str = ""
-    storage_nfs_server: str = ""
-    storage_nfs_path: str = "/"
-    storage_account_name: str = ""
-    storage_account_key: str = ""
 
 
 @dataclass(frozen=True)
@@ -327,11 +327,6 @@ class OnPremConfig:
     kubelet_port: int
     http_node_port: int
     https_node_port: int
-    storage_type: str
-    storage_size: str = ""
-    storage_class_name: str = ""
-    storage_nfs_server: str = ""
-    storage_nfs_path: str = "/"
 
 
 @dataclass(frozen=True)
@@ -397,7 +392,7 @@ class PlatformConfig:
     jobs_fallback_host: str
     jobs_allow_privileged_mode: bool
     idle_jobs: Sequence[Dict[str, Any]]
-    storage_pvc_name: str
+    storages: Sequence[StorageConfig]
     helm_repo: HelmRepo
     docker_registry: DockerRegistry
     grafana_username: str
@@ -421,6 +416,12 @@ class PlatformConfig:
     aws: Optional[AwsConfig] = None
     azure: Optional[AzureConfig] = None
     on_prem: Optional[OnPremConfig] = None
+
+    def get_storage_claim_name(self, path: str) -> str:
+        name = f"{self.namespace}-storage"
+        if path:
+            name += path.replace("/", "-")
+        return name
 
     def create_dns_config(
         self,
@@ -677,11 +678,11 @@ class PlatformConfigFactory:
             monitoring_metrics_retention_time=(
                 monitoring_metrics_spec.get("retentionTime", "")
             ),
+            storages=self._create_storages(platform_body["spec"]),
             disks_storage_limit_per_user_gb=cluster["disks"][
                 "storage_limit_per_user_gb"
             ],
             disks_storage_class_name=disks_storage_class_name,
-            storage_pvc_name=f"{self._config.platform_namespace}-storage",
             helm_repo=self._create_helm_repo(cluster),
             docker_registry=self._create_neuro_docker_registry(cluster),
             grafana_username=cluster["credentials"]["grafana"]["username"],
@@ -753,6 +754,44 @@ class PlatformConfigFactory:
             password=data["password"],
         )
 
+    @classmethod
+    def _create_storages(cls, spec: kopf.Spec) -> Sequence[StorageConfig]:
+        result: List[StorageConfig] = []
+        for storage_spec in spec["storages"]:
+            result.append(cls._create_storage(StorageSpec(storage_spec)))
+        return result
+
+    @classmethod
+    def _create_storage(cls, storage_spec: StorageSpec) -> StorageConfig:
+        if StorageType.KUBERNETES in storage_spec:
+            return StorageConfig(
+                type=StorageType.KUBERNETES,
+                path=storage_spec.path,
+                storage_class_name=storage_spec.storage_class_name,
+                storage_size=storage_spec.storage_size,
+            )
+        if StorageType.NFS in storage_spec:
+            return StorageConfig(
+                type=StorageType.NFS,
+                path=storage_spec.path,
+                nfs_server=storage_spec.nfs_server,
+                nfs_export_path=storage_spec.nfs_export_path,
+            )
+        if StorageType.AZURE_fILE in storage_spec:
+            return StorageConfig(
+                type=StorageType.AZURE_fILE,
+                path=storage_spec.path,
+                azure_storage_account_name=storage_spec.azure_storage_account_name,
+                azure_storage_account_key=storage_spec.azure_storage_account_key,
+                azure_share_name=storage_spec.azure_share_name,
+            )
+        if StorageType.GCS in storage_spec:
+            return StorageConfig(
+                type=StorageType.GCS, gcs_bucket_name=storage_spec.gcs_bucket_name
+            )
+
+        raise ValueError("Storage type is not supported")
+
     def _create_gcp(self, spec: kopf.Spec, cluster: Cluster) -> GcpConfig:
         cloud_provider = cluster["cloud_provider"]
         iam_gcp_spec = spec.get("iam", {}).get("gcp")
@@ -762,61 +801,33 @@ class PlatformConfigFactory:
         service_account_key_base64 = iam_gcp_spec.get(
             "serviceAccountKeyBase64"
         ) or self._base64_encode(json.dumps(cloud_provider["credentials"]))
-        storage_spec = StorageSpec(spec["storage"])
-        storage_type = storage_spec.get_storage_type("kubernetes", "nfs", "gcs")
-        assert storage_type, "Invalid storage type"
         return GcpConfig(
             project=cloud_provider["project"],
             region=cloud_provider["region"],
             service_account_key=service_account_key,
             service_account_key_base64=service_account_key_base64,
-            storage_type=storage_type,
-            storage_size=storage_spec.storage_size,
-            storage_class_name=storage_spec.storage_class_name,
-            storage_nfs_server=storage_spec.nfs_server,
-            storage_nfs_path=storage_spec.nfs_path,
-            storage_gcs_bucket_name=storage_spec.gcs_bucket_name,
         )
 
     def _create_aws(self, spec: kopf.Spec, cluster: Cluster) -> "AwsConfig":
         registry_url = URL(spec["registry"]["aws"]["url"])
         if not registry_url.scheme:
             registry_url = URL(f"https://{registry_url!s}")
-        storage_spec = StorageSpec(spec["storage"])
-        storage_type = storage_spec.get_storage_type("kubernetes", "nfs")
-        assert storage_type, "Invalid storage type"
         return AwsConfig(
             region=cluster["cloud_provider"]["region"],
             role_arn=spec.get("iam", {}).get("aws", {}).get("roleArn", ""),
             s3_role_arn=spec.get("iam", {}).get("aws", {}).get("s3RoleArn", ""),
             registry_url=registry_url,
-            storage_type=storage_type,
-            storage_size=storage_spec.storage_size,
-            storage_class_name=storage_spec.storage_class_name,
-            storage_nfs_server=storage_spec.nfs_server,
-            storage_nfs_path=storage_spec.nfs_path,
         )
 
     def _create_azure(self, spec: kopf.Spec, cluster: Cluster) -> AzureConfig:
         registry_url = URL(spec["registry"]["azure"]["url"])
         if not registry_url.scheme:
             registry_url = URL(f"https://{registry_url!s}")
-        storage_spec = StorageSpec(spec["storage"])
-        storage_type = storage_spec.get_storage_type("kubernetes", "nfs", "azureFile")
-        assert storage_type, "Invalid storage type"
         return AzureConfig(
             region=cluster["cloud_provider"]["region"],
             registry_url=registry_url,
             registry_username=spec["registry"]["azure"]["username"],
             registry_password=spec["registry"]["azure"]["password"],
-            storage_type=storage_type,
-            storage_size=storage_spec.storage_size,
-            storage_class_name=storage_spec.storage_class_name,
-            storage_nfs_server=storage_spec.nfs_server,
-            storage_nfs_path=storage_spec.nfs_path,
-            storage_account_name=storage_spec.azure_file_storage_account_name,
-            storage_account_key=storage_spec.azure_file_storage_account_key,
-            storage_share_name=storage_spec.azure_file_share_name,
             blob_storage_account_name=spec["blobStorage"]["azure"][
                 "storageAccountName"
             ],
@@ -825,9 +836,6 @@ class PlatformConfigFactory:
 
     def _create_on_prem(self, spec: kopf.Spec, cluster: Cluster) -> OnPremConfig:
         kubernetes_spec = spec["kubernetes"]
-        storage_spec = StorageSpec(spec["storage"])
-        storage_type = storage_spec.get_storage_type("kubernetes", "nfs")
-        assert storage_type, "Invalid storage type"
 
         if "kubernetes" in spec["registry"]:
             registry_persistence = spec["registry"]["kubernetes"]["persistence"]
@@ -887,11 +895,6 @@ class PlatformConfigFactory:
             registry_password=registry_password,
             registry_storage_class_name=registry_storage_class_name,
             registry_storage_size=registry_storage_size,
-            storage_type=storage_type,
-            storage_class_name=storage_spec.storage_class_name,
-            storage_size=storage_spec.storage_size or "10Gi",
-            storage_nfs_server=storage_spec.nfs_server,
-            storage_nfs_path=storage_spec.nfs_path,
             minio_install=minio_install,
             blob_storage_url=blob_storage_url,
             blob_storage_public_url=blob_storage_public_url,

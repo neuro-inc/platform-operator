@@ -23,6 +23,8 @@ from platform_operator.models import (
     Config,
     PlatformConfig,
     PlatformConfigFactory,
+    StorageConfig,
+    StorageType,
 )
 
 
@@ -189,7 +191,8 @@ async def test_is_obs_csi_driver_deploy_required_on_install_true(
     )
 
     gcp_platform_config = replace(
-        gcp_platform_config, gcp=replace(gcp_platform_config.gcp, storage_type="gcs")
+        gcp_platform_config,
+        storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="bucket")],
     )
     helm_client.get_release.return_value = None
 
@@ -211,7 +214,8 @@ async def test_is_obs_csi_driver_deploy_required_on_install_false(
     )
 
     gcp_platform_config = replace(
-        gcp_platform_config, gcp=replace(gcp_platform_config.gcp, storage_type="gcs")
+        gcp_platform_config,
+        storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="bucket")],
     )
     helm_client.get_release.return_value = None
 
@@ -234,7 +238,8 @@ async def test_is_obs_csi_driver_deploy_required_on_version_update_true(
     )
 
     gcp_platform_config = replace(
-        gcp_platform_config, gcp=replace(gcp_platform_config.gcp, storage_type="gcs")
+        gcp_platform_config,
+        storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="bucket")],
     )
     helm_client.get_release.return_value = {
         "Chart": (
@@ -262,7 +267,8 @@ async def test_is_obs_csi_driver_deploy_required_on_values_update_true(
     )
 
     gcp_platform_config = replace(
-        gcp_platform_config, gcp=replace(gcp_platform_config.gcp, storage_type="gcs")
+        gcp_platform_config,
+        storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="bucket")],
     )
     helm_client.get_release.return_value = {
         "Chart": (
@@ -290,7 +296,8 @@ async def test_is_obs_csi_driver_deploy_required_no_update_false(
     )
 
     gcp_platform_config = replace(
-        gcp_platform_config, gcp=replace(gcp_platform_config.gcp, storage_type="gcs")
+        gcp_platform_config,
+        storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="bucket")],
     )
     helm_client.get_release.return_value = {
         "Chart": (
@@ -684,16 +691,10 @@ async def test_deploy_gcp_with_gcs_storage(
     is_obs_csi_driver_deploy_failed.return_value = False
     is_obs_csi_driver_deploy_required.return_value = True
     config_client.get_cluster.return_value = gcp_cluster
-    gcp_platform_body["spec"]["storage"] = {"gcs": {"bucket": "storage"}}
+    gcp_platform_body["spec"]["storages"] = [{"gcs": {"bucket": "storage"}}]
     gcp_platform_config = replace(
         gcp_platform_config,
-        gcp=replace(
-            gcp_platform_config.gcp,
-            storage_type="gcs",
-            storage_nfs_server="",
-            storage_nfs_path="/",
-            storage_gcs_bucket_name="storage",
-        ),
+        storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="storage")],
     )
 
     await deploy(  # type: ignore
@@ -817,7 +818,7 @@ async def test_deploy_with_invalid_spec(
 ) -> None:
     from platform_operator.handlers import deploy
 
-    del gcp_platform_body["spec"]["storage"]
+    del gcp_platform_body["spec"]["storages"]
 
     with pytest.raises(kopf.PermanentError, match="Invalid platform configuration"):
         await deploy(  # type: ignore
@@ -976,7 +977,7 @@ async def test_delete_gcp_with_gcs_storage(
     from platform_operator.handlers import delete
 
     config_client.get_cluster.return_value = gcp_cluster
-    gcp_platform_body["spec"]["storage"] = {"gcs": {"bucket": "storage"}}
+    gcp_platform_body["spec"]["storages"] = [{"gcs": {"bucket": "storage"}}]
 
     await delete(  # type: ignore
         name=gcp_platform_config.cluster_name,
@@ -1030,7 +1031,7 @@ async def test_delete_with_invalid_configuration(
 ) -> None:
     from platform_operator.handlers import delete
 
-    del gcp_platform_body["spec"]["storage"]
+    del gcp_platform_body["spec"]["storages"]
 
     await delete(  # type: ignore
         name=gcp_platform_config.cluster_name,

@@ -25,7 +25,13 @@ from .kube_client import (
     PlatformPhase,
     PlatformStatusManager,
 )
-from .models import Config, HelmRepoName, PlatformConfig, PlatformConfigFactory
+from .models import (
+    Config,
+    HelmRepoName,
+    PlatformConfig,
+    PlatformConfigFactory,
+    StorageType,
+)
 from .operator import LOCK_KEY
 
 
@@ -260,8 +266,7 @@ async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
         logger.error(message)
         raise kopf.TemporaryError(message)
 
-    is_gcp_gcs_platform = platform.gcp and platform.gcp.storage_type == "gcs"
-    if is_gcp_gcs_platform:
+    if has_gcs_storage(platform):
         await app.helm_client.delete(
             config.helm_release_names.obs_csi_driver,
             purge=True,
@@ -373,7 +378,7 @@ async def get_platform_config(name: str, body: kopf.Body) -> PlatformConfig:
 async def is_obs_csi_driver_deploy_required(
     platform: PlatformConfig, install: bool = False
 ) -> bool:
-    if not platform.gcp or platform.gcp.storage_type != "gcs":
+    if not has_gcs_storage(platform):
         return False
 
     return await is_helm_deploy_required(
@@ -382,6 +387,12 @@ async def is_obs_csi_driver_deploy_required(
         chart_version=config.helm_chart_versions.obs_csi_driver,
         values=app.helm_values_factory.create_obs_csi_driver_values(platform),
         install=install,
+    )
+
+
+def has_gcs_storage(platform: PlatformConfig) -> bool:
+    return platform.gcp is not None and any(
+        s.type == StorageType.GCS for s in platform.storages
     )
 
 
