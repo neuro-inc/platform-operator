@@ -32,7 +32,7 @@ dependencies:
     repository: "@stable"
     condition: minioEnabled
   - name: platformstorageapi
-    version: "21.8.4"
+    version: "21.10.1"
     repository: "@neuro"
     alias: platform-storage
   - name: platformregistryapi
@@ -58,7 +58,7 @@ dependencies:
     repository: "@neuro"
     alias: platform-disk-api
   - name: platformapi-poller
-    version: "21.8.4"
+    version: "21.10.1"
     repository: "@neuro"
     alias: platform-api-poller
   - name: platformbucketsapi

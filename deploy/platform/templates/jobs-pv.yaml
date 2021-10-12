@@ -1,37 +1,38 @@
-{{- if ne .Values.storage.type "kubernetes" }}
+{{- range .Values.storages }}
+{{- if ne .type "kubernetes" }}
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: {{ include "platform.storage.jobsPvName" . }}
-  labels:
-{{ include "platform.labels.standard" . | indent 4 }}
+  name: {{ $.Release.Name }}-{{ include "platform.storage.jobsVolumeNameSuffix" .path }}
+  labels: {{ include "platform.labels.standard" $ | nindent 4 }}
 spec:
   capacity:
-    storage: {{ .Values.storage.size }}
+    storage: {{ .size }}
   accessModes:
   - ReadWriteMany
   volumeMode: Filesystem
   persistentVolumeReclaimPolicy: Retain
-{{- if eq .Values.storage.type "nfs" }}
+  {{- if eq .type "nfs" }}
   nfs:
-    server: {{ .Values.storage.nfs.server }}
-    path: {{ .Values.storage.nfs.path }}
+    server: {{ .nfs.server }}
+    path: {{ .nfs.path }}
     readOnly: false
-{{- else if eq .Values.storage.type "azureFile" }}
+  {{- else if eq .type "azureFile" }}
   azureFile:
-    secretName: {{ include "platform.azure.storageAccount.secretName" . }}
-    secretNamespace: {{ .Release.Namespace }}
-    shareName: {{ .Values.storage.azureFile.shareName }}
+    secretName: {{ $.Release.Name }}-{{ include "platform.azure.storageAccount.secretNameSuffix" .path }}
+    secretNamespace: {{ $.Release.Namespace }}
+    shareName: {{ .azureFile.shareName }}
     readOnly: false
   mountOptions:
-    - mfsymlinks
-{{- else if eq .Values.storage.type "gcs" }}
+  - mfsymlinks
+  {{- else if eq .type "gcs" }}
   csi:
     driver: obs.csi.neu.ro
-    volumeHandle: {{ .Values.storage.gcs.bucketName }}
+    volumeHandle: {{ .gcs.bucketName }}
     volumeAttributes:
-      bucket: {{ .Values.storage.gcs.bucketName }}
+      bucket: {{ .gcs.bucketName }}
       key_file: /accounts/key.json
       additional_args: --limit-ops-per-sec 0
+  {{- end }}
 {{- end }}
 {{- end }}

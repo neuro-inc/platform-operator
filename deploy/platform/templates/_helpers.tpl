@@ -22,10 +22,6 @@ heritage: {{ .Release.Service | quote }}
 release: {{ .Release.Name | quote }}
 {{- end -}}
 
-{{- define "platform.azure.storageAccount.secretName" -}}
-{{ .Release.Name }}-azure-storage-account
-{{- end -}}
-
 {{- define "platform.jobs.namespace.name" -}}
 {{- if .Values.jobs.namespace.name -}}
 {{- .Values.jobs.namespace.name | quote -}}
@@ -38,12 +34,36 @@ release: {{ .Release.Name | quote }}
 {{ .Release.Name }}-idle-job
 {{- end -}}
 
-{{- define "platform.storage.platformPvName" -}}
-{{ .Release.Name }}-storage
+{{- define "platform.azure.storageAccount.secretNameSuffix" -}}
+{{- if . -}}
+{{- printf "azure-storage-account%s" . | replace "/" "-" -}}
+{{- else -}}
+{{- printf "azure-storage-account" -}}
+{{- end -}}
 {{- end -}}
 
-{{- define "platform.storage.jobsPvName" -}}
-{{ .Release.Name }}-jobs-storage
+{{- define "platform.storage.platformVolumeNameSuffix" -}}
+{{- if . -}}
+{{- printf "storage%s" . | replace "/" "-" -}}
+{{- else -}}
+{{- printf "storage" -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "platform.storage.jobsVolumeNameSuffix" -}}
+{{- if . -}}
+{{- printf "jobs-storage%s" . | replace "/" "-" -}}
+{{- else -}}
+{{- printf "jobs-storage" -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "platform.storage.claimNameSuffix" -}}
+{{- if . -}}
+{{- printf "storage%s" . | replace "/" "-" -}}
+{{- else -}}
+{{- printf "storage" -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "platform.dockerConfigJson" -}}

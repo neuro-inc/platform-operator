@@ -5,7 +5,13 @@ import pytest
 from yarl import URL
 
 from platform_operator.helm_values import HelmValuesFactory
-from platform_operator.models import Config, LabelsConfig, PlatformConfig
+from platform_operator.models import (
+    Config,
+    LabelsConfig,
+    PlatformConfig,
+    StorageConfig,
+    StorageType,
+)
 
 
 class TestHelmValuesFactory:
@@ -90,7 +96,13 @@ class TestHelmValuesFactory:
                 }
             ],
             "disks": {"storageClass": {"create": True, "name": "platform-disk"}},
-            "storage": {"type": "nfs", "nfs": {"server": "192.168.0.3", "path": "/"}},
+            "storages": [
+                {
+                    "type": "nfs",
+                    "size": "10Gi",
+                    "nfs": {"server": "192.168.0.3", "path": "/"},
+                }
+            ],
             "traefik": mock.ANY,
             "adjust-inotify": mock.ANY,
             "nvidia-gpu-driver-gcp": mock.ANY,
@@ -158,20 +170,23 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(
             replace(
                 gcp_platform_config,
-                gcp=replace(
-                    gcp_platform_config.gcp,
-                    storage_type="kubernetes",
-                    storage_class_name="storage-class",
-                    storage_size="100Gi",
-                ),
+                storages=[
+                    StorageConfig(
+                        type=StorageType.KUBERNETES,
+                        storage_class_name="storage-class",
+                        storage_size="100Gi",
+                    )
+                ],
             )
         )
 
-        assert result["storage"] == {
-            "type": "kubernetes",
-            "storageClassName": "storage-class",
-            "size": "100Gi",
-        }
+        assert result["storages"] == [
+            {
+                "type": "kubernetes",
+                "storageClassName": "storage-class",
+                "size": "100Gi",
+            }
+        ]
 
     def test_create_gcp_platform_values_with_gcs_storage(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -179,18 +194,22 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(
             replace(
                 gcp_platform_config,
-                gcp=replace(
-                    gcp_platform_config.gcp,
-                    storage_type="gcs",
-                    storage_gcs_bucket_name="platform-storage",
-                ),
+                storages=[
+                    StorageConfig(
+                        type=StorageType.GCS,
+                        gcs_bucket_name="platform-storage",
+                    )
+                ],
             )
         )
 
-        assert result["storage"] == {
-            "type": "gcs",
-            "gcs": {"bucketName": "platform-storage"},
-        }
+        assert result["storages"] == [
+            {
+                "type": "gcs",
+                "size": "10Gi",
+                "gcs": {"bucketName": "platform-storage"},
+            }
+        ]
 
     def test_create_gcp_platform_values_without_namespace(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -236,34 +255,40 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(
             replace(
                 aws_platform_config,
-                aws=replace(
-                    aws_platform_config.aws,
-                    storage_type="kubernetes",
-                    storage_class_name="storage-class",
-                    storage_size="100Gi",
-                ),
+                storages=[
+                    StorageConfig(
+                        type=StorageType.KUBERNETES,
+                        storage_class_name="storage-class",
+                        storage_size="100Gi",
+                    )
+                ],
             )
         )
 
-        assert result["storage"] == {
-            "type": "kubernetes",
-            "storageClassName": "storage-class",
-            "size": "100Gi",
-        }
+        assert result["storages"] == [
+            {
+                "type": "kubernetes",
+                "size": "100Gi",
+                "storageClassName": "storage-class",
+            }
+        ]
 
     def test_create_azure_platform_values(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_values(azure_platform_config)
 
-        assert result["storage"] == {
-            "type": "azureFile",
-            "azureFile": {
-                "storageAccountName": "accountName1",
-                "storageAccountKey": "accountKey1",
-                "shareName": "share",
-            },
-        }
+        assert result["storages"] == [
+            {
+                "type": "azureFile",
+                "size": "10Gi",
+                "azureFile": {
+                    "storageAccountName": "accountName1",
+                    "storageAccountKey": "accountKey1",
+                    "shareName": "share",
+                },
+            }
+        ]
         assert result["blobStorage"] == {
             "azure": {
                 "storageAccountName": "accountName2",
@@ -278,20 +303,23 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(
             replace(
                 azure_platform_config,
-                azure=replace(
-                    azure_platform_config.azure,
-                    storage_type="kubernetes",
-                    storage_class_name="storage-class",
-                    storage_size="100Gi",
-                ),
+                storages=[
+                    StorageConfig(
+                        type=StorageType.KUBERNETES,
+                        storage_class_name="storage-class",
+                        storage_size="100Gi",
+                    )
+                ],
             )
         )
 
-        assert result["storage"] == {
-            "type": "kubernetes",
-            "storageClassName": "storage-class",
-            "size": "100Gi",
-        }
+        assert result["storages"] == [
+            {
+                "type": "kubernetes",
+                "size": "100Gi",
+                "storageClassName": "storage-class",
+            }
+        ]
 
     def test_create_azure_platform_values_with_nfs_storage(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -299,19 +327,23 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(
             replace(
                 azure_platform_config,
-                azure=replace(
-                    azure_platform_config.azure,
-                    storage_type="nfs",
-                    storage_nfs_server="nfs-server",
-                    storage_nfs_path="/path",
-                ),
+                storages=[
+                    StorageConfig(
+                        type=StorageType.NFS,
+                        nfs_server="nfs-server",
+                        nfs_export_path="/path",
+                    )
+                ],
             )
         )
 
-        assert result["storage"] == {
-            "type": "nfs",
-            "nfs": {"server": "nfs-server", "path": "/path"},
-        }
+        assert result["storages"] == [
+            {
+                "type": "nfs",
+                "size": "10Gi",
+                "nfs": {"server": "nfs-server", "path": "/path"},
+            }
+        ]
 
     def test_create_on_prem_platform_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -319,11 +351,13 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(on_prem_platform_config)
 
         assert result["standardStorageClass"] == {"create": False, "name": "standard"}
-        assert result["storage"] == {
-            "type": "kubernetes",
-            "storageClassName": "storage-standard",
-            "size": "1000Gi",
-        }
+        assert result["storages"] == [
+            {
+                "type": "kubernetes",
+                "storageClassName": "storage-standard",
+                "size": "1000Gi",
+            }
+        ]
         assert result["dockerRegistryEnabled"] is True
         assert "docker-registry" in result
         assert result["minioEnabled"] is True
@@ -715,18 +749,14 @@ class TestHelmValuesFactory:
         result = factory.create_platform_storage_values(gcp_platform_config)
 
         assert result == {
-            "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
-            "NP_STORAGE_AUTH_URL": "https://dev.neu.ro",
-            "NP_STORAGE_PVC_CLAIM_NAME": "platform-storage",
-            "NP_CORS_ORIGINS": (
-                "https://release--neuro-web.netlify.app,https://app.neu.ro"
-            ),
             "image": {"repository": "neuro.io/platformstorageapi"},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
             },
             "platform": {
+                "clusterName": gcp_platform_config.cluster_name,
+                "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -734,15 +764,56 @@ class TestHelmValuesFactory:
                             "key": "token",
                         }
                     }
-                }
+                },
             },
+            "storages": [{"type": "pvc", "path": "", "claimName": "platform-storage"}],
             "secrets": [{"name": "platform-storage-token", "data": {"token": "token"}}],
+            "cors": {
+                "origins": [
+                    "https://release--neuro-web.netlify.app",
+                    "https://app.neu.ro",
+                ]
+            },
             "sentry": {
                 "dsn": "https://sentry",
                 "clusterName": gcp_platform_config.cluster_name,
                 "sampleRate": 0.1,
             },
         }
+
+    def test_create_platform_storage_values_with_multiple_storages(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_storage_values(
+            replace(
+                gcp_platform_config,
+                storages=[
+                    StorageConfig(
+                        type=StorageType.KUBERNETES,
+                        path="/storage1",
+                        storage_class_name="class",
+                    ),
+                    StorageConfig(
+                        type=StorageType.KUBERNETES,
+                        path="/storage2",
+                        storage_class_name="class",
+                    ),
+                ],
+            )
+        )
+
+        assert result["storages"] == [
+            {
+                "type": "pvc",
+                "path": "/storage1",
+                "claimName": "platform-storage-storage1",
+            },
+            {
+                "type": "pvc",
+                "path": "/storage2",
+                "claimName": "platform-storage-storage2",
+            },
+        ]
 
     def test_create_platform_storage_without_tracing_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -1941,28 +2012,15 @@ class TestHelmValuesFactory:
         result = factory.create_platformapi_poller_values(gcp_platform_config)
 
         assert result == {
-            "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
-            "NP_PLATFORM_API_URL": "https://dev.neu.ro/api/v1",
-            "NP_AUTH_URL": "https://dev.neu.ro",
-            "NP_AUTH_PUBLIC_URL": "https://dev.neu.ro/api/v1/users",
-            "NP_PLATFORM_CONFIG_URI": "https://dev.neu.ro/api/v1",
-            "NP_KUBE_NAMESPACE": "platform-jobs",
-            "NP_KUBE_INGRESS_CLASS": "traefik",
-            "NP_KUBE_INGRESS_OAUTH_AUTHORIZE_URL": (
-                "https://platformingressauth/oauth/authorize"
-            ),
-            "NP_KUBE_NODE_LABEL_JOB": "platform.neuromation.io/job",
-            "NP_KUBE_NODE_LABEL_GPU": "platform.neuromation.io/accelerator",
-            "NP_KUBE_NODE_LABEL_PREEMPTIBLE": "platform.neuromation.io/preemptible",
-            "NP_KUBE_NODE_LABEL_NODE_POOL": "platform.neuromation.io/nodepool",
-            "NP_KUBE_IMAGE_PULL_SECRET": "platform-docker-hub-config",
-            "NP_REGISTRY_URL": (
-                f"https://registry.{gcp_platform_config.cluster_name}.org.neu.ro"
-            ),
-            "NP_STORAGE_TYPE": "pvc",
-            "NP_PVC_NAME": "platform-storage",
             "image": {"repository": "neuro.io/platformapi"},
             "platform": {
+                "clusterName": gcp_platform_config.cluster_name,
+                "authUrl": "https://dev.neu.ro",
+                "configUrl": "https://dev.neu.ro/api/v1",
+                "apiUrl": "https://dev.neu.ro/api/v1",
+                "registryUrl": (
+                    f"https://registry.{gcp_platform_config.cluster_name}.org.neu.ro"
+                ),
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -1970,7 +2028,22 @@ class TestHelmValuesFactory:
                             "name": "platform-poller-token",
                         }
                     }
-                }
+                },
+            },
+            "jobs": {
+                "namespace": "platform-jobs",
+                "ingressClass": "traefik",
+                "ingressOAuthAuthorizeUrl": (
+                    "https://platformingressauth/oauth/authorize"
+                ),
+                "imagePullSecret": "platform-docker-hub-config",
+            },
+            "storages": [{"path": "", "type": "pvc", "claimName": "platform-storage"}],
+            "nodeLabels": {
+                "job": "platform.neuromation.io/job",
+                "gpu": "platform.neuromation.io/accelerator",
+                "preemptible": "platform.neuromation.io/preemptible",
+                "nodePool": "platform.neuromation.io/nodepool",
             },
             "ingress": {
                 "enabled": True,
@@ -1989,12 +2062,46 @@ class TestHelmValuesFactory:
             },
         }
 
+    def test_create_platform_api_poller_values_with_multiple_storages(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platformapi_poller_values(
+            replace(
+                gcp_platform_config,
+                storages=[
+                    StorageConfig(
+                        type=StorageType.KUBERNETES,
+                        path="/storage1",
+                        storage_class_name="class",
+                    ),
+                    StorageConfig(
+                        type=StorageType.KUBERNETES,
+                        path="/storage2",
+                        storage_class_name="class",
+                    ),
+                ],
+            )
+        )
+
+        assert result["storages"] == [
+            {
+                "type": "pvc",
+                "path": "/storage1",
+                "claimName": "platform-storage-storage1",
+            },
+            {
+                "type": "pvc",
+                "path": "/storage2",
+                "claimName": "platform-storage-storage2",
+            },
+        ]
+
     def test_create_azure_platform_api_poller_values(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platformapi_poller_values(azure_platform_config)
 
         assert (
-            result["NP_KUBE_POD_PREEMPTIBLE_TOLERATION_KEY"]
+            result["jobs"]["preemptibleTolerationKey"]
             == "kubernetes.azure.com/scalesetpriority"
         )

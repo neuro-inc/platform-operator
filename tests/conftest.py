@@ -26,6 +26,8 @@ from platform_operator.models import (
     OnPremConfig,
     OpenStackCredentials,
     PlatformConfig,
+    StorageConfig,
+    StorageType,
 )
 
 
@@ -321,7 +323,7 @@ def gcp_platform_body(cluster_name: str) -> kopf.Body:
                 "tpuIPv4CIDR": "192.168.0.0/16",
             },
             "iam": {"gcp": {"serviceAccountKeyBase64": "e30="}},
-            "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
+            "storages": [{"nfs": {"server": "192.168.0.3", "path": "/"}}],
             "monitoring": {
                 "logs": {"blobStorage": {"bucket": "job-logs"}},
                 "metrics": {"blobStorage": {"bucket": "job-metrics"}},
@@ -340,7 +342,7 @@ def aws_platform_body(cluster_name: str) -> kopf.Body:
         "spec": {
             "token": "token",
             "registry": {"aws": {"url": "platform.dkr.ecr.us-east-1.amazonaws.com"}},
-            "storage": {"nfs": {"server": "192.168.0.3", "path": "/"}},
+            "storages": [{"nfs": {"server": "192.168.0.3", "path": "/"}}],
             "monitoring": {
                 "logs": {"blobStorage": {"bucket": "job-logs"}},
                 "metrics": {"blobStorage": {"bucket": "job-metrics"}},
@@ -365,13 +367,15 @@ def azure_platform_body(cluster_name: str) -> kopf.Body:
                     "password": "admin-password",
                 }
             },
-            "storage": {
-                "azureFile": {
-                    "storageAccountName": "accountName1",
-                    "storageAccountKey": "accountKey1",
-                    "shareName": "share",
+            "storages": [
+                {
+                    "azureFile": {
+                        "storageAccountName": "accountName1",
+                        "storageAccountKey": "accountKey1",
+                        "shareName": "share",
+                    }
                 }
-            },
+            ],
             "blobStorage": {
                 "azure": {
                     "storageAccountName": "accountName2",
@@ -408,14 +412,16 @@ def on_prem_platform_body(cluster_name: str) -> kopf.Body:
                     }
                 }
             },
-            "storage": {
-                "kubernetes": {
-                    "persistence": {
-                        "storageClassName": "storage-standard",
-                        "size": "1000Gi",
+            "storages": [
+                {
+                    "kubernetes": {
+                        "persistence": {
+                            "storageClassName": "storage-standard",
+                            "size": "1000Gi",
+                        }
                     }
                 }
-            },
+            ],
             "blobStorage": {
                 "kubernetes": {
                     "persistence": {
@@ -518,7 +524,13 @@ def gcp_platform_config(
         service_traefik_name="platform-traefik",
         monitoring_logs_bucket_name="job-logs",
         monitoring_metrics_bucket_name="job-metrics",
-        storage_pvc_name="platform-storage",
+        storages=[
+            StorageConfig(
+                type=StorageType.NFS,
+                nfs_server="192.168.0.3",
+                nfs_export_path="/",
+            )
+        ],
         helm_repo=HelmRepo(
             name=HelmRepoName.NEURO,
             url=URL("https://neuro.jfrog.io/neuro/helm-virtual-public"),
@@ -542,9 +554,6 @@ def gcp_platform_config(
             region="us-central1",
             service_account_key="{}",
             service_account_key_base64="e30=",
-            storage_type="nfs",
-            storage_nfs_server="192.168.0.3",
-            storage_nfs_path="/",
         ),
         docker_hub_config_secret_name="platform-docker-hub-config",
         docker_hub_registry=DockerRegistry(
@@ -572,9 +581,6 @@ def aws_platform_config(
         aws=AwsConfig(
             region="us-east-1",
             registry_url=URL("https://platform.dkr.ecr.us-east-1.amazonaws.com"),
-            storage_type="nfs",
-            storage_nfs_server="192.168.0.3",
-            storage_nfs_path="/",
             s3_role_arn="",
         ),
     )
@@ -593,15 +599,19 @@ def azure_platform_config(
             {"name": "Standard_NC6-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}
         ],
         jobs_resource_pool_types=[resource_pool_type_factory()],
+        storages=[
+            StorageConfig(
+                type=StorageType.AZURE_fILE,
+                azure_storage_account_name="accountName1",
+                azure_storage_account_key="accountKey1",
+                azure_share_name="share",
+            )
+        ],
         azure=AzureConfig(
             region="westus",
             registry_url=URL("https://platform.azurecr.io"),
             registry_username="admin",
             registry_password="admin-password",
-            storage_type="azureFile",
-            storage_account_name="accountName1",
-            storage_account_key="accountKey1",
-            storage_share_name="share",
             blob_storage_account_name="accountName2",
             blob_storage_account_key="accountKey2",
         ),
@@ -626,6 +636,13 @@ def on_prem_platform_config(
         monitoring_metrics_storage_class_name="metrics-standard",
         monitoring_metrics_storage_size="100Gi",
         disks_storage_class_name="openebs-cstor",
+        storages=[
+            StorageConfig(
+                type=StorageType.KUBERNETES,
+                storage_size="1000Gi",
+                storage_class_name="storage-standard",
+            )
+        ],
         on_prem=OnPremConfig(
             docker_registry_install=True,
             registry_url=URL("http://platform-docker-registry:5000"),
@@ -633,9 +650,6 @@ def on_prem_platform_config(
             registry_password="",
             registry_storage_class_name="registry-standard",
             registry_storage_size="100Gi",
-            storage_type="kubernetes",
-            storage_class_name="storage-standard",
-            storage_size="1000Gi",
             minio_install=True,
             blob_storage_public_url=URL(f"https://blob.{cluster_name}.org.neu.ro"),
             blob_storage_url=URL("http://platform-minio:9000"),

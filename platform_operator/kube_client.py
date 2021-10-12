@@ -105,6 +105,19 @@ class Node:
         return version[0:end]
 
 
+class Service(Dict[str, Any]):
+    def __init__(self, payload: Dict[str, Any]) -> None:
+        super().__init__(payload)
+
+    @property
+    def cluster_ip(self) -> str:
+        return self["spec"]["clusterIP"]
+
+    @property
+    def load_balancer_host(self) -> str:
+        return self["status"]["loadBalancer"]["ingress"][0]["hostname"]
+
+
 class KubeClient:
     def __init__(
         self,
@@ -189,14 +202,14 @@ class KubeClient:
         ) as response:
             response.raise_for_status()
 
-    async def get_service(self, namespace: str, name: str) -> Dict[str, Any]:
+    async def get_service(self, namespace: str, name: str) -> Service:
         assert self._session
         async with self._session.get(
             self._endpoints.service(namespace, name)
         ) as response:
             response.raise_for_status()
             payload = await response.json()
-            return payload
+            return Service(payload)
 
     async def get_service_account(self, namespace: str, name: str) -> Dict[str, Any]:
         assert self._session

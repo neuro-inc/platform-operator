@@ -4,7 +4,14 @@ from typing import Any, Dict, Optional
 
 import bcrypt
 
-from .models import HelmChartNames, HelmReleaseNames, LabelsConfig, PlatformConfig
+from .models import (
+    HelmChartNames,
+    HelmReleaseNames,
+    LabelsConfig,
+    PlatformConfig,
+    StorageConfig,
+    StorageType,
+)
 
 
 class HelmValuesFactory:
@@ -55,6 +62,7 @@ class HelmValuesFactory:
                 "label": platform.kubernetes_node_labels.job,
             },
             "idleJobs": [self._create_idle_job(job) for job in platform.idle_jobs],
+            "storages": [self._create_storage_values(s) for s in platform.storages],
             "disks": {
                 "storageClass": {
                     "create": not platform.on_prem,
@@ -125,59 +133,15 @@ class HelmValuesFactory:
             result[
                 self._chart_names.nvidia_gpu_driver_gcp
             ] = self.create_nvidia_gpu_driver_gcp_values(platform)
-            if platform.gcp.storage_type == "kubernetes":
-                result["storage"] = self._create_kubernetes_storage_values(
-                    storage_class_name=platform.gcp.storage_class_name,
-                    size=platform.gcp.storage_size,
-                )
-            if platform.gcp.storage_type == "nfs":
-                result["storage"] = self._create_nfs_storage_values(
-                    server=platform.gcp.storage_nfs_server,
-                    path=platform.gcp.storage_nfs_path,
-                )
-            if platform.gcp.storage_type == "gcs":
-                result["storage"] = {
-                    "type": "gcs",
-                    "gcs": {"bucketName": platform.gcp.storage_gcs_bucket_name},
-                }
         else:
             result[
                 self._chart_names.nvidia_gpu_driver
             ] = self.create_nvidia_gpu_driver_values(platform)
         if platform.aws:
-            if platform.aws.storage_type == "kubernetes":
-                result["storage"] = self._create_kubernetes_storage_values(
-                    storage_class_name=platform.aws.storage_class_name,
-                    size=platform.aws.storage_size,
-                )
-            if platform.aws.storage_type == "nfs":
-                result["storage"] = self._create_nfs_storage_values(
-                    server=platform.aws.storage_nfs_server,
-                    path=platform.aws.storage_nfs_path,
-                )
             result[
                 self._chart_names.cluster_autoscaler
             ] = self.create_cluster_autoscaler_values(platform)
         if platform.azure:
-            if platform.azure.storage_type == "kubernetes":
-                result["storage"] = self._create_kubernetes_storage_values(
-                    storage_class_name=platform.azure.storage_class_name,
-                    size=platform.azure.storage_size,
-                )
-            if platform.azure.storage_type == "nfs":
-                result["storage"] = self._create_nfs_storage_values(
-                    server=platform.azure.storage_nfs_server,
-                    path=platform.azure.storage_nfs_path,
-                )
-            if platform.azure.storage_type == "azureFile":
-                result["storage"] = {
-                    "type": "azureFile",
-                    "azureFile": {
-                        "storageAccountName": platform.azure.storage_account_name,
-                        "storageAccountKey": platform.azure.storage_account_key,
-                        "shareName": platform.azure.storage_share_name,
-                    },
-                }
             result["blobStorage"] = {
                 "azure": {
                     "storageAccountName": platform.azure.blob_storage_account_name,
@@ -188,16 +152,6 @@ class HelmValuesFactory:
             result["tags"] = {"on_prem": True}
             result["dockerRegistryEnabled"] = platform.on_prem.docker_registry_install
             result["minioEnabled"] = platform.on_prem.minio_install
-            if platform.on_prem.storage_type == "kubernetes":
-                result["storage"] = self._create_kubernetes_storage_values(
-                    storage_class_name=platform.on_prem.storage_class_name,
-                    size=platform.on_prem.storage_size,
-                )
-            if platform.on_prem.storage_type == "nfs":
-                result["storage"] = self._create_nfs_storage_values(
-                    server=platform.on_prem.storage_nfs_server,
-                    path=platform.on_prem.storage_nfs_path,
-                )
             if platform.on_prem.docker_registry_install:
                 result[
                     self._chart_names.docker_registry
@@ -226,17 +180,41 @@ class HelmValuesFactory:
             result["resources"]["nvidia.com/gpu"] = resources["gpu"]
         return result
 
-    def _create_kubernetes_storage_values(
-        self, storage_class_name: str, size: str
-    ) -> Dict[str, Any]:
-        return {
-            "type": "kubernetes",
-            "storageClassName": storage_class_name,
-            "size": size,
-        }
-
-    def _create_nfs_storage_values(self, server: str, path: str) -> Dict[str, Any]:
-        return {"type": "nfs", "nfs": {"server": server, "path": path}}
+    def _create_storage_values(self, storage: StorageConfig) -> Dict[str, Any]:
+        if storage.type == StorageType.KUBERNETES:
+            return {
+                "type": StorageType.KUBERNETES.value,
+                "size": storage.storage_size,
+                "storageClassName": storage.storage_class_name,
+            }
+        if storage.type == StorageType.NFS:
+            return {
+                "type": StorageType.NFS.value,
+                "size": storage.storage_size,
+                "nfs": {
+                    "server": storage.nfs_server,
+                    "path": storage.nfs_export_path,
+                },
+            }
+        if storage.type == StorageType.AZURE_fILE:
+            return {
+                "type": StorageType.AZURE_fILE.value,
+                "size": storage.storage_size,
+                "azureFile": {
+                    "storageAccountName": storage.azure_storage_account_name,
+                    "storageAccountKey": storage.azure_storage_account_key,
+                    "shareName": storage.azure_share_name,
+                },
+            }
+        if storage.type == StorageType.GCS:
+            return {
+                "type": StorageType.GCS.value,
+                "size": storage.storage_size,
+                "gcs": {
+                    "bucketName": storage.gcs_bucket_name,
+                },
+            }
+        raise ValueError(f"Storage type {storage.type.value!r} is not supported")
 
     def create_obs_csi_driver_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         assert platform.gcp
@@ -580,12 +558,10 @@ class HelmValuesFactory:
     ) -> Dict[str, Any]:
         docker_server = platform.docker_registry.url.host
         result = {
-            "NP_CLUSTER_NAME": platform.cluster_name,
-            "NP_STORAGE_AUTH_URL": str(platform.auth_url),
-            "NP_STORAGE_PVC_CLAIM_NAME": f"{self._release_names.platform}-storage",
-            "NP_CORS_ORIGINS": ",".join(platform.ingress_cors_origins),
             "image": {"repository": f"{docker_server}/platformstorageapi"},
             "platform": {
+                "clusterName": platform.cluster_name,
+                "authUrl": str(platform.auth_url),
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -593,8 +569,16 @@ class HelmValuesFactory:
                             "key": "token",
                         }
                     }
-                }
+                },
             },
+            "storages": [
+                {
+                    "path": s.path,
+                    "type": "pvc",
+                    "claimName": platform.get_storage_claim_name(s.path),
+                }
+                for s in platform.storages
+            ],
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
             "secrets": [
                 {
@@ -603,6 +587,8 @@ class HelmValuesFactory:
                 }
             ],
         }
+        if platform.ingress_cors_origins:
+            result["cors"] = {"origins": platform.ingress_cors_origins}
         result.update(**self._create_tracing_values(platform))
         return result
 
@@ -1253,27 +1239,13 @@ class HelmValuesFactory:
     ) -> Dict[str, Any]:
         docker_server = platform.docker_registry.url.host
         result: Dict[str, Any] = {
-            "NP_CLUSTER_NAME": platform.cluster_name,
-            "NP_PLATFORM_API_URL": str(platform.api_url / "api/v1"),
-            "NP_AUTH_URL": str(platform.auth_url),
-            "NP_AUTH_PUBLIC_URL": str(platform.auth_url / "api/v1/users"),
-            "NP_PLATFORM_CONFIG_URI": str(platform.config_url / "api/v1"),
-            "NP_KUBE_NAMESPACE": platform.jobs_namespace,
-            "NP_KUBE_INGRESS_CLASS": "traefik",
-            "NP_KUBE_INGRESS_OAUTH_AUTHORIZE_URL": str(
-                platform.ingress_auth_url / "oauth/authorize"
-            ),
-            "NP_KUBE_NODE_LABEL_JOB": platform.kubernetes_node_labels.job,
-            "NP_KUBE_NODE_LABEL_GPU": platform.kubernetes_node_labels.accelerator,
-            "NP_KUBE_NODE_LABEL_PREEMPTIBLE": (
-                platform.kubernetes_node_labels.preemptible
-            ),
-            "NP_KUBE_NODE_LABEL_NODE_POOL": platform.kubernetes_node_labels.node_pool,
-            "NP_REGISTRY_URL": str(platform.ingress_registry_url),
-            "NP_STORAGE_TYPE": "pvc",
-            "NP_PVC_NAME": platform.storage_pvc_name,
             "image": {"repository": f"{docker_server}/platformapi"},
             "platform": {
+                "clusterName": platform.cluster_name,
+                "authUrl": str(platform.auth_url),
+                "configUrl": str(platform.config_url / "api/v1"),
+                "apiUrl": str(platform.api_url / "api/v1"),
+                "registryUrl": str(platform.ingress_registry_url),
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -1281,8 +1253,29 @@ class HelmValuesFactory:
                             "key": "token",
                         }
                     }
-                }
+                },
             },
+            "jobs": {
+                "namespace": platform.jobs_namespace,
+                "ingressClass": "traefik",
+                "ingressOAuthAuthorizeUrl": str(
+                    platform.ingress_auth_url / "oauth/authorize"
+                ),
+            },
+            "nodeLabels": {
+                "job": platform.kubernetes_node_labels.job,
+                "gpu": platform.kubernetes_node_labels.accelerator,
+                "preemptible": platform.kubernetes_node_labels.preemptible,
+                "nodePool": platform.kubernetes_node_labels.node_pool,
+            },
+            "storages": [
+                {
+                    "path": s.path,
+                    "type": "pvc",
+                    "claimName": platform.get_storage_claim_name(s.path),
+                }
+                for i, s in enumerate(platform.storages)
+            ],
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
             "secrets": [
                 {
@@ -1293,11 +1286,11 @@ class HelmValuesFactory:
         }
         result.update(**self._create_tracing_values(platform))
         if platform.azure:
-            result[
-                "NP_KUBE_POD_PREEMPTIBLE_TOLERATION_KEY"
+            result["jobs"][
+                "preemptibleTolerationKey"
             ] = "kubernetes.azure.com/scalesetpriority"
         if platform.docker_hub_registry:
-            result["NP_KUBE_IMAGE_PULL_SECRET"] = platform.docker_hub_config_secret_name
+            result["jobs"]["imagePullSecret"] = platform.docker_hub_config_secret_name
         return result
 
     def create_platform_buckets_api_values(

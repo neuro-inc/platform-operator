@@ -56,23 +56,23 @@ jobs:
 
 idleJobs: []
 
-storage:
-  size: 10Gi
-  storageClassName: ""
+storage: []
+# - type: kubernetes # nfs, gcs, azureFile
 
-  type: kubernetes # nfs, gcs, azureFile
+#   size: 10Gi
+#   storageClassName: ""
 
-  # azureFile:
-  #   storageAccountName: storage-account-name
-  #   storageAccountKey: storage-account-key
-  #   shareName: share
+#   nfs:
+#     server: nfs-server
+#     path: /path
 
-  # nfs:
-  #   server: nfs-server
-  #   path: /
+#   azureFile:
+#     storageAccountName: storage-account-name
+#     storageAccountKey: storage-account-key
+#     shareName: share
 
-  # gcs:
-  #   bucketName: bucket
+#   gcs:
+#     bucketName: bucket
 
 disks:
   storageClass:
