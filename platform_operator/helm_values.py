@@ -184,12 +184,14 @@ class HelmValuesFactory:
         if storage.type == StorageType.KUBERNETES:
             return {
                 "type": StorageType.KUBERNETES.value,
+                "path": storage.path,
                 "size": storage.storage_size,
                 "storageClassName": storage.storage_class_name,
             }
         if storage.type == StorageType.NFS:
             return {
                 "type": StorageType.NFS.value,
+                "path": storage.path,
                 "size": storage.storage_size,
                 "nfs": {
                     "server": storage.nfs_server,
@@ -199,6 +201,7 @@ class HelmValuesFactory:
         if storage.type == StorageType.AZURE_fILE:
             return {
                 "type": StorageType.AZURE_fILE.value,
+                "path": storage.path,
                 "size": storage.storage_size,
                 "azureFile": {
                     "storageAccountName": storage.azure_storage_account_name,
@@ -209,6 +212,7 @@ class HelmValuesFactory:
         if storage.type == StorageType.GCS:
             return {
                 "type": StorageType.GCS.value,
+                "path": storage.path,
                 "size": storage.storage_size,
                 "gcs": {
                     "bucketName": storage.gcs_bucket_name,
@@ -1274,7 +1278,7 @@ class HelmValuesFactory:
                     "type": "pvc",
                     "claimName": platform.get_storage_claim_name(s.path),
                 }
-                for i, s in enumerate(platform.storages)
+                for s in platform.storages
             ],
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
             "secrets": [

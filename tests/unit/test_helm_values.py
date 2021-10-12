@@ -99,6 +99,7 @@ class TestHelmValuesFactory:
             "storages": [
                 {
                     "type": "nfs",
+                    "path": "",
                     "size": "10Gi",
                     "nfs": {"server": "192.168.0.3", "path": "/"},
                 }
@@ -183,6 +184,7 @@ class TestHelmValuesFactory:
         assert result["storages"] == [
             {
                 "type": "kubernetes",
+                "path": "",
                 "storageClassName": "storage-class",
                 "size": "100Gi",
             }
@@ -206,6 +208,7 @@ class TestHelmValuesFactory:
         assert result["storages"] == [
             {
                 "type": "gcs",
+                "path": "",
                 "size": "10Gi",
                 "gcs": {"bucketName": "platform-storage"},
             }
@@ -268,6 +271,7 @@ class TestHelmValuesFactory:
         assert result["storages"] == [
             {
                 "type": "kubernetes",
+                "path": "",
                 "size": "100Gi",
                 "storageClassName": "storage-class",
             }
@@ -281,6 +285,7 @@ class TestHelmValuesFactory:
         assert result["storages"] == [
             {
                 "type": "azureFile",
+                "path": "",
                 "size": "10Gi",
                 "azureFile": {
                     "storageAccountName": "accountName1",
@@ -316,6 +321,7 @@ class TestHelmValuesFactory:
         assert result["storages"] == [
             {
                 "type": "kubernetes",
+                "path": "",
                 "size": "100Gi",
                 "storageClassName": "storage-class",
             }
@@ -340,6 +346,7 @@ class TestHelmValuesFactory:
         assert result["storages"] == [
             {
                 "type": "nfs",
+                "path": "",
                 "size": "10Gi",
                 "nfs": {"server": "nfs-server", "path": "/path"},
             }
@@ -354,6 +361,7 @@ class TestHelmValuesFactory:
         assert result["storages"] == [
             {
                 "type": "kubernetes",
+                "path": "",
                 "storageClassName": "storage-standard",
                 "size": "1000Gi",
             }
