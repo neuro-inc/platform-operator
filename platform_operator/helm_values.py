@@ -1441,7 +1441,7 @@ class HelmValuesFactory:
                         "valueFrom": {
                             "secretKeyRef": {
                                 "name": secret_name,
-                                "key": "token",
+                                "key": "key",
                             }
                         }
                     },

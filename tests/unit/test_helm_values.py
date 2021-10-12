@@ -1118,7 +1118,7 @@ class TestHelmValuesFactory:
                     "credential": {
                         "valueFrom": {
                             "secretKeyRef": {
-                                "key": "token",
+                                "key": "key",
                                 "name": "platform-buckets-azure-storage-account-key",
                             }
                         }
