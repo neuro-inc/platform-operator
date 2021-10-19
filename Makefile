@@ -23,8 +23,7 @@ WAIT_FOR_IT = curl -s $(WAIT_FOR_IT_URL) | bash -s --
 
 setup:
 	pip install -U pip
-	pip install setuptools wheel
-	pip install -r requirements/dev.txt
+	pip install -e .[dev]
 	pre-commit install
 
 format:
@@ -35,7 +34,7 @@ else
 endif
 
 lint: format
-	mypy platform_operator tests setup.py
+	mypy platform_operator tests
 
 test_unit:
 	pytest -vv tests/unit
@@ -51,7 +50,12 @@ test_integration:
 	exit $$exit_code
 
 docker_build:
-	docker build -t $(IMAGE_NAME):latest .
+	rm -rf build dist
+	pip install -U build
+	python -m build
+	docker build \
+		--build-arg PYTHON_BASE=slim-buster \
+		-t $(IMAGE_NAME):latest .
 
 docker_push: docker_build
 	docker tag $(IMAGE_NAME):latest $(IMAGE_REPO):$(TAG)

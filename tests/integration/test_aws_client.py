@@ -20,7 +20,6 @@ class TestAwsElbClient:
                     "LoadBalancerPort": 123,
                     "InstanceProtocol": "string",
                     "InstancePort": 123,
-                    "SSLCertificateId": "string",
                 }
             ],
         )

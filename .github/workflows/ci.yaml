@@ -4,14 +4,18 @@ on:
   push:
     branches: [master]
     tags: ['v*.*.*']
+  pull_request:
+    branches: [master]
   pull_request_target:
     branches: [master]
 
 jobs:
-
   test:
     name: Run tests
     runs-on: ubuntu-latest
+    if: |
+      (github.event_name != 'pull_request_target' && github.actor != 'dependabot[bot]') ||
+      (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]')
     env:
       HELM_VERSION: ${{ secrets.HELM_VERSION }}
     steps:
@@ -25,8 +29,7 @@ jobs:
       uses: actions/cache@v2.1.6
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-py-3.8-${{ hashFiles('requirements/*.txt') }}-${{ hashFiles('setup.py')
-          }}
+        key: ${{ runner.os }}-py-3.8-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('setup.cfg') }}
     - name: Install dependencies
       run: make setup
     - name: Lint
@@ -40,11 +43,13 @@ jobs:
     - name: Start minikube
       run: |
         curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        sudo apt-get update
+        sudo apt-get install -y conntrack
         sudo install minikube-linux-amd64 /usr/local/bin/minikube
-        sudo minikube start --kubernetes-version="1.16.15" --driver="none"
-        sudo mv /root/.kube /root/.minikube $HOME
-        sudo chown -R $USER $HOME/.kube $HOME/.minikube
-        sed "s/root/home\/$USER/g" $HOME/.kube/config > tmp; mv tmp $HOME/.kube/config
+        minikube start --kubernetes-version="1.20.9" --driver="none"
+        sudo chown -R $USER $HOME/.kube /root/.minikube
+        sudo chmod -R a+r $HOME/.kube /root/.minikube
+        sudo find /root/.minikube -name id_rsa -exec chmod 600 {} \;
     - name: Install helm
       run: |
         sudo apt -y install socat
