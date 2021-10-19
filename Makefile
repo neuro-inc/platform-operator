@@ -23,7 +23,6 @@ WAIT_FOR_IT = curl -s $(WAIT_FOR_IT_URL) | bash -s --
 
 setup:
 	pip install -U pip
-	pip install setuptools wheel
 	pip install -e .[dev]
 	pre-commit install
 
