@@ -43,11 +43,13 @@ jobs:
     - name: Start minikube
       run: |
         curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        sudo apt-get update
+        sudo apt-get install -y conntrack
         sudo install minikube-linux-amd64 /usr/local/bin/minikube
-        sudo minikube start --kubernetes-version="1.20.9" --driver="none"
-        sudo mv /root/.kube /root/.minikube $HOME
-        sudo chown -R $USER $HOME/.kube $HOME/.minikube
-        sed "s/root/home\/$USER/g" $HOME/.kube/config > tmp; mv tmp $HOME/.kube/config
+        minikube start --kubernetes-version="1.20.9" --driver="none"
+        sudo chown -R $USER $HOME/.kube /root/.minikube
+        sudo chmod -R a+r $HOME/.kube /root/.minikube
+        sudo find /root/.minikube -name id_rsa -exec chmod 600 {} \;
     - name: Install helm
       run: |
         sudo apt -y install socat
