@@ -4,14 +4,18 @@ on:
   push:
     branches: [master]
     tags: ['v*.*.*']
+  pull_request:
+    branches: [master]
   pull_request_target:
     branches: [master]
 
 jobs:
-
   test:
     name: Run tests
     runs-on: ubuntu-latest
+    if: |
+      (github.event_name != 'pull_request_target' && github.actor != 'dependabot[bot]') ||
+      (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]')
     env:
       HELM_VERSION: ${{ secrets.HELM_VERSION }}
     steps:
