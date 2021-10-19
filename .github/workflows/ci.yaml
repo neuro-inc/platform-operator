@@ -25,8 +25,7 @@ jobs:
       uses: actions/cache@v2.1.6
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-py-3.8-${{ hashFiles('requirements/*.txt') }}-${{ hashFiles('setup.py')
-          }}
+        key: ${{ runner.os }}-py-3.8-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('setup.cfg') }}
     - name: Install dependencies
       run: make setup
     - name: Lint
@@ -41,7 +40,7 @@ jobs:
       run: |
         curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
         sudo install minikube-linux-amd64 /usr/local/bin/minikube
-        sudo minikube start --kubernetes-version="1.16.15" --driver="none"
+        sudo minikube start --kubernetes-version="1.20.9" --driver="none"
         sudo mv /root/.kube /root/.minikube $HOME
         sudo chown -R $USER $HOME/.kube $HOME/.minikube
         sed "s/root/home\/$USER/g" $HOME/.kube/config > tmp; mv tmp $HOME/.kube/config
