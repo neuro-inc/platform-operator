@@ -9,12 +9,11 @@ import aiohttp
 import kopf
 from neuro_logging import make_request_logging_trace_config
 
-from platform_operator.consul_client import ConsulClient
-
 from .aws_client import AwsElbClient
 from .certificate_store import CertificateStore
 from .config_client import ConfigClient, NotificationType
-from .helm_client import HelmClient
+from .consul_client import ConsulClient
+from .helm_client import HelmClient, ReleaseStatus
 from .helm_values import HelmValuesFactory
 from .kube_client import (
     PLATFORM_API_VERSION,
@@ -60,7 +59,7 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
     trace_configs = [make_request_logging_trace_config()]
 
     app.platform_config_factory = PlatformConfigFactory(config)
-    app.helm_client = HelmClient(tiller_namespace=config.platform_namespace)
+    app.helm_client = HelmClient(namespace=config.platform_namespace)
     app.kube_client = await app.exit_stack.enter_async_context(
         KubeClient(config.kube_config, trace_configs),
     )
@@ -234,12 +233,7 @@ async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
         )
         return
 
-    await app.helm_client.init(client_only=True, skip_refresh=True)
-
-    await app.helm_client.delete(
-        config.helm_release_names.platform,
-        purge=True,
-    )
+    await app.helm_client.delete(config.helm_release_names.platform)
 
     try:
         # We need first to delete all pods that use storage.
@@ -267,10 +261,7 @@ async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
         raise kopf.TemporaryError(message)
 
     if has_gcs_storage(platform):
-        await app.helm_client.delete(
-            config.helm_release_names.obs_csi_driver,
-            purge=True,
-        )
+        await app.helm_client.delete(config.helm_release_names.obs_csi_driver)
 
 
 @kopf.on.daemon(  # type: ignore
@@ -420,7 +411,7 @@ async def is_helm_deploy_required(
     if not old_release:
         return install
 
-    old_chart = old_release["Chart"]
+    old_chart = old_release.chart
     old_release_values = await app.helm_client.get_release_values(release_name)
     new_chart = f"{chart_name}-{chart_version}"
 
@@ -441,7 +432,7 @@ async def is_helm_deploy_failed(release_name: str) -> bool:
     if not release:
         return False
 
-    return release["Status"].upper() == "FAILED"
+    return release.status == ReleaseStatus.FAILED
 
 
 async def start_deployment(name: str, body: kopf.Body, retry: int = 0) -> None:
@@ -472,7 +463,6 @@ async def fail_deployment(name: str, body: kopf.Body) -> None:
 
 
 async def initialize_helm(platform: PlatformConfig) -> None:
-    await app.helm_client.init(client_only=True, skip_refresh=True)
     await app.helm_client.add_repo(config.helm_stable_repo)
     await app.helm_client.add_repo(platform.helm_repo)
     await app.helm_client.update_repo()
@@ -487,7 +477,6 @@ async def upgrade_obs_csi_driver_helm_release(platform: PlatformConfig) -> None:
             f"{HelmRepoName.NEURO}/{config.helm_chart_names.obs_csi_driver}",
             values=app.helm_values_factory.create_obs_csi_driver_values(platform),
             version=config.helm_chart_versions.obs_csi_driver,
-            namespace=config.platform_namespace,
             install=True,
             wait=True,
             timeout=600,
@@ -508,7 +497,6 @@ async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
             f"{HelmRepoName.NEURO}/{config.helm_chart_names.platform}",
             values=app.helm_values_factory.create_platform_values(platform),
             version=config.helm_chart_versions.platform,
-            namespace=config.platform_namespace,
             install=True,
             wait=True,
             timeout=600,

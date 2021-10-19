@@ -16,7 +16,7 @@ FROM python:${PYTHON_VERSION}-${PYTHON_BASE} AS service
 
 LABEL org.opencontainers.image.source = "https://github.com/neuro-inc/platform-operator"
 
-RUN curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash -s -- -v v2.17.0
+RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- -v v3.7.0
 
 WORKDIR /app
 

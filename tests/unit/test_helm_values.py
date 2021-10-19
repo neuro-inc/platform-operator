@@ -39,18 +39,19 @@ class TestHelmValuesFactory:
             "pauseImage": {"repository": "neuro.io/google_containers/pause"},
             "crictlImage": {"repository": "neuro.io/crictl"},
             "serviceToken": "token",
-            "kubernetes": {
-                "nodePools": [
-                    {"name": "n1-highmem-8-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}
-                ],
-                "imagesPrepull": {
-                    "refreshInterval": "1h",
-                    "images": [{"image": "neuromation/base"}],
-                },
-                "labels": {
-                    "nodePool": "platform.neuromation.io/nodepool",
-                    "job": "platform.neuromation.io/job",
-                },
+            "nodePools": [
+                {"name": "n1-highmem-8-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}
+            ],
+            "nodeLabels": {
+                "nodePool": "platform.neuromation.io/nodepool",
+                "job": "platform.neuromation.io/job",
+            },
+            "nvidiaGpuDriver": {
+                "image": {"repository": "neuro.io/nvidia/k8s-device-plugin"},
+            },
+            "imagesPrepull": {
+                "refreshInterval": "1h",
+                "images": [{"image": "neuromation/base"}],
             },
             "standardStorageClass": {
                 "create": True,
@@ -105,8 +106,6 @@ class TestHelmValuesFactory:
                 }
             ],
             "traefik": mock.ANY,
-            "adjust-inotify": mock.ANY,
-            "nvidia-gpu-driver-gcp": mock.ANY,
             "platform-storage": mock.ANY,
             "platform-registry": mock.ANY,
             "platform-monitoring": mock.ANY,
@@ -250,7 +249,6 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(aws_platform_config)
 
         assert "cluster-autoscaler" in result
-        assert "nvidia-gpu-driver" in result
 
     def test_create_aws_platform_values_with_kubernetes_storage(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -300,7 +298,6 @@ class TestHelmValuesFactory:
                 "storageAccountKey": "accountKey2",
             }
         }
-        assert "nvidia-gpu-driver" in result
 
     def test_create_azure_platform_values_with_kubernetes_storage(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -370,7 +367,6 @@ class TestHelmValuesFactory:
         assert "docker-registry" in result
         assert result["minioEnabled"] is True
         assert "minio" in result
-        assert "nvidia-gpu-driver" in result
         assert "platform-object-storage" not in result
 
     def test_create_on_prem_platform_values_without_docker_registry(
@@ -722,34 +718,6 @@ class TestHelmValuesFactory:
         assert result["podAnnotations"] == {
             "iam.amazonaws.com/role": "auto_scaling_role"
         }
-
-    def test_create_nvidia_gpu_driver_gcp_values(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_nvidia_gpu_driver_gcp_values(gcp_platform_config)
-
-        assert result == {
-            "kubectlImage": {"repository": "neuro.io/bitnami/kubectl"},
-            "pauseImage": {"repository": "neuro.io/google_containers/pause"},
-            "gpuNodeLabel": gcp_platform_config.kubernetes_node_labels.accelerator,
-        }
-
-    def test_create_nvidia_gpu_driver_values(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_nvidia_gpu_driver_values(aws_platform_config)
-
-        assert result == {
-            "image": {"repository": "neuro.io/nvidia/k8s-device-plugin"},
-            "gpuNodeLabel": aws_platform_config.kubernetes_node_labels.accelerator,
-        }
-
-    def test_create_adjust_inotify_values(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_adjust_inotify_values(gcp_platform_config)
-
-        assert result == {"image": {"repository": "neuro.io/busybox"}}
 
     def test_create_platform_storage_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory

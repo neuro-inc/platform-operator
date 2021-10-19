@@ -1,6 +1,6 @@
 pauseImage:
   repository: $DOCKER_SERVER/google_containers/pause
-  tag: "3.0"
+  tag: 3.0
 
 alpineImage:
   repository: $DOCKER_SERVER/alpine
@@ -10,15 +10,29 @@ crictlImage:
   repository: $DOCKER_SERVER/crictl
   tag: 1.22.0
 
+kubectlImage:
+  repository: $DOCKER_SERVER/bitnami/kubectl
+  tag: 1.16
+
 serviceToken: ""
 
-kubernetes:
-  nodePools: []
-  labels:
-    nodePool: platform.neuromation.io/nodepool
-  # imagesPrepull:
-  #   refreshInterval: 1h
-  #   images: []
+nodePools: []
+
+nodeLabels:
+  nodePool: platform.neuromation.io/nodepool
+  job: platform.neuromation.io/job
+
+inotify:
+  maxWatchers: 65536
+
+nvidiaGpuDriver:
+  image:
+    repository: $DOCKER_SERVER/nvidia/k8s-device-plugin
+    tag: 1.0.0-beta6
+
+imagesPrepull:
+  refreshInterval: 1h
+  images: []
 
 dockerConfigSecret:
   create: false
@@ -58,8 +72,9 @@ idleJobs: []
 
 storage: []
 # - type: kubernetes # nfs, gcs, azureFile
-
+#   path:
 #   size: 10Gi
+
 #   storageClassName: ""
 
 #   nfs:

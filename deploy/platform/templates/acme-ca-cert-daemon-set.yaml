@@ -3,8 +3,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: {{ .Release.Name }}-acme-ca-cert
-  labels:
-{{ include "platform.labels.standard" . | indent 4 }}
+  labels: {{ include "platform.labels.standard" . | nindent 4 }}
     component: acme-ca-cert
 spec:
   selector:

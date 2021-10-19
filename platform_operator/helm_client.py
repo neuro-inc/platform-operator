@@ -1,8 +1,10 @@
 import asyncio
+import enum
 import json
 import logging
 import shlex
 from asyncio import subprocess
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
@@ -15,6 +17,35 @@ logger = logging.getLogger(__name__)
 
 class HelmException(Exception):
     pass
+
+
+class ReleaseStatus(enum.Enum):
+    UNKNOWN = "unknown"
+    DEPLOYED = "deployed"
+    UNINSTALLED = "uninstalled"
+    SUPERSEDED = "superseded"
+    FAILED = "failed"
+    UNINSTALLING = "uninstalling"
+    PENDINGINSTALL = "pending-install"
+    PENDINGUPGRADE = "pending-upgrade"
+    PENDINGROLLBACK = "pending-rollback"
+
+
+@dataclass(frozen=True)
+class Release:
+    name: str
+    namespace: str
+    chart: str
+    status: ReleaseStatus
+
+    @classmethod
+    def parse(cls, payload: Dict[str, Any]) -> "Release":
+        return cls(
+            name=payload["name"],
+            namespace=payload["namespace"],
+            chart=payload["chart"],
+            status=ReleaseStatus(payload["status"]),
+        )
 
 
 class HelmOptions:
@@ -51,13 +82,9 @@ class HelmOptions:
 
 
 class HelmClient:
-    def __init__(
-        self,
-        kube_context: str = "",
-        tiller_namespace: str = "",
-    ) -> None:
+    def __init__(self, kube_context: str = "", namespace: str = "") -> None:
         self._global_options = HelmOptions(
-            kube_context=kube_context or None, tiller_namespace=tiller_namespace or None
+            kube_context=kube_context or None, namespace=namespace or None
         )
 
     async def _run(
@@ -79,22 +106,6 @@ class HelmClient:
         stderr_text = (stderr or b"").decode("utf-8")
         return (process, stdout_text, stderr_text)
 
-    async def init(
-        self, client_only: bool = False, wait: bool = False, skip_refresh: bool = False
-    ) -> None:
-        options = self._global_options.add(
-            client_only=client_only, wait=wait, skip_refresh=skip_refresh
-        )
-        cmd = f"helm init {options!s}"
-        logger.info("Running %s", cmd)
-        process, _, stderr_text = await self._run(
-            cmd, capture_stdout=False, capture_stderr=True
-        )
-        if process.returncode != 0:
-            logger.error("Failed to initialize helm: %s", stderr_text.strip())
-            raise HelmException("Failed to initialize helm")
-        logger.info("Initialized helm")
-
     async def add_repo(self, repo: HelmRepo) -> None:
         options = self._global_options.add(
             username=repo.username or None, password=repo.password or None
@@ -105,7 +116,7 @@ class HelmClient:
             repo.url,
             options.masked,
         )
-        cmd = f"helm repo add {repo.name} {repo.url!s} {options!s}"
+        cmd = f"helm repo add {repo.name} {repo.url!s} {options!s} --force-update"
         process, _, stderr_text = await self._run(
             cmd,
             capture_stdout=False,
@@ -137,25 +148,22 @@ class HelmClient:
             raise HelmException("Failed to update helm repositories")
         logger.info("Updated helm repo")
 
-    async def get_release(self, release_name: str) -> Optional[Dict[str, Any]]:
-        options = self._global_options.add(all=True, output="json")
-        cmd = f'helm list "^{release_name}$" {options!s}'
+    async def get_release(self, release_name: str) -> Optional[Release]:
+        options = self._global_options.add(filter=f"^{release_name}$", output="json")
+        cmd = f"helm list {options!s}"
         logger.info("Running %s", cmd)
         process, stdout_text, stderr_text = await self._run(
-            cmd,
-            capture_stdout=True,
-            capture_stderr=True,
+            cmd, capture_stdout=True, capture_stderr=True
         )
         if process.returncode != 0:
-            logger.error("Failed to initialize helm: %s", stderr_text.strip())
-            raise HelmException("Failed to initialize helm")
+            logger.error("Failed to list releases: %s", stderr_text.strip())
+            raise HelmException("Failed to list releases")
         if not stdout_text:
             logger.info("Received empty response")
             return None
         logger.debug("Received response %s", stdout_text)
-        response_json = json.loads(stdout_text)
-        releases = response_json.get("Releases")
-        return releases[0] if releases else None
+        releases = json.loads(stdout_text)
+        return Release.parse(releases[0]) if releases else None
 
     async def get_release_values(self, release_name: str) -> Optional[Dict[str, Any]]:
         options = self._global_options.add(output="json")
@@ -170,8 +178,8 @@ class HelmClient:
             if "not found" in stdout_text:
                 logger.info("Release %s not found", release_name)
                 return None
-            logger.error("Failed to initialize helm: %s", stderr_text.strip())
-            raise HelmException("Failed to initialize helm")
+            logger.error("Failed to get values: %s", stderr_text.strip())
+            raise HelmException("Failed to get values")
         logger.debug("Received response %s", stdout_text)
         return json.loads(stdout_text)
 
@@ -182,7 +190,6 @@ class HelmClient:
         *,
         version: str = "",
         values: Optional[Dict[str, Any]] = None,
-        namespace: Optional[str] = None,
         install: bool = False,
         wait: bool = False,
         timeout: Optional[int] = None,
@@ -190,7 +197,6 @@ class HelmClient:
         options = self._global_options.add(
             version=version,
             values="-",
-            namespace=namespace,
             install=install,
             wait=wait,
             timeout=timeout,
@@ -218,8 +224,8 @@ class HelmClient:
             raise HelmException(f"Failed to upgrade release {release_name}")
         logger.info("Upgraded helm release %s", release_name)
 
-    async def delete(self, release_name: str, *, purge: bool = False) -> None:
-        options = self._global_options.add(purge=purge)
+    async def delete(self, release_name: str) -> None:
+        options = self._global_options
         cmd = f"helm delete {release_name} {options!s}"
         logger.info("Running %s", cmd)
         process, _, stderr_text = await self._run(
