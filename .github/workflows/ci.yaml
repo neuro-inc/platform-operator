@@ -17,7 +17,7 @@ jobs:
       (github.event_name != 'pull_request_target' && github.actor != 'dependabot[bot]') ||
       (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]')
     env:
-      HELM_VERSION: ${{ secrets.HELM_VERSION }}
+      HELM_VERSION: ${{ secrets.HELM3_VERSION }}
     steps:
     - name: Checkout commit
       uses: actions/checkout@v2
@@ -67,7 +67,7 @@ jobs:
       ARTIFACTORY_DOCKER_REPO: ${{ secrets.ARTIFACTORY_ANONYMOUS_DOCKER_REPO }}
       ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
       ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
-      HELM_VERSION: ${{ secrets.HELM_VERSION }}
+      HELM_VERSION: ${{ secrets.HELM3_VERSION }}
     steps:
     - name: Checkout commit
       uses: actions/checkout@v2
