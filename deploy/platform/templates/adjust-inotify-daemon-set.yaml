@@ -37,6 +37,5 @@ spec:
       - name: pause
         image: {{ .Values.pauseImage.repository }}:{{ .Values.pauseImage.tag }}
       restartPolicy: Always
-  templateGeneration: 1
   updateStrategy:
     type: OnDelete

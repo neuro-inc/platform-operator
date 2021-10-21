@@ -1,6 +1,6 @@
 pauseImage:
   repository: $DOCKER_SERVER/google_containers/pause
-  tag: 3.0
+  tag: "3.0"
 
 alpineImage:
   repository: $DOCKER_SERVER/alpine
@@ -8,11 +8,11 @@ alpineImage:
 
 crictlImage:
   repository: $DOCKER_SERVER/crictl
-  tag: 1.22.0
+  tag: "1.22.0"
 
 kubectlImage:
   repository: $DOCKER_SERVER/bitnami/kubectl
-  tag: 1.16
+  tag: "1.16"
 
 serviceToken: ""
 

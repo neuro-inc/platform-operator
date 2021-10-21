@@ -192,14 +192,14 @@ class HelmClient:
         values: Optional[Dict[str, Any]] = None,
         install: bool = False,
         wait: bool = False,
-        timeout: Optional[int] = None,
+        timeout_s: Optional[int] = None,
     ) -> None:
         options = self._global_options.add(
             version=version,
             values="-",
             install=install,
             wait=wait,
-            timeout=timeout,
+            timeout=f"{timeout_s}s" if timeout_s is not None else None,
         )
         logger.info(
             "Running helm upgrade %s %s %s",
@@ -224,8 +224,16 @@ class HelmClient:
             raise HelmException(f"Failed to upgrade release {release_name}")
         logger.info("Upgraded helm release %s", release_name)
 
-    async def delete(self, release_name: str) -> None:
-        options = self._global_options
+    async def delete(
+        self,
+        release_name: str,
+        wait: bool = False,
+        timeout_s: Optional[int] = None,  # default 5m
+    ) -> None:
+        options = self._global_options.add(
+            wait=wait,
+            timeout=f"{timeout_s}s" if timeout_s else None,
+        )
         cmd = f"helm delete {release_name} {options!s}"
         logger.info("Running %s", cmd)
         process, _, stderr_text = await self._run(
@@ -233,11 +241,15 @@ class HelmClient:
             capture_stdout=False,
             capture_stderr=True,
         )
-        if process.returncode != 0 and "not found" not in stderr_text:
-            logger.error(
-                "Failed to delete helm release %s: %s",
-                release_name,
-                stderr_text.strip(),
-            )
-            raise HelmException(f"Failed to delete release {release_name}")
-        logger.info("Deleted helm release %s", release_name)
+        if process.returncode == 0:
+            logger.info("Deleted helm release %s", release_name)
+        else:
+            if "not found" in stderr_text:
+                logger.info("Helm release %s has already been deleted", release_name)
+            else:
+                logger.error(
+                    "Failed to delete helm release %s: %s",
+                    release_name,
+                    stderr_text.strip(),
+                )
+                raise HelmException(f"Failed to delete release {release_name}")

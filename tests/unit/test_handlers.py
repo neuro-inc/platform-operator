@@ -600,7 +600,7 @@ async def test_deploy(
         version="1.0.0",
         install=True,
         wait=True,
-        timeout=600,
+        timeout_s=600,
     )
 
     certificate_store.wait_till_certificate_created.assert_awaited_once()
@@ -668,7 +668,7 @@ async def test_deploy_with_ingress_controller_disabled(
         version="1.0.0",
         install=True,
         wait=True,
-        timeout=600,
+        timeout_s=600,
     )
 
     certificate_store.wait_till_certificate_created.assert_not_awaited()
@@ -729,7 +729,7 @@ async def test_deploy_gcp_with_gcs_storage(
         version="2.0.0",
         install=True,
         wait=True,
-        timeout=600,
+        timeout_s=600,
     )
 
 
@@ -1135,7 +1135,7 @@ async def test_watch_config(
                 version="2.0.0",
                 install=True,
                 wait=True,
-                timeout=600,
+                timeout_s=600,
             ),
             mock.call(
                 "platform",
@@ -1144,7 +1144,7 @@ async def test_watch_config(
                 version="1.0.0",
                 install=True,
                 wait=True,
-                timeout=600,
+                timeout_s=600,
             ),
         ]
     )

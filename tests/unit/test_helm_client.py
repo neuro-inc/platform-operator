@@ -6,10 +6,10 @@ class TestHelmOptions:
         options = HelmOptions(
             wait=False,
             namespace="default",
-            timeout=600,
+            timeout="600s",
         )
 
-        assert str(options) == "--namespace default --timeout 600"
+        assert str(options) == "--namespace default --timeout 600s"
 
     def test_str_empty(self) -> None:
         assert str(HelmOptions()) == ""

@@ -45,6 +45,7 @@ class TestHelmValuesFactory:
             "nodeLabels": {
                 "nodePool": "platform.neuromation.io/nodepool",
                 "job": "platform.neuromation.io/job",
+                "gpu": "platform.neuromation.io/accelerator",
             },
             "nvidiaGpuDriver": {
                 "image": {"repository": "neuro.io/nvidia/k8s-device-plugin"},
@@ -246,9 +247,7 @@ class TestHelmValuesFactory:
     def test_create_aws_platform_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_values(aws_platform_config)
-
-        assert "cluster-autoscaler" in result
+        assert factory.create_platform_values(aws_platform_config)
 
     def test_create_aws_platform_values_with_kubernetes_storage(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -521,12 +520,7 @@ class TestHelmValuesFactory:
             "logLevel": "debug",
             "serviceType": "LoadBalancer",
             "externalTrafficPolicy": "Cluster",
-            "ssl": {
-                "enabled": True,
-                "enforced": True,
-                "defaultCert": "",
-                "defaultKey": "",
-            },
+            "ssl": {"enabled": True, "enforced": True},
             "acme": {
                 "enabled": True,
                 "onHostRule": False,
@@ -645,79 +639,6 @@ class TestHelmValuesFactory:
             "httpsEnabled": True,
         }
         assert result["timeouts"] == {"responding": {"idleTimeout": "600s"}}
-
-    def test_create_cluster_autoscaler_values(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_cluster_autoscaler_values(aws_platform_config)
-
-        assert result == {
-            "cloudProvider": "aws",
-            "awsRegion": "us-east-1",
-            "image": {
-                "repository": "neuro.io/autoscaling/cluster-autoscaler",
-                "tag": "v1.14.8",
-                "pullSecrets": ["platform-docker-config"],
-            },
-            "rbac": {"create": True},
-            "autoDiscovery": {"clusterName": aws_platform_config.cluster_name},
-            "extraArgs": {
-                "expander": "least-waste",
-                "skip-nodes-with-local-storage": False,
-                "skip-nodes-with-system-pods": False,
-                "balance-similar-node-groups": True,
-            },
-        }
-
-    def test_create_cluster_autoscaler_not_supported(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        with pytest.raises(
-            ValueError,
-            match="Cluster autoscaler for Kubernetes 1.13.8 is not supported",
-        ):
-            factory.create_cluster_autoscaler_values(
-                replace(aws_platform_config, kubernetes_version="1.13.8")
-            )
-
-    @pytest.mark.parametrize(
-        "kubernetes_version,image_tag",
-        [
-            ("1.14.8", "v1.14.8"),
-            ("1.15.7", "v1.15.7"),
-            ("1.16.6", "v1.16.6"),
-            ("1.17.4", "v1.17.4"),
-            ("1.18.3", "v1.18.3"),
-            ("1.19.1", "v1.19.1"),
-            ("1.20.0", "v1.20.0"),
-        ],
-    )
-    def test_create_cluster_autoscaler_image_tag(
-        self,
-        aws_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
-        kubernetes_version: str,
-        image_tag: str,
-    ) -> None:
-        result = factory.create_cluster_autoscaler_values(
-            replace(aws_platform_config, kubernetes_version=kubernetes_version)
-        )
-
-        assert result["image"]["tag"] == image_tag
-
-    def test_create_cluster_autoscaler_values_with_role(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_cluster_autoscaler_values(
-            replace(
-                aws_platform_config,
-                aws=replace(aws_platform_config.aws, role_arn="auto_scaling_role"),
-            )
-        )
-
-        assert result["podAnnotations"] == {
-            "iam.amazonaws.com/role": "auto_scaling_role"
-        }
 
     def test_create_platform_storage_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory

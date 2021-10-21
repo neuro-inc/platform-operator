@@ -8,11 +8,6 @@ dependencies:
     version: "1.85.1"
     repository: "@stable"
     condition: traefikEnabled
-  - name: cluster-autoscaler
-    version: "6.2.0"
-    repository: "@stable"
-    tags:
-      - aws
   - name: docker-registry
     version: "1.9.2"
     repository: "@stable"

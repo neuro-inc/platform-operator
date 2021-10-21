@@ -233,7 +233,7 @@ async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
         )
         return
 
-    await app.helm_client.delete(config.helm_release_names.platform)
+    await app.helm_client.delete(config.helm_release_names.platform, wait=True)
 
     try:
         # We need first to delete all pods that use storage.
@@ -261,7 +261,9 @@ async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
         raise kopf.TemporaryError(message)
 
     if has_gcs_storage(platform):
-        await app.helm_client.delete(config.helm_release_names.obs_csi_driver)
+        await app.helm_client.delete(
+            config.helm_release_names.obs_csi_driver, wait=True
+        )
 
 
 @kopf.on.daemon(  # type: ignore
@@ -479,7 +481,7 @@ async def upgrade_obs_csi_driver_helm_release(platform: PlatformConfig) -> None:
             version=config.helm_chart_versions.obs_csi_driver,
             install=True,
             wait=True,
-            timeout=600,
+            timeout_s=600,
         )
 
 
@@ -499,7 +501,7 @@ async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
             version=config.helm_chart_versions.platform,
             install=True,
             wait=True,
-            timeout=600,
+            timeout_s=600,
         )
 
 

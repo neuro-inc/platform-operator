@@ -16,6 +16,8 @@ FROM python:${PYTHON_VERSION}-${PYTHON_BASE} AS service
 
 LABEL org.opencontainers.image.source = "https://github.com/neuro-inc/platform-operator"
 
+RUN apt-get update && apt-get install -y curl \
+    && rm -rf /var/lib/apt/lists/*
 RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- -v v3.7.0
 
 WORKDIR /app

@@ -39,6 +39,7 @@ class HelmValuesFactory:
             "nodeLabels": {
                 "nodePool": platform.kubernetes_node_labels.node_pool,
                 "job": platform.kubernetes_node_labels.job,
+                "gpu": platform.kubernetes_node_labels.accelerator,
             },
             "nvidiaGpuDriver": {
                 "image": {"repository": f"{docker_server}/nvidia/k8s-device-plugin"},
@@ -127,10 +128,6 @@ class HelmValuesFactory:
             result["dockerHubConfigSecret"] = {"create": False}
         if platform.consul_install:
             result[self._chart_names.consul] = self.create_consul_values(platform)
-        if platform.aws:
-            result[
-                self._chart_names.cluster_autoscaler
-            ] = self.create_cluster_autoscaler_values(platform)
         if platform.azure:
             result["blobStorage"] = {
                 "azure": {
@@ -310,12 +307,7 @@ class HelmValuesFactory:
             "logLevel": "debug",
             "serviceType": "LoadBalancer",
             "externalTrafficPolicy": "Cluster",
-            "ssl": {
-                "enabled": True,
-                "enforced": True,
-                "defaultCert": "",
-                "defaultKey": "",
-            },
+            "ssl": {"enabled": True, "enforced": True},
             "acme": {
                 "enabled": True,
                 "onHostRule": False,
@@ -453,60 +445,6 @@ class HelmValuesFactory:
                 "httpsEnabled": True,
             }
             result["timeouts"] = {"responding": {"idleTimeout": "600s"}}
-        return result
-
-    def create_cluster_autoscaler_values(
-        self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
-        assert platform.aws
-        if platform.kubernetes_version.startswith("1.14"):
-            image_tag = "v1.14.8"
-        elif platform.kubernetes_version.startswith("1.15"):
-            image_tag = "v1.15.7"
-        elif platform.kubernetes_version.startswith("1.16"):
-            image_tag = "v1.16.6"
-        elif platform.kubernetes_version.startswith("1.17"):
-            image_tag = "v1.17.4"
-        elif platform.kubernetes_version.startswith("1.18"):
-            image_tag = "v1.18.3"
-        elif platform.kubernetes_version.startswith("1.19"):
-            image_tag = "v1.19.1"
-        elif platform.kubernetes_version.startswith("1.20"):
-            image_tag = "v1.20.0"
-        else:
-            raise ValueError(
-                f"Cluster autoscaler for Kubernetes {platform.kubernetes_version} "
-                "is not supported"
-            )
-        docker_server = platform.docker_registry.url.host
-        result = {
-            "cloudProvider": "aws",
-            "awsRegion": platform.aws.region,
-            "image": {
-                "repository": f"{docker_server}/autoscaling/cluster-autoscaler",
-                "tag": image_tag,
-                "pullSecrets": platform.image_pull_secret_names,
-            },
-            "rbac": {"create": True},
-            "autoDiscovery": {"clusterName": platform.cluster_name},
-            "extraArgs": {
-                # least-waste will expand the ASG that will waste
-                # the least amount of CPU/MEM resources
-                "expander": "least-waste",
-                # If true cluster autoscaler will never delete nodes with pods
-                # with local storage, e.g. EmptyDir or HostPath
-                "skip-nodes-with-local-storage": False,
-                # If true cluster autoscaler will never delete nodes with pods
-                # from kube-system (except for DaemonSet or mirror pods)
-                "skip-nodes-with-system-pods": False,
-                # Detect similar node groups and balance the number of nodes
-                # between them. This option is required for balancing nodepool
-                # nodes between multiple availability zones.
-                "balance-similar-node-groups": True,
-            },
-        }
-        if platform.aws.role_arn:
-            result["podAnnotations"] = {"iam.amazonaws.com/role": platform.aws.role_arn}
         return result
 
     def _create_tracing_values(self, platform: PlatformConfig) -> Dict[str, Any]:
