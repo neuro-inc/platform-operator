@@ -51,10 +51,7 @@ jobs:
         sudo chmod -R a+r $HOME/.kube /root/.minikube
         sudo find /root/.minikube -name id_rsa -exec chmod 600 {} \;
     - name: Install helm
-      run: |
-        sudo apt -y install socat
-        make helm_install
-        helm init --wait
+      run: make helm_install
     - name: Run integration tests
       run: make test_integration
 
