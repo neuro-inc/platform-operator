@@ -959,7 +959,7 @@ async def test_delete(
         retry=0,
     )
 
-    helm_client.delete.assert_awaited_once_with("platform")
+    helm_client.delete.assert_awaited_once_with("platform", wait=True)
 
     kube_client.wait_till_pods_deleted.assert_has_awaits(
         [
@@ -998,8 +998,8 @@ async def test_delete_gcp_with_gcs_storage(
 
     helm_client.delete.assert_has_awaits(
         [
-            mock.call("platform"),
-            mock.call("platform-obs-csi-driver"),
+            mock.call("platform", wait=True),
+            mock.call("platform-obs-csi-driver", wait=True),
         ]
     )
 
@@ -1026,7 +1026,7 @@ async def test_delete_on_prem(
 
     helm_client.delete.assert_has_awaits(
         [
-            mock.call("platform"),
+            mock.call("platform", wait=True),
         ]
     )
 
