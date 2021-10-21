@@ -31,8 +31,7 @@ spec:
   iam:
     aws:
       roles:
-        autoScalingRoleArn: arn:aws:iam::771188043543:role/autoscaler-a44a2ab779525184303d93f9583a3ceb
-        ecrRoleArn: arn:aws:iam::771188043543:role/ecr-a44a2ab779525184303d93f9583a3ceb
+        roleArn: arn:aws:iam::771188043543:role/neuro-a44a2ab779525184303d93f9583a3ceb
         s3RoleArn: arn:aws:iam::771188043543:role/s3-a44a2ab779525184303d93f9583a3ceb
   storage:
     nfs:

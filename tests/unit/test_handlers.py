@@ -10,7 +10,7 @@ from platform_operator.aws_client import AwsElbClient
 from platform_operator.certificate_store import CertificateStore
 from platform_operator.config_client import ConfigClient, NotificationType
 from platform_operator.consul_client import ConsulClient
-from platform_operator.helm_client import HelmClient
+from platform_operator.helm_client import HelmClient, Release, ReleaseStatus
 from platform_operator.helm_values import HelmValuesFactory
 from platform_operator.kube_client import (
     KubeClient,
@@ -241,12 +241,15 @@ async def test_is_obs_csi_driver_deploy_required_on_version_update_true(
         gcp_platform_config,
         storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="bucket")],
     )
-    helm_client.get_release.return_value = {
-        "Chart": (
+    helm_client.get_release.return_value = Release(
+        name=config.helm_release_names.obs_csi_driver,
+        namespace=config.platform_namespace,
+        chart=(
             f"{config.helm_chart_names.obs_csi_driver}"
             f"-{config.helm_chart_versions.obs_csi_driver}-0"
-        )
-    }
+        ),
+        status=ReleaseStatus.DEPLOYED,
+    )
     helm_client.get_release_values.return_value = {}
     helm_values_factory.create_obs_csi_driver_values.return_value = {}
 
@@ -270,12 +273,15 @@ async def test_is_obs_csi_driver_deploy_required_on_values_update_true(
         gcp_platform_config,
         storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="bucket")],
     )
-    helm_client.get_release.return_value = {
-        "Chart": (
+    helm_client.get_release.return_value = Release(
+        name=config.helm_release_names.obs_csi_driver,
+        namespace=config.platform_namespace,
+        chart=(
             f"{config.helm_chart_names.obs_csi_driver}"
             f"-{config.helm_chart_versions.obs_csi_driver}"
-        )
-    }
+        ),
+        status=ReleaseStatus.DEPLOYED,
+    )
     helm_client.get_release_values.return_value = {}
     helm_values_factory.create_obs_csi_driver_values.return_value = {"new": "value"}
 
@@ -299,12 +305,15 @@ async def test_is_obs_csi_driver_deploy_required_no_update_false(
         gcp_platform_config,
         storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="bucket")],
     )
-    helm_client.get_release.return_value = {
-        "Chart": (
+    helm_client.get_release.return_value = Release(
+        name=config.helm_release_names.obs_csi_driver,
+        namespace=config.platform_namespace,
+        chart=(
             f"{config.helm_chart_names.obs_csi_driver}"
             f"-{config.helm_chart_versions.obs_csi_driver}"
-        )
-    }
+        ),
+        status=ReleaseStatus.DEPLOYED,
+    )
     helm_client.get_release_values.return_value = {}
     helm_values_factory.create_obs_csi_driver_values.return_value = {}
 
@@ -371,12 +380,15 @@ async def test_is_platform_deploy_required_on_version_update_true(
         is_platform_deploy_required as _is_platform_deploy_required,
     )
 
-    helm_client.get_release.return_value = {
-        "Chart": (
+    helm_client.get_release.return_value = Release(
+        name=config.helm_release_names.platform,
+        namespace=config.platform_namespace,
+        chart=(
             f"{config.helm_chart_names.platform}"
             f"-{config.helm_chart_versions.platform}-0"
-        )
-    }
+        ),
+        status=ReleaseStatus.DEPLOYED,
+    )
     helm_client.get_release_values.return_value = {}
     helm_values_factory.create_platform_values.return_value = {}
 
@@ -396,12 +408,15 @@ async def test_is_platform_deploy_required_on_values_update_true(
         is_platform_deploy_required as _is_platform_deploy_required,
     )
 
-    helm_client.get_release.return_value = {
-        "Chart": (
+    helm_client.get_release.return_value = Release(
+        name=config.helm_release_names.platform,
+        namespace=config.platform_namespace,
+        chart=(
             f"{config.helm_chart_names.platform}"
             f"-{config.helm_chart_versions.platform}"
-        )
-    }
+        ),
+        status=ReleaseStatus.DEPLOYED,
+    )
     helm_client.get_release_values.return_value = {}
     helm_values_factory.create_platform_values.return_value = {"new": "value"}
 
@@ -421,12 +436,15 @@ async def test_is_platform_deploy_required_no_update_false(
         is_platform_deploy_required as _is_platform_deploy_required,
     )
 
-    helm_client.get_release.return_value = {
-        "Chart": (
+    helm_client.get_release.return_value = Release(
+        name=config.helm_release_names.platform,
+        namespace=config.platform_namespace,
+        chart=(
             f"{config.helm_chart_names.platform}"
             f"-{config.helm_chart_versions.platform}"
-        )
-    }
+        ),
+        status=ReleaseStatus.DEPLOYED,
+    )
     helm_client.get_release_values.return_value = {}
     helm_values_factory.create_platform_values.return_value = {}
 
@@ -571,7 +589,6 @@ async def test_deploy(
         image_pull_secrets=gcp_platform_config.image_pull_secret_names,
     )
 
-    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
     helm_client.add_repo.assert_has_awaits(
         [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
     )
@@ -581,10 +598,9 @@ async def test_deploy(
         "neuro/platform",
         values=mock.ANY,
         version="1.0.0",
-        namespace="platform",
         install=True,
         wait=True,
-        timeout=600,
+        timeout_s=600,
     )
 
     certificate_store.wait_till_certificate_created.assert_awaited_once()
@@ -641,7 +657,6 @@ async def test_deploy_with_ingress_controller_disabled(
         token=gcp_platform_body["spec"]["token"],
     )
 
-    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
     helm_client.add_repo.assert_has_awaits(
         [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
     )
@@ -651,10 +666,9 @@ async def test_deploy_with_ingress_controller_disabled(
         "neuro/platform",
         values=mock.ANY,
         version="1.0.0",
-        namespace="platform",
         install=True,
         wait=True,
-        timeout=600,
+        timeout_s=600,
     )
 
     certificate_store.wait_till_certificate_created.assert_not_awaited()
@@ -713,10 +727,9 @@ async def test_deploy_gcp_with_gcs_storage(
         "neuro/obs-csi-driver",
         values=mock.ANY,
         version="2.0.0",
-        namespace="platform",
         install=True,
         wait=True,
-        timeout=600,
+        timeout_s=600,
     )
 
 
@@ -756,7 +769,6 @@ async def test_deploy_all_charts_deployed(
 
     kube_client.update_service_account_image_pull_secrets.assert_not_awaited()
 
-    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
     helm_client.add_repo.assert_has_awaits(
         [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
     )
@@ -870,7 +882,6 @@ async def test_deploy_no_changes(
         token=gcp_platform_body["spec"]["token"],
     )
 
-    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
     helm_client.add_repo.assert_has_awaits(
         [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
     )
@@ -948,8 +959,7 @@ async def test_delete(
         retry=0,
     )
 
-    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
-    helm_client.delete.assert_awaited_once_with("platform", purge=True)
+    helm_client.delete.assert_awaited_once_with("platform", wait=True)
 
     kube_client.wait_till_pods_deleted.assert_has_awaits(
         [
@@ -988,8 +998,8 @@ async def test_delete_gcp_with_gcs_storage(
 
     helm_client.delete.assert_has_awaits(
         [
-            mock.call("platform", purge=True),
-            mock.call("platform-obs-csi-driver", purge=True),
+            mock.call("platform", wait=True),
+            mock.call("platform-obs-csi-driver", wait=True),
         ]
     )
 
@@ -1016,7 +1026,7 @@ async def test_delete_on_prem(
 
     helm_client.delete.assert_has_awaits(
         [
-            mock.call("platform", purge=True),
+            mock.call("platform", wait=True),
         ]
     )
 
@@ -1043,7 +1053,7 @@ async def test_delete_with_invalid_configuration(
     status_manager.start_deletion.assert_awaited_once_with(
         gcp_platform_config.cluster_name
     )
-    helm_client.init.assert_not_awaited()
+    helm_client.add_repo.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -1112,7 +1122,6 @@ async def test_watch_config(
         image_pull_secrets=gcp_platform_config.image_pull_secret_names,
     )
 
-    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
     helm_client.add_repo.assert_has_awaits(
         [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
     )
@@ -1124,20 +1133,18 @@ async def test_watch_config(
                 "neuro/obs-csi-driver",
                 values=mock.ANY,
                 version="2.0.0",
-                namespace="platform",
                 install=True,
                 wait=True,
-                timeout=600,
+                timeout_s=600,
             ),
             mock.call(
                 "platform",
                 "neuro/platform",
                 values=mock.ANY,
                 version="1.0.0",
-                namespace="platform",
                 install=True,
                 wait=True,
-                timeout=600,
+                timeout_s=600,
             ),
         ]
     )
@@ -1198,7 +1205,6 @@ async def test_watch_config_all_charts_deployed(
         token=gcp_platform_config.token,
     )
 
-    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
     helm_client.add_repo.assert_has_awaits(
         [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
     )
@@ -1257,7 +1263,6 @@ async def test_watch_config_no_changes(
         token=gcp_platform_config.token,
     )
 
-    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
     helm_client.add_repo.assert_has_awaits(
         [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
     )
@@ -1295,7 +1300,7 @@ async def test_watch_config_platform_deploying_deleting(
     )
 
     consul_client.wait_healthy.assert_called_once()
-    helm_client.init.assert_not_awaited()
+    helm_client.add_repo.assert_not_awaited()
     status_manager.start_deployment.assert_not_awaited()
 
 
@@ -1340,7 +1345,6 @@ async def test_watch_config_helm_release_failed(
         token=gcp_platform_config.token,
     )
 
-    helm_client.init.assert_awaited_once_with(client_only=True, skip_refresh=True)
     helm_client.add_repo.assert_has_awaits(
         [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
     )

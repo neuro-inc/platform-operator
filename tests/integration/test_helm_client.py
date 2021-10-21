@@ -4,7 +4,7 @@ from typing import Any, Dict
 import pytest
 from yarl import URL
 
-from platform_operator.helm_client import HelmClient, HelmException
+from platform_operator.helm_client import HelmClient, HelmException, ReleaseStatus
 from platform_operator.models import HelmRepo
 
 
@@ -26,7 +26,6 @@ class TestHelmClient:
         helm_client: HelmClient,
         config_map: Dict[str, Any],
     ) -> None:
-        await helm_client.init(client_only=True)
         await helm_client.add_repo(
             HelmRepo("incubator", URL("https://charts.helm.sh/incubator"))
         )
@@ -39,24 +38,23 @@ class TestHelmClient:
                 "incubator/raw",
                 values=values,
                 version="0.2.3",
-                namespace=kube_namespace,
                 install=True,
                 wait=True,
             )
             release = await helm_client.get_release(release_name)
 
             assert release
-            assert release["Name"] == release_name
-            assert release["Chart"] == "raw-0.2.3"
-            assert release["Namespace"] == kube_namespace
-            assert release["Status"] == "DEPLOYED"
+            assert release.name == release_name
+            assert release.chart == "raw-0.2.3"
+            assert release.namespace == kube_namespace
+            assert release.status == ReleaseStatus.DEPLOYED
 
             release_values = await helm_client.get_release_values(release_name)
 
             assert release_values
             assert release_values == values
         finally:
-            await helm_client.delete(release_name, purge=True)
+            await helm_client.delete(release_name)
 
     @pytest.mark.asyncio
     async def test_add_unknown_repo(self, helm_client: HelmClient) -> None:
@@ -64,7 +62,6 @@ class TestHelmClient:
             HelmException,
             match="Failed to add helm repo unknown https://unknown",
         ):
-            await helm_client.init(client_only=True)
             await helm_client.add_repo(HelmRepo("unknown", URL("https://unknown")))
 
     @pytest.mark.asyncio
@@ -73,7 +70,6 @@ class TestHelmClient:
             HelmException,
             match="Failed to upgrade release unknown",
         ):
-            await helm_client.init(client_only=True)
             await helm_client.upgrade(
                 "unknown",
                 "unknown/unknown",
@@ -83,5 +79,4 @@ class TestHelmClient:
 
     @pytest.mark.asyncio
     async def test_delete_unknown_release(self, helm_client: HelmClient) -> None:
-        await helm_client.init(client_only=True)
-        await helm_client.delete("unknown", purge=True)
+        await helm_client.delete("unknown")

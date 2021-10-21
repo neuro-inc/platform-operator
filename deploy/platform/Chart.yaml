@@ -1,5 +1,58 @@
+apiVersion: v2
 name: platform
-description: Deploy Platform
-apiVersion: v1
+description: Neu.ro platform services
 version: "0.0.1"
 appVersion: "0.0.1"
+dependencies:
+  - name: traefik
+    version: "1.85.1"
+    repository: "@stable"
+    condition: traefikEnabled
+  - name: docker-registry
+    version: "1.9.2"
+    repository: "@stable"
+    condition: dockerRegistryEnabled
+  - name: minio
+    version: "5.0.33"
+    repository: "@stable"
+    condition: minioEnabled
+  - name: platformstorageapi
+    version: "21.10.2"
+    repository: "@neuro"
+    alias: platform-storage
+  - name: platformregistryapi
+    version: "21.10.0"
+    repository: "@neuro"
+    alias: platform-registry
+  - name: platformmonitoringapi
+    version: "21.10.0"
+    repository: "@neuro"
+    alias: platform-monitoring
+  - name: platform-container-runtime
+    version: "21.10.0"
+    repository: "@neuro"
+  - name: platformsecrets
+    version: "21.10.0"
+    repository: "@neuro"
+    alias: platform-secrets
+  - name: platform-reports
+    version: "21.10.2"
+    repository: "@neuro"
+  - name: platformdiskapi
+    version: "21.10.0"
+    repository: "@neuro"
+    alias: platform-disk-api
+  - name: platformapi-poller
+    version: "21.10.2"
+    repository: "@neuro"
+    alias: platform-api-poller
+  - name: platformbucketsapi
+    version: "21.10.2"
+    repository: "@neuro"
+    alias: platform-buckets-api
+
+  # Deprecated, left for backward compatibility with old clusters
+  - name: consul
+    version: "3.6.0"
+    repository: "@neuro"
+    condition: consulEnabled

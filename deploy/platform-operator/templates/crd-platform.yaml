@@ -1,3 +1,0 @@
-{{- if not (.Capabilities.APIVersions.Has "neuromation.io/v1/Platform") }}
-{{ .Files.Get "crds/platform.yaml" }}
-{{- end }}

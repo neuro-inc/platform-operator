@@ -35,16 +35,18 @@ class HelmValuesFactory:
             "pauseImage": {"repository": f"{docker_server}/google_containers/pause"},
             "crictlImage": {"repository": f"{docker_server}/crictl"},
             "serviceToken": platform.token,
-            "kubernetes": {
-                "nodePools": platform.jobs_node_pools,
-                "labels": {
-                    "nodePool": platform.kubernetes_node_labels.node_pool,
-                    "job": platform.kubernetes_node_labels.job,
-                },
-                "imagesPrepull": {
-                    "refreshInterval": "1h",
-                    "images": [{"image": image} for image in platform.pre_pull_images],
-                },
+            "nodePools": platform.jobs_node_pools,
+            "nodeLabels": {
+                "nodePool": platform.kubernetes_node_labels.node_pool,
+                "job": platform.kubernetes_node_labels.job,
+                "gpu": platform.kubernetes_node_labels.accelerator,
+            },
+            "nvidiaGpuDriver": {
+                "image": {"repository": f"{docker_server}/nvidia/k8s-device-plugin"},
+            },
+            "imagesPrepull": {
+                "refreshInterval": "1h",
+                "images": [{"image": image} for image in platform.pre_pull_images],
             },
             "standardStorageClass": {
                 "create": not platform.on_prem,
@@ -69,9 +71,6 @@ class HelmValuesFactory:
                     "name": platform.disks_storage_class_name,
                 }
             },
-            self._chart_names.adjust_inotify: self.create_adjust_inotify_values(
-                platform
-            ),
             self._chart_names.traefik: self.create_traefik_values(platform),
             self._chart_names.platform_storage: self.create_platform_storage_values(
                 platform
@@ -129,18 +128,6 @@ class HelmValuesFactory:
             result["dockerHubConfigSecret"] = {"create": False}
         if platform.consul_install:
             result[self._chart_names.consul] = self.create_consul_values(platform)
-        if platform.gcp:
-            result[
-                self._chart_names.nvidia_gpu_driver_gcp
-            ] = self.create_nvidia_gpu_driver_gcp_values(platform)
-        else:
-            result[
-                self._chart_names.nvidia_gpu_driver
-            ] = self.create_nvidia_gpu_driver_values(platform)
-        if platform.aws:
-            result[
-                self._chart_names.cluster_autoscaler
-            ] = self.create_cluster_autoscaler_values(platform)
         if platform.azure:
             result["blobStorage"] = {
                 "azure": {
@@ -320,12 +307,7 @@ class HelmValuesFactory:
             "logLevel": "debug",
             "serviceType": "LoadBalancer",
             "externalTrafficPolicy": "Cluster",
-            "ssl": {
-                "enabled": True,
-                "enforced": True,
-                "defaultCert": "",
-                "defaultKey": "",
-            },
+            "ssl": {"enabled": True, "enforced": True},
             "acme": {
                 "enabled": True,
                 "onHostRule": False,
@@ -464,82 +446,6 @@ class HelmValuesFactory:
             }
             result["timeouts"] = {"responding": {"idleTimeout": "600s"}}
         return result
-
-    def create_cluster_autoscaler_values(
-        self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
-        assert platform.aws
-        if platform.kubernetes_version.startswith("1.14"):
-            image_tag = "v1.14.8"
-        elif platform.kubernetes_version.startswith("1.15"):
-            image_tag = "v1.15.7"
-        elif platform.kubernetes_version.startswith("1.16"):
-            image_tag = "v1.16.6"
-        elif platform.kubernetes_version.startswith("1.17"):
-            image_tag = "v1.17.4"
-        elif platform.kubernetes_version.startswith("1.18"):
-            image_tag = "v1.18.3"
-        elif platform.kubernetes_version.startswith("1.19"):
-            image_tag = "v1.19.1"
-        elif platform.kubernetes_version.startswith("1.20"):
-            image_tag = "v1.20.0"
-        else:
-            raise ValueError(
-                f"Cluster autoscaler for Kubernetes {platform.kubernetes_version} "
-                "is not supported"
-            )
-        docker_server = platform.docker_registry.url.host
-        result = {
-            "cloudProvider": "aws",
-            "awsRegion": platform.aws.region,
-            "image": {
-                "repository": f"{docker_server}/autoscaling/cluster-autoscaler",
-                "tag": image_tag,
-                "pullSecrets": platform.image_pull_secret_names,
-            },
-            "rbac": {"create": True},
-            "autoDiscovery": {"clusterName": platform.cluster_name},
-            "extraArgs": {
-                # least-waste will expand the ASG that will waste
-                # the least amount of CPU/MEM resources
-                "expander": "least-waste",
-                # If true cluster autoscaler will never delete nodes with pods
-                # with local storage, e.g. EmptyDir or HostPath
-                "skip-nodes-with-local-storage": False,
-                # If true cluster autoscaler will never delete nodes with pods
-                # from kube-system (except for DaemonSet or mirror pods)
-                "skip-nodes-with-system-pods": False,
-                # Detect similar node groups and balance the number of nodes
-                # between them. This option is required for balancing nodepool
-                # nodes between multiple availability zones.
-                "balance-similar-node-groups": True,
-            },
-        }
-        if platform.aws.role_arn:
-            result["podAnnotations"] = {"iam.amazonaws.com/role": platform.aws.role_arn}
-        return result
-
-    def create_adjust_inotify_values(self, platform: PlatformConfig) -> Dict[str, Any]:
-        return {"image": {"repository": f"{platform.docker_registry.url.host}/busybox"}}
-
-    def create_nvidia_gpu_driver_gcp_values(
-        self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
-        docker_server = platform.docker_registry.url.host
-        return {
-            "kubectlImage": {"repository": f"{docker_server}/bitnami/kubectl"},
-            "pauseImage": {"repository": f"{docker_server}/google_containers/pause"},
-            "gpuNodeLabel": platform.kubernetes_node_labels.accelerator,
-        }
-
-    def create_nvidia_gpu_driver_values(
-        self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
-        docker_server = platform.docker_registry.url.host
-        return {
-            "image": {"repository": f"{docker_server}/nvidia/k8s-device-plugin"},
-            "gpuNodeLabel": platform.kubernetes_node_labels.accelerator,
-        }
 
     def _create_tracing_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         if not platform.sentry_dsn:

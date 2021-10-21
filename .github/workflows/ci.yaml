@@ -17,7 +17,7 @@ jobs:
       (github.event_name != 'pull_request_target' && github.actor != 'dependabot[bot]') ||
       (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]')
     env:
-      HELM_VERSION: ${{ secrets.HELM_VERSION }}
+      HELM_VERSION: ${{ secrets.HELM3_VERSION }}
     steps:
     - name: Checkout commit
       uses: actions/checkout@v2
@@ -29,7 +29,7 @@ jobs:
       uses: actions/cache@v2.1.6
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-py-3.8-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('setup.cfg') }}
+        key: ${{ runner.os }}-py-3.8-${{ hashFiles('pyproject.toml', 'setup.cfg') }}
     - name: Install dependencies
       run: make setup
     - name: Lint
@@ -51,10 +51,7 @@ jobs:
         sudo chmod -R a+r $HOME/.kube /root/.minikube
         sudo find /root/.minikube -name id_rsa -exec chmod 600 {} \;
     - name: Install helm
-      run: |
-        sudo apt -y install socat
-        make helm_install
-        helm init --wait
+      run: make helm_install
     - name: Run integration tests
       run: make test_integration
 
@@ -67,7 +64,7 @@ jobs:
       ARTIFACTORY_DOCKER_REPO: ${{ secrets.ARTIFACTORY_ANONYMOUS_DOCKER_REPO }}
       ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
       ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
-      HELM_VERSION: ${{ secrets.HELM_VERSION }}
+      HELM_VERSION: ${{ secrets.HELM3_VERSION }}
     steps:
     - name: Checkout commit
       uses: actions/checkout@v2
