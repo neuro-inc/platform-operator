@@ -368,6 +368,38 @@ class TestHelmValuesFactory:
         assert "minio" in result
         assert "platform-object-storage" not in result
 
+    def test_create_gcp_platform_values_with_smb_storage(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(
+                gcp_platform_config,
+                storages=[
+                    StorageConfig(
+                        type=StorageType.SMB,
+                        smb_server="smb-server",
+                        smb_share_name="smb-share",
+                        smb_username="smb-username",
+                        smb_password="smb-password",
+                    )
+                ],
+            )
+        )
+
+        assert result["storages"] == [
+            {
+                "type": "smb",
+                "path": "",
+                "size": "10Gi",
+                "smb": {
+                    "server": "smb-server",
+                    "shareName": "smb-share",
+                    "username": "smb-username",
+                    "password": "smb-password",
+                },
+            }
+        ]
+
     def test_create_on_prem_platform_values_without_docker_registry(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -417,6 +449,7 @@ class TestHelmValuesFactory:
                 "size": "100Gi",
             },
             "secrets": {"haSharedSecret": mock.ANY},
+            "configData": {"storage": {"delete": {"enabled": True}}},
         }
         assert result["secrets"]["haSharedSecret"]
 
@@ -739,13 +772,17 @@ class TestHelmValuesFactory:
         result = factory.create_platform_buckets_api_values(aws_platform_config)
 
         assert result == {
-            "NP_BUCKETS_API_K8S_NS": "platform-jobs",
+            "bucketNamespace": "platform-jobs",
             "bucketProvider": {
                 "type": "aws",
                 "aws": {"regionName": "us-east-1", "s3RoleArn": ""},
             },
-            "authUrl": "https://dev.neu.ro",
-            "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
+            "cors": {
+                "origins": [
+                    "https://release--neuro-web.netlify.app",
+                    "https://app.neu.ro",
+                ]
+            },
             "image": {"repository": "neuro.io/platformbucketsapi"},
             "ingress": {
                 "enabled": True,
@@ -753,6 +790,7 @@ class TestHelmValuesFactory:
             },
             "platform": {
                 "clusterName": aws_platform_config.cluster_name,
+                "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -768,6 +806,15 @@ class TestHelmValuesFactory:
             "sentry": mock.ANY,
             "disableCreation": False,
         }
+
+    def test_create_aws_buckets_api_values_without_cors(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_buckets_api_values(
+            replace(aws_platform_config, ingress_cors_origins=[])
+        )
+
+        assert "cors" not in result
 
     def test_create_aws_platform_buckets_api_values_with_role(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -791,7 +838,7 @@ class TestHelmValuesFactory:
         )
 
         assert result == {
-            "NP_BUCKETS_API_K8S_NS": "platform-jobs",
+            "bucketNamespace": "platform-jobs",
             "bucketProvider": {
                 "type": "emc_ecs",
                 "emc_ecs": {
@@ -816,8 +863,12 @@ class TestHelmValuesFactory:
                     },
                 },
             },
-            "authUrl": "https://dev.neu.ro",
-            "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
+            "cors": {
+                "origins": [
+                    "https://release--neuro-web.netlify.app",
+                    "https://app.neu.ro",
+                ]
+            },
             "image": {"repository": "neuro.io/platformbucketsapi"},
             "ingress": {
                 "enabled": True,
@@ -827,6 +878,7 @@ class TestHelmValuesFactory:
             },
             "platform": {
                 "clusterName": on_prem_platform_config_with_emc_ecs.cluster_name,
+                "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -857,7 +909,7 @@ class TestHelmValuesFactory:
         )
 
         assert result == {
-            "NP_BUCKETS_API_K8S_NS": "platform-jobs",
+            "bucketNamespace": "platform-jobs",
             "bucketProvider": {
                 "type": "open_stack",
                 "open_stack": {
@@ -882,8 +934,12 @@ class TestHelmValuesFactory:
                     },
                 },
             },
-            "authUrl": "https://dev.neu.ro",
-            "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
+            "cors": {
+                "origins": [
+                    "https://release--neuro-web.netlify.app",
+                    "https://app.neu.ro",
+                ]
+            },
             "image": {"repository": "neuro.io/platformbucketsapi"},
             "ingress": {
                 "enabled": True,
@@ -893,6 +949,7 @@ class TestHelmValuesFactory:
             },
             "platform": {
                 "clusterName": on_prem_platform_config_with_open_stack.cluster_name,
+                "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -920,7 +977,7 @@ class TestHelmValuesFactory:
         cluster_name = on_prem_platform_config.cluster_name
 
         assert result == {
-            "NP_BUCKETS_API_K8S_NS": "platform-jobs",
+            "bucketNamespace": "platform-jobs",
             "bucketProvider": {
                 "type": "minio",
                 "minio": {
@@ -931,8 +988,12 @@ class TestHelmValuesFactory:
                     "publicUrl": f"https://blob.{cluster_name}.org.neu.ro",
                 },
             },
-            "authUrl": "https://dev.neu.ro",
-            "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
+            "cors": {
+                "origins": [
+                    "https://release--neuro-web.netlify.app",
+                    "https://app.neu.ro",
+                ]
+            },
             "image": {"repository": "neuro.io/platformbucketsapi"},
             "ingress": {
                 "enabled": True,
@@ -940,6 +1001,7 @@ class TestHelmValuesFactory:
             },
             "platform": {
                 "clusterName": cluster_name,
+                "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -962,7 +1024,7 @@ class TestHelmValuesFactory:
         result = factory.create_platform_buckets_api_values(gcp_platform_config)
 
         assert result == {
-            "NP_BUCKETS_API_K8S_NS": "platform-jobs",
+            "bucketNamespace": "platform-jobs",
             "bucketProvider": {
                 "type": "gcp",
                 "gcp": {
@@ -976,8 +1038,12 @@ class TestHelmValuesFactory:
                     }
                 },
             },
-            "authUrl": "https://dev.neu.ro",
-            "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
+            "cors": {
+                "origins": [
+                    "https://release--neuro-web.netlify.app",
+                    "https://app.neu.ro",
+                ]
+            },
             "image": {"repository": "neuro.io/platformbucketsapi"},
             "ingress": {
                 "enabled": True,
@@ -985,6 +1051,7 @@ class TestHelmValuesFactory:
             },
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
+                "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -1008,7 +1075,7 @@ class TestHelmValuesFactory:
         result = factory.create_platform_buckets_api_values(azure_platform_config)
 
         assert result == {
-            "NP_BUCKETS_API_K8S_NS": "platform-jobs",
+            "bucketNamespace": "platform-jobs",
             "bucketProvider": {
                 "type": "azure",
                 "azure": {
@@ -1023,8 +1090,12 @@ class TestHelmValuesFactory:
                     "url": "https://accountName2.blob.core.windows.net",
                 },
             },
-            "authUrl": "https://dev.neu.ro",
-            "corsOrigins": "https://release--neuro-web.netlify.app,https://app.neu.ro",
+            "cors": {
+                "origins": [
+                    "https://release--neuro-web.netlify.app",
+                    "https://app.neu.ro",
+                ]
+            },
             "image": {"repository": "neuro.io/platformbucketsapi"},
             "ingress": {
                 "enabled": True,
@@ -1032,6 +1103,7 @@ class TestHelmValuesFactory:
             },
             "platform": {
                 "clusterName": azure_platform_config.cluster_name,
+                "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {

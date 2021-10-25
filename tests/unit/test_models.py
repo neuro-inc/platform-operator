@@ -763,6 +763,38 @@ class TestPlatformConfigFactory:
             ],
         )
 
+    def test_on_prem_platform_config_with_smb_storage(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: kopf.Body,
+        on_prem_cluster: Cluster,
+        on_prem_platform_config: PlatformConfig,
+    ) -> None:
+        on_prem_platform_body["spec"]["storages"] = [
+            {
+                "smb": {
+                    "server": "smb-server",
+                    "shareName": "smb-share",
+                    "username": "smb-username",
+                    "password": "smb-password",
+                }
+            }
+        ]
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result == replace(
+            on_prem_platform_config,
+            storages=[
+                StorageConfig(
+                    type=StorageType.SMB,
+                    smb_server="smb-server",
+                    smb_share_name="smb-share",
+                    smb_username="smb-username",
+                    smb_password="smb-password",
+                )
+            ],
+        )
+
     def test_on_prem_platform_config_without_node_ports__fails(
         self,
         factory: PlatformConfigFactory,

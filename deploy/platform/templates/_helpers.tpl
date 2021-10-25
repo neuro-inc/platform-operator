@@ -34,6 +34,22 @@ release: {{ .Release.Name | quote }}
 {{ .Release.Name }}-idle-job
 {{- end -}}
 
+{{- define "platform.smb.volumeHandle" -}}
+{{- if .path -}}
+{{- printf "smb-%s%s" .smb.server .path | replace "." "-" -}}
+{{- else -}}
+{{- printf "smb-%s" .smb.server | replace "." "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "platform.smb.secretNameSuffix" -}}
+{{- if .path -}}
+{{- printf "smb-%s%s" .smb.server .path | replace "." "-" -}}
+{{- else -}}
+{{- printf "smb-%s" .smb.server | replace "." "-" -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "platform.azure.storageAccount.secretNameSuffix" -}}
 {{- if . -}}
 {{- printf "azure-storage-account%s" . | replace "/" "-" -}}

@@ -185,6 +185,18 @@ class HelmValuesFactory:
                     "path": storage.nfs_export_path,
                 },
             }
+        if storage.type == StorageType.SMB:
+            return {
+                "type": StorageType.SMB.value,
+                "path": storage.path,
+                "size": storage.storage_size,
+                "smb": {
+                    "server": storage.smb_server,
+                    "shareName": storage.smb_share_name,
+                    "username": storage.smb_username,
+                    "password": storage.smb_password,
+                },
+            }
         if storage.type == StorageType.AZURE_fILE:
             return {
                 "type": StorageType.AZURE_fILE.value,
@@ -240,6 +252,7 @@ class HelmValuesFactory:
             "secrets": {
                 "haSharedSecret": sha256(platform.cluster_name.encode()).hexdigest()
             },
+            "configData": {"storage": {"delete": {"enabled": True}}},
         }
         if platform.on_prem.registry_username and platform.on_prem.registry_password:
             username = platform.on_prem.registry_username
@@ -1209,10 +1222,10 @@ class HelmValuesFactory:
         docker_server = platform.docker_registry.url.host
         result: Dict[str, Any] = {
             "image": {"repository": f"{docker_server}/platformbucketsapi"},
-            "NP_BUCKETS_API_K8S_NS": platform.jobs_namespace,
-            "authUrl": str(platform.auth_url),
+            "bucketNamespace": platform.jobs_namespace,
             "platform": {
                 "clusterName": platform.cluster_name,
+                "authUrl": str(platform.auth_url),
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -1231,9 +1244,10 @@ class HelmValuesFactory:
                     "data": {"token": platform.token},
                 }
             ],
-            "corsOrigins": ",".join(platform.ingress_cors_origins),
             "disableCreation": platform.buckets_disable_creation,
         }
+        if platform.ingress_cors_origins:
+            result["cors"] = {"origins": platform.ingress_cors_origins}
         result.update(**self._create_tracing_values(platform))
         if platform.aws:
             result["bucketProvider"] = {
