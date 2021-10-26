@@ -17,6 +17,20 @@ spec:
     server: {{ .nfs.server }}
     path: {{ .nfs.path }}
     readOnly: false
+  {{- else if eq .type "smb" }}
+  smb:
+    driver: smb.csi.k8s.io
+    readOnly: false
+    volumeHandle: {{ include "platform.smb.volumeHandle" . }}
+    volumeAttributes:
+      source: //{{ .smb.server }}/{{ .smb.shareName }}
+    nodeStageSecretRef:
+      name: {{ $.Release.Name }}-{{ include "platform.smb.secretNameSuffix" . }}
+      namespace: {{ $.Release.Namespace }}
+  mountOptions:
+  - dir_mode=0777
+  - file_mode=0777
+  - vers=3.0
   {{- else if eq .type "azureFile" }}
   azureFile:
     secretName: {{ $.Release.Name }}-{{ include "platform.azure.storageAccount.secretNameSuffix" .path }}

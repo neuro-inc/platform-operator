@@ -1,24 +1,9 @@
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: platforms.neuromation.io
 spec:
-  additionalPrinterColumns:
-  - JSONPath: .status.phase
-    name: Status
-    type: string
-  - JSONPath: .status.retries
-    name: Retries
-    type: string
-  - JSONPath: .metadata.creationTimestamp
-    name: Age
-    type: date
   group: neuromation.io
-  version: v1
-  versions:
-  - name: v1
-    served: true
-    storage: true
   scope: Namespaced
   names:
     kind: Platform
@@ -26,407 +11,329 @@ spec:
     plural: platforms
     singular: platform
     shortNames: []
-  subresources:
-    status: {}
-  validation:
-    openAPIV3Schema:
-      type: object
-      properties:
-        apiVersion:
-          description: >-
-            APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info:
-            https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
-          type: string
-        kind:
-          description: >-
-            Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info:
-            https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-          type: string
-        metadata:
-          type: object
-        status:
-          type: object
-          properties:
-            phase:
-              type: string
-            conditions:
-              type: array
-              items:
-                type: object
-                required:
-                - type
-                - status
-                - lastTransitionTime
-                properties:
-                  type:
-                    type: string
-                  status:
-                    type: string
-                    enum:
-                    - "True"
-                    - "False"
-                    - Unknown
-                  lastTransitionTime:
-                    type: string
-                    format: date-time
-        spec:
-          type: object
-          required:
-          - token
-          - storages
-          - monitoring
-          properties:
-            token:
-              type: string
-            kubernetes:
-              type: object
-              properties:
-                standardStorageClassName:
-                  type: string
-                tpuIPv4CIDR:
-                  type: string
-                nodePorts:
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Status
+      type: string
+    - jsonPath: .status.retries
+      name: Retries
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    subresources:
+      status: {}
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+              conditions:
+                type: array
+                items:
                   type: object
-                  required:
-                  - kubelet
-                  - http
-                  - https
+                  required: [type, status, lastTransitionTime]
                   properties:
-                    kubelet:
-                      type: integer
-                    http:
-                      type: integer
-                    https:
-                      type: integer
-                nodeLabels:
-                  type: object
-                  properties:
-                    job:
+                    type:
                       type: string
-                    nodePool:
+                    status:
                       type: string
-                    accelerator:
+                      enum:
+                      - "True"
+                      - "False"
+                      - "Unknown"
+                    lastTransitionTime:
                       type: string
-                    preemptible:
-                      type: string
-                ingressController:
-                  type: object
-                  properties:
-                    enabled:
-                      type: boolean
-                ingressPublicIPs:
-                  type: array
-                  items:
-                    type: string
-                dockerConfigSecret:
-                  type: object
-                  properties:
-                    create:
-                      type: boolean
-                    name:
-                      type: string
-                serviceAccount:
-                  type: object
-                  properties:
-                    imagePullSecrets:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          name:
-                            type: string
-                        required:
-                        - name
-                jobsNamespace:
-                  type: object
-                  properties:
-                    create:
-                      type: boolean
-                    name:
-                      type: string
-            iam:
-              type: object
-              properties:
-                gcp:
-                  type: object
-                  properties:
-                    serviceAccountKeyBase64:
-                      type: string
-                aws:
-                  type: object
-                  properties:
-                    roleArn:
-                      type: string
-                    s3RoleArn:
-                      type: string
-              oneOf:
-              - properties:
-                  gcp: {}
-                required:
-                - gcp
-              - properties:
-                  aws: {}
-                required:
-                - aws
-            registry:
-              type: object
-              properties:
-                azure:
-                  type: object
-                  required:
-                  - url
-                  - username
-                  - password
-                  properties:
-                    url:
-                      type: string
-                    username:
-                      type: string
-                    password:
-                      type: string
-                aws:
-                  type: object
-                  required:
-                  - url
-                  properties:
-                    url:
-                      type: string
-                docker:
-                  type: object
-                  required:
-                  - url
-                  properties:
-                    url:
-                      type: string
-                    username:
-                      type: string
-                    password:
-                      type: string
-                kubernetes:
-                  type: object
-                  required:
-                  - persistence
-                  properties:
-                    persistence:
-                      type: object
-                      required:
-                      - storageClassName
-                      properties:
-                        storageClassName:
-                          type: string
-                        size:
-                          type: string
-              oneOf:
-              - properties:
-                  azure: {}
-                required:
-                - azure
-              - properties:
-                  aws: {}
-                required:
-                - aws
-              - properties:
-                  kubernetes: {}
-                required:
-                - kubernetes
-              - properties:
-                  docker: {}
-                required:
-                - docker
-            storages:
-              type: array
-              items:
+                      format: date-time
+          spec:
+            type: object
+            required: [token, storages, monitoring]
+            properties:
+              token:
+                type: string
+              kubernetes:
                 type: object
                 properties:
-                  path:
+                  standardStorageClassName:
                     type: string
-                  nfs:
+                  tpuIPv4CIDR:
+                    type: string
+                  nodePorts:
                     type: object
-                    required:
-                    - server
+                    required: [kubelet, http, https]
                     properties:
-                      server:
-                        type: string
-                      path:
-                        type: string
-                  gcs:
+                      kubelet:
+                        type: integer
+                      http:
+                        type: integer
+                      https:
+                        type: integer
+                  nodeLabels:
                     type: object
-                    required:
-                    - bucket
                     properties:
-                      bucket:
+                      job:
                         type: string
-                  azureFile:
+                      nodePool:
+                        type: string
+                      accelerator:
+                        type: string
+                      preemptible:
+                        type: string
+                  ingressController:
                     type: object
-                    required:
-                    - storageAccountName
-                    - storageAccountKey
-                    - shareName
                     properties:
-                      storageAccountName:
+                      enabled:
+                        type: boolean
+                  ingressPublicIPs:
+                    type: array
+                    items:
+                      type: string
+                  dockerConfigSecret:
+                    type: object
+                    properties:
+                      create:
+                        type: boolean
+                      name:
                         type: string
-                      storageAccountKey:
+                  serviceAccount:
+                    type: object
+                    properties:
+                      imagePullSecrets:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                          required: [name]
+                  jobsNamespace:
+                    type: object
+                    properties:
+                      create:
+                        type: boolean
+                      name:
                         type: string
-                      shareName:
+              iam:
+                type: object
+                properties:
+                  gcp:
+                    type: object
+                    properties:
+                      serviceAccountKeyBase64:
+                        type: string
+                  aws:
+                    type: object
+                    properties:
+                      roleArn:
+                        type: string
+                      s3RoleArn:
+                        type: string
+                oneOf:
+                - required: [gcp]
+                - required: [aws]
+              registry:
+                type: object
+                properties:
+                  azure:
+                    type: object
+                    required: [url, username, password]
+                    properties:
+                      url:
+                        type: string
+                      username:
+                        type: string
+                      password:
+                        type: string
+                  aws:
+                    type: object
+                    required: [url]
+                    properties:
+                      url:
+                        type: string
+                  docker:
+                    type: object
+                    required: [url]
+                    properties:
+                      url:
+                        type: string
+                      username:
+                        type: string
+                      password:
                         type: string
                   kubernetes:
                     type: object
-                    required:
-                    - persistence
+                    required: [persistence]
                     properties:
                       persistence:
                         type: object
-                        required:
-                        - storageClassName
+                        required: [storageClassName]
                         properties:
                           storageClassName:
                             type: string
                           size:
                             type: string
                 oneOf:
-                - properties:
-                    path: {}
-                    nfs: {}
-                  required:
-                  - nfs
-                - properties:
-                    path: {}
-                    gcs: {}
-                  required:
-                  - gcs
-                - properties:
-                    path: {}
-                    azureFile: {}
-                  required:
-                  - azureFile
-                - properties:
-                    path: {}
-                    kubernetes: {}
-                  required:
-                  - kubernetes
-            blobStorage:
-              type: object
-              properties:
-                azure:
+                - required: [azure]
+                - required: [aws]
+                - required: [kubernetes]
+                - required: [docker]
+              storages:
+                type: array
+                items:
                   type: object
-                  required:
-                  - storageAccountName
-                  - storageAccountKey
                   properties:
-                    storageAccountName:
+                    path:
                       type: string
-                    storageAccountKey:
-                      type: string
-                minio:
-                  type: object
-                  required:
-                  - url
-                  - region
-                  - accessKey
-                  - secretKey
-                  properties:
-                    url:
-                      type: string
-                    region:
-                      type: string
-                    accessKey:
-                      type: string
-                    secretKey:
-                      type: string
-                kubernetes:
-                  type: object
-                  required:
-                  - persistence
-                  properties:
-                    persistence:
+                    nfs:
                       type: object
-                      required:
-                      - storageClassName
+                      required: [server]
                       properties:
-                        storageClassName:
+                        server:
                           type: string
-                        size:
+                        path:
                           type: string
-              oneOf:
-              - properties:
-                  azure: {}
-                required:
-                - azure
-              - properties:
-                  kubernetes: {}
-                required:
-                - kubernetes
-              - properties:
-                  minio: {}
-                required:
-                - minio
-            monitoring:
-              type: object
-              required:
-              - logs
-              - metrics
-              properties:
-                logs:
-                  type: object
-                  required:
-                  - blobStorage
-                  properties:
-                    blobStorage:
+                    smb:
                       type: object
-                      required:
-                      - bucket
+                      required: [server, shareName, username, password]
+                      properties:
+                        server:
+                          type: string
+                        shareName:
+                          type: string
+                        username:
+                          type: string
+                        password:
+                          type: string
+                    gcs:
+                      type: object
+                      required: [bucket]
                       properties:
                         bucket:
                           type: string
-                metrics:
-                  type: object
-                  properties:
-                    retentionTime:
-                      type: string
-                    blobStorage:
+                    azureFile:
                       type: object
-                      required:
-                      - bucket
+                      required: [storageAccountName, storageAccountKey, shareName]
                       properties:
-                        bucket:
+                        storageAccountName:
+                          type: string
+                        storageAccountKey:
+                          type: string
+                        shareName:
                           type: string
                     kubernetes:
                       type: object
-                      required:
-                      - persistence
+                      required: [persistence]
                       properties:
                         persistence:
                           type: object
-                          required:
-                          - storageClassName
+                          required: [storageClassName]
                           properties:
                             storageClassName:
                               type: string
                             size:
                               type: string
                   oneOf:
-                  - properties:
-                      blobStorage: {}
-                    required:
-                    - blobStorage
-                  - properties:
-                      kubernetes: {}
-                    required:
-                    - kubernetes
-            disks:
-              type: object
-              properties:
-                kubernetes:
-                  type: object
-                  properties:
-                    persistence:
-                      type: object
-                      required:
-                      - storageClassName
-                      properties:
-                        storageClassName:
-                          type: string
+                  - required: [nfs]
+                  - required: [smb]
+                  - required: [gcs]
+                  - required: [azureFile]
+                  - required: [kubernetes]
+              blobStorage:
+                type: object
+                properties:
+                  azure:
+                    type: object
+                    required: [storageAccountName, storageAccountKey]
+                    properties:
+                      storageAccountName:
+                        type: string
+                      storageAccountKey:
+                        type: string
+                  minio:
+                    type: object
+                    required: [url, region, accessKey, secretKey]
+                    properties:
+                      url:
+                        type: string
+                      region:
+                        type: string
+                      accessKey:
+                        type: string
+                      secretKey:
+                        type: string
+                  kubernetes:
+                    type: object
+                    required: [persistence]
+                    properties:
+                      persistence:
+                        type: object
+                        required: [storageClassName]
+                        properties:
+                          storageClassName:
+                            type: string
+                          size:
+                            type: string
+                oneOf:
+                - required: [azure]
+                - required: [kubernetes]
+                - required: [minio]
+              monitoring:
+                type: object
+                required: [logs, metrics]
+                properties:
+                  logs:
+                    type: object
+                    required: [blobStorage]
+                    properties:
+                      blobStorage:
+                        type: object
+                        required: [bucket]
+                        properties:
+                          bucket:
+                            type: string
+                  metrics:
+                    type: object
+                    properties:
+                      retentionTime:
+                        type: string
+                      blobStorage:
+                        type: object
+                        required: [bucket]
+                        properties:
+                          bucket:
+                            type: string
+                      kubernetes:
+                        type: object
+                        required: [persistence]
+                        properties:
+                          persistence:
+                            type: object
+                            required: [storageClassName]
+                            properties:
+                              storageClassName:
+                                type: string
+                              size:
+                                type: string
+                    oneOf:
+                    - required: [blobStorage]
+                    - required: [kubernetes]
+              disks:
+                type: object
+                properties:
+                  kubernetes:
+                    type: object
+                    properties:
+                      persistence:
+                        type: object
+                        required: [storageClassName]
+                        properties:
+                          storageClassName:
+                            type: string

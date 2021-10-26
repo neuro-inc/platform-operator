@@ -244,6 +244,22 @@ class StorageSpec(Dict[str, Any]):
         return self._spec["nfs"].get("path", "/")
 
     @property
+    def smb_server(self) -> str:
+        return self._spec["smb"].get("server", "")
+
+    @property
+    def smb_share_name(self) -> str:
+        return self._spec["smb"].get("shareName", "")
+
+    @property
+    def smb_username(self) -> str:
+        return self._spec["smb"].get("username", "")
+
+    @property
+    def smb_password(self) -> str:
+        return self._spec["smb"].get("password", "")
+
+    @property
     def gcs_bucket_name(self) -> str:
         return self._spec["gcs"].get("bucket", "")
 
@@ -263,6 +279,7 @@ class StorageSpec(Dict[str, Any]):
 class StorageType(str, Enum):
     KUBERNETES = "kubernetes"
     NFS = "nfs"
+    SMB = "smb"
     GCS = "gcs"
     AZURE_fILE = "azureFile"
 
@@ -275,6 +292,10 @@ class StorageConfig:
     storage_class_name: str = ""
     nfs_export_path: str = ""
     nfs_server: str = ""
+    smb_server: str = ""
+    smb_share_name: str = ""
+    smb_username: str = ""
+    smb_password: str = ""
     azure_storage_account_name: str = ""
     azure_storage_account_key: str = ""
     azure_share_name: str = ""
@@ -775,6 +796,15 @@ class PlatformConfigFactory:
                 path=storage_spec.path,
                 nfs_server=storage_spec.nfs_server,
                 nfs_export_path=storage_spec.nfs_export_path,
+            )
+        if StorageType.SMB in storage_spec:
+            return StorageConfig(
+                type=StorageType.SMB,
+                path=storage_spec.path,
+                smb_server=storage_spec.smb_server,
+                smb_share_name=storage_spec.smb_share_name,
+                smb_username=storage_spec.smb_username,
+                smb_password=storage_spec.smb_password,
             )
         if StorageType.AZURE_fILE in storage_spec:
             return StorageConfig(
