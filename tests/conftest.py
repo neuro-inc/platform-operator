@@ -8,13 +8,12 @@ import pytest
 from yarl import URL
 
 from platform_operator.models import (
-    AwsConfig,
-    AzureConfig,
+    BucketsConfig,
+    BucketsProvider,
+    CloudProvider,
     Cluster,
     Config,
-    DockerRegistry,
-    EMCECSCredentials,
-    GcpConfig,
+    DockerConfig,
     HelmChartNames,
     HelmChartVersions,
     HelmReleaseNames,
@@ -23,9 +22,11 @@ from platform_operator.models import (
     KubeClientAuthType,
     KubeConfig,
     LabelsConfig,
-    OnPremConfig,
-    OpenStackCredentials,
+    MetricsStorageType,
+    MonitoringConfig,
     PlatformConfig,
+    RegistryConfig,
+    RegistryProvider,
     StorageConfig,
     StorageType,
 )
@@ -42,7 +43,7 @@ def config() -> Config:
         retries=3,
         backoff=60,
         kube_config=KubeConfig(
-            version="1.14.9",
+            version="1.16.10",
             url=URL("https://kubernetes.default"),
             auth_type=KubeClientAuthType.NONE,
         ),
@@ -72,34 +73,17 @@ def cluster_name() -> str:
 
 
 @pytest.fixture
-def node_pool_factory() -> Callable[[str], Dict[str, Any]]:
-    def _factory(machine_type: str) -> Dict[str, Any]:
-        return {
-            "name": machine_type + "-name",
-            "machine_type": machine_type,
-            "min_size": 0,
-            "max_size": 1,
-            "cpu": 1.0,
-            "available_cpu": 1.0,
-            "memory_mb": 1024,
-            "available_memory_mb": 1024,
-            "gpu": 1,
-            "gpu_model": "nvidia-tesla-k80",
-        }
-
-    return _factory
-
-
-@pytest.fixture
-def resource_pool_type_factory() -> Callable[[], Dict[str, Any]]:
-    def _factory(tpu_ipv4_cidr_block: str = "") -> Dict[str, Any]:
+def resource_pool_type_factory() -> Callable[..., Dict[str, Any]]:
+    def _factory(name: str, tpu_ipv4_cidr_block: str = "") -> Dict[str, Any]:
         result = {
-            "name": "gpu",
+            "name": name,
             "is_preemptible": False,
             "min_size": 0,
             "max_size": 1,
             "cpu": 1,
+            "available_cpu": 1,
             "memory_mb": 1024,
+            "available_memory_mb": 1024,
             "gpu": 1,
             "gpu_model": "nvidia-tesla-k80",
             "presets": [{"name": "gpu-small", "cpu": 1, "memory_mb": 1024, "gpu": 1}],
@@ -128,10 +112,10 @@ def resource_preset_factory() -> Callable[[], Dict[str, Any]]:
 
 @pytest.fixture
 def cluster_factory(
-    resource_pool_type_factory: Callable[[], Dict[str, Any]],
+    resource_pool_type_factory: Callable[..., Dict[str, Any]],
     resource_preset_factory: Callable[[], Dict[str, Any]],
-) -> Callable[[str], Cluster]:
-    def _factory(name: str) -> Cluster:
+) -> Callable[..., Cluster]:
+    def _factory(name: str, resource_pool_name: str) -> Cluster:
         payload = {
             "name": name,
             "storage": {"url": f"https://{name}.org.neu.ro/api/v1/storage"},
@@ -139,7 +123,7 @@ def cluster_factory(
             "orchestrator": {
                 "job_hostname_template": f"{{job_id}}.jobs.{name}.org.neu.ro",
                 "is_http_ingress_secure": True,
-                "resource_pool_types": [resource_pool_type_factory()],
+                "resource_pool_types": [resource_pool_type_factory(resource_pool_name)],
                 "resource_presets": [resource_preset_factory()],
                 "job_fallback_hostname": "default.jobs-dev.neu.ro",
                 "job_schedule_timeout_s": 60,
@@ -198,94 +182,29 @@ def cluster_factory(
 
 
 @pytest.fixture
-def gcp_cluster(
-    cluster_name: str,
-    cluster_factory: Callable[[str], Cluster],
-    node_pool_factory: Callable[[str], Dict[str, Any]],
-) -> Cluster:
-    cluster = cluster_factory(cluster_name)
-    cluster["cloud_provider"] = {
-        "type": "gcp",
-        "location_type": "zonal",
-        "region": "us-central1",
-        "zone": "us-central1-a",
-        "project": "project",
-        "credentials": {
-            # XXX: Add other stab credentials as needed
-            "client_email": "test-acc@test-project.iam.gserviceaccount.com"
-        },
-        "node_pools": [node_pool_factory("n1-highmem-8")],
-        "storage": {"tier": "PREMIUM", "capacity_tb": 5, "backend": "filestore"},
-    }
+def gcp_cluster(cluster_name: str, cluster_factory: Callable[..., Cluster]) -> Cluster:
+    cluster = cluster_factory(cluster_name, "n1-highmem-8")
     cluster["orchestrator"]["resource_pool_types"][0]["tpu"] = {}
     return cluster
 
 
 @pytest.fixture
-def aws_cluster(
-    cluster_name: str,
-    cluster_factory: Callable[[str], Cluster],
-    node_pool_factory: Callable[[str], Dict[str, Any]],
-) -> Cluster:
-    cluster = cluster_factory(cluster_name)
-    cluster["cloud_provider"] = {
-        "type": "aws",
-        "region": "us-east-1",
-        "zones": ["us-east-1a", "us-east-1b"],
-        "vpc_id": "test-vpc",
-        "credentials": {
-            "access_key_id": "access_key_id",
-            "secret_access_key": "secret_access_key",
-        },
-        "node_pools": [node_pool_factory("p2.xlarge")],
-        "storage": {
-            "performance_mode": "generalPurpose",
-            "throughput_mode": "bursting",
-        },
-    }
-    return cluster
+def aws_cluster(cluster_name: str, cluster_factory: Callable[..., Cluster]) -> Cluster:
+    return cluster_factory(cluster_name, "p2.xlarge")
 
 
 @pytest.fixture
 def azure_cluster(
-    cluster_name: str,
-    cluster_factory: Callable[[str], Cluster],
-    node_pool_factory: Callable[[str], Dict[str, Any]],
+    cluster_name: str, cluster_factory: Callable[..., Cluster]
 ) -> Cluster:
-    cluster = cluster_factory(cluster_name)
-    cluster["cloud_provider"] = {
-        "type": "azure",
-        "region": "westus",
-        "resource_group": "platform-resource-group",
-        "credentials": {
-            "subscription_id": "client_subscription_id",
-            "tenant_id": "client_tenant_id",
-            "client_id": "client_client_id",
-            "client_secret": "client_client_secret",
-        },
-        "node_pools": [node_pool_factory("Standard_NC6")],
-        "storage": {
-            "tier": "Premium",
-            "replication_type": "LRS",
-            "file_share_size_gib": 100,
-        },
-    }
-    return cluster
+    return cluster_factory(cluster_name, "Standard_NC6")
 
 
 @pytest.fixture
 def on_prem_cluster(
-    cluster_name: str,
-    cluster_factory: Callable[[str], Cluster],
-    node_pool_factory: Callable[[str], Dict[str, Any]],
+    cluster_name: str, cluster_factory: Callable[..., Cluster]
 ) -> Cluster:
-    cluster = cluster_factory(cluster_name)
-    cluster["cloud_provider"] = {
-        "type": "on_prem",
-        "kubernetes_url": "https://192.168.0.2",
-        "credentials": {"token": "kubernetes-token", "ca_data": "kubernetes-ca-data"},
-        "node_pools": [node_pool_factory("gpu")],
-    }
+    cluster = cluster_factory(cluster_name, "gpu")
     cluster["credentials"]["minio"] = {
         "username": "username",
         "password": "password",
@@ -294,16 +213,8 @@ def on_prem_cluster(
 
 
 @pytest.fixture
-def vcd_cluster(
-    cluster_name: str,
-    cluster_factory: Callable[[str], Cluster],
-    node_pool_factory: Callable[[str], Dict[str, Any]],
-) -> Cluster:
-    cluster = cluster_factory(cluster_name)
-    cluster["cloud_provider"] = {
-        "type": "vcd_mts",
-        "node_pools": [node_pool_factory("gpu")],
-    }
+def vcd_cluster(cluster_name: str, cluster_factory: Callable[..., Cluster]) -> Cluster:
+    cluster = cluster_factory(cluster_name, "gpu")
     cluster["credentials"]["minio"] = {
         "username": "username",
         "password": "password",
@@ -319,14 +230,17 @@ def gcp_platform_body(cluster_name: str) -> kopf.Body:
         "metadata": {"name": cluster_name},
         "spec": {
             "token": "token",
-            "kubernetes": {
-                "tpuIPv4CIDR": "192.168.0.0/16",
-            },
+            "kubernetes": {"provider": "gcp", "tpuIPv4CIDR": "192.168.0.0/16"},
             "iam": {"gcp": {"serviceAccountKeyBase64": "e30="}},
+            "registry": {"gcp": {"project": "project"}},
             "storages": [{"nfs": {"server": "192.168.0.3", "path": "/"}}],
+            "blobStorage": {"gcp": {"project": "project"}},
             "monitoring": {
                 "logs": {"blobStorage": {"bucket": "job-logs"}},
-                "metrics": {"blobStorage": {"bucket": "job-metrics"}},
+                "metrics": {
+                    "region": "us-central1",
+                    "blobStorage": {"bucket": "job-metrics"},
+                },
             },
         },
     }
@@ -341,11 +255,16 @@ def aws_platform_body(cluster_name: str) -> kopf.Body:
         "metadata": {"name": cluster_name},
         "spec": {
             "token": "token",
-            "registry": {"aws": {"url": "platform.dkr.ecr.us-east-1.amazonaws.com"}},
+            "kubernetes": {"provider": "aws"},
+            "registry": {"aws": {"accountId": "platform", "region": "us-east-1"}},
             "storages": [{"nfs": {"server": "192.168.0.3", "path": "/"}}],
+            "blobStorage": {"aws": {"region": "us-east-1"}},
             "monitoring": {
                 "logs": {"blobStorage": {"bucket": "job-logs"}},
-                "metrics": {"blobStorage": {"bucket": "job-metrics"}},
+                "metrics": {
+                    "region": "us-east-1",
+                    "blobStorage": {"bucket": "job-metrics"},
+                },
             },
         },
     }
@@ -360,6 +279,7 @@ def azure_platform_body(cluster_name: str) -> kopf.Body:
         "metadata": {"name": cluster_name},
         "spec": {
             "token": "token",
+            "kubernetes": {"provider": "azure"},
             "registry": {
                 "azure": {
                     "url": "platform.azurecr.io",
@@ -384,7 +304,10 @@ def azure_platform_body(cluster_name: str) -> kopf.Body:
             },
             "monitoring": {
                 "logs": {"blobStorage": {"bucket": "job-logs"}},
-                "metrics": {"blobStorage": {"bucket": "job-metrics"}},
+                "metrics": {
+                    "region": "westus",
+                    "blobStorage": {"bucket": "job-metrics"},
+                },
             },
         },
     }
@@ -400,9 +323,9 @@ def on_prem_platform_body(cluster_name: str) -> kopf.Body:
         "spec": {
             "token": "token",
             "kubernetes": {
+                "provider": "kubeadm",
                 "ingressPublicIPs": ["192.168.0.3"],
                 "standardStorageClassName": "standard",
-                "nodePorts": {"kubelet": 10250, "http": 30080, "https": 30443},
             },
             "registry": {
                 "kubernetes": {
@@ -461,38 +384,38 @@ def vcd_platform_body(on_prem_platform_body: kopf.Body) -> kopf.Body:
 @pytest.fixture
 def gcp_platform_config(
     cluster_name: str,
-    resource_pool_type_factory: Callable[[str], Dict[str, Any]],
+    resource_pool_type_factory: Callable[..., Dict[str, Any]],
     resource_preset_factory: Callable[[], Dict[str, Any]],
 ) -> PlatformConfig:
     return PlatformConfig(
         auth_url=URL("https://dev.neu.ro"),
-        ingress_auth_url=URL("https://platformingressauth"),
         config_url=URL("https://dev.neu.ro"),
         api_url=URL("https://dev.neu.ro"),
         token="token",
         cluster_name=cluster_name,
-        cloud_provider="gcp",
         namespace="platform",
         service_account_name="default",
-        docker_config_secret_create=True,
-        docker_config_secret_name="platform-docker-config",
-        image_pull_secret_names=["platform-docker-config"],
+        image_pull_secret_names=[
+            "platform-docker-config",
+            "platform-docker-hub-config",
+        ],
         pre_pull_images=["neuromation/base"],
         standard_storage_class_name="platform-standard-topology-aware",
-        kubernetes_version="1.14.9",
-        kubernetes_node_labels=LabelsConfig(
+        kubernetes_provider=CloudProvider.GCP,
+        kubernetes_version="1.16.10",
+        kubelet_port=10250,
+        node_labels=LabelsConfig(
             job="platform.neuromation.io/job",
             node_pool="platform.neuromation.io/nodepool",
             accelerator="platform.neuromation.io/accelerator",
             preemptible="platform.neuromation.io/preemptible",
         ),
-        dns_name=f"{cluster_name}.org.neu.ro",
         jobs_namespace_create=True,
         jobs_namespace="platform-jobs",
-        jobs_node_pools=[
-            {"name": "n1-highmem-8-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}
+        jobs_node_pools=[{"name": "n1-highmem-8", "idleSize": 0, "cpu": 1, "gpu": 1}],
+        jobs_resource_pool_types=[
+            resource_pool_type_factory("n1-highmem-8", "192.168.0.0/16")
         ],
-        jobs_resource_pool_types=[resource_pool_type_factory("192.168.0.0/16")],
         jobs_resource_presets=[resource_preset_factory()],
         jobs_fallback_host="default.jobs-dev.neu.ro",
         jobs_host_template=f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
@@ -509,7 +432,9 @@ def gcp_platform_config(
                 "resources": {"cpu_m": 1000, "memory_mb": 1024},
             }
         ],
+        ingress_dns_name=f"{cluster_name}.org.neu.ro",
         ingress_url=URL(f"https://{cluster_name}.org.neu.ro"),
+        ingress_auth_url=URL("https://platformingressauth"),
         ingress_registry_url=URL(f"https://registry.{cluster_name}.org.neu.ro"),
         ingress_metrics_url=URL(f"https://metrics.{cluster_name}.org.neu.ro"),
         ingress_acme_environment="staging",
@@ -519,11 +444,9 @@ def gcp_platform_config(
             "https://release--neuro-web.netlify.app",
             "https://app.neu.ro",
         ],
-        disks_storage_limit_per_user_gb=10240,
-        disks_storage_class_name="platform-disk",
-        service_traefik_name="platform-traefik",
-        monitoring_logs_bucket_name="job-logs",
-        monitoring_metrics_bucket_name="job-metrics",
+        ingress_service_name="platform-traefik",
+        ingress_http_node_port=30080,
+        ingress_https_node_port=30443,
         storages=[
             StorageConfig(
                 type=StorageType.NFS,
@@ -531,15 +454,23 @@ def gcp_platform_config(
                 nfs_export_path="/",
             )
         ],
+        registry=RegistryConfig(provider=RegistryProvider.GCP, gcp_project="project"),
+        buckets=BucketsConfig(
+            provider=BucketsProvider.GCP,
+            gcp_location="us",
+            gcp_project="project",
+        ),
+        monitoring=MonitoringConfig(
+            logs_bucket_name="job-logs",
+            metrics_storage_type=MetricsStorageType.BUCKETS,
+            metrics_region="us-central1",
+            metrics_bucket_name="job-metrics",
+        ),
+        disks_storage_limit_per_user_gb=10240,
+        disks_storage_class_name="platform-disk",
         helm_repo=HelmRepo(
             name=HelmRepoName.NEURO,
             url=URL("https://neuro.jfrog.io/neuro/helm-virtual-public"),
-            username=cluster_name,
-            password="password",
-        ),
-        docker_registry=DockerRegistry(
-            url=URL("https://neuro.io"),
-            email=f"{cluster_name}@neuromation.io",
             username=cluster_name,
             password="password",
         ),
@@ -549,18 +480,23 @@ def gcp_platform_config(
         consul_install=False,
         sentry_dsn=URL("https://sentry"),
         sentry_sample_rate=0.1,
-        gcp=GcpConfig(
-            project="project",
-            region="us-central1",
-            service_account_key="{}",
-            service_account_key_base64="e30=",
+        gcp_service_account_key="{}",
+        gcp_service_account_key_base64="e30=",
+        docker_config=DockerConfig(
+            url=URL("https://neuro.io"),
+            email=f"{cluster_name}@neuromation.io",
+            username=cluster_name,
+            password="password",
+            create_secret=True,
+            secret_name="platform-docker-config",
         ),
-        docker_hub_config_secret_name="platform-docker-hub-config",
-        docker_hub_registry=DockerRegistry(
+        docker_hub_config=DockerConfig(
             url=URL("https://index.docker.io/v1/"),
             email=f"{cluster_name}@neuromation.io",
             username=cluster_name,
             password="password",
+            secret_name="platform-docker-hub-config",
+            create_secret=True,
         ),
     )
 
@@ -568,20 +504,29 @@ def gcp_platform_config(
 @pytest.fixture
 def aws_platform_config(
     gcp_platform_config: PlatformConfig,
-    resource_pool_type_factory: Callable[[], Dict[str, Any]],
+    resource_pool_type_factory: Callable[..., Dict[str, Any]],
 ) -> PlatformConfig:
     return replace(
         gcp_platform_config,
-        gcp=None,
-        cloud_provider="aws",
-        jobs_node_pools=[
-            {"name": "p2.xlarge-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}
-        ],
-        jobs_resource_pool_types=[resource_pool_type_factory()],
-        aws=AwsConfig(
-            region="us-east-1",
-            registry_url=URL("https://platform.dkr.ecr.us-east-1.amazonaws.com"),
-            s3_role_arn="",
+        gcp_service_account_key="",
+        gcp_service_account_key_base64="",
+        kubernetes_provider=CloudProvider.AWS,
+        jobs_node_pools=[{"name": "p2.xlarge", "idleSize": 0, "cpu": 1.0, "gpu": 1}],
+        jobs_resource_pool_types=[resource_pool_type_factory("p2.xlarge")],
+        registry=RegistryConfig(
+            provider=RegistryProvider.AWS,
+            aws_account_id="platform",
+            aws_region="us-east-1",
+        ),
+        buckets=BucketsConfig(
+            provider=BucketsProvider.AWS,
+            aws_region="us-east-1",
+        ),
+        monitoring=MonitoringConfig(
+            logs_bucket_name="job-logs",
+            metrics_storage_type=MetricsStorageType.BUCKETS,
+            metrics_region="us-east-1",
+            metrics_bucket_name="job-metrics",
         ),
     )
 
@@ -589,16 +534,15 @@ def aws_platform_config(
 @pytest.fixture
 def azure_platform_config(
     gcp_platform_config: PlatformConfig,
-    resource_pool_type_factory: Callable[[], Dict[str, Any]],
+    resource_pool_type_factory: Callable[..., Dict[str, Any]],
 ) -> PlatformConfig:
     return replace(
         gcp_platform_config,
-        gcp=None,
-        cloud_provider="azure",
-        jobs_node_pools=[
-            {"name": "Standard_NC6-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}
-        ],
-        jobs_resource_pool_types=[resource_pool_type_factory()],
+        gcp_service_account_key="",
+        gcp_service_account_key_base64="",
+        kubernetes_provider=CloudProvider.AZURE,
+        jobs_node_pools=[{"name": "Standard_NC6", "idleSize": 0, "cpu": 1.0, "gpu": 1}],
+        jobs_resource_pool_types=[resource_pool_type_factory("Standard_NC6")],
         storages=[
             StorageConfig(
                 type=StorageType.AZURE_fILE,
@@ -607,13 +551,22 @@ def azure_platform_config(
                 azure_share_name="share",
             )
         ],
-        azure=AzureConfig(
-            region="westus",
-            registry_url=URL("https://platform.azurecr.io"),
-            registry_username="admin",
-            registry_password="admin-password",
-            blob_storage_account_name="accountName2",
-            blob_storage_account_key="accountKey2",
+        registry=RegistryConfig(
+            provider=RegistryProvider.AZURE,
+            azure_url=URL("https://platform.azurecr.io"),
+            azure_username="admin",
+            azure_password="admin-password",
+        ),
+        buckets=BucketsConfig(
+            provider=BucketsProvider.AZURE,
+            azure_storage_account_name="accountName2",
+            azure_storage_account_key="accountKey2",
+        ),
+        monitoring=MonitoringConfig(
+            logs_bucket_name="job-logs",
+            metrics_storage_type=MetricsStorageType.BUCKETS,
+            metrics_region="westus",
+            metrics_bucket_name="job-metrics",
         ),
     )
 
@@ -621,20 +574,18 @@ def azure_platform_config(
 @pytest.fixture
 def on_prem_platform_config(
     gcp_platform_config: PlatformConfig,
-    resource_pool_type_factory: Callable[[], Dict[str, Any]],
+    resource_pool_type_factory: Callable[..., Dict[str, Any]],
     cluster_name: str,
 ) -> PlatformConfig:
     return replace(
         gcp_platform_config,
-        gcp=None,
+        gcp_service_account_key="",
+        gcp_service_account_key_base64="",
         ingress_public_ips=[IPv4Address("192.168.0.3")],
         standard_storage_class_name="standard",
-        cloud_provider="on_prem",
-        jobs_node_pools=[{"name": "gpu-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}],
-        jobs_resource_pool_types=[resource_pool_type_factory()],
-        monitoring_metrics_bucket_name="",
-        monitoring_metrics_storage_class_name="metrics-standard",
-        monitoring_metrics_storage_size="100Gi",
+        kubernetes_provider="kubeadm",
+        jobs_node_pools=[{"name": "gpu", "idleSize": 0, "cpu": 1.0, "gpu": 1}],
+        jobs_resource_pool_types=[resource_pool_type_factory("gpu")],
         disks_storage_class_name="openebs-cstor",
         storages=[
             StorageConfig(
@@ -643,64 +594,35 @@ def on_prem_platform_config(
                 storage_class_name="storage-standard",
             )
         ],
-        on_prem=OnPremConfig(
+        registry=RegistryConfig(
+            provider=RegistryProvider.DOCKER,
             docker_registry_install=True,
-            registry_url=URL("http://platform-docker-registry:5000"),
-            registry_username="",
-            registry_password="",
-            registry_storage_class_name="registry-standard",
-            registry_storage_size="100Gi",
+            docker_registry_url=URL("http://platform-docker-registry:5000"),
+            docker_registry_username="",
+            docker_registry_password="",
+            docker_registry_storage_class_name="registry-standard",
+            docker_registry_storage_size="100Gi",
+        ),
+        buckets=BucketsConfig(
+            provider=BucketsProvider.MINIO,
             minio_install=True,
-            blob_storage_public_url=URL(f"https://blob.{cluster_name}.org.neu.ro"),
-            blob_storage_url=URL("http://platform-minio:9000"),
-            blob_storage_region="minio",
-            blob_storage_access_key="username",
-            blob_storage_secret_key="password",
-            blob_storage_class_name="blob-storage-standard",
-            blob_storage_size="10Gi",
-            kubelet_port=10250,
-            http_node_port=30080,
-            https_node_port=30443,
+            minio_public_url=URL(f"https://blob.{cluster_name}.org.neu.ro"),
+            minio_url=URL("http://platform-minio:9000"),
+            minio_region="minio",
+            minio_access_key="username",
+            minio_secret_key="password",
+            minio_storage_class_name="blob-storage-standard",
+            minio_storage_size="10Gi",
         ),
-    )
-
-
-@pytest.fixture
-def on_prem_platform_config_with_emc_ecs(
-    on_prem_platform_config: PlatformConfig,
-    resource_pool_type_factory: Callable[[], Dict[str, Any]],
-    cluster_name: str,
-) -> PlatformConfig:
-    return replace(
-        on_prem_platform_config,
-        emc_ecs_credentials=EMCECSCredentials(
-            access_key_id="access-key",
-            secret_access_key="secret-key",
-            s3_endpoint=URL("https://emc-ecs.s3"),
-            management_endpoint=URL("https://emc-ecs.management"),
-            s3_assumable_role="s3-role",
-        ),
-    )
-
-
-@pytest.fixture
-def on_prem_platform_config_with_open_stack(
-    on_prem_platform_config: PlatformConfig,
-    resource_pool_type_factory: Callable[[], Dict[str, Any]],
-    cluster_name: str,
-) -> PlatformConfig:
-    return replace(
-        on_prem_platform_config,
-        open_stack_credentials=OpenStackCredentials(
-            account_id="account_id",
-            password="password",
-            s3_endpoint=URL("https://os.s3"),
-            endpoint=URL("https://os.management"),
-            region_name="region",
+        monitoring=MonitoringConfig(
+            logs_bucket_name="job-logs",
+            metrics_storage_type=MetricsStorageType.KUBERNETES,
+            metrics_storage_class_name="metrics-standard",
+            metrics_storage_size="100Gi",
         ),
     )
 
 
 @pytest.fixture
 def vcd_platform_config(on_prem_platform_config: PlatformConfig) -> PlatformConfig:
-    return replace(on_prem_platform_config, cloud_provider="vcd_mts")
+    return replace(on_prem_platform_config, kubernetes_provider="kubeadm")

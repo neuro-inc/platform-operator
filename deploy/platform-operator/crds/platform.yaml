@@ -62,20 +62,14 @@ spec:
               kubernetes:
                 type: object
                 properties:
+                  provider:
+                    type: string
                   standardStorageClassName:
                     type: string
                   tpuIPv4CIDR:
                     type: string
-                  nodePorts:
-                    type: object
-                    required: [kubelet, http, https]
-                    properties:
-                      kubelet:
-                        type: integer
-                      http:
-                        type: integer
-                      https:
-                        type: integer
+                  kubeletPort:
+                    type: integer
                   nodeLabels:
                     type: object
                     properties:
@@ -103,17 +97,6 @@ spec:
                         type: boolean
                       name:
                         type: string
-                  serviceAccount:
-                    type: object
-                    properties:
-                      imagePullSecrets:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            name:
-                              type: string
-                          required: [name]
                   jobsNamespace:
                     type: object
                     properties:
@@ -126,12 +109,16 @@ spec:
                 properties:
                   gcp:
                     type: object
+                    required: [serviceAccountKeyBase64]
                     properties:
                       serviceAccountKeyBase64:
                         type: string
                   aws:
                     type: object
+                    required: [region]
                     properties:
+                      region:
+                        type: string
                       roleArn:
                         type: string
                       s3RoleArn:
@@ -154,9 +141,17 @@ spec:
                         type: string
                   aws:
                     type: object
-                    required: [url]
+                    required: [accountId, region]
                     properties:
-                      url:
+                      accountId:
+                        type: string
+                      region:
+                        type: string
+                  gcp:
+                    type: object
+                    required: [project]
+                    properties:
+                      project:
                         type: string
                   docker:
                     type: object
@@ -181,8 +176,9 @@ spec:
                           size:
                             type: string
                 oneOf:
-                - required: [azure]
                 - required: [aws]
+                - required: [gcp]
+                - required: [azure]
                 - required: [kubernetes]
                 - required: [docker]
               storages:
@@ -249,6 +245,18 @@ spec:
               blobStorage:
                 type: object
                 properties:
+                  aws:
+                    type: object
+                    required: [region]
+                    properties:
+                      region:
+                        type: string
+                  gcp:
+                    type: object
+                    required: [project]
+                    properties:
+                      project:
+                        type: string
                   azure:
                     type: object
                     required: [storageAccountName, storageAccountKey]
@@ -256,6 +264,34 @@ spec:
                       storageAccountName:
                         type: string
                       storageAccountKey:
+                        type: string
+                  emcEcs:
+                    type: object
+                    required: [accessKeyId, secretAccessKey, s3Role, endpoint, s3Endpoint]
+                    properties:
+                      accessKeyId:
+                        type: string
+                      secretAccessKey:
+                        type: string
+                      s3Role:
+                        type: string
+                      endpoint:
+                        type: string
+                      s3Endpoint:
+                        type: string
+                  openStack:
+                    type: object
+                    required: [user, password, region, endpoint, s3Endpoint]
+                    properties:
+                      user:
+                        type: string
+                      password:
+                        type: string
+                      region:
+                        type: string
+                      endpoint:
+                        type: string
+                      s3Endpoint:
                         type: string
                   minio:
                     type: object
@@ -282,6 +318,8 @@ spec:
                           size:
                             type: string
                 oneOf:
+                - required: [aws]
+                - required: [gcp]
                 - required: [azure]
                 - required: [kubernetes]
                 - required: [minio]
@@ -297,11 +335,15 @@ spec:
                         type: object
                         required: [bucket]
                         properties:
+                          region:
+                            type: string
                           bucket:
                             type: string
                   metrics:
                     type: object
                     properties:
+                      region:
+                        type: string
                       retentionTime:
                         type: string
                       blobStorage:

@@ -17,6 +17,7 @@ from platform_operator.kube_client import (
     PlatformConditionType,
     PlatformPhase,
     PlatformStatusManager,
+    Service,
 )
 from platform_operator.models import (
     Cluster,
@@ -160,10 +161,12 @@ def traefik_service() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def aws_traefik_service() -> Dict[str, Any]:
-    return {
-        "status": {"loadBalancer": {"ingress": [{"hostname": "platform-traefik"}]}},
-    }
+def aws_traefik_service() -> Service:
+    return Service(
+        {
+            "status": {"loadBalancer": {"ingress": [{"hostname": "platform-traefik"}]}},
+        }
+    )
 
 
 @pytest.fixture
@@ -479,8 +482,8 @@ async def test_configure_aws_cluster(
         cluster_name=aws_platform_config.cluster_name,
         token=aws_platform_config.token,
         payload=aws_platform_config.create_cluster_config(
-            traefik_service=aws_traefik_service,
-            aws_traefik_lb=aws_traefik_lb,
+            ingress_service=aws_traefik_service,
+            aws_ingress_lb=aws_traefik_lb,
         ),
     )
 
@@ -505,7 +508,7 @@ async def test_configure_cluster(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_config.token,
         payload=gcp_platform_config.create_cluster_config(
-            traefik_service=traefik_service,
+            ingress_service=traefik_service,
         ),
     )
 

@@ -1,5 +1,4 @@
 import copy
-import json
 import os
 from base64 import b64decode, b64encode
 from collections import defaultdict
@@ -104,14 +103,6 @@ class HelmChartVersions:
 
 
 @dataclass(frozen=True)
-class DockerRegistry:
-    url: URL
-    email: str
-    username: str
-    password: str
-
-
-@dataclass(frozen=True)
 class Config:
     node_name: str
     log_level: str
@@ -194,17 +185,6 @@ class Cluster(Dict[str, Any]):
         return self["name"]
 
     @property
-    def cloud_provider_type(self) -> str:
-        return self["cloud_provider"]["type"]
-
-    @property
-    def is_on_prem(self) -> bool:
-        return (
-            self.cloud_provider_type == "on_prem"
-            or self.cloud_provider_type.startswith("vcd_")
-        )
-
-    @property
     def acme_environment(self) -> str:
         return self["ingress"]["acme_environment"]
 
@@ -213,67 +193,409 @@ class Cluster(Dict[str, Any]):
         return self["dns"]["name"]
 
 
+def _spec_default_factory() -> Dict[str, Any]:
+    return defaultdict(_spec_default_factory)
+
+
+class IamSpec(Dict[str, Any]):
+    def __init__(self, spec: Dict[str, Any]) -> None:
+        super().__init__(spec)
+
+        self._spec = defaultdict(_spec_default_factory, spec)
+
+    @property
+    def aws_region(self) -> str:
+        return self._spec["aws"].get("region", "")
+
+    @property
+    def aws_role_arn(self) -> str:
+        return self._spec["aws"].get("roleArn", "")
+
+    @property
+    def aws_s3_role_arn(self) -> str:
+        return self._spec["aws"].get("s3RoleArn", "")
+
+    @property
+    def gcp_service_account_key_base64(self) -> str:
+        return self._spec["gcp"].get("serviceAccountKeyBase64", "")
+
+
+class KubernetesSpec(Dict[str, Any]):
+    def __init__(self, spec: Dict[str, Any]) -> None:
+        super().__init__(spec)
+
+        self._spec = defaultdict(_spec_default_factory, spec)
+
+    @property
+    def provider(self) -> str:
+        return self["provider"]
+
+    @property
+    def standard_storage_class_name(self) -> str:
+        return self.get("standardStorageClassName", "")
+
+    @property
+    def node_label_job(self) -> str:
+        return self._spec["nodeLabels"].get("job", "")
+
+    @property
+    def node_label_node_pool(self) -> str:
+        return self._spec["nodeLabels"].get("nodePool", "")
+
+    @property
+    def node_label_accelerator(self) -> str:
+        return self._spec["nodeLabels"].get("accelerator", "")
+
+    @property
+    def node_label_preemptible(self) -> str:
+        return self._spec["nodeLabels"].get("preemptible", "")
+
+    @property
+    def kubelet_port(self) -> Optional[int]:
+        return self.get("kubeletPort")
+
+    @property
+    def ingress_controller_enabled(self) -> bool:
+        return self._spec["ingressController"].get("enabled", True)
+
+    @property
+    def ingress_public_ips(self) -> Sequence[IPv4Address]:
+        return [IPv4Address(ip) for ip in self._spec.get("ingressPublicIPs", [])]
+
+    @property
+    def jobs_namespace_create(self) -> bool:
+        return self._spec["jobsNamespace"].get("create", True)
+
+    @property
+    def jobs_namespace_name(self) -> str:
+        return self._spec["jobsNamespace"].get("name", "")
+
+    @property
+    def docker_config_secret_create(self) -> bool:
+        return self._spec["dockerConfigSecret"].get("create", True)
+
+    @property
+    def docker_config_secret_name(self) -> str:
+        return self._spec["dockerConfigSecret"].get("name", "")
+
+    @property
+    def tpu_network(self) -> Optional[IPv4Network]:
+        return IPv4Network(self["tpuIPv4CIDR"]) if "tpuIPv4CIDR" in self else None
+
+
 class StorageSpec(Dict[str, Any]):
     def __init__(self, spec: Dict[str, Any]) -> None:
         super().__init__(spec)
 
-        self._spec = defaultdict(self._default_factory, spec)
-
-    @classmethod
-    def _default_factory(cls) -> Dict[str, Any]:
-        return defaultdict(cls._default_factory)
-
     @property
     def path(self) -> str:
-        return self._spec.get("path", "")
+        return self.get("path", "")
 
     @property
     def storage_size(self) -> str:
-        return self._spec["kubernetes"]["persistence"].get("size", "")
+        return self["kubernetes"]["persistence"].get("size", "")
+
+    @property
+    def storage_class_name(self) -> str:
+        return self["kubernetes"]["persistence"].get("storageClassName", "")
+
+    @property
+    def nfs_server(self) -> str:
+        return self["nfs"].get("server", "")
+
+    @property
+    def nfs_export_path(self) -> str:
+        return self["nfs"].get("path", "/")
+
+    @property
+    def smb_server(self) -> str:
+        return self["smb"].get("server", "")
+
+    @property
+    def smb_share_name(self) -> str:
+        return self["smb"].get("shareName", "")
+
+    @property
+    def smb_username(self) -> str:
+        return self["smb"].get("username", "")
+
+    @property
+    def smb_password(self) -> str:
+        return self["smb"].get("password", "")
+
+    @property
+    def gcs_bucket_name(self) -> str:
+        return self["gcs"].get("bucket", "")
+
+    @property
+    def azure_storage_account_name(self) -> str:
+        return self["azureFile"].get("storageAccountName", "")
+
+    @property
+    def azure_storage_account_key(self) -> str:
+        return self["azureFile"].get("storageAccountKey", "")
+
+    @property
+    def azure_share_name(self) -> str:
+        return self["azureFile"].get("shareName", "")
+
+
+class BlobStorageSpec(Dict[str, Any]):
+    def __init__(self, spec: Dict[str, Any]) -> None:
+        super().__init__(spec)
+
+    @property
+    def aws_region(self) -> str:
+        return self["aws"]["region"]
+
+    @property
+    def gcp_project(self) -> str:
+        return self["gcp"]["project"]
+
+    @property
+    def azure_storrage_account_name(self) -> str:
+        return self["azure"]["storageAccountName"]
+
+    @property
+    def azure_storrage_account_key(self) -> str:
+        return self["azure"]["storageAccountKey"]
+
+    @property
+    def emc_ecs_access_key_id(self) -> str:
+        return self["emcEcs"]["accessKeyId"]
+
+    @property
+    def emc_ecs_secret_access_key(self) -> str:
+        return self["emcEcs"]["secretAccessKey"]
+
+    @property
+    def emc_ecs_s3_role(self) -> str:
+        return self["emcEcs"]["s3Role"]
+
+    @property
+    def emc_ecs_s3_endpoint(self) -> str:
+        return self["emcEcs"]["s3Endpoint"]
+
+    @property
+    def emc_ecs_management_endpoint(self) -> str:
+        return self["emcEcs"]["managementEndpoint"]
+
+    @property
+    def open_stack_region(self) -> str:
+        return self["openStack"]["region"]
+
+    @property
+    def open_stack_user(self) -> str:
+        return self["openStack"]["user"]
+
+    @property
+    def open_stack_password(self) -> str:
+        return self["openStack"]["password"]
+
+    @property
+    def open_stack_endpoint(self) -> str:
+        return self["openStack"]["endpoint"]
+
+    @property
+    def open_stack_s3_endpoint(self) -> str:
+        return self["openStack"]["s3Endpoint"]
+
+    @property
+    def minio_url(self) -> str:
+        return self["minio"]["url"]
+
+    @property
+    def minio_region(self) -> str:
+        return self["minio"]["region"]
+
+    @property
+    def minio_access_key(self) -> str:
+        return self["minio"]["accessKey"]
+
+    @property
+    def minio_secret_key(self) -> str:
+        return self["minio"]["secretKey"]
+
+    @property
+    def kubernetes_storage_class_name(self) -> str:
+        return self["kubernetes"]["persistence"].get("storageClassName", "")
+
+    @property
+    def kubernetes_storage_size(self) -> str:
+        return self["kubernetes"]["persistence"].get("size", "")
+
+
+class RegistrySpec(Dict[str, Any]):
+    def __init__(self, spec: Dict[str, Any]) -> None:
+        super().__init__(spec)
+
+    @property
+    def aws_account_id(self) -> str:
+        return self["aws"]["accountId"]
+
+    @property
+    def aws_region(self) -> str:
+        return self["aws"]["region"]
+
+    @property
+    def gcp_project(self) -> str:
+        return self["gcp"]["project"]
+
+    @property
+    def azure_url(self) -> str:
+        return self["azure"]["url"]
+
+    @property
+    def azure_username(self) -> str:
+        return self["azure"]["username"]
+
+    @property
+    def azure_password(self) -> str:
+        return self["azure"]["password"]
+
+    @property
+    def docker_url(self) -> str:
+        return self["docker"]["url"]
+
+    @property
+    def docker_username(self) -> str:
+        return self["docker"].get("username", "")
+
+    @property
+    def docker_password(self) -> str:
+        return self["docker"].get("password", "")
+
+    @property
+    def kubernetes_storage_class_name(self) -> str:
+        return self["kubernetes"]["persistence"].get("storageClassName", "")
+
+    @property
+    def kubernetes_storage_size(self) -> str:
+        return self["kubernetes"]["persistence"].get("size", "")
+
+
+class MonitoringSpec(Dict[str, Any]):
+    def __init__(self, spec: Dict[str, Any]) -> None:
+        super().__init__(spec)
+
+    @property
+    def logs_region(self) -> str:
+        return self["logs"]["blobStorage"].get("region", "")
+
+    @property
+    def logs_bucket(self) -> str:
+        return self["logs"]["blobStorage"]["bucket"]
+
+    @property
+    def metrics(self) -> Dict[str, Any]:
+        return self["metrics"]
+
+    @property
+    def metrics_region(self) -> str:
+        return self["metrics"].get("region", "")
+
+    @property
+    def metrics_retention_time(self) -> str:
+        return self["metrics"].get("retentionTime", "")
+
+    @property
+    def metrics_bucket(self) -> str:
+        return self["metrics"]["blobStorage"].get("bucket", "")
+
+    @property
+    def metrics_storage_size(self) -> str:
+        return self["metrics"]["kubernetes"]["persistence"].get("size", "")
+
+    @property
+    def metrics_storage_class_name(self) -> str:
+        return self["metrics"]["kubernetes"]["persistence"].get("storageClassName", "")
+
+
+class DisksSpec(Dict[str, Any]):
+    def __init__(self, spec: Dict[str, Any]) -> None:
+        super().__init__(spec)
+
+        self._spec = defaultdict(_spec_default_factory, spec)
 
     @property
     def storage_class_name(self) -> str:
         return self._spec["kubernetes"]["persistence"].get("storageClassName", "")
 
-    @property
-    def nfs_server(self) -> str:
-        return self._spec["nfs"].get("server", "")
+
+class Spec(Dict[str, Any]):
+    def __init__(self, spec: Dict[str, Any]) -> None:
+        super().__init__(spec)
+
+        spec = defaultdict(_spec_default_factory, spec)
+        self._token = spec["token"]
+        self._iam = IamSpec(spec["iam"])
+        self._kubernetes = KubernetesSpec(spec["kubernetes"])
+        self._registry = RegistrySpec(spec["registry"])
+        self._storages = [StorageSpec(s) for s in spec["storages"]]
+        self._blob_storage = BlobStorageSpec(spec["blobStorage"])
+        self._disks = DisksSpec(spec["disks"])
+        self._monitoring = MonitoringSpec(spec["monitoring"])
 
     @property
-    def nfs_export_path(self) -> str:
-        return self._spec["nfs"].get("path", "/")
+    def token(self) -> str:
+        return self._token
 
     @property
-    def smb_server(self) -> str:
-        return self._spec["smb"].get("server", "")
+    def iam(self) -> IamSpec:
+        return self._iam
 
     @property
-    def smb_share_name(self) -> str:
-        return self._spec["smb"].get("shareName", "")
+    def kubernetes(self) -> KubernetesSpec:
+        return self._kubernetes
 
     @property
-    def smb_username(self) -> str:
-        return self._spec["smb"].get("username", "")
+    def registry(self) -> RegistrySpec:
+        return self._registry
 
     @property
-    def smb_password(self) -> str:
-        return self._spec["smb"].get("password", "")
+    def storages(self) -> Sequence[StorageSpec]:
+        return self._storages
 
     @property
-    def gcs_bucket_name(self) -> str:
-        return self._spec["gcs"].get("bucket", "")
+    def blob_storage(self) -> BlobStorageSpec:
+        return self._blob_storage
 
     @property
-    def azure_storage_account_name(self) -> str:
-        return self._spec["azureFile"].get("storageAccountName", "")
+    def disks(self) -> DisksSpec:
+        return self._disks
 
     @property
-    def azure_storage_account_key(self) -> str:
-        return self._spec["azureFile"].get("storageAccountKey", "")
+    def monitoring(self) -> MonitoringSpec:
+        return self._monitoring
+
+
+class Metadata(Dict[str, Any]):
+    def __init__(self, spec: Dict[str, Any]) -> None:
+        super().__init__(spec)
 
     @property
-    def azure_share_name(self) -> str:
-        return self._spec["azureFile"].get("shareName", "")
+    def name(self) -> str:
+        return self["name"]
+
+
+class CloudProvider(str, Enum):
+    AWS = "aws"
+    GCP = "gcp"
+    AZURE = "azure"
+
+    @classmethod
+    def has_value(cls, value: str) -> bool:
+        return value in CloudProvider._value2member_map_
+
+
+@dataclass(frozen=True)
+class DockerConfig:
+    url: URL
+    email: str = ""
+    username: str = ""
+    password: str = ""
+    secret_name: str = ""
+    create_secret: bool = False
 
 
 class StorageType(str, Enum):
@@ -302,73 +624,94 @@ class StorageConfig:
     gcs_bucket_name: str = ""
 
 
-@dataclass(frozen=True)
-class GcpConfig:
-    project: str
-    region: str
-    service_account_key: str
-    service_account_key_base64: str
+class RegistryProvider(str, Enum):
+    AWS = "aws"
+    AZURE = "azure"
+    GCP = "gcp"
+    DOCKER = "docker"
 
 
 @dataclass(frozen=True)
-class AwsConfig:
-    region: str
-    registry_url: URL
-    role_arn: str = ""
-    s3_role_arn: str = ""
+class RegistryConfig:
+    provider: RegistryProvider
+
+    aws_account_id: str = ""
+    aws_region: str = ""
+
+    gcp_project: str = ""
+
+    azure_url: Optional[URL] = None
+    azure_username: str = ""
+    azure_password: str = ""
+
+    docker_registry_install: bool = False
+    docker_registry_url: Optional[URL] = None
+    docker_registry_username: str = ""
+    docker_registry_password: str = ""
+    docker_registry_storage_class_name: str = ""
+    docker_registry_storage_size: str = ""
+
+
+class BucketsProvider(str, Enum):
+    AWS = "aws"
+    AZURE = "azure"
+    GCP = "gcp"
+    EMC_ECS = "emcEcs"
+    OPEN_STACK = "openStack"
+    MINIO = "minio"
 
 
 @dataclass(frozen=True)
-class AzureConfig:
-    region: str
-    registry_url: URL
-    registry_username: str
-    registry_password: str
-    blob_storage_account_name: str
-    blob_storage_account_key: str
+class BucketsConfig:
+    provider: BucketsProvider
+    disable_creation: bool = False
+
+    aws_region: str = ""
+
+    gcp_project: str = ""
+    gcp_location: str = "us"  # default GCP location
+
+    azure_storage_account_name: str = ""
+    azure_storage_account_key: str = ""
+
+    minio_install: bool = False
+    minio_url: Optional[URL] = None
+    minio_public_url: Optional[URL] = None
+    minio_region: str = ""
+    minio_access_key: str = ""
+    minio_secret_key: str = ""
+    minio_storage_class_name: str = ""
+    minio_storage_size: str = ""
+
+    emc_ecs_access_key_id: str = ""
+    emc_ecs_secret_access_key: str = ""
+    emc_ecs_s3_endpoint: Optional[URL] = None
+    emc_ecs_management_endpoint: Optional[URL] = None
+    emc_ecs_s3_assumable_role: str = ""
+
+    open_stack_user: str = ""
+    open_stack_password: str = ""
+    open_stack_endpoint: Optional[URL] = None
+    open_stack_s3_endpoint: Optional[URL] = None
+    open_stack_region_name: str = ""
+
+
+class MetricsStorageType(Enum):
+    BUCKETS = 1
+    KUBERNETES = 2
 
 
 @dataclass(frozen=True)
-class OnPremConfig:
-    docker_registry_install: bool
-    registry_url: URL
-    registry_username: str
-    registry_password: str
-    registry_storage_class_name: str
-    registry_storage_size: str
-    minio_install: bool
-    blob_storage_url: URL
-    blob_storage_public_url: URL
-    blob_storage_region: str
-    blob_storage_access_key: str
-    blob_storage_secret_key: str
-    blob_storage_class_name: str
-    blob_storage_size: str
-    kubelet_port: int
-    http_node_port: int
-    https_node_port: int
-
-
-@dataclass(frozen=True)
-class EMCECSCredentials:
-    """
-    Credentials to EMC ECS (blob storage engine developed by vmware creators)
-    """
-
-    access_key_id: str
-    secret_access_key: str
-    s3_endpoint: URL
-    management_endpoint: URL
-    s3_assumable_role: str
-
-
-@dataclass(frozen=True)
-class OpenStackCredentials:
-    account_id: str
-    password: str
-    endpoint: URL
-    s3_endpoint: URL
-    region_name: str
+class MonitoringConfig:
+    logs_bucket_name: str
+    logs_region: str = ""
+    metrics_storage_type: MetricsStorageType = MetricsStorageType.BUCKETS
+    metrics_bucket_name: str = ""
+    metrics_storage_class_name: str = ""
+    metrics_storage_size: str = ""
+    # 15d is default prometheus retention time
+    metrics_retention_time: str = "15d"
+    metrics_region: str = ""
 
 
 @dataclass(frozen=True)
@@ -379,17 +722,16 @@ class PlatformConfig:
     api_url: URL
     token: str
     cluster_name: str
-    cloud_provider: str
-    namespace: str
-    docker_config_secret_create: bool
-    docker_config_secret_name: str
     service_account_name: str
     image_pull_secret_names: Sequence[str]
     pre_pull_images: Sequence[str]
     standard_storage_class_name: str
+    kubernetes_provider: str
     kubernetes_version: str
-    kubernetes_node_labels: LabelsConfig
-    dns_name: str
+    node_labels: LabelsConfig
+    kubelet_port: int
+    namespace: str
+    ingress_dns_name: str
     ingress_url: URL
     ingress_registry_url: URL
     ingress_metrics_url: URL
@@ -397,8 +739,11 @@ class PlatformConfig:
     ingress_controller_install: bool
     ingress_public_ips: Sequence[IPv4Address]
     ingress_cors_origins: Sequence[str]
+    ingress_http_node_port: int
+    ingress_https_node_port: int
+    ingress_service_name: str
     disks_storage_limit_per_user_gb: int
-    service_traefik_name: str
+    disks_storage_class_name: str
     jobs_namespace_create: bool
     jobs_namespace: str
     jobs_node_pools: Sequence[Dict[str, Any]]
@@ -413,29 +758,23 @@ class PlatformConfig:
     jobs_allow_privileged_mode: bool
     idle_jobs: Sequence[Dict[str, Any]]
     storages: Sequence[StorageConfig]
+    buckets: BucketsConfig
+    registry: RegistryConfig
+    monitoring: MonitoringConfig
     helm_repo: HelmRepo
-    docker_registry: DockerRegistry
+    docker_config: DockerConfig
     grafana_username: str
     grafana_password: str
     consul_url: URL
     consul_install: bool
-    monitoring_logs_bucket_name: str = ""
-    monitoring_metrics_bucket_name: str = ""
-    monitoring_metrics_storage_class_name: str = ""
-    monitoring_metrics_storage_size: str = ""
-    monitoring_metrics_retention_time: str = ""
-    disks_storage_class_name: str = ""
     sentry_dsn: URL = URL("")
     sentry_sample_rate: Optional[float] = None
-    docker_hub_config_secret_name: str = ""
-    docker_hub_registry: Optional[DockerRegistry] = None
-    emc_ecs_credentials: Optional[EMCECSCredentials] = None
-    open_stack_credentials: Optional[OpenStackCredentials] = None
-    buckets_disable_creation: bool = False
-    gcp: Optional[GcpConfig] = None
-    aws: Optional[AwsConfig] = None
-    azure: Optional[AzureConfig] = None
-    on_prem: Optional[OnPremConfig] = None
+    docker_hub_config: Optional[DockerConfig] = None
+    aws_region: str = ""
+    aws_role_arn: str = ""
+    aws_s3_role_arn: str = ""
+    gcp_service_account_key: str = ""
+    gcp_service_account_key_base64: str = ""
 
     def get_storage_claim_name(self, path: str) -> str:
         name = f"{self.namespace}-storage"
@@ -445,76 +784,87 @@ class PlatformConfig:
 
     def create_dns_config(
         self,
-        traefik_service: Optional[Dict[str, Any]] = None,
-        aws_traefik_lb: Optional[Dict[str, Any]] = None,
+        ingress_service: Optional[Dict[str, Any]] = None,
+        aws_ingress_lb: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
-        if not traefik_service and not self.ingress_public_ips:
+        if not ingress_service and not self.ingress_public_ips:
             return None
-        result: Dict[str, Any] = {"name": self.dns_name, "a_records": []}
+        result: Dict[str, Any] = {"name": self.ingress_dns_name, "a_records": []}
         if self.ingress_public_ips:
             ips = [str(ip) for ip in self.ingress_public_ips]
             result["a_records"].extend(
                 (
-                    {"name": f"{self.dns_name}.", "ips": ips},
-                    {"name": f"*.jobs.{self.dns_name}.", "ips": ips},
-                    {"name": f"registry.{self.dns_name}.", "ips": ips},
-                    {"name": f"metrics.{self.dns_name}.", "ips": ips},
+                    {"name": f"{self.ingress_dns_name}.", "ips": ips},
+                    {"name": f"*.jobs.{self.ingress_dns_name}.", "ips": ips},
+                    {"name": f"registry.{self.ingress_dns_name}.", "ips": ips},
+                    {"name": f"metrics.{self.ingress_dns_name}.", "ips": ips},
                 )
             )
-            if self.on_prem:
+            if self.buckets.provider == BucketsProvider.MINIO:
                 result["a_records"].extend(
-                    ({"name": f"blob.{self.dns_name}.", "ips": ips},)
+                    ({"name": f"blob.{self.ingress_dns_name}.", "ips": ips},)
                 )
-        elif self.aws and traefik_service:
-            traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0][
+        elif aws_ingress_lb and ingress_service:
+            ingress_host = ingress_service["status"]["loadBalancer"]["ingress"][0][
                 "hostname"
             ]
-            assert aws_traefik_lb
-            traefik_zone_id = aws_traefik_lb["CanonicalHostedZoneNameID"]
+            ingress_zone_id = aws_ingress_lb["CanonicalHostedZoneNameID"]
             result["a_records"].extend(
                 (
                     {
-                        "name": f"{self.dns_name}.",
-                        "dns_name": traefik_host,
-                        "zone_id": traefik_zone_id,
+                        "name": f"{self.ingress_dns_name}.",
+                        "dns_name": ingress_host,
+                        "zone_id": ingress_zone_id,
                     },
                     {
-                        "name": f"*.jobs.{self.dns_name}.",
-                        "dns_name": traefik_host,
-                        "zone_id": traefik_zone_id,
+                        "name": f"*.jobs.{self.ingress_dns_name}.",
+                        "dns_name": ingress_host,
+                        "zone_id": ingress_zone_id,
                     },
                     {
-                        "name": f"registry.{self.dns_name}.",
-                        "dns_name": traefik_host,
-                        "zone_id": traefik_zone_id,
+                        "name": f"registry.{self.ingress_dns_name}.",
+                        "dns_name": ingress_host,
+                        "zone_id": ingress_zone_id,
                     },
                     {
-                        "name": f"metrics.{self.dns_name}.",
-                        "dns_name": traefik_host,
-                        "zone_id": traefik_zone_id,
+                        "name": f"metrics.{self.ingress_dns_name}.",
+                        "dns_name": ingress_host,
+                        "zone_id": ingress_zone_id,
                     },
                 )
             )
-        elif traefik_service:
-            traefik_host = traefik_service["status"]["loadBalancer"]["ingress"][0]["ip"]
+        elif ingress_service:
+            ingress_host = ingress_service["status"]["loadBalancer"]["ingress"][0]["ip"]
             result["a_records"].extend(
                 (
-                    {"name": f"{self.dns_name}.", "ips": [traefik_host]},
-                    {"name": f"*.jobs.{self.dns_name}.", "ips": [traefik_host]},
-                    {"name": f"registry.{self.dns_name}.", "ips": [traefik_host]},
-                    {"name": f"metrics.{self.dns_name}.", "ips": [traefik_host]},
+                    {
+                        "name": f"{self.ingress_dns_name}.",
+                        "ips": [ingress_host],
+                    },
+                    {
+                        "name": f"*.jobs.{self.ingress_dns_name}.",
+                        "ips": [ingress_host],
+                    },
+                    {
+                        "name": f"registry.{self.ingress_dns_name}.",
+                        "ips": [ingress_host],
+                    },
+                    {
+                        "name": f"metrics.{self.ingress_dns_name}.",
+                        "ips": [ingress_host],
+                    },
                 )
             )
-            if self.on_prem:
+            if self.buckets.provider == BucketsProvider.MINIO:
                 result["a_records"].extend(
-                    ({"name": f"blob.{self.dns_name}.", "ips": [traefik_host]},)
+                    ({"name": f"blob.{self.ingress_dns_name}.", "ips": [ingress_host]},)
                 )
         return result
 
     def create_cluster_config(
         self,
-        traefik_service: Optional[Dict[str, Any]] = None,
-        aws_traefik_lb: Optional[Dict[str, Any]] = None,
+        ingress_service: Optional[Dict[str, Any]] = None,
+        aws_ingress_lb: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         result: Dict[str, Any] = {
             "orchestrator": {
@@ -534,7 +884,7 @@ class PlatformConfig:
             },
         }
         dns = self.create_dns_config(
-            traefik_service=traefik_service, aws_traefik_lb=aws_traefik_lb
+            ingress_service=ingress_service, aws_ingress_lb=aws_ingress_lb
         )
         if dns:
             result["dns"] = dns
@@ -554,117 +904,74 @@ class PlatformConfigFactory:
         self._config = config
 
     def create(self, platform_body: kopf.Body, cluster: Cluster) -> "PlatformConfig":
-        ingress_host = cluster.dns_name
-        standard_storage_class_name = (
-            f"{self._config.platform_namespace}-standard-topology-aware"
+        metadata = Metadata(platform_body["metadata"])
+        spec = Spec(platform_body["spec"])
+        docker_config = self._create_neuro_docker_config(
+            cluster,
+            (
+                spec.kubernetes.docker_config_secret_name
+                or f"{self._config.platform_namespace}-docker-config"
+            ),
+            spec.kubernetes.docker_config_secret_create,
         )
-        kubernetes_spec = platform_body["spec"].get("kubernetes", {})
-        kubernetes_node_labels = kubernetes_spec.get("nodeLabels", {})
-        tpu_network = None
-        if cluster.cloud_provider_type == "gcp":
-            tpu_network = (
-                IPv4Network(kubernetes_spec["tpuIPv4CIDR"])
-                if "tpuIPv4CIDR" in kubernetes_spec
-                else None
-            )
-        if cluster.is_on_prem:
-            standard_storage_class_name = kubernetes_spec["standardStorageClassName"]
-        monitoring_spec = platform_body["spec"]["monitoring"]
-        monitoring_metrics_spec = platform_body["spec"]["monitoring"].get("metrics", {})
-        monitoring_metrics_default_storage_size = ""
-        if cluster.is_on_prem:
-            monitoring_metrics_default_storage_size = "10Gi"
-        docker_config_secret_spec = kubernetes_spec.get("dockerConfigSecret", {})
-        docker_config_secret_name = docker_config_secret_spec.get(
-            "name", f"{self._config.platform_namespace}-docker-config"
+        docker_hub_config = self._create_docker_hub_config(
+            cluster, f"{self._config.platform_namespace}-docker-hub-config"
         )
-        service_account_spec = kubernetes_spec.get("serviceAccount", {})
-        image_pull_secrets = service_account_spec.get("imagePullSecrets", [])
-        image_pull_secret_names = [secret["name"] for secret in image_pull_secrets]
-        if docker_config_secret_name not in image_pull_secret_names:
-            image_pull_secret_names.append(docker_config_secret_name)
-        jobs_namespace_spec = kubernetes_spec.get("jobsNamespace", {})
-        jobs_namespace = jobs_namespace_spec.get(
-            "name", self._config.platform_namespace + "-jobs"
+        jobs_namespace = (
+            spec.kubernetes.jobs_namespace_name
+            or self._config.platform_namespace + "-jobs"
         )
-        disks_storage_class_name = f"{self._config.platform_namespace}-disk"
-        disks_spec = platform_body["spec"].get("disks", {})
-        if cluster.is_on_prem:
-            disks_storage_class_name = (
-                disks_spec.get("kubernetes", {})
-                .get("persistence", {})
-                .get("storageClassName", "")
-            )
-        emc_ecs_data = cluster["credentials"].get("emc_ecs")
-        emc_ecs_credentials: Optional[EMCECSCredentials] = None
-        if emc_ecs_data:
-            emc_ecs_credentials = EMCECSCredentials(
-                access_key_id=emc_ecs_data["access_key_id"],
-                secret_access_key=emc_ecs_data["secret_access_key"],
-                s3_endpoint=URL(emc_ecs_data["s3_endpoint"]),
-                management_endpoint=URL(emc_ecs_data["management_endpoint"]),
-                s3_assumable_role=emc_ecs_data["s3_assumable_role"],
-            )
-        open_stack_data = cluster["credentials"].get("open_stack")
-        open_stack_credentials: Optional[OpenStackCredentials] = None
-        if open_stack_data:
-            open_stack_credentials = OpenStackCredentials(
-                account_id=open_stack_data["account_id"],
-                password=open_stack_data["password"],
-                endpoint=URL(open_stack_data["endpoint"]),
-                s3_endpoint=URL(open_stack_data["s3_endpoint"]),
-                region_name=open_stack_data["region_name"],
-            )
-
         return PlatformConfig(
             auth_url=self._config.platform_auth_url,
             ingress_auth_url=self._config.platform_ingress_auth_url,
             config_url=self._config.platform_config_url,
             api_url=self._config.platform_api_url,
-            token=platform_body["spec"]["token"],
-            cluster_name=platform_body["metadata"]["name"],
-            cloud_provider=cluster.cloud_provider_type,
+            token=spec.token,
+            cluster_name=metadata.name,
             namespace=self._config.platform_namespace,
-            docker_config_secret_create=docker_config_secret_spec.get("create", True),
-            docker_config_secret_name=docker_config_secret_name,
             service_account_name="default",
-            image_pull_secret_names=image_pull_secret_names,
+            image_pull_secret_names=self._create_image_pull_secret_names(
+                docker_config, docker_hub_config
+            ),
             pre_pull_images=cluster["orchestrator"].get("pre_pull_images", ()),
-            standard_storage_class_name=standard_storage_class_name,
+            standard_storage_class_name=(
+                spec.kubernetes.standard_storage_class_name
+                or f"{self._config.platform_namespace}-standard-topology-aware"
+            ),
+            kubernetes_provider=spec.kubernetes.provider,
             kubernetes_version=self._config.kube_config.version,
-            kubernetes_node_labels=LabelsConfig(
-                job=kubernetes_node_labels.get("job", LabelsConfig.job),
-                node_pool=kubernetes_node_labels.get(
-                    "nodePool", LabelsConfig.node_pool
+            kubelet_port=int(spec.kubernetes.kubelet_port or 10250),
+            node_labels=LabelsConfig(
+                job=spec.kubernetes.node_label_job or LabelsConfig.job,
+                node_pool=(
+                    spec.kubernetes.node_label_node_pool or LabelsConfig.node_pool
                 ),
-                accelerator=kubernetes_node_labels.get(
-                    "accelerator", LabelsConfig.accelerator
+                accelerator=(
+                    spec.kubernetes.node_label_accelerator or LabelsConfig.accelerator
                 ),
-                preemptible=kubernetes_node_labels.get(
-                    "preemptible", LabelsConfig.preemptible
+                preemptible=(
+                    spec.kubernetes.node_label_preemptible or LabelsConfig.preemptible
                 ),
             ),
-            dns_name=cluster.dns_name,
-            ingress_url=URL(f"https://{ingress_host}"),
-            ingress_registry_url=URL(f"https://registry.{ingress_host}"),
-            ingress_metrics_url=URL(f"https://metrics.{ingress_host}"),
+            ingress_dns_name=cluster.dns_name,
+            ingress_url=URL(f"https://{cluster.dns_name}"),
+            ingress_registry_url=URL(f"https://registry.{cluster.dns_name}"),
+            ingress_metrics_url=URL(f"https://metrics.{cluster.dns_name}"),
             ingress_acme_environment=cluster.acme_environment,
-            ingress_controller_install=kubernetes_spec.get("ingressController", {}).get(
-                "enabled", True
-            ),
-            ingress_public_ips=[
-                IPv4Address(ip) for ip in kubernetes_spec.get("ingressPublicIPs", [])
-            ],
+            ingress_controller_install=spec.kubernetes.ingress_controller_enabled,
+            ingress_public_ips=spec.kubernetes.ingress_public_ips,
             ingress_cors_origins=cluster["ingress"].get("cors_origins", ()),
-            service_traefik_name=f"{self._config.platform_namespace}-traefik",
-            jobs_namespace_create=jobs_namespace_spec.get("create", True),
+            ingress_service_name=f"{self._config.platform_namespace}-traefik",
+            ingress_http_node_port=30080,
+            ingress_https_node_port=30443,
+            jobs_namespace_create=spec.kubernetes.jobs_namespace_create,
             jobs_namespace=jobs_namespace,
             jobs_node_pools=self._create_node_pools(
-                cluster["cloud_provider"]["node_pools"]
+                cluster["orchestrator"].get("resource_pool_types", ())
             ),
             jobs_resource_pool_types=self._update_tpu_network(
                 cluster["orchestrator"].get("resource_pool_types", ()),
-                tpu_network,
+                spec.kubernetes.tpu_network,
             ),
             jobs_resource_presets=cluster["orchestrator"].get("resource_presets", ()),
             jobs_schedule_timeout_s=cluster["orchestrator"]["job_schedule_timeout_s"],
@@ -672,39 +979,27 @@ class PlatformConfigFactory:
                 "job_schedule_scale_up_timeout_s"
             ],
             jobs_priority_class_name=f"{self._config.platform_namespace}-job",
-            jobs_host_template=f"{{job_id}}.jobs.{ingress_host}",
+            jobs_host_template=f"{{job_id}}.jobs.{cluster.dns_name}",
             jobs_internal_host_template=f"{{job_id}}.{jobs_namespace}",
             jobs_fallback_host=cluster["orchestrator"]["job_fallback_hostname"],
             jobs_allow_privileged_mode=cluster["orchestrator"].get(
                 "allow_privileged_mode", False
             ),
             idle_jobs=cluster["orchestrator"].get("idle_jobs", ()),
-            monitoring_logs_bucket_name=(
-                monitoring_spec["logs"]["blobStorage"]["bucket"]
-            ),
-            monitoring_metrics_bucket_name=(
-                monitoring_metrics_spec.get("blobStorage", {}).get("bucket", "")
-            ),
-            monitoring_metrics_storage_class_name=(
-                monitoring_metrics_spec.get("kubernetes", {})
-                .get("persistence", {})
-                .get("storageClassName", "")
-            ),
-            monitoring_metrics_storage_size=(
-                monitoring_metrics_spec.get("kubernetes", {})
-                .get("persistence", {})
-                .get("size", monitoring_metrics_default_storage_size)
-            ),
-            monitoring_metrics_retention_time=(
-                monitoring_metrics_spec.get("retentionTime", "")
-            ),
-            storages=self._create_storages(platform_body["spec"]),
+            storages=[self._create_storage(s) for s in spec.storages],
+            buckets=self._create_buckets(spec.blob_storage, cluster),
+            registry=self._create_registry(spec.registry),
+            monitoring=self._create_monitoring(spec.monitoring),
             disks_storage_limit_per_user_gb=cluster["disks"][
                 "storage_limit_per_user_gb"
             ],
-            disks_storage_class_name=disks_storage_class_name,
+            disks_storage_class_name=(
+                spec.disks.storage_class_name
+                or f"{self._config.platform_namespace}-disk"
+            ),
             helm_repo=self._create_helm_repo(cluster),
-            docker_registry=self._create_neuro_docker_registry(cluster),
+            docker_config=docker_config,
+            docker_hub_config=docker_hub_config,
             grafana_username=cluster["credentials"]["grafana"]["username"],
             grafana_password=cluster["credentials"]["grafana"]["password"],
             consul_url=self._config.consul_url,
@@ -715,37 +1010,16 @@ class PlatformConfigFactory:
             sentry_sample_rate=(
                 cluster["credentials"].get("sentry", {}).get("sample_rate")
             ),
-            docker_hub_config_secret_name=(
-                f"{self._config.platform_namespace}-docker-hub-config"
+            aws_region=spec.iam.aws_region,
+            aws_role_arn=spec.iam.aws_role_arn,
+            aws_s3_role_arn=spec.iam.aws_s3_role_arn,
+            gcp_service_account_key=self._base64_decode(
+                spec.iam.gcp_service_account_key_base64
             ),
-            docker_hub_registry=self._create_docker_hub_registry(cluster),
-            emc_ecs_credentials=emc_ecs_credentials,
-            open_stack_credentials=open_stack_credentials,
-            buckets_disable_creation=cluster["buckets"].get("disable_creation", False),
-            gcp=(
-                self._create_gcp(platform_body["spec"], cluster)
-                if cluster.cloud_provider_type == "gcp"
-                else None
-            ),
-            aws=(
-                self._create_aws(platform_body["spec"], cluster)
-                if cluster.cloud_provider_type == "aws"
-                else None
-            ),
-            azure=(
-                self._create_azure(platform_body["spec"], cluster)
-                if cluster.cloud_provider_type == "azure"
-                else None
-            ),
-            on_prem=(
-                self._create_on_prem(platform_body["spec"], cluster)
-                if cluster.is_on_prem
-                else None
-            ),
+            gcp_service_account_key_base64=spec.iam.gcp_service_account_key_base64,
         )
 
-    @classmethod
-    def _create_helm_repo(cls, cluster: Cluster) -> HelmRepo:
+    def _create_helm_repo(self, cluster: Cluster) -> HelmRepo:
         neuro_helm = cluster["credentials"]["neuro_helm"]
         return HelmRepo(
             name=HelmRepoName.NEURO,
@@ -754,188 +1028,242 @@ class PlatformConfigFactory:
             password=neuro_helm["password"],
         )
 
-    @classmethod
-    def _create_neuro_docker_registry(cls, cluster: Cluster) -> DockerRegistry:
-        return cls._create_docker_registry(cluster["credentials"]["neuro_registry"])
+    def _create_neuro_docker_config(
+        self, cluster: Cluster, secret_name: str, create_secret: bool
+    ) -> DockerConfig:
+        return self._create_docker_config(
+            cluster["credentials"]["neuro_registry"], secret_name, create_secret
+        )
 
-    @classmethod
-    def _create_docker_hub_registry(cls, cluster: Cluster) -> Optional[DockerRegistry]:
+    def _create_docker_hub_config(
+        self, cluster: Cluster, secret_name: str
+    ) -> Optional[DockerConfig]:
         docker_hub_data = cluster["credentials"].get("docker_hub")
         if docker_hub_data is None:
             return None
-        return cls._create_docker_registry(docker_hub_data)
+        return self._create_docker_config(docker_hub_data, secret_name, True)
 
-    @classmethod
-    def _create_docker_registry(cls, data: Mapping[str, Any]) -> DockerRegistry:
-        return DockerRegistry(
+    def _create_docker_config(
+        self, data: Mapping[str, Any], secret_name: str, create_secret: bool
+    ) -> DockerConfig:
+        username = data.get("username", "")
+        password = data.get("password", "")
+        if not username or not password:
+            create_secret = False
+        return DockerConfig(
             url=URL(data["url"]),
-            email=data["email"],
-            username=data["username"],
-            password=data["password"],
+            email=data.get("email", ""),
+            username=username,
+            password=password,
+            secret_name=secret_name,
+            create_secret=create_secret,
         )
 
-    @classmethod
-    def _create_storages(cls, spec: kopf.Spec) -> Sequence[StorageConfig]:
-        result: List[StorageConfig] = []
-        for storage_spec in spec["storages"]:
-            result.append(cls._create_storage(StorageSpec(storage_spec)))
+    def _create_image_pull_secret_names(
+        self, *docker_config: Optional[DockerConfig]
+    ) -> Sequence[str]:
+        result: List[str] = []
+        for config in docker_config:
+            if config:
+                result.append(config.secret_name)
         return result
 
-    @classmethod
-    def _create_storage(cls, storage_spec: StorageSpec) -> StorageConfig:
-        if StorageType.KUBERNETES in storage_spec:
+    def _create_storage(self, spec: StorageSpec) -> StorageConfig:
+        if not spec:
+            raise ValueError("Storage spec is empty")
+
+        if StorageType.KUBERNETES in spec:
             return StorageConfig(
                 type=StorageType.KUBERNETES,
-                path=storage_spec.path,
-                storage_class_name=storage_spec.storage_class_name,
-                storage_size=storage_spec.storage_size,
+                path=spec.path,
+                storage_class_name=spec.storage_class_name,
+                storage_size=spec.storage_size,
             )
-        if StorageType.NFS in storage_spec:
+        elif StorageType.NFS in spec:
             return StorageConfig(
                 type=StorageType.NFS,
-                path=storage_spec.path,
-                nfs_server=storage_spec.nfs_server,
-                nfs_export_path=storage_spec.nfs_export_path,
+                path=spec.path,
+                nfs_server=spec.nfs_server,
+                nfs_export_path=spec.nfs_export_path,
             )
-        if StorageType.SMB in storage_spec:
+        elif StorageType.SMB in spec:
             return StorageConfig(
                 type=StorageType.SMB,
-                path=storage_spec.path,
-                smb_server=storage_spec.smb_server,
-                smb_share_name=storage_spec.smb_share_name,
-                smb_username=storage_spec.smb_username,
-                smb_password=storage_spec.smb_password,
+                path=spec.path,
+                smb_server=spec.smb_server,
+                smb_share_name=spec.smb_share_name,
+                smb_username=spec.smb_username,
+                smb_password=spec.smb_password,
             )
-        if StorageType.AZURE_fILE in storage_spec:
+        elif StorageType.AZURE_fILE in spec:
             return StorageConfig(
                 type=StorageType.AZURE_fILE,
-                path=storage_spec.path,
-                azure_storage_account_name=storage_spec.azure_storage_account_name,
-                azure_storage_account_key=storage_spec.azure_storage_account_key,
-                azure_share_name=storage_spec.azure_share_name,
+                path=spec.path,
+                azure_storage_account_name=spec.azure_storage_account_name,
+                azure_storage_account_key=spec.azure_storage_account_key,
+                azure_share_name=spec.azure_share_name,
             )
-        if StorageType.GCS in storage_spec:
+        elif StorageType.GCS in spec:
             return StorageConfig(
-                type=StorageType.GCS, gcs_bucket_name=storage_spec.gcs_bucket_name
+                type=StorageType.GCS, gcs_bucket_name=spec.gcs_bucket_name
             )
+        else:
+            raise ValueError("Storage type is not supported")
 
-        raise ValueError("Storage type is not supported")
+    def _create_buckets(self, spec: BlobStorageSpec, cluster: Cluster) -> BucketsConfig:
+        if not spec:
+            raise ValueError("Blob storage spec is empty")
 
-    def _create_gcp(self, spec: kopf.Spec, cluster: Cluster) -> GcpConfig:
-        cloud_provider = cluster["cloud_provider"]
-        iam_gcp_spec = spec.get("iam", {}).get("gcp")
-        service_account_key = self._base64_decode(
-            iam_gcp_spec.get("serviceAccountKeyBase64")
-        ) or json.dumps(cloud_provider["credentials"])
-        service_account_key_base64 = iam_gcp_spec.get(
-            "serviceAccountKeyBase64"
-        ) or self._base64_encode(json.dumps(cloud_provider["credentials"]))
-        return GcpConfig(
-            project=cloud_provider["project"],
-            region=cloud_provider["region"],
-            service_account_key=service_account_key,
-            service_account_key_base64=service_account_key_base64,
-        )
+        disable_creation = cluster["buckets"].get("disable_creation", False)
 
-    def _create_aws(self, spec: kopf.Spec, cluster: Cluster) -> "AwsConfig":
-        registry_url = URL(spec["registry"]["aws"]["url"])
-        if not registry_url.scheme:
-            registry_url = URL(f"https://{registry_url!s}")
-        return AwsConfig(
-            region=cluster["cloud_provider"]["region"],
-            role_arn=spec.get("iam", {}).get("aws", {}).get("roleArn", ""),
-            s3_role_arn=spec.get("iam", {}).get("aws", {}).get("s3RoleArn", ""),
-            registry_url=registry_url,
-        )
-
-    def _create_azure(self, spec: kopf.Spec, cluster: Cluster) -> AzureConfig:
-        registry_url = URL(spec["registry"]["azure"]["url"])
-        if not registry_url.scheme:
-            registry_url = URL(f"https://{registry_url!s}")
-        return AzureConfig(
-            region=cluster["cloud_provider"]["region"],
-            registry_url=registry_url,
-            registry_username=spec["registry"]["azure"]["username"],
-            registry_password=spec["registry"]["azure"]["password"],
-            blob_storage_account_name=spec["blobStorage"]["azure"][
-                "storageAccountName"
-            ],
-            blob_storage_account_key=spec["blobStorage"]["azure"]["storageAccountKey"],
-        )
-
-    def _create_on_prem(self, spec: kopf.Spec, cluster: Cluster) -> OnPremConfig:
-        kubernetes_spec = spec["kubernetes"]
-
-        if "kubernetes" in spec["registry"]:
-            registry_persistence = spec["registry"]["kubernetes"]["persistence"]
-            docker_registry_install = True
-            registry_url = URL.build(
-                scheme="http",
-                host=f"{self._config.helm_release_names.platform}-docker-registry",
-                port=5000,
+        if BucketsProvider.AWS in spec:
+            return BucketsConfig(
+                provider=BucketsProvider.AWS,
+                disable_creation=disable_creation,
+                aws_region=spec.aws_region,
             )
-            # Credentials are not important as we don't expose
-            # service outside of the network.
-            registry_username = ""
-            registry_password = ""
-            registry_storage_class_name = registry_persistence["storageClassName"]
-            registry_storage_size = registry_persistence.get("size") or "10Gi"
-
-        if "docker" in spec["registry"]:
-            docker_registry_install = False
-            registry_url = URL(spec["registry"]["docker"]["url"])
-            registry_username = spec["registry"]["docker"].get("username", "")
-            registry_password = spec["registry"]["docker"].get("password", "")
-            registry_storage_class_name = ""
-            registry_storage_size = ""
-
-        if "kubernetes" in spec["blobStorage"]:
-            blob_storage_persistence = spec["blobStorage"]["kubernetes"]["persistence"]
-            minio_install = True
-            blob_storage_url = URL.build(
-                scheme="http",
-                host=f"{self._config.helm_release_names.platform}-minio",
-                port=9000,
+        elif BucketsProvider.GCP in spec:
+            return BucketsConfig(
+                provider=BucketsProvider.GCP,
+                gcp_project=spec.gcp_project,
+                disable_creation=disable_creation,
             )
-            blob_storage_region = "minio"
-            # Credentials are not important as we don't expose
-            # service outside of the network.
-            blob_storage_public_url = URL(f"https://blob.{cluster.dns_name}")
-            blob_storage_access_key = cluster["credentials"]["minio"]["username"]
-            blob_storage_secret_key = cluster["credentials"]["minio"]["password"]
-            blob_storage_class_name = blob_storage_persistence["storageClassName"]
-            blob_storage_size = blob_storage_persistence.get("size") or "10Gi"
+        elif BucketsProvider.AZURE in spec:
+            return BucketsConfig(
+                provider=BucketsProvider.AZURE,
+                disable_creation=disable_creation,
+                azure_storage_account_name=spec.azure_storrage_account_name,
+                azure_storage_account_key=spec.azure_storrage_account_key,
+            )
+        elif BucketsProvider.EMC_ECS in spec:
+            return BucketsConfig(
+                provider=BucketsProvider.EMC_ECS,
+                disable_creation=disable_creation,
+                emc_ecs_access_key_id=spec.emc_ecs_access_key_id,
+                emc_ecs_secret_access_key=spec.emc_ecs_secret_access_key,
+                emc_ecs_s3_assumable_role=spec.emc_ecs_s3_role,
+                emc_ecs_s3_endpoint=URL(spec.emc_ecs_s3_endpoint),
+                emc_ecs_management_endpoint=URL(spec.emc_ecs_management_endpoint),
+            )
+        elif BucketsProvider.OPEN_STACK in spec:
+            return BucketsConfig(
+                provider=BucketsProvider.OPEN_STACK,
+                disable_creation=disable_creation,
+                open_stack_region_name=spec.open_stack_region,
+                open_stack_user=spec.open_stack_user,
+                open_stack_password=spec.open_stack_password,
+                open_stack_endpoint=URL(spec.open_stack_endpoint),
+                open_stack_s3_endpoint=URL(spec.open_stack_s3_endpoint),
+            )
+        elif BucketsProvider.MINIO in spec:
+            return BucketsConfig(
+                provider=BucketsProvider.MINIO,
+                disable_creation=disable_creation,
+                minio_url=URL(spec.minio_url),
+                # Ingress should be configured manually in this case
+                minio_public_url=URL(f"https://blob.{cluster.dns_name}"),
+                minio_region=spec.minio_region,
+                minio_access_key=spec.minio_access_key,
+                minio_secret_key=spec.minio_secret_key,
+            )
+        elif "kubernetes" in spec:
+            return BucketsConfig(
+                provider=BucketsProvider.MINIO,
+                disable_creation=disable_creation,
+                minio_install=True,
+                minio_url=URL.build(
+                    scheme="http",
+                    host=f"{self._config.helm_release_names.platform}-minio",
+                    port=9000,
+                ),
+                # Ingress should be configured manually in this case
+                minio_public_url=URL(f"https://blob.{cluster.dns_name}"),
+                minio_region="minio",
+                minio_access_key=cluster["credentials"]["minio"]["username"],
+                minio_secret_key=cluster["credentials"]["minio"]["password"],
+                minio_storage_class_name=spec.kubernetes_storage_class_name,
+                minio_storage_size=spec.kubernetes_storage_size or "10Gi",
+            )
+        else:
+            raise ValueError("Bucket provider is not supported")
 
-        if "minio" in spec["blobStorage"]:
-            minio_install = False
-            blob_storage_url = URL(spec["blobStorage"]["minio"]["url"])
-            # Ingress should be manually in this case
-            blob_storage_public_url = URL(f"https://blob.{cluster.dns_name}")
-            blob_storage_region = spec["blobStorage"]["minio"]["region"]
-            blob_storage_access_key = spec["blobStorage"]["minio"]["accessKey"]
-            blob_storage_secret_key = spec["blobStorage"]["minio"]["secretKey"]
-            blob_storage_class_name = ""
-            blob_storage_size = ""
+    def _create_registry(self, spec: RegistrySpec) -> RegistryConfig:
+        if not spec:
+            raise ValueError("Registry spec is empty")
 
-        return OnPremConfig(
-            docker_registry_install=docker_registry_install,
-            registry_url=registry_url,
-            registry_username=registry_username,
-            registry_password=registry_password,
-            registry_storage_class_name=registry_storage_class_name,
-            registry_storage_size=registry_storage_size,
-            minio_install=minio_install,
-            blob_storage_url=blob_storage_url,
-            blob_storage_public_url=blob_storage_public_url,
-            blob_storage_region=blob_storage_region,
-            blob_storage_access_key=blob_storage_access_key,
-            blob_storage_secret_key=blob_storage_secret_key,
-            blob_storage_class_name=blob_storage_class_name,
-            blob_storage_size=blob_storage_size,
-            kubelet_port=int(kubernetes_spec["nodePorts"]["kubelet"]),
-            http_node_port=int(kubernetes_spec["nodePorts"]["http"]),
-            https_node_port=int(kubernetes_spec["nodePorts"]["https"]),
-        )
+        if RegistryProvider.AWS in spec:
+            return RegistryConfig(
+                provider=RegistryProvider.AWS,
+                aws_account_id=spec.aws_account_id,
+                aws_region=spec.aws_region,
+            )
+        elif RegistryProvider.GCP in spec:
+            return RegistryConfig(
+                provider=RegistryProvider.GCP,
+                gcp_project=spec.gcp_project,
+            )
+        elif RegistryProvider.AZURE in spec:
+            url = URL(spec.azure_url)
+            if not url.scheme:
+                url = URL(f"https://{url!s}")
+            return RegistryConfig(
+                provider=RegistryProvider.AZURE,
+                azure_url=url,
+                azure_username=spec.azure_username,
+                azure_password=spec.azure_password,
+            )
+        elif RegistryProvider.DOCKER in spec:
+            return RegistryConfig(
+                provider=RegistryProvider.DOCKER,
+                docker_registry_url=URL(spec.docker_url),
+                docker_registry_username=spec.docker_username,
+                docker_registry_password=spec.docker_password,
+            )
+        elif "kubernetes" in spec:
+            return RegistryConfig(
+                provider=RegistryProvider.DOCKER,
+                docker_registry_install=True,
+                docker_registry_url=URL.build(
+                    scheme="http",
+                    host=f"{self._config.helm_release_names.platform}-docker-registry",
+                    port=5000,
+                ),
+                docker_registry_storage_class_name=spec.kubernetes_storage_class_name,
+                docker_registry_storage_size=spec.kubernetes_storage_size or "10Gi",
+            )
+        else:
+            raise ValueError("Registry provider is not supported")
+
+    def _create_monitoring(self, spec: MonitoringSpec) -> MonitoringConfig:
+        if not spec:
+            raise ValueError("Monitoring spec is empty")
+
+        if "blobStorage" in spec.metrics:
+            return MonitoringConfig(
+                logs_region=spec.logs_region,
+                logs_bucket_name=spec.logs_bucket,
+                metrics_storage_type=MetricsStorageType.BUCKETS,
+                metrics_region=spec.metrics_region,
+                metrics_bucket_name=spec.metrics_bucket,
+                metrics_retention_time=(
+                    spec.metrics_retention_time
+                    or MonitoringConfig.metrics_retention_time
+                ),
+            )
+        elif "kubernetes" in spec.metrics:
+            return MonitoringConfig(
+                logs_bucket_name=spec.logs_bucket,
+                metrics_storage_type=MetricsStorageType.KUBERNETES,
+                metrics_storage_class_name=spec.metrics_storage_class_name,
+                metrics_storage_size=spec.metrics_storage_size or "10Gi",
+                metrics_retention_time=(
+                    spec.metrics_retention_time
+                    or MonitoringConfig.metrics_retention_time
+                ),
+                metrics_region=spec.metrics_region,
+            )
+        else:
+            raise ValueError("Metrics storage type is not supported")
 
     @classmethod
     def _base64_encode(cls, value: str) -> str:
@@ -966,10 +1294,10 @@ class PlatformConfigFactory:
         return [cls._create_node_pool(np) for np in node_pools]
 
     @classmethod
-    def _create_node_pool(cls, node_pool: Mapping[str, Any]) -> Dict[str, Any]:
+    def _create_node_pool(cls, resource_pool: Mapping[str, Any]) -> Dict[str, Any]:
         return {
-            "name": node_pool["name"],
-            "idleSize": node_pool.get("idle_size", 0),
-            "cpu": node_pool["available_cpu"],
-            "gpu": node_pool.get("gpu", 0),
+            "name": resource_pool["name"],
+            "idleSize": resource_pool.get("idle_size", 0),
+            "cpu": resource_pool["available_cpu"],
+            "gpu": resource_pool.get("gpu", 0),
         }

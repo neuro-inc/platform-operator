@@ -25,6 +25,7 @@ from .kube_client import (
     PlatformStatusManager,
 )
 from .models import (
+    CloudProvider,
     Config,
     HelmRepoName,
     PlatformConfig,
@@ -384,9 +385,7 @@ async def is_obs_csi_driver_deploy_required(
 
 
 def has_gcs_storage(platform: PlatformConfig) -> bool:
-    return platform.gcp is not None and any(
-        s.type == StorageType.GCS for s in platform.storages
-    )
+    return any(s.type == StorageType.GCS for s in platform.storages)
 
 
 async def is_platform_deploy_required(
@@ -525,22 +524,22 @@ async def wait_for_cluster_configured(platform: PlatformConfig) -> None:
 
 
 async def configure_cluster(platform: PlatformConfig) -> None:
-    traefik_service: Optional[Dict[str, Any]] = None
-    aws_traefik_lb: Optional[Dict[str, Any]] = None
+    ingress_service: Optional[Dict[str, Any]] = None
+    aws_ingress_lb: Optional[Dict[str, Any]] = None
 
     if platform.ingress_controller_install:
-        traefik_service = await app.kube_client.get_service(
-            namespace=platform.namespace, name=platform.service_traefik_name
+        ingress_service = await app.kube_client.get_service(
+            namespace=platform.namespace, name=platform.ingress_service_name
         )
-        if platform.aws:
-            async with AwsElbClient(region=platform.aws.region) as client:
-                aws_traefik_lb = await client.get_load_balancer_by_dns_name(
-                    traefik_service["status"]["loadBalancer"]["ingress"][0]["hostname"]
+        if platform.kubernetes_provider == CloudProvider.AWS:
+            async with AwsElbClient(region=platform.aws_region) as client:
+                aws_ingress_lb = await client.get_load_balancer_by_dns_name(
+                    ingress_service.load_balancer_host
                 )
 
     cluster_config = platform.create_cluster_config(
-        traefik_service=traefik_service,
-        aws_traefik_lb=aws_traefik_lb,
+        ingress_service=ingress_service,
+        aws_ingress_lb=aws_ingress_lb,
     )
     await app.config_client.patch_cluster(
         cluster_name=platform.cluster_name, token=platform.token, payload=cluster_config

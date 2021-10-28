@@ -6,8 +6,13 @@ from yarl import URL
 
 from platform_operator.helm_values import HelmValuesFactory
 from platform_operator.models import (
+    BucketsConfig,
+    BucketsProvider,
     Config,
+    DockerConfig,
     LabelsConfig,
+    MetricsStorageType,
+    MonitoringConfig,
     PlatformConfig,
     StorageConfig,
     StorageType,
@@ -40,7 +45,7 @@ class TestHelmValuesFactory:
             "crictlImage": {"repository": "neuro.io/crictl"},
             "serviceToken": "token",
             "nodePools": [
-                {"name": "n1-highmem-8-name", "idleSize": 0, "cpu": 1.0, "gpu": 1}
+                {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "gpu": 1}
             ],
             "nodeLabels": {
                 "nodePool": "platform.neuromation.io/nodepool",
@@ -230,7 +235,14 @@ class TestHelmValuesFactory:
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_values(
-            replace(gcp_platform_config, docker_config_secret_create=False)
+            replace(
+                gcp_platform_config,
+                docker_config=DockerConfig(
+                    url=URL("https://neuro.io"),
+                    secret_name="secret",
+                    create_secret=False,
+                ),
+            )
         )
 
         assert result["dockerConfigSecret"] == {"create": False}
@@ -239,7 +251,7 @@ class TestHelmValuesFactory:
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_values(
-            replace(gcp_platform_config, docker_hub_registry=None)
+            replace(gcp_platform_config, docker_hub_config=None)
         )
 
         assert result["dockerHubConfigSecret"] == {"create": False}
@@ -291,12 +303,6 @@ class TestHelmValuesFactory:
                 },
             }
         ]
-        assert result["blobStorage"] == {
-            "azure": {
-                "storageAccountName": "accountName2",
-                "storageAccountKey": "accountKey2",
-            }
-        }
 
     def test_create_azure_platform_values_with_kubernetes_storage(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -406,13 +412,13 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(
             replace(
                 on_prem_platform_config,
-                on_prem=replace(
-                    on_prem_platform_config.on_prem, docker_registry_install=False
+                registry=replace(
+                    on_prem_platform_config.registry, docker_registry_install=False
                 ),
             )
         )
 
-        assert result["dockerRegistryEnabled"] is False
+        assert "dockerRegistryEnabled" not in result
         assert "docker-registry" not in result
 
     def test_create_on_prem_platform_values_without_minio(
@@ -421,11 +427,11 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(
             replace(
                 on_prem_platform_config,
-                on_prem=replace(on_prem_platform_config.on_prem, minio_install=False),
+                buckets=replace(on_prem_platform_config.buckets, minio_install=False),
             )
         )
 
-        assert result["minioEnabled"] is False
+        assert "minioEnabled" not in result
         assert "minio" not in result
 
     def test_create_vcd_platform_values(
@@ -433,7 +439,7 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_values(vcd_platform_config)
 
-        assert result["tags"] == {"on_prem": True}
+        assert result["tags"] == {"kubeadm": True}
 
     def test_create_docker_registry_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -463,7 +469,10 @@ class TestHelmValuesFactory:
                 "repository": "neuro.io/minio/minio",
                 "tag": "RELEASE.2021-08-25T00-41-18Z",
             },
-            "imagePullSecrets": [{"name": "platform-docker-config"}],
+            "imagePullSecrets": [
+                {"name": "platform-docker-config"},
+                {"name": "platform-docker-hub-config"},
+            ],
             "DeploymentUpdate": {
                 "type": "RollingUpdate",
                 "maxUnavailable": 1,
@@ -549,7 +558,10 @@ class TestHelmValuesFactory:
             },
             "image": "neuro.io/traefik",
             "imageTag": "1.7.20-alpine",
-            "imagePullSecrets": ["platform-docker-config"],
+            "imagePullSecrets": [
+                "platform-docker-config",
+                "platform-docker-hub-config",
+            ],
             "logLevel": "debug",
             "serviceType": "LoadBalancer",
             "externalTrafficPolicy": "Cluster",
@@ -820,21 +832,28 @@ class TestHelmValuesFactory:
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_buckets_api_values(
-            replace(
-                aws_platform_config,
-                aws=replace(aws_platform_config.aws, role_arn="s3_role"),
-            )
+            replace(aws_platform_config, aws_role_arn="s3_role")
         )
 
         assert result["annotations"] == {"iam.amazonaws.com/role": "s3_role"}
 
     def test_create_emc_ecs_buckets_api_values(
         self,
-        on_prem_platform_config_with_emc_ecs: PlatformConfig,
+        on_prem_platform_config: PlatformConfig,
         factory: HelmValuesFactory,
     ) -> None:
         result = factory.create_platform_buckets_api_values(
-            on_prem_platform_config_with_emc_ecs
+            replace(
+                on_prem_platform_config,
+                buckets=BucketsConfig(
+                    provider=BucketsProvider.EMC_ECS,
+                    emc_ecs_access_key_id="access_key",
+                    emc_ecs_secret_access_key="secret_key",
+                    emc_ecs_s3_endpoint=URL("https://emc-ecs.s3"),
+                    emc_ecs_management_endpoint=URL("https://emc-ecs.management"),
+                    emc_ecs_s3_assumable_role="s3-role",
+                ),
+            )
         )
 
         assert result == {
@@ -872,12 +891,10 @@ class TestHelmValuesFactory:
             "image": {"repository": "neuro.io/platformbucketsapi"},
             "ingress": {
                 "enabled": True,
-                "hosts": [
-                    f"{on_prem_platform_config_with_emc_ecs.cluster_name}.org.neu.ro"
-                ],
+                "hosts": [f"{on_prem_platform_config.cluster_name}.org.neu.ro"],
             },
             "platform": {
-                "clusterName": on_prem_platform_config_with_emc_ecs.cluster_name,
+                "clusterName": on_prem_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
@@ -891,7 +908,7 @@ class TestHelmValuesFactory:
             "secrets": [
                 {"data": {"token": "token"}, "name": "platform-buckets-api-token"},
                 {
-                    "data": {"key": "access-key", "secret": "secret-key"},
+                    "data": {"key": "access_key", "secret": "secret_key"},
                     "name": "platform-buckets-emc-ecs-key",
                 },
             ],
@@ -901,11 +918,21 @@ class TestHelmValuesFactory:
 
     def test_create_open_stack_buckets_api_values(
         self,
-        on_prem_platform_config_with_open_stack: PlatformConfig,
+        on_prem_platform_config: PlatformConfig,
         factory: HelmValuesFactory,
     ) -> None:
         result = factory.create_platform_buckets_api_values(
-            on_prem_platform_config_with_open_stack
+            replace(
+                on_prem_platform_config,
+                buckets=BucketsConfig(
+                    provider=BucketsProvider.OPEN_STACK,
+                    open_stack_user="account_id",
+                    open_stack_password="password",
+                    open_stack_s3_endpoint=URL("https://os.s3"),
+                    open_stack_endpoint=URL("https://os.management"),
+                    open_stack_region_name="region",
+                ),
+            ),
         )
 
         assert result == {
@@ -943,12 +970,10 @@ class TestHelmValuesFactory:
             "image": {"repository": "neuro.io/platformbucketsapi"},
             "ingress": {
                 "enabled": True,
-                "hosts": [
-                    f"{on_prem_platform_config_with_open_stack.cluster_name}.org.neu.ro"
-                ],
+                "hosts": [f"{on_prem_platform_config.cluster_name}.org.neu.ro"],
             },
             "platform": {
-                "clusterName": on_prem_platform_config_with_open_stack.cluster_name,
+                "clusterName": on_prem_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
@@ -1129,7 +1154,6 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_registry_values(gcp_platform_config)
 
-        assert gcp_platform_config.gcp
         assert result == {
             "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
             "NP_REGISTRY_AUTH_URL": "https://dev.neu.ro",
@@ -1157,7 +1181,7 @@ class TestHelmValuesFactory:
                     "name": "platform-registry-gcp-key",
                     "data": {
                         "username": "_json_key",
-                        "password": gcp_platform_config.gcp.service_account_key,
+                        "password": gcp_platform_config.gcp_service_account_key,
                     },
                 },
             ],
@@ -1235,10 +1259,7 @@ class TestHelmValuesFactory:
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_registry_values(
-            replace(
-                aws_platform_config,
-                aws=replace(aws_platform_config.aws, role_arn="ecr_role"),
-            )
+            replace(aws_platform_config, aws_role_arn="ecr_role")
         )
 
         assert result["annotations"] == {"iam.amazonaws.com/role": "ecr_role"}
@@ -1248,7 +1269,6 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_registry_values(azure_platform_config)
 
-        assert azure_platform_config.azure
         assert result == {
             "NP_CLUSTER_NAME": azure_platform_config.cluster_name,
             "NP_REGISTRY_AUTH_URL": "https://dev.neu.ro",
@@ -1275,8 +1295,8 @@ class TestHelmValuesFactory:
                 {
                     "name": "platform-registry-azure-credentials",
                     "data": {
-                        "username": azure_platform_config.azure.registry_username,
-                        "password": azure_platform_config.azure.registry_password,
+                        "username": azure_platform_config.registry.azure_username,
+                        "password": azure_platform_config.registry.azure_password,
                     },
                 },
             ],
@@ -1430,7 +1450,7 @@ class TestHelmValuesFactory:
                     "gcp": {
                         "bucket": "job-logs",
                         "project": "project",
-                        "region": "us-central1",
+                        "location": "us",
                         "serviceAccountKeyBase64": "e30=",
                     },
                 }
@@ -1440,6 +1460,30 @@ class TestHelmValuesFactory:
                 "clusterName": gcp_platform_config.cluster_name,
                 "sampleRate": 0.1,
             },
+        }
+
+    def test_create_gcp_platform_monitoring_values_with_custom_logs_region(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_monitoring_values(
+            replace(
+                gcp_platform_config,
+                monitoring=replace(
+                    gcp_platform_config.monitoring, logs_region="us-central1"
+                ),
+            )
+        )
+
+        assert result["logs"] == {
+            "persistence": {
+                "type": "gcp",
+                "gcp": {
+                    "bucket": "job-logs",
+                    "project": "project",
+                    "location": "us-central1",
+                    "serviceAccountKeyBase64": "e30=",
+                },
+            }
         }
 
     def test_create_aws_platform_monitoring_values(
@@ -1458,10 +1502,7 @@ class TestHelmValuesFactory:
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_monitoring_values(
-            replace(
-                aws_platform_config,
-                aws=replace(aws_platform_config.aws, role_arn="s3_role"),
-            )
+            replace(aws_platform_config, aws_role_arn="s3_role")
         )
 
         assert result["podAnnotations"] == {"iam.amazonaws.com/role": "s3_role"}
@@ -1479,7 +1520,6 @@ class TestHelmValuesFactory:
                 "type": "azure",
                 "azure": {
                     "bucket": "job-logs",
-                    "region": "westus",
                     "storageAccountKey": "accountKey2",
                     "storageAccountName": "accountName2",
                 },
@@ -1630,10 +1670,16 @@ class TestHelmValuesFactory:
                 }
             },
             "prometheus-operator": {
-                "global": {"imagePullSecrets": [{"name": "platform-docker-config"}]},
+                "global": {
+                    "imagePullSecrets": [
+                        {"name": "platform-docker-config"},
+                        {"name": "platform-docker-hub-config"},
+                    ]
+                },
                 "prometheus": {
                     "prometheusSpec": {
                         "image": {"repository": "neuro.io/prometheus/prometheus"},
+                        "retention": "15d",
                         "thanos": {
                             "image": "neuro.io/thanos/thanos:v0.14.0",
                             "version": "v0.14.0",
@@ -1689,13 +1735,19 @@ class TestHelmValuesFactory:
                 "kube-state-metrics": {
                     "image": {"repository": "neuro.io/coreos/kube-state-metrics"},
                     "serviceAccount": {
-                        "imagePullSecrets": [{"name": "platform-docker-config"}]
+                        "imagePullSecrets": [
+                            {"name": "platform-docker-config"},
+                            {"name": "platform-docker-hub-config"},
+                        ]
                     },
                 },
                 "prometheus-node-exporter": {
                     "image": {"repository": "neuro.io/prometheus/node-exporter"},
                     "serviceAccount": {
-                        "imagePullSecrets": [{"name": "platform-docker-config"}]
+                        "imagePullSecrets": [
+                            {"name": "platform-docker-config"},
+                            {"name": "platform-docker-hub-config"},
+                        ]
                     },
                 },
             },
@@ -1727,18 +1779,27 @@ class TestHelmValuesFactory:
             "grafana": {
                 "image": {
                     "repository": "neuro.io/grafana/grafana",
-                    "pullSecrets": ["platform-docker-config"],
+                    "pullSecrets": [
+                        "platform-docker-config",
+                        "platform-docker-hub-config",
+                    ],
                 },
                 "initChownData": {
                     "image": {
                         "repository": "neuro.io/busybox",
-                        "pullSecrets": ["platform-docker-config"],
+                        "pullSecrets": [
+                            "platform-docker-config",
+                            "platform-docker-hub-config",
+                        ],
                     }
                 },
                 "sidecar": {
                     "image": {
                         "repository": "neuro.io/kiwigrid/k8s-sidecar",
-                        "pullSecrets": ["platform-docker-config"],
+                        "pullSecrets": [
+                            "platform-docker-config",
+                            "platform-docker-hub-config",
+                        ],
                     }
                 },
                 "adminUser": "admin",
@@ -1766,7 +1827,7 @@ class TestHelmValuesFactory:
         result = factory.create_platform_reports_values(
             replace(
                 gcp_platform_config,
-                kubernetes_node_labels=LabelsConfig(
+                node_labels=LabelsConfig(
                     job="other.io/job",
                     node_pool="other.io/node-pool",
                     accelerator="other.io/accelerator",
@@ -1818,10 +1879,7 @@ class TestHelmValuesFactory:
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_reports_values(
-            replace(
-                aws_platform_config,
-                aws=replace(aws_platform_config.aws, role_arn="role_arn"),
-            )
+            replace(aws_platform_config, aws_role_arn="role_arn")
         )
 
         assert result["metricsServer"]["podMetadata"]["annotations"] == {
@@ -1882,13 +1940,116 @@ class TestHelmValuesFactory:
         )
         assert "cloudProvider" not in result
 
+    def test_create_on_prem_platform_reports_values_with_minio(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_reports_values(
+            replace(
+                on_prem_platform_config,
+                buckets=BucketsConfig(
+                    provider=BucketsProvider.MINIO,
+                    minio_public_url=URL("https://minio.org.neu.ro"),
+                    minio_url=URL("http://platform-minio:9000"),
+                    minio_region="minio",
+                    minio_access_key="minio_access_key",
+                    minio_secret_key="minio_secret_key",
+                    minio_storage_class_name="blob-storage-standard",
+                    minio_storage_size="10Gi",
+                ),
+                monitoring=MonitoringConfig(
+                    logs_bucket_name="job-logs",
+                    metrics_storage_type=MetricsStorageType.BUCKETS,
+                    metrics_bucket_name="job-metrics",
+                ),
+            )
+        )
+
+        assert result["thanos"]["objstore"] == {
+            "type": "S3",
+            "config": {
+                "bucket": "job-metrics",
+                "region": "minio",
+                "endpoint": "http://platform-minio:9000",
+                "access_key": "minio_access_key",
+                "secret_key": "minio_secret_key",
+            },
+        }
+
+    def test_create_on_prem_platform_reports_values_with_emc_ecs(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_reports_values(
+            replace(
+                on_prem_platform_config,
+                buckets=BucketsConfig(
+                    provider=BucketsProvider.EMC_ECS,
+                    emc_ecs_access_key_id="emc_ecs_access_key",
+                    emc_ecs_secret_access_key="emc_ecs_secret_key",
+                    emc_ecs_s3_endpoint=URL("https://emc-ecs.s3"),
+                    emc_ecs_management_endpoint=URL("https://emc-ecs.management"),
+                    emc_ecs_s3_assumable_role="s3-role",
+                ),
+                monitoring=MonitoringConfig(
+                    logs_bucket_name="job-logs",
+                    metrics_storage_type=MetricsStorageType.BUCKETS,
+                    metrics_bucket_name="job-metrics",
+                ),
+            )
+        )
+
+        assert result["thanos"]["objstore"] == {
+            "type": "S3",
+            "config": {
+                "bucket": "job-metrics",
+                "endpoint": "https://emc-ecs.s3",
+                "access_key": "emc_ecs_access_key",
+                "secret_key": "emc_ecs_secret_key",
+            },
+        }
+
+    def test_create_on_prem_platform_reports_values_with_open_stack(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_reports_values(
+            replace(
+                on_prem_platform_config,
+                buckets=BucketsConfig(
+                    provider=BucketsProvider.OPEN_STACK,
+                    open_stack_user="os_user",
+                    open_stack_password="os_password",
+                    open_stack_s3_endpoint=URL("https://os.s3"),
+                    open_stack_endpoint=URL("https://os.management"),
+                    open_stack_region_name="os_region",
+                ),
+                monitoring=MonitoringConfig(
+                    logs_bucket_name="job-logs",
+                    metrics_storage_type=MetricsStorageType.BUCKETS,
+                    metrics_bucket_name="job-metrics",
+                ),
+            )
+        )
+
+        assert result["thanos"]["objstore"] == {
+            "type": "S3",
+            "config": {
+                "bucket": "job-metrics",
+                "region": "os_region",
+                "endpoint": "https://os.s3",
+                "access_key": "os_user",
+                "secret_key": "os_password",
+            },
+        }
+
     def test_create_on_prem_platform_reports_values_with_retention(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         on_prem_platform_config = replace(
             on_prem_platform_config,
-            monitoring_metrics_retention_time="1d",
-            monitoring_metrics_storage_size="10Gi",
+            monitoring=replace(
+                on_prem_platform_config.monitoring,
+                metrics_retention_time="1d",
+                metrics_storage_size="10Gi",
+            ),
         )
 
         result = factory.create_platform_reports_values(on_prem_platform_config)

@@ -7,9 +7,10 @@ import pytest
 from yarl import URL
 
 from platform_operator.models import (
+    BucketsConfig,
+    BucketsProvider,
     Cluster,
     Config,
-    EMCECSCredentials,
     HelmChartNames,
     HelmChartVersions,
     HelmReleaseNames,
@@ -17,9 +18,10 @@ from platform_operator.models import (
     KubeClientAuthType,
     KubeConfig,
     LabelsConfig,
-    OpenStackCredentials,
     PlatformConfig,
     PlatformConfigFactory,
+    RegistryConfig,
+    RegistryProvider,
     StorageConfig,
     StorageType,
 )
@@ -168,11 +170,6 @@ class TestCluster:
 
         assert cluster.name == "test"
 
-    def test_cloud_provider_type(self) -> None:
-        cluster = Cluster({"cloud_provider": {"type": "gcp"}})
-
-        assert cluster.cloud_provider_type == "gcp"
-
     def test_acme_environment(self) -> None:
         cluster = Cluster({"ingress": {"acme_environment": "staging"}})
 
@@ -208,11 +205,11 @@ class TestPlatformConfig:
     def test_create_dns_config_from_traefik_service(
         self, gcp_platform_config: PlatformConfig, traefik_service: Dict[str, Any]
     ) -> None:
-        result = gcp_platform_config.create_dns_config(traefik_service=traefik_service)
-        dns_name = gcp_platform_config.dns_name
+        result = gcp_platform_config.create_dns_config(ingress_service=traefik_service)
+        dns_name = gcp_platform_config.ingress_dns_name
 
         assert result == {
-            "name": gcp_platform_config.dns_name,
+            "name": gcp_platform_config.ingress_dns_name,
             "a_records": [
                 {"name": f"{dns_name}.", "ips": ["192.168.0.1"]},
                 {"name": f"*.jobs.{dns_name}.", "ips": ["192.168.0.1"]},
@@ -225,10 +222,10 @@ class TestPlatformConfig:
         self, on_prem_platform_config: PlatformConfig
     ) -> None:
         result = on_prem_platform_config.create_dns_config()
-        dns_name = on_prem_platform_config.dns_name
+        dns_name = on_prem_platform_config.ingress_dns_name
 
         assert result == {
-            "name": on_prem_platform_config.dns_name,
+            "name": on_prem_platform_config.ingress_dns_name,
             "a_records": [
                 {"name": f"{dns_name}.", "ips": ["192.168.0.3"]},
                 {"name": f"*.jobs.{dns_name}.", "ips": ["192.168.0.3"]},
@@ -245,12 +242,12 @@ class TestPlatformConfig:
         aws_traefik_lb: Dict[str, Any],
     ) -> None:
         result = aws_platform_config.create_dns_config(
-            traefik_service=aws_traefik_service, aws_traefik_lb=aws_traefik_lb
+            ingress_service=aws_traefik_service, aws_ingress_lb=aws_traefik_lb
         )
-        dns_name = aws_platform_config.dns_name
+        dns_name = aws_platform_config.ingress_dns_name
 
         assert result == {
-            "name": aws_platform_config.dns_name,
+            "name": aws_platform_config.ingress_dns_name,
             "a_records": [
                 {
                     "name": f"{dns_name}.",
@@ -280,16 +277,16 @@ class TestPlatformConfig:
         cluster_name: str,
         gcp_platform_config: PlatformConfig,
         traefik_service: Dict[str, Any],
-        resource_pool_type_factory: Callable[[str], Dict[str, Any]],
+        resource_pool_type_factory: Callable[..., Dict[str, Any]],
         resource_preset_factory: Callable[[], Dict[str, Any]],
     ) -> None:
         resource_preset = resource_preset_factory()
         resource_preset.pop("resource_affinity", None)
 
         result = gcp_platform_config.create_cluster_config(
-            traefik_service=traefik_service,
+            ingress_service=traefik_service,
         )
-        dns_name = gcp_platform_config.dns_name
+        dns_name = gcp_platform_config.ingress_dns_name
 
         assert result == {
             "orchestrator": {
@@ -299,7 +296,9 @@ class TestPlatformConfig:
                 "job_fallback_hostname": "default.jobs-dev.neu.ro",
                 "job_schedule_timeout_s": 60,
                 "job_schedule_scale_up_timeout_s": 30,
-                "resource_pool_types": [resource_pool_type_factory("192.168.0.0/16")],
+                "resource_pool_types": [
+                    resource_pool_type_factory("n1-highmem-8", "192.168.0.0/16")
+                ],
                 "resource_presets": [resource_preset],
                 "pre_pull_images": ["neuromation/base"],
                 "allow_privileged_mode": True,
@@ -313,7 +312,7 @@ class TestPlatformConfig:
                 ],
             },
             "dns": {
-                "name": gcp_platform_config.dns_name,
+                "name": gcp_platform_config.ingress_dns_name,
                 "a_records": [
                     {"name": f"{dns_name}.", "ips": ["192.168.0.1"]},
                     {"name": f"*.jobs.{dns_name}.", "ips": ["192.168.0.1"]},
@@ -352,7 +351,7 @@ class TestPlatformConfigFactory:
 
         result = factory.create(gcp_platform_body, gcp_cluster)
 
-        assert result.kubernetes_node_labels == LabelsConfig(
+        assert result.node_labels == LabelsConfig(
             job="job",
             node_pool="nodepool",
             accelerator="accelerator",
@@ -376,54 +375,18 @@ class TestPlatformConfigFactory:
         gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
-        resource_pool_type_factory: Callable[[], Dict[str, Any]],
+        resource_pool_type_factory: Callable[..., Dict[str, Any]],
     ) -> None:
         del gcp_platform_body["spec"]["kubernetes"]["tpuIPv4CIDR"]
         gcp_cluster["orchestrator"]["resource_pool_types"] = [
-            resource_pool_type_factory()
+            resource_pool_type_factory("n1-highmem-8")
         ]
         result = factory.create(gcp_platform_body, gcp_cluster)
 
         assert result == replace(
             gcp_platform_config,
-            jobs_resource_pool_types=[resource_pool_type_factory()],
+            jobs_resource_pool_types=[resource_pool_type_factory("n1-highmem-8")],
         )
-
-    def test_gcp_platform_config_without_service_account_key_in_spec(
-        self,
-        factory: PlatformConfigFactory,
-        gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        del gcp_platform_body["spec"]["iam"]["gcp"]["serviceAccountKeyBase64"]
-        result = factory.create(gcp_platform_body, gcp_cluster)
-
-        assert result == replace(
-            gcp_platform_config,
-            gcp=replace(
-                gcp_platform_config.gcp,
-                service_account_key=(
-                    '{"client_email": "test-acc@test-project.iam.gserviceaccount.com"}'
-                ),
-                service_account_key_base64=(
-                    "eyJjbGllbnRfZW1haWwiOiAidGVzdC1hY2NAdGV"
-                    "zdC1wcm9qZWN0LmlhbS5nc2VydmljZWFjY291bnQuY29tIn0="
-                ),
-            ),
-        )
-
-    def test_gcp_platform_config_without_service_account_key___fails(
-        self,
-        factory: PlatformConfigFactory,
-        gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
-    ) -> None:
-        del gcp_platform_body["spec"]["iam"]["gcp"]["serviceAccountKeyBase64"]
-        del gcp_cluster["cloud_provider"]["credentials"]
-
-        with pytest.raises(KeyError):
-            factory.create(gcp_platform_body, gcp_cluster)
 
     def test_gcp_platform_config_with_kubernetes_storage(
         self,
@@ -518,22 +481,9 @@ class TestPlatformConfigFactory:
         }
         result = factory.create(gcp_platform_body, gcp_cluster)
 
-        assert result.docker_config_secret_create is False
-        assert result.docker_config_secret_name == "secret"
-        assert result.image_pull_secret_names == ["secret"]
-
-    def test_gcp_platform_config_with_service_account_image_pull_secrets(
-        self,
-        factory: PlatformConfigFactory,
-        gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
-    ) -> None:
-        gcp_platform_body["spec"]["kubernetes"]["serviceAccount"] = {
-            "imagePullSecrets": [{"name": "secret"}, {"name": "platform-docker-config"}]
-        }
-        result = factory.create(gcp_platform_body, gcp_cluster)
-
-        assert result.image_pull_secret_names == ["secret", "platform-docker-config"]
+        assert result.docker_config.create_secret is False
+        assert result.docker_config.secret_name == "secret"
+        assert "secret" in result.image_pull_secret_names
 
     def test_gcp_platform_config_without_tracing(
         self,
@@ -568,7 +518,8 @@ class TestPlatformConfigFactory:
         del gcp_cluster["credentials"]["docker_hub"]
         result = factory.create(gcp_platform_body, gcp_cluster)
 
-        assert result.docker_hub_registry is None
+        assert result.image_pull_secret_names == ["platform-docker-config"]
+        assert result.docker_hub_config is None
 
     def test_aws_platform_config(
         self,
@@ -589,17 +540,14 @@ class TestPlatformConfigFactory:
         aws_platform_config: PlatformConfig,
     ) -> None:
         aws_platform_body["spec"]["iam"] = {
-            "aws": {"roleArn": "role_arn", "s3RoleArn": "s3-role-arn"}
+            "aws": {"roleArn": "role-arn", "s3RoleArn": "s3-role-arn"}
         }
         result = factory.create(aws_platform_body, aws_cluster)
 
         assert result == replace(
             aws_platform_config,
-            aws=replace(
-                aws_platform_config.aws,
-                role_arn="role_arn",
-                s3_role_arn="s3-role-arn",
-            ),
+            aws_role_arn="role-arn",
+            aws_s3_role_arn="s3-role-arn",
         )
 
     def test_aws_platform_config_without_registry__fails(
@@ -610,7 +558,7 @@ class TestPlatformConfigFactory:
     ) -> None:
         del aws_platform_body["spec"]["registry"]
 
-        with pytest.raises(KeyError):
+        with pytest.raises(ValueError, match="Registry spec is empty"):
             factory.create(aws_platform_body, aws_cluster)
 
     def test_aws_platform_config_with_kubernetes_storage(
@@ -662,7 +610,7 @@ class TestPlatformConfigFactory:
     ) -> None:
         azure_platform_body["spec"]["registry"] = {}
 
-        with pytest.raises(KeyError):
+        with pytest.raises(ValueError, match="Registry spec is empty"):
             factory.create(azure_platform_body, azure_cluster)
 
     def test_azure_platform_config_with_kubernetes_storage(
@@ -726,7 +674,7 @@ class TestPlatformConfigFactory:
     ) -> None:
         azure_platform_body["spec"]["blobStorage"] = {}
 
-        with pytest.raises(KeyError):
+        with pytest.raises(ValueError, match="Blob storage spec is empty"):
             factory.create(azure_platform_body, azure_cluster)
 
     def test_on_prem_platform_config(
@@ -795,17 +743,6 @@ class TestPlatformConfigFactory:
             ],
         )
 
-    def test_on_prem_platform_config_without_node_ports__fails(
-        self,
-        factory: PlatformConfigFactory,
-        on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
-    ) -> None:
-        del on_prem_platform_body["spec"]["kubernetes"]["nodePorts"]
-
-        with pytest.raises(KeyError):
-            factory.create(on_prem_platform_body, on_prem_cluster)
-
     def test_on_prem_platform_config_with_metrics_retention_time(
         self,
         factory: PlatformConfigFactory,
@@ -816,7 +753,7 @@ class TestPlatformConfigFactory:
 
         result = factory.create(on_prem_platform_body, on_prem_cluster)
 
-        assert result.monitoring_metrics_retention_time == "1d"
+        assert result.monitoring.metrics_retention_time == "1d"
 
     def test_on_prem_platform_config_without_disks_storage_class_name(
         self,
@@ -828,7 +765,7 @@ class TestPlatformConfigFactory:
 
         result = factory.create(on_prem_platform_body, on_prem_cluster)
 
-        assert result.disks_storage_class_name == ""
+        assert result.disks_storage_class_name == "platform-disk"
 
     def test_on_prem_platform_config_with_docker_registry(
         self,
@@ -846,11 +783,13 @@ class TestPlatformConfigFactory:
 
         result = factory.create(on_prem_platform_body, on_prem_cluster)
 
-        assert result.on_prem
-        assert result.on_prem.docker_registry_install is False
-        assert result.on_prem.registry_url == URL("http://docker-registry")
-        assert result.on_prem.registry_username == "docker_username"
-        assert result.on_prem.registry_password == "docker_password"
+        assert result.registry == RegistryConfig(
+            provider=RegistryProvider.DOCKER,
+            docker_registry_install=False,
+            docker_registry_url=URL("http://docker-registry"),
+            docker_registry_username="docker_username",
+            docker_registry_password="docker_password",
+        )
 
     def test_on_prem_platform_config_with_unprotected_docker_registry(
         self,
@@ -864,13 +803,15 @@ class TestPlatformConfigFactory:
 
         result = factory.create(on_prem_platform_body, on_prem_cluster)
 
-        assert result.on_prem
-        assert result.on_prem.docker_registry_install is False
-        assert result.on_prem.registry_url == URL("http://docker-registry")
-        assert result.on_prem.registry_username == ""
-        assert result.on_prem.registry_password == ""
+        assert result.registry == RegistryConfig(
+            provider=RegistryProvider.DOCKER,
+            docker_registry_install=False,
+            docker_registry_url=URL("http://docker-registry"),
+            docker_registry_username="",
+            docker_registry_password="",
+        )
 
-    def test_on_prem_platform_config_with_s3(
+    def test_on_prem_platform_config_with_minio_buckets(
         self,
         factory: PlatformConfigFactory,
         on_prem_platform_body: kopf.Body,
@@ -888,64 +829,68 @@ class TestPlatformConfigFactory:
 
         result = factory.create(on_prem_platform_body, on_prem_cluster)
 
-        assert result.on_prem
-        assert result.on_prem.minio_install is False
-        assert result.on_prem.blob_storage_url == URL("http://minio")
-        assert result.on_prem.blob_storage_public_url == URL(
-            f"https://blob.{cluster_name}.org.neu.ro"
+        assert result.buckets == BucketsConfig(
+            provider=BucketsProvider.MINIO,
+            minio_install=False,
+            minio_url=URL("http://minio"),
+            minio_public_url=URL(f"https://blob.{cluster_name}.org.neu.ro"),
+            minio_region="minio_region",
+            minio_access_key="minio_access_key",
+            minio_secret_key="minio_secret_key",
         )
-        assert result.on_prem.blob_storage_region == "minio_region"
-        assert result.on_prem.blob_storage_access_key == "minio_access_key"
-        assert result.on_prem.blob_storage_secret_key == "minio_secret_key"
 
-    def test_on_prem_platform_config_with_emc_ecs(
+    def test_on_prem_platform_config_with_emc_ecs_buckets(
         self,
         factory: PlatformConfigFactory,
         on_prem_platform_body: kopf.Body,
         on_prem_cluster: Cluster,
-        cluster_name: str,
     ) -> None:
-        on_prem_cluster["credentials"]["emc_ecs"] = {
-            "access_key_id": "key_id",
-            "secret_access_key": "secret_key",
-            "s3_endpoint": "https://emc-ecs.s3",
-            "management_endpoint": "https://emc-ecs.management",
-            "s3_assumable_role": "s3-role",
+        on_prem_platform_body["spec"]["blobStorage"] = {
+            "emcEcs": {
+                "accessKeyId": "key_id",
+                "secretAccessKey": "secret_key",
+                "s3Endpoint": "https://emc-ecs.s3",
+                "managementEndpoint": "https://emc-ecs.management",
+                "s3Role": "s3-role",
+            }
         }
 
         result = factory.create(on_prem_platform_body, on_prem_cluster)
 
-        assert result.emc_ecs_credentials == EMCECSCredentials(
-            access_key_id="key_id",
-            secret_access_key="secret_key",
-            s3_endpoint=URL("https://emc-ecs.s3"),
-            management_endpoint=URL("https://emc-ecs.management"),
-            s3_assumable_role="s3-role",
+        assert result.buckets == BucketsConfig(
+            provider=BucketsProvider.EMC_ECS,
+            emc_ecs_access_key_id="key_id",
+            emc_ecs_secret_access_key="secret_key",
+            emc_ecs_s3_endpoint=URL("https://emc-ecs.s3"),
+            emc_ecs_management_endpoint=URL("https://emc-ecs.management"),
+            emc_ecs_s3_assumable_role="s3-role",
         )
 
-    def test_on_prem_platform_config_with_open_stack(
+    def test_on_prem_platform_config_with_open_stack_buckets(
         self,
         factory: PlatformConfigFactory,
         on_prem_platform_body: kopf.Body,
         on_prem_cluster: Cluster,
-        cluster_name: str,
     ) -> None:
-        on_prem_cluster["credentials"]["open_stack"] = {
-            "account_id": "account_id",
-            "password": "password",
-            "s3_endpoint": "https://os.s3",
-            "endpoint": "https://os.management",
-            "region_name": "region",
+        on_prem_platform_body["spec"]["blobStorage"] = {
+            "openStack": {
+                "user": "account_id",
+                "password": "password",
+                "region": "region",
+                "s3Endpoint": "https://os.s3",
+                "endpoint": "https://os.management",
+            }
         }
 
         result = factory.create(on_prem_platform_body, on_prem_cluster)
 
-        assert result.open_stack_credentials == OpenStackCredentials(
-            account_id="account_id",
-            password="password",
-            s3_endpoint=URL("https://os.s3"),
-            endpoint=URL("https://os.management"),
-            region_name="region",
+        assert result.buckets == BucketsConfig(
+            provider=BucketsProvider.OPEN_STACK,
+            open_stack_user="account_id",
+            open_stack_password="password",
+            open_stack_s3_endpoint=URL("https://os.s3"),
+            open_stack_endpoint=URL("https://os.management"),
+            open_stack_region_name="region",
         )
 
     def test_vcd_platform_config(
