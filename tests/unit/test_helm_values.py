@@ -37,7 +37,7 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(gcp_platform_config)
 
         assert result == {
-            "tags": {"gcp": True},
+            "kubernetesProvider": "gcp",
             "traefikEnabled": True,
             "consulEnabled": False,
             "alpineImage": {"repository": "neuro.io/alpine"},
@@ -58,10 +58,6 @@ class TestHelmValuesFactory:
             "imagesPrepull": {
                 "refreshInterval": "1h",
                 "images": [{"image": "neuromation/base"}],
-            },
-            "standardStorageClass": {
-                "create": True,
-                "name": "platform-standard-topology-aware",
             },
             "dockerConfigSecret": {
                 "create": True,
@@ -359,7 +355,6 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_values(on_prem_platform_config)
 
-        assert result["standardStorageClass"] == {"create": False, "name": "standard"}
         assert result["storages"] == [
             {
                 "type": "kubernetes",
@@ -439,7 +434,7 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_values(vcd_platform_config)
 
-        assert result["tags"] == {"kubeadm": True}
+        assert result["kubernetesProvider"] == "kubeadm"
 
     def test_create_docker_registry_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory

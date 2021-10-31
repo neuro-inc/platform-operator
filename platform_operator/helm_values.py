@@ -32,7 +32,7 @@ class HelmValuesFactory:
     def create_platform_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
-            "tags": {platform.kubernetes_provider: True},
+            "kubernetesProvider": platform.kubernetes_provider,
             "traefikEnabled": platform.ingress_controller_install,
             "consulEnabled": platform.consul_install,
             "alpineImage": {"repository": f"{docker_server}/alpine"},
@@ -51,10 +51,6 @@ class HelmValuesFactory:
             "imagesPrepull": {
                 "refreshInterval": "1h",
                 "images": [{"image": image} for image in platform.pre_pull_images],
-            },
-            "standardStorageClass": {
-                "create": CloudProvider.has_value(platform.kubernetes_provider),
-                "name": platform.standard_storage_class_name,
             },
             "ingress": {
                 "jobFallbackHost": str(platform.jobs_fallback_host),

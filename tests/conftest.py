@@ -230,7 +230,11 @@ def gcp_platform_body(cluster_name: str) -> kopf.Body:
         "metadata": {"name": cluster_name},
         "spec": {
             "token": "token",
-            "kubernetes": {"provider": "gcp", "tpuIPv4CIDR": "192.168.0.0/16"},
+            "kubernetes": {
+                "provider": "gcp",
+                "standardStorageClassName": "platform-standard-topology-aware",
+                "tpuIPv4CIDR": "192.168.0.0/16",
+            },
             "iam": {"gcp": {"serviceAccountKeyBase64": "e30="}},
             "registry": {"gcp": {"project": "project"}},
             "storages": [{"nfs": {"server": "192.168.0.3", "path": "/"}}],
@@ -255,7 +259,10 @@ def aws_platform_body(cluster_name: str) -> kopf.Body:
         "metadata": {"name": cluster_name},
         "spec": {
             "token": "token",
-            "kubernetes": {"provider": "aws"},
+            "kubernetes": {
+                "provider": "aws",
+                "standardStorageClassName": "platform-standard-topology-aware",
+            },
             "registry": {"aws": {"accountId": "platform", "region": "us-east-1"}},
             "storages": [{"nfs": {"server": "192.168.0.3", "path": "/"}}],
             "blobStorage": {"aws": {"region": "us-east-1"}},
@@ -279,7 +286,10 @@ def azure_platform_body(cluster_name: str) -> kopf.Body:
         "metadata": {"name": cluster_name},
         "spec": {
             "token": "token",
-            "kubernetes": {"provider": "azure"},
+            "kubernetes": {
+                "provider": "azure",
+                "standardStorageClassName": "platform-standard-topology-aware",
+            },
             "registry": {
                 "azure": {
                     "url": "platform.azurecr.io",
@@ -324,8 +334,8 @@ def on_prem_platform_body(cluster_name: str) -> kopf.Body:
             "token": "token",
             "kubernetes": {
                 "provider": "kubeadm",
-                "ingressPublicIPs": ["192.168.0.3"],
                 "standardStorageClassName": "standard",
+                "ingressPublicIPs": ["192.168.0.3"],
             },
             "registry": {
                 "kubernetes": {

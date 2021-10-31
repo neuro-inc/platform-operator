@@ -369,6 +369,30 @@ class TestPlatformConfigFactory:
 
         assert result == gcp_platform_config
 
+    def test_gcp_platform_config_with_empty_storage_class(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: kopf.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        gcp_platform_body["spec"]["kubernetes"]["standardStorageClassName"] = ""
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result == replace(gcp_platform_config, standard_storage_class_name=None)
+
+    def test_gcp_platform_config_without_storage_class(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: kopf.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        del gcp_platform_body["spec"]["kubernetes"]["standardStorageClassName"]
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result == replace(gcp_platform_config, standard_storage_class_name=None)
+
     def test_gcp_platform_config_without_tpu(
         self,
         factory: PlatformConfigFactory,
@@ -468,6 +492,20 @@ class TestPlatformConfigFactory:
 
         assert result.jobs_namespace_create is False
         assert result.jobs_namespace == "jobs-namespace"
+
+    def test_gcp_platform_config_with_docker_config_secret_without_credentials(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: kopf.Body,
+        gcp_cluster: Cluster,
+    ) -> None:
+        gcp_cluster["credentials"]["neuro_registry"] = {"url": "https://neuro.io"}
+        del gcp_cluster["credentials"]["docker_hub"]
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result.docker_config.create_secret is False
+        assert not result.docker_config.secret_name
+        assert result.image_pull_secret_names == []
 
     def test_gcp_platform_config_with_custom_docker_config_secret(
         self,

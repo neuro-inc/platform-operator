@@ -280,7 +280,7 @@ class KubernetesSpec(Dict[str, Any]):
 
     @property
     def tpu_network(self) -> Optional[IPv4Network]:
-        return IPv4Network(self["tpuIPv4CIDR"]) if "tpuIPv4CIDR" in self else None
+        return IPv4Network(self["tpuIPv4CIDR"]) if self.get("tpuIPv4CIDR") else None
 
 
 class StorageSpec(Dict[str, Any]):
@@ -725,7 +725,7 @@ class PlatformConfig:
     service_account_name: str
     image_pull_secret_names: Sequence[str]
     pre_pull_images: Sequence[str]
-    standard_storage_class_name: str
+    standard_storage_class_name: Optional[str]
     kubernetes_provider: str
     kubernetes_version: str
     node_labels: LabelsConfig
@@ -935,8 +935,7 @@ class PlatformConfigFactory:
             ),
             pre_pull_images=cluster["orchestrator"].get("pre_pull_images", ()),
             standard_storage_class_name=(
-                spec.kubernetes.standard_storage_class_name
-                or f"{self._config.platform_namespace}-standard-topology-aware"
+                spec.kubernetes.standard_storage_class_name or None
             ),
             kubernetes_provider=spec.kubernetes.provider,
             kubernetes_version=self._config.kube_config.version,
@@ -1049,6 +1048,7 @@ class PlatformConfigFactory:
         username = data.get("username", "")
         password = data.get("password", "")
         if not username or not password:
+            secret_name = ""
             create_secret = False
         return DockerConfig(
             url=URL(data["url"]),
@@ -1064,7 +1064,7 @@ class PlatformConfigFactory:
     ) -> Sequence[str]:
         result: List[str] = []
         for config in docker_config:
-            if config:
+            if config and config.secret_name:
                 result.append(config.secret_name)
         return result
 
