@@ -5,10 +5,14 @@ from typing import Any, Dict, Optional
 import bcrypt
 
 from .models import (
+    BucketsProvider,
+    CloudProvider,
     HelmChartNames,
     HelmReleaseNames,
     LabelsConfig,
+    MetricsStorageType,
     PlatformConfig,
+    RegistryProvider,
     StorageConfig,
     StorageType,
 )
@@ -26,9 +30,9 @@ class HelmValuesFactory:
         self._container_runtime = container_runtime
 
     def create_platform_values(self, platform: PlatformConfig) -> Dict[str, Any]:
-        docker_server = platform.docker_registry.url.host
+        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
-            "tags": {platform.cloud_provider: True},
+            "kubernetesProvider": platform.kubernetes_provider,
             "traefikEnabled": platform.ingress_controller_install,
             "consulEnabled": platform.consul_install,
             "alpineImage": {"repository": f"{docker_server}/alpine"},
@@ -37,9 +41,9 @@ class HelmValuesFactory:
             "serviceToken": platform.token,
             "nodePools": platform.jobs_node_pools,
             "nodeLabels": {
-                "nodePool": platform.kubernetes_node_labels.node_pool,
-                "job": platform.kubernetes_node_labels.job,
-                "gpu": platform.kubernetes_node_labels.accelerator,
+                "nodePool": platform.node_labels.node_pool,
+                "job": platform.node_labels.job,
+                "gpu": platform.node_labels.accelerator,
             },
             "nvidiaGpuDriver": {
                 "image": {"repository": f"{docker_server}/nvidia/k8s-device-plugin"},
@@ -47,10 +51,6 @@ class HelmValuesFactory:
             "imagesPrepull": {
                 "refreshInterval": "1h",
                 "images": [{"image": image} for image in platform.pre_pull_images],
-            },
-            "standardStorageClass": {
-                "create": not platform.on_prem,
-                "name": platform.standard_storage_class_name,
             },
             "ingress": {
                 "jobFallbackHost": str(platform.jobs_fallback_host),
@@ -61,13 +61,13 @@ class HelmValuesFactory:
                     "create": platform.jobs_namespace_create,
                     "name": platform.jobs_namespace,
                 },
-                "label": platform.kubernetes_node_labels.job,
+                "label": platform.node_labels.job,
             },
             "idleJobs": [self._create_idle_job(job) for job in platform.idle_jobs],
             "storages": [self._create_storage_values(s) for s in platform.storages],
             "disks": {
                 "storageClass": {
-                    "create": not platform.on_prem,
+                    "create": CloudProvider.has_value(platform.kubernetes_provider),
                     "name": platform.disks_storage_class_name,
                 }
             },
@@ -100,51 +100,42 @@ class HelmValuesFactory:
                 self.create_platform_buckets_api_values(platform)
             ),
         }
-        if platform.docker_config_secret_create:
+        if platform.docker_config.create_secret:
             result["dockerConfigSecret"] = {
                 "create": True,
-                "name": platform.docker_config_secret_name,
+                "name": platform.docker_config.secret_name,
                 "credentials": {
-                    "url": str(platform.docker_registry.url),
-                    "email": platform.docker_registry.email,
-                    "username": platform.docker_registry.username,
-                    "password": platform.docker_registry.password,
+                    "url": str(platform.docker_config.url),
+                    "email": platform.docker_config.email,
+                    "username": platform.docker_config.username,
+                    "password": platform.docker_config.password,
                 },
             }
         else:
             result["dockerConfigSecret"] = {"create": False}
-        if platform.docker_hub_registry:
+        if platform.docker_hub_config and platform.docker_hub_config.create_secret:
             result["dockerHubConfigSecret"] = {
                 "create": True,
-                "name": platform.docker_hub_config_secret_name,
+                "name": platform.docker_hub_config.secret_name,
                 "credentials": {
-                    "url": str(platform.docker_hub_registry.url),
-                    "email": platform.docker_hub_registry.email,
-                    "username": platform.docker_hub_registry.username,
-                    "password": platform.docker_hub_registry.password,
+                    "url": str(platform.docker_hub_config.url),
+                    "email": platform.docker_hub_config.email,
+                    "username": platform.docker_hub_config.username,
+                    "password": platform.docker_hub_config.password,
                 },
             }
         else:
             result["dockerHubConfigSecret"] = {"create": False}
         if platform.consul_install:
             result[self._chart_names.consul] = self.create_consul_values(platform)
-        if platform.azure:
-            result["blobStorage"] = {
-                "azure": {
-                    "storageAccountName": platform.azure.blob_storage_account_name,
-                    "storageAccountKey": platform.azure.blob_storage_account_key,
-                }
-            }
-        if platform.on_prem:
-            result["tags"] = {"on_prem": True}
-            result["dockerRegistryEnabled"] = platform.on_prem.docker_registry_install
-            result["minioEnabled"] = platform.on_prem.minio_install
-            if platform.on_prem.docker_registry_install:
-                result[
-                    self._chart_names.docker_registry
-                ] = self.create_docker_registry_values(platform)
-            if platform.on_prem.minio_install:
-                result[self._chart_names.minio] = self.create_minio_values(platform)
+        if platform.registry.docker_registry_install:
+            result["dockerRegistryEnabled"] = True
+            result[
+                self._chart_names.docker_registry
+            ] = self.create_docker_registry_values(platform)
+        if platform.buckets.minio_install:
+            result["minioEnabled"] = True
+            result[self._chart_names.minio] = self.create_minio_values(platform)
         return result
 
     def _create_idle_job(self, job: Dict[str, Any]) -> Dict[str, Any]:
@@ -220,53 +211,62 @@ class HelmValuesFactory:
         raise ValueError(f"Storage type {storage.type.value!r} is not supported")
 
     def create_obs_csi_driver_values(self, platform: PlatformConfig) -> Dict[str, Any]:
-        assert platform.gcp
-        return {
-            "image": f"{platform.docker_registry.url.host}/obs-csi-driver",
+        result = {
+            "image": f"{platform.docker_config.url.host}/obs-csi-driver",
             "driverName": "obs.csi.neu.ro",
             "credentialsSecret": {
                 "create": True,
-                "gcpServiceAccountKeyBase64": platform.gcp.service_account_key_base64,
-            },
-            "imagePullSecret": {
-                "create": True,
-                "credentials": {
-                    "url": str(platform.docker_registry.url),
-                    "email": platform.docker_registry.email,
-                    "username": platform.docker_registry.username,
-                    "password": platform.docker_registry.password,
-                },
+                "gcpServiceAccountKeyBase64": platform.gcp_service_account_key_base64,
             },
         }
+        if platform.docker_config.create_secret:
+            result["imagePullSecret"] = {
+                "create": True,
+                "credentials": {
+                    "url": str(platform.docker_config.url),
+                    "email": platform.docker_config.email,
+                    "username": platform.docker_config.username,
+                    "password": platform.docker_config.password,
+                },
+            }
+        else:
+            result["imagePullSecret"] = {
+                "create": False,
+                "name": platform.docker_config.secret_name,
+            }
+        return result
 
     def create_docker_registry_values(self, platform: PlatformConfig) -> Dict[str, Any]:
-        assert platform.on_prem
         result: Dict[str, Any] = {
-            "image": {"repository": f"{platform.docker_registry.url.host}/registry"},
+            "image": {"repository": f"{platform.docker_config.url.host}/registry"},
             "ingress": {"enabled": False},
             "persistence": {
                 "enabled": True,
-                "storageClass": platform.on_prem.registry_storage_class_name,
-                "size": platform.on_prem.registry_storage_size,
+                "storageClass": platform.registry.docker_registry_storage_class_name,
+                "size": platform.registry.docker_registry_storage_size,
             },
             "secrets": {
                 "haSharedSecret": sha256(platform.cluster_name.encode()).hexdigest()
             },
             "configData": {"storage": {"delete": {"enabled": True}}},
         }
-        if platform.on_prem.registry_username and platform.on_prem.registry_password:
-            username = platform.on_prem.registry_username
+        if (
+            platform.registry.docker_registry_username
+            and platform.registry.docker_registry_password
+        ):
+            username = platform.registry.docker_registry_username
             password_hash = bcrypt.hashpw(
-                platform.on_prem.registry_password.encode(), bcrypt.gensalt(rounds=10)
+                platform.registry.docker_registry_password.encode(),
+                bcrypt.gensalt(rounds=10),
             ).decode()
             result["secrets"]["htpasswd"] = f"{username}:{password_hash}"
         return result
 
     def create_minio_values(self, platform: PlatformConfig) -> Dict[str, Any]:
-        assert platform.on_prem
+        assert platform.buckets.minio_public_url
         return {
             "image": {
-                "repository": f"{platform.docker_registry.url.host}/minio/minio",
+                "repository": f"{platform.docker_config.url.host}/minio/minio",
                 "tag": "RELEASE.2021-08-25T00-41-18Z",
             },
             "imagePullSecrets": [
@@ -280,29 +280,29 @@ class HelmValuesFactory:
             "mode": "standalone",
             "persistence": {
                 "enabled": True,
-                "storageClass": platform.on_prem.blob_storage_class_name,
-                "size": platform.on_prem.blob_storage_size,
+                "storageClass": platform.buckets.minio_storage_class_name,
+                "size": platform.buckets.minio_storage_size,
             },
-            "accessKey": platform.on_prem.blob_storage_access_key,
-            "secretKey": platform.on_prem.blob_storage_secret_key,
+            "accessKey": platform.buckets.minio_access_key,
+            "secretKey": platform.buckets.minio_secret_key,
             "ingress": {
                 "enabled": True,
                 "annotations": {
                     "kubernetes.io/ingress.class": "traefik",
                     "traefik.frontend.rule.type": "PathPrefix",
                 },
-                "hosts": [platform.on_prem.blob_storage_public_url.host],
+                "hosts": [platform.buckets.minio_public_url.host],
             },
-            "environment": {"MINIO_REGION_NAME": platform.on_prem.blob_storage_region},
+            "environment": {"MINIO_REGION_NAME": platform.buckets.minio_region},
         }
 
     def create_consul_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         result = {
-            "Image": f"{platform.docker_registry.url.host}/consul",
+            "Image": f"{platform.docker_config.url.host}/consul",
             "StorageClass": platform.standard_storage_class_name,
             "Replicas": 3,
         }
-        if platform.on_prem:
+        if not CloudProvider.has_value(platform.kubernetes_provider):
             result["Replicas"] = 1
         return result
 
@@ -314,7 +314,7 @@ class HelmValuesFactory:
                 "type": "RollingUpdate",
                 "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
             },
-            "image": f"{platform.docker_registry.url.host}/traefik",
+            "image": f"{platform.docker_config.url.host}/traefik",
             "imageTag": "1.7.20-alpine",
             "imagePullSecrets": platform.image_pull_secret_names,
             "logLevel": "debug",
@@ -402,8 +402,9 @@ class HelmValuesFactory:
                 "requests": {"cpu": "1200m", "memory": "5Gi"},
                 "limits": {"cpu": "1200m", "memory": "5Gi"},
             },
+            "timeouts": {"responding": {"idleTimeout": "600s"}},
         }
-        if platform.gcp:
+        if platform.kubernetes_provider == CloudProvider.GCP:
             result["timeouts"] = {
                 "responding": {
                     # must be greater than lb timeout
@@ -411,7 +412,7 @@ class HelmValuesFactory:
                     "idleTimeout": "660s"  # must be greater than lb timeout
                 }
             }
-        if platform.aws:
+        if platform.kubernetes_provider == CloudProvider.AWS:
             # aws lb default idle timeout is 60s
             # aws network lb default idle timeout is 350s and cannot be changed
             result["service"] = {
@@ -428,7 +429,7 @@ class HelmValuesFactory:
                     "idleTimeout": "660s"  # must be greater than lb timeout
                 }
             }
-        if platform.azure:
+        if platform.kubernetes_provider == CloudProvider.AZURE:
             # azure lb default and minimum idle timeout is 4m, maximum is 30m
             result["service"] = {
                 "annotations": {
@@ -444,20 +445,19 @@ class HelmValuesFactory:
                     "idleTimeout": "660s"  # must be greater than lb timeout
                 }
             }
-        if platform.on_prem:
+        if platform.ingress_public_ips:
             result["replicas"] = 1
             result["serviceType"] = "NodePort"
             result["service"] = {
                 "nodePorts": {
-                    "http": platform.on_prem.http_node_port,
-                    "https": platform.on_prem.https_node_port,
+                    "http": platform.ingress_http_node_port,
+                    "https": platform.ingress_https_node_port,
                 }
             }
             result["deployment"]["hostPort"] = {
                 "httpEnabled": True,
                 "httpsEnabled": True,
             }
-            result["timeouts"] = {"responding": {"idleTimeout": "600s"}}
         return result
 
     def _create_tracing_values(self, platform: PlatformConfig) -> Dict[str, Any]:
@@ -479,7 +479,7 @@ class HelmValuesFactory:
     def create_platform_storage_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
-        docker_server = platform.docker_registry.url.host
+        docker_server = platform.docker_config.url.host
         result = {
             "image": {"repository": f"{docker_server}/platformstorageapi"},
             "platform": {
@@ -518,7 +518,7 @@ class HelmValuesFactory:
     def create_platform_registry_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
-        docker_server = platform.docker_registry.url.host
+        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
             "NP_CLUSTER_NAME": platform.cluster_name,
             "NP_REGISTRY_AUTH_URL": str(platform.auth_url),
@@ -542,7 +542,7 @@ class HelmValuesFactory:
             ],
         }
         result.update(**self._create_tracing_values(platform))
-        if platform.gcp:
+        if platform.registry.provider == RegistryProvider.GCP:
             gcp_key_secret_name = f"{self._release_names.platform}-registry-gcp-key"
             result["upstreamRegistry"] = {
                 "type": "oauth",
@@ -565,7 +565,7 @@ class HelmValuesFactory:
                         }
                     }
                 },
-                "project": platform.gcp.project,
+                "project": platform.registry.gcp_project,
                 "maxCatalogEntries": 10000,
             }
             result["secrets"].append(
@@ -573,31 +573,35 @@ class HelmValuesFactory:
                     "name": gcp_key_secret_name,
                     "data": {
                         "username": "_json_key",
-                        "password": platform.gcp.service_account_key,
+                        "password": platform.gcp_service_account_key,
                     },
                 }
             )
-        if platform.aws:
-            result["AWS_DEFAULT_REGION"] = platform.aws.region
+        elif platform.registry.provider == RegistryProvider.AWS:
+            result["AWS_DEFAULT_REGION"] = platform.registry.aws_region
             result["upstreamRegistry"] = {
                 "type": "aws_ecr",
-                "url": str(platform.aws.registry_url),
+                "url": (
+                    f"https://{platform.registry.aws_account_id}.dkr.ecr"
+                    f".{platform.registry.aws_region}.amazonaws.com"
+                ),
                 "project": "neuro",
                 "maxCatalogEntries": 1000,
             }
-            if platform.aws.role_arn:
+            if platform.aws_role_arn:
                 result["annotations"] = {
-                    "iam.amazonaws.com/role": platform.aws.role_arn
+                    "iam.amazonaws.com/role": platform.aws_role_arn
                 }
-        if platform.azure:
+        elif platform.registry.provider == RegistryProvider.AZURE:
+            assert platform.registry.azure_url
             azure_credentials_secret_name = (
                 f"{self._release_names.platform}-registry-azure-credentials"
             )
             result["upstreamRegistry"] = {
                 "type": "oauth",
-                "url": str(platform.azure.registry_url),
-                "tokenUrl": str(platform.azure.registry_url / "oauth2/token"),
-                "tokenService": platform.azure.registry_url.host,
+                "url": str(platform.registry.azure_url),
+                "tokenUrl": str(platform.registry.azure_url / "oauth2/token"),
+                "tokenService": platform.registry.azure_url.host,
                 "tokenUsername": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -621,18 +625,18 @@ class HelmValuesFactory:
                 {
                     "name": azure_credentials_secret_name,
                     "data": {
-                        "username": platform.azure.registry_username,
-                        "password": platform.azure.registry_password,
+                        "username": platform.registry.azure_username,
+                        "password": platform.registry.azure_password,
                     },
                 }
             )
-        if platform.on_prem:
+        elif platform.registry.provider == RegistryProvider.DOCKER:
             docker_registry_credentials_secret_name = (
                 f"{self._release_names.platform}-docker-registry"
             )
             result["upstreamRegistry"] = {
                 "type": "basic",
-                "url": str(platform.on_prem.registry_url),
+                "url": str(platform.registry.docker_registry_url),
                 "basicUsername": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -656,17 +660,19 @@ class HelmValuesFactory:
                 {
                     "name": docker_registry_credentials_secret_name,
                     "data": {
-                        "username": platform.on_prem.registry_username,
-                        "password": platform.on_prem.registry_password,
+                        "username": platform.registry.docker_registry_username,
+                        "password": platform.registry.docker_registry_password,
                     },
                 }
             )
+        else:
+            assert False, "was unable to construct registry config"
         return result
 
     def create_platform_monitoring_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
-        docker_server = platform.docker_registry.url.host
+        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
             "NP_MONITORING_CLUSTER_NAME": platform.cluster_name,
             "NP_MONITORING_K8S_NS": platform.jobs_namespace,
@@ -677,8 +683,8 @@ class HelmValuesFactory:
             "NP_CORS_ORIGINS": ",".join(platform.ingress_cors_origins),
             "image": {"repository": f"{docker_server}/platformmonitoringapi"},
             "nodeLabels": {
-                "job": platform.kubernetes_node_labels.job,
-                "nodePool": platform.kubernetes_node_labels.node_pool,
+                "job": platform.node_labels.job,
+                "nodePool": platform.node_labels.node_pool,
             },
             "platform": {
                 "token": {
@@ -711,63 +717,69 @@ class HelmValuesFactory:
             ],
         }
         result.update(**self._create_tracing_values(platform))
-        if platform.gcp:
+        if platform.buckets.provider == BucketsProvider.GCP:
             result["logs"] = {
                 "persistence": {
                     "type": "gcp",
                     "gcp": {
                         "serviceAccountKeyBase64": (
-                            platform.gcp.service_account_key_base64
+                            platform.gcp_service_account_key_base64
                         ),
-                        "project": platform.gcp.project,
-                        "region": platform.gcp.region,
-                        "bucket": platform.monitoring_logs_bucket_name,
+                        "project": platform.buckets.gcp_project,
+                        "location": (
+                            platform.monitoring.logs_region
+                            or platform.buckets.gcp_location
+                        ),
+                        "bucket": platform.monitoring.logs_bucket_name,
                     },
                 }
             }
-        if platform.aws:
-            if platform.aws.role_arn:
+        elif platform.buckets.provider == BucketsProvider.AWS:
+            if platform.aws_role_arn:
                 result["podAnnotations"] = {
-                    "iam.amazonaws.com/role": platform.aws.role_arn
+                    "iam.amazonaws.com/role": platform.aws_role_arn
                 }
                 result["fluentd"]["podAnnotations"] = {
-                    "iam.amazonaws.com/role": platform.aws.role_arn
+                    "iam.amazonaws.com/role": platform.aws_role_arn
                 }
             result["logs"] = {
                 "persistence": {
                     "type": "aws",
                     "aws": {
-                        "region": platform.aws.region,
-                        "bucket": platform.monitoring_logs_bucket_name,
+                        "region": platform.buckets.aws_region,
+                        "bucket": platform.monitoring.logs_bucket_name,
                     },
                 }
             }
-        if platform.azure:
+        elif platform.buckets.provider == BucketsProvider.AZURE:
             result["logs"] = {
                 "persistence": {
                     "type": "azure",
                     "azure": {
-                        "storageAccountName": platform.azure.blob_storage_account_name,
-                        "storageAccountKey": platform.azure.blob_storage_account_key,
-                        "region": platform.azure.region,
-                        "bucket": platform.monitoring_logs_bucket_name,
+                        "storageAccountName": (
+                            platform.buckets.azure_storage_account_name
+                        ),
+                        "storageAccountKey": platform.buckets.azure_storage_account_key,
+                        "bucket": platform.monitoring.logs_bucket_name,
                     },
                 }
             }
-        if platform.on_prem:
+        elif platform.buckets.provider == BucketsProvider.MINIO:
             result["logs"] = {
                 "persistence": {
                     "type": "minio",
                     "minio": {
-                        "url": str(platform.on_prem.blob_storage_url),
-                        "accessKey": platform.on_prem.blob_storage_access_key,
-                        "secretKey": platform.on_prem.blob_storage_secret_key,
-                        "region": platform.on_prem.blob_storage_region,
-                        "bucket": platform.monitoring_logs_bucket_name,
+                        "url": str(platform.buckets.minio_url),
+                        "accessKey": platform.buckets.minio_access_key,
+                        "secretKey": platform.buckets.minio_secret_key,
+                        "region": platform.buckets.minio_region,
+                        "bucket": platform.monitoring.logs_bucket_name,
                     },
                 }
             }
-            result["NP_MONITORING_K8S_KUBELET_PORT"] = platform.on_prem.kubelet_port
+            result["NP_MONITORING_K8S_KUBELET_PORT"] = platform.kubelet_port
+        else:
+            assert False, "was unable to construct monitoring config"
         return result
 
     def create_platform_container_runtime_values(
@@ -781,7 +793,7 @@ class HelmValuesFactory:
                             {
                                 "matchExpressions": [
                                     {
-                                        "key": platform.kubernetes_node_labels.job,
+                                        "key": platform.node_labels.job,
                                         "operator": "Exists",
                                     }
                                 ]
@@ -796,7 +808,7 @@ class HelmValuesFactory:
     def create_platform_secrets_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
-        docker_server = platform.docker_registry.url.host
+        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
             "NP_CLUSTER_NAME": platform.cluster_name,
             "NP_SECRETS_K8S_NS": platform.jobs_namespace,
@@ -830,19 +842,19 @@ class HelmValuesFactory:
         object_store_config_map_name = "thanos-object-storage-config"
         relabelings = [
             self._relabel_reports_label(
-                platform.kubernetes_node_labels.job,
+                platform.node_labels.job,
                 LabelsConfig.job,
             ),
             self._relabel_reports_label(
-                platform.kubernetes_node_labels.node_pool,
+                platform.node_labels.node_pool,
                 LabelsConfig.node_pool,
             ),
             self._relabel_reports_label(
-                platform.kubernetes_node_labels.accelerator,
+                platform.node_labels.accelerator,
                 LabelsConfig.accelerator,
             ),
             self._relabel_reports_label(
-                platform.kubernetes_node_labels.preemptible,
+                platform.node_labels.preemptible,
                 LabelsConfig.preemptible,
             ),
         ]
@@ -854,17 +866,17 @@ class HelmValuesFactory:
                     "node.kubernetes.io/instance-type",
                 )
             )
-        docker_server = platform.docker_registry.url.host
+        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
             "image": {"repository": f"{docker_server}/platform-reports"},
             "nvidiaDCGMExporterImage": {
                 "repository": f"{docker_server}/nvidia/dcgm-exporter"
             },
             "nodePoolLabels": {
-                "job": platform.kubernetes_node_labels.job,
-                "gpu": platform.kubernetes_node_labels.accelerator,
-                "nodePool": platform.kubernetes_node_labels.node_pool,
-                "preemptible": platform.kubernetes_node_labels.preemptible,
+                "job": platform.node_labels.job,
+                "gpu": platform.node_labels.accelerator,
+                "nodePool": platform.node_labels.node_pool,
+                "preemptible": platform.node_labels.preemptible,
             },
             "objectStore": {
                 "supported": True,
@@ -909,6 +921,7 @@ class HelmValuesFactory:
                         "image": {
                             "repository": f"{docker_server}/prometheus/prometheus"
                         },
+                        "retention": platform.monitoring.metrics_retention_time,
                         "thanos": {
                             "image": f"{docker_server}/thanos/thanos:v0.14.0",
                             "version": "v0.14.0",
@@ -1019,90 +1032,129 @@ class HelmValuesFactory:
         }
         result.update(**self._create_tracing_values(platform))
         prometheus_spec = result["prometheus-operator"]["prometheus"]["prometheusSpec"]
-        if platform.gcp:
-            result["thanos"]["objstore"] = {
-                "type": "GCS",
-                "config": {
-                    "bucket": platform.monitoring_metrics_bucket_name,
-                    "service_account": b64decode(
-                        platform.gcp.service_account_key_base64
-                    ).decode(),
-                },
-            }
-            result["cloudProvider"] = {
-                "type": "gcp",
-                "region": platform.gcp.region,
-                "serviceAccountSecret": {
-                    "name": f"{self._release_names.platform}-reports-gcp-key",
-                    "key": "key.json",
-                },
-            }
-            result["secrets"].append(
-                {
-                    "name": f"{self._release_names.platform}-reports-gcp-key",
-                    "data": {"key.json": platform.gcp.service_account_key},
-                }
-            )
-        if platform.aws:
-            if platform.aws.role_arn:
-                result["metricsServer"] = {
-                    "podMetadata": {
-                        "annotations": {"iam.amazonaws.com/role": platform.aws.role_arn}
-                    }
-                }
-                prometheus_spec["podMetadata"] = {
-                    "annotations": {"iam.amazonaws.com/role": platform.aws.role_arn}
-                }
-                result["thanos"]["store"]["annotations"] = {
-                    "iam.amazonaws.com/role": platform.aws.role_arn
-                }
-                result["thanos"]["bucket"] = {
-                    "annotations": {"iam.amazonaws.com/role": platform.aws.role_arn}
-                }
-                result["thanos"]["compact"]["annotations"] = {
-                    "iam.amazonaws.com/role": platform.aws.role_arn
-                }
-            result["thanos"]["objstore"] = {
-                "type": "S3",
-                "config": {
-                    "bucket": platform.monitoring_metrics_bucket_name,
-                    "endpoint": f"s3.{platform.aws.region}.amazonaws.com",
-                },
-            }
-            result["cloudProvider"] = {"type": "aws", "region": platform.aws.region}
-        if platform.azure:
-            result["thanos"]["objstore"] = {
-                "type": "AZURE",
-                "config": {
-                    "container": platform.monitoring_metrics_bucket_name,
-                    "storage_account": platform.azure.blob_storage_account_name,
-                    "storage_account_key": platform.azure.blob_storage_account_key,
-                },
-            }
-            result["cloudProvider"] = {"type": "azure", "region": platform.azure.region}
-        if platform.on_prem:
+        if platform.monitoring.metrics_storage_type == MetricsStorageType.KUBERNETES:
             result["objectStore"] = {"supported": False}
             result["prometheusProxy"] = {
                 "prometheus": {"host": "prometheus-prometheus", "port": 9090}
             }
-            prometheus_spec["retention"] = (
-                platform.monitoring_metrics_retention_time or "15d"
-            )  # 15d is default prometheus retention time
-            if platform.monitoring_metrics_storage_size:
-                prometheus_spec["retentionSize"] = (
-                    platform.monitoring_metrics_storage_size.replace("i", "")
-                    + "B"  # Gi -> GB
-                )
+            prometheus_spec["retentionSize"] = (
+                platform.monitoring.metrics_storage_size.replace("i", "")
+                + "B"  # Gi -> GB
+            )
             prometheus_spec["storageSpec"]["volumeClaimTemplate"]["spec"] = {
-                "storageClassName": platform.monitoring_metrics_storage_class_name,
+                "storageClassName": platform.monitoring.metrics_storage_class_name,
                 "resources": {
-                    "requests": {"storage": platform.monitoring_metrics_storage_size}
+                    "requests": {"storage": platform.monitoring.metrics_storage_size}
                 },
             }
             # Because of the bug in helm the only way to delete thanos values
             # is to set it to empty string
             prometheus_spec["thanos"] = ""
             del result["thanos"]
+        elif platform.buckets.provider == BucketsProvider.GCP:
+            result["thanos"]["objstore"] = {
+                "type": "GCS",
+                "config": {
+                    "bucket": platform.monitoring.metrics_bucket_name,
+                    "service_account": b64decode(
+                        platform.gcp_service_account_key_base64
+                    ).decode(),
+                },
+            }
+            result["secrets"].append(
+                {
+                    "name": f"{self._release_names.platform}-reports-gcp-key",
+                    "data": {"key.json": platform.gcp_service_account_key},
+                }
+            )
+        elif platform.buckets.provider == BucketsProvider.AWS:
+            if platform.aws_role_arn:
+                result["metricsServer"] = {
+                    "podMetadata": {
+                        "annotations": {"iam.amazonaws.com/role": platform.aws_role_arn}
+                    }
+                }
+                prometheus_spec["podMetadata"] = {
+                    "annotations": {"iam.amazonaws.com/role": platform.aws_role_arn}
+                }
+                result["thanos"]["store"]["annotations"] = {
+                    "iam.amazonaws.com/role": platform.aws_role_arn
+                }
+                result["thanos"]["bucket"] = {
+                    "annotations": {"iam.amazonaws.com/role": platform.aws_role_arn}
+                }
+                result["thanos"]["compact"]["annotations"] = {
+                    "iam.amazonaws.com/role": platform.aws_role_arn
+                }
+            result["thanos"]["objstore"] = {
+                "type": "S3",
+                "config": {
+                    "bucket": platform.monitoring.metrics_bucket_name,
+                    "endpoint": f"s3.{platform.buckets.aws_region}.amazonaws.com",
+                },
+            }
+        elif platform.buckets.provider == BucketsProvider.AZURE:
+            result["thanos"]["objstore"] = {
+                "type": "AZURE",
+                "config": {
+                    "container": platform.monitoring.metrics_bucket_name,
+                    "storage_account": platform.buckets.azure_storage_account_name,
+                    "storage_account_key": platform.buckets.azure_storage_account_key,
+                },
+            }
+        elif platform.buckets.provider == BucketsProvider.MINIO:
+            result["thanos"]["objstore"] = {
+                "type": "S3",
+                "config": {
+                    "bucket": platform.monitoring.metrics_bucket_name,
+                    "endpoint": str(platform.buckets.minio_url),
+                    "region": platform.buckets.minio_region,
+                    "access_key": platform.buckets.minio_access_key,
+                    "secret_key": platform.buckets.minio_secret_key,
+                },
+            }
+        elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+            result["thanos"]["objstore"] = {
+                "type": "S3",
+                "config": {
+                    "bucket": platform.monitoring.metrics_bucket_name,
+                    "endpoint": str(platform.buckets.emc_ecs_s3_endpoint),
+                    "access_key": platform.buckets.emc_ecs_access_key_id,
+                    "secret_key": platform.buckets.emc_ecs_secret_access_key,
+                },
+            }
+        elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+            result["thanos"]["objstore"] = {
+                "type": "S3",
+                "config": {
+                    "bucket": platform.monitoring.metrics_bucket_name,
+                    "endpoint": str(platform.buckets.open_stack_s3_endpoint),
+                    "region": platform.buckets.open_stack_region_name,
+                    "access_key": platform.buckets.open_stack_user,
+                    "secret_key": platform.buckets.open_stack_password,
+                },
+            }
+        else:
+            assert False, "was unable to construct thanos object store config"
+        if platform.kubernetes_provider == CloudProvider.GCP:
+            result["cloudProvider"] = {
+                "type": "gcp",
+                "region": platform.monitoring.metrics_region,
+                "serviceAccountSecret": {
+                    "name": f"{self._release_names.platform}-reports-gcp-key",
+                    "key": "key.json",
+                },
+            }
+        if platform.kubernetes_provider == CloudProvider.AWS:
+            result["cloudProvider"] = {
+                "type": "aws",
+                "region": platform.monitoring.metrics_region,
+            }
+        if platform.kubernetes_provider == CloudProvider.AZURE:
+            result["cloudProvider"] = {
+                "type": "azure",
+                "region": platform.monitoring.metrics_region,
+            }
         return result
 
     def _relabel_reports_label(
@@ -1121,7 +1173,7 @@ class HelmValuesFactory:
     def create_platform_disk_api_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
-        docker_server = platform.docker_registry.url.host
+        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
             "image": {"repository": f"{docker_server}/platformdiskapi"},
             "disks": {
@@ -1160,7 +1212,7 @@ class HelmValuesFactory:
     def create_platformapi_poller_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
-        docker_server = platform.docker_registry.url.host
+        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
             "image": {"repository": f"{docker_server}/platformapi"},
             "platform": {
@@ -1186,10 +1238,10 @@ class HelmValuesFactory:
                 ),
             },
             "nodeLabels": {
-                "job": platform.kubernetes_node_labels.job,
-                "gpu": platform.kubernetes_node_labels.accelerator,
-                "preemptible": platform.kubernetes_node_labels.preemptible,
-                "nodePool": platform.kubernetes_node_labels.node_pool,
+                "job": platform.node_labels.job,
+                "gpu": platform.node_labels.accelerator,
+                "preemptible": platform.node_labels.preemptible,
+                "nodePool": platform.node_labels.node_pool,
             },
             "storages": [
                 {
@@ -1208,18 +1260,18 @@ class HelmValuesFactory:
             ],
         }
         result.update(**self._create_tracing_values(platform))
-        if platform.azure:
+        if platform.kubernetes_provider == CloudProvider.AZURE:
             result["jobs"][
                 "preemptibleTolerationKey"
             ] = "kubernetes.azure.com/scalesetpriority"
-        if platform.docker_hub_registry:
-            result["jobs"]["imagePullSecret"] = platform.docker_hub_config_secret_name
+        if platform.docker_hub_config:
+            result["jobs"]["imagePullSecret"] = platform.docker_hub_config.secret_name
         return result
 
     def create_platform_buckets_api_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
-        docker_server = platform.docker_registry.url.host
+        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
             "image": {"repository": f"{docker_server}/platformbucketsapi"},
             "bucketNamespace": platform.jobs_namespace,
@@ -1244,38 +1296,38 @@ class HelmValuesFactory:
                     "data": {"token": platform.token},
                 }
             ],
-            "disableCreation": platform.buckets_disable_creation,
+            "disableCreation": platform.buckets.disable_creation,
         }
         if platform.ingress_cors_origins:
             result["cors"] = {"origins": platform.ingress_cors_origins}
         result.update(**self._create_tracing_values(platform))
-        if platform.aws:
+        if platform.buckets.provider == BucketsProvider.AWS:
             result["bucketProvider"] = {
                 "type": "aws",
                 "aws": {
-                    "regionName": platform.aws.region,
-                    "s3RoleArn": platform.aws.s3_role_arn,
+                    "regionName": platform.buckets.aws_region,
+                    "s3RoleArn": platform.aws_s3_role_arn,
                 },
             }
-            if platform.aws.role_arn:
+            if platform.aws_role_arn:
                 result["annotations"] = {
-                    "iam.amazonaws.com/role": platform.aws.role_arn
+                    "iam.amazonaws.com/role": platform.aws_role_arn
                 }
-        elif platform.emc_ecs_credentials:
+        elif platform.buckets.provider == BucketsProvider.EMC_ECS:
             secret_name = f"{self._release_names.platform}-buckets-emc-ecs-key"
             result["secrets"].append(
                 {
                     "name": secret_name,
                     "data": {
-                        "key": platform.emc_ecs_credentials.access_key_id,
-                        "secret": platform.emc_ecs_credentials.secret_access_key,
+                        "key": platform.buckets.emc_ecs_access_key_id,
+                        "secret": platform.buckets.emc_ecs_secret_access_key,
                     },
                 }
             )
             result["bucketProvider"] = {
                 "type": "emc_ecs",
                 "emc_ecs": {
-                    "s3RoleUrn": platform.emc_ecs_credentials.s3_assumable_role,
+                    "s3RoleUrn": platform.buckets.emc_ecs_s3_assumable_role,
                     "accessKeyId": {
                         "valueFrom": {
                             "secretKeyRef": {
@@ -1292,27 +1344,27 @@ class HelmValuesFactory:
                             }
                         }
                     },
-                    "s3EndpointUrl": str(platform.emc_ecs_credentials.s3_endpoint),
+                    "s3EndpointUrl": str(platform.buckets.emc_ecs_s3_endpoint),
                     "managementEndpointUrl": str(
-                        platform.emc_ecs_credentials.management_endpoint
+                        platform.buckets.emc_ecs_management_endpoint
                     ),
                 },
             }
-        elif platform.open_stack_credentials:
+        elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
             secret_name = f"{self._release_names.platform}-buckets-open-stack-key"
             result["secrets"].append(
                 {
                     "name": secret_name,
                     "data": {
-                        "accountId": platform.open_stack_credentials.account_id,
-                        "password": platform.open_stack_credentials.password,
+                        "accountId": platform.buckets.open_stack_user,
+                        "password": platform.buckets.open_stack_password,
                     },
                 }
             )
             result["bucketProvider"] = {
                 "type": "open_stack",
                 "open_stack": {
-                    "regionName": platform.open_stack_credentials.region_name,
+                    "regionName": platform.buckets.open_stack_region_name,
                     "accountId": {
                         "valueFrom": {
                             "secretKeyRef": {
@@ -1329,36 +1381,36 @@ class HelmValuesFactory:
                             }
                         }
                     },
-                    "s3EndpointUrl": str(platform.open_stack_credentials.s3_endpoint),
-                    "endpointUrl": str(platform.open_stack_credentials.endpoint),
+                    "s3EndpointUrl": str(platform.buckets.open_stack_s3_endpoint),
+                    "endpointUrl": str(platform.buckets.open_stack_endpoint),
                 },
             }
-        elif platform.on_prem:
+        elif platform.buckets.provider == BucketsProvider.MINIO:
             result["bucketProvider"] = {
                 "type": "minio",
                 "minio": {
-                    "url": str(platform.on_prem.blob_storage_url),
-                    "publicUrl": str(platform.on_prem.blob_storage_public_url),
-                    "accessKeyId": platform.on_prem.blob_storage_access_key,
-                    "secretAccessKey": platform.on_prem.blob_storage_secret_key,
-                    "regionName": platform.on_prem.blob_storage_region,
+                    "url": str(platform.buckets.minio_url),
+                    "publicUrl": str(platform.buckets.minio_public_url),
+                    "accessKeyId": platform.buckets.minio_access_key,
+                    "secretAccessKey": platform.buckets.minio_secret_key,
+                    "regionName": platform.buckets.minio_region,
                 },
             }
-        elif platform.azure:
+        elif platform.buckets.provider == BucketsProvider.AZURE:
             secret_name = (
                 f"{self._release_names.platform}-buckets-azure-storage-account-key"
             )
             result["secrets"].append(
                 {
                     "name": secret_name,
-                    "data": {"key": platform.azure.blob_storage_account_key},
+                    "data": {"key": platform.buckets.azure_storage_account_key},
                 }
             )
             result["bucketProvider"] = {
                 "type": "azure",
                 "azure": {
                     "url": (
-                        f"https://{platform.azure.blob_storage_account_name}"
+                        f"https://{platform.buckets.azure_storage_account_name}"
                         f".blob.core.windows.net"
                     ),
                     "credential": {
@@ -1371,12 +1423,12 @@ class HelmValuesFactory:
                     },
                 },
             }
-        elif platform.gcp:
+        elif platform.buckets.provider == BucketsProvider.GCP:
             secret_name = f"{self._release_names.platform}-buckets-gcp-sa-key"
             result["secrets"].append(
                 {
                     "name": secret_name,
-                    "data": {"SAKeyB64": platform.gcp.service_account_key_base64},
+                    "data": {"SAKeyB64": platform.gcp_service_account_key_base64},
                 }
             )
             result["bucketProvider"] = {

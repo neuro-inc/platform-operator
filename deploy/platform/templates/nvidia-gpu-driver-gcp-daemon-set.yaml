@@ -1,4 +1,4 @@
-{{- if .Values.tags.gcp }}
+{{- if eq .Values.kubernetesProvider "gcp" }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
