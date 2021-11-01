@@ -71,7 +71,7 @@ helm_install:
 helm_repo_add:
 	helm repo add stable https://charts.helm.sh/stable --force-update
 	helm repo add hashicorp https://helm.releases.hashicorp.com
-	@helm repo add neuro https://neuro.jfrog.io/artifactory/helm-virtual-public \
+	@helm repo add neuro https://neuro.jfrog.io/artifactory/api/helm/helm-virtual-public \
 		--username ${ARTIFACTORY_USERNAME} \
 		--password ${ARTIFACTORY_PASSWORD}
 	@helm repo add neuro-local-public https://neuro.jfrog.io/artifactory/helm-local-public \
