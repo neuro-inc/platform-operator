@@ -21,7 +21,7 @@ spec:
   smb:
     driver: smb.csi.k8s.io
     readOnly: false
-    volumeHandle: {{ include "platform.smb.volumeHandle" . }}
+    volumeHandle: {{ include "platform.smb.volumeHandle" . }}-jobs
     volumeAttributes:
       source: //{{ .smb.server }}/{{ .smb.shareName }}
     nodeStageSecretRef:
