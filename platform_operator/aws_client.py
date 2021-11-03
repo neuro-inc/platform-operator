@@ -1,11 +1,11 @@
 from typing import Any, Dict, Optional
 
-import aiobotocore
+import aiobotocore.session
 from yarl import URL
 
 
 class AwsElbClient:
-    _session = aiobotocore.get_session()
+    _session = aiobotocore.session.get_session()
 
     def __init__(
         self,
