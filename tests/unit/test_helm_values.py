@@ -921,7 +921,7 @@ class TestHelmValuesFactory:
                 on_prem_platform_config,
                 buckets=BucketsConfig(
                     provider=BucketsProvider.OPEN_STACK,
-                    open_stack_user="account_id",
+                    open_stack_username="account_id",
                     open_stack_password="password",
                     open_stack_s3_endpoint=URL("https://os.s3"),
                     open_stack_endpoint=URL("https://os.management"),
@@ -2010,7 +2010,7 @@ class TestHelmValuesFactory:
                 on_prem_platform_config,
                 buckets=BucketsConfig(
                     provider=BucketsProvider.OPEN_STACK,
-                    open_stack_user="os_user",
+                    open_stack_username="os_user",
                     open_stack_password="os_password",
                     open_stack_s3_endpoint=URL("https://os.s3"),
                     open_stack_endpoint=URL("https://os.management"),

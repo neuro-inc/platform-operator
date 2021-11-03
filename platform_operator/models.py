@@ -385,8 +385,8 @@ class BlobStorageSpec(Dict[str, Any]):
         return self["openStack"]["region"]
 
     @property
-    def open_stack_user(self) -> str:
-        return self["openStack"]["user"]
+    def open_stack_username(self) -> str:
+        return self["openStack"]["username"]
 
     @property
     def open_stack_password(self) -> str:
@@ -689,7 +689,7 @@ class BucketsConfig:
     emc_ecs_management_endpoint: Optional[URL] = None
     emc_ecs_s3_assumable_role: str = ""
 
-    open_stack_user: str = ""
+    open_stack_username: str = ""
     open_stack_password: str = ""
     open_stack_endpoint: Optional[URL] = None
     open_stack_s3_endpoint: Optional[URL] = None
@@ -1150,7 +1150,7 @@ class PlatformConfigFactory:
                 provider=BucketsProvider.OPEN_STACK,
                 disable_creation=disable_creation,
                 open_stack_region_name=spec.open_stack_region,
-                open_stack_user=spec.open_stack_user,
+                open_stack_username=spec.open_stack_username,
                 open_stack_password=spec.open_stack_password,
                 open_stack_endpoint=URL(spec.open_stack_endpoint),
                 open_stack_s3_endpoint=URL(spec.open_stack_s3_endpoint),

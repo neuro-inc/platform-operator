@@ -281,9 +281,9 @@ spec:
                         type: string
                   openStack:
                     type: object
-                    required: [user, password, region, endpoint, s3Endpoint]
+                    required: [username, password, region, endpoint, s3Endpoint]
                     properties:
-                      user:
+                      username:
                         type: string
                       password:
                         type: string

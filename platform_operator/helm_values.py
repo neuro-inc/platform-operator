@@ -1130,7 +1130,7 @@ class HelmValuesFactory:
                     "bucket": platform.monitoring.metrics_bucket_name,
                     "endpoint": str(platform.buckets.open_stack_s3_endpoint),
                     "region": platform.buckets.open_stack_region_name,
-                    "access_key": platform.buckets.open_stack_user,
+                    "access_key": platform.buckets.open_stack_username,
                     "secret_key": platform.buckets.open_stack_password,
                 },
             }
@@ -1356,7 +1356,7 @@ class HelmValuesFactory:
                 {
                     "name": secret_name,
                     "data": {
-                        "accountId": platform.buckets.open_stack_user,
+                        "accountId": platform.buckets.open_stack_username,
                         "password": platform.buckets.open_stack_password,
                     },
                 }
