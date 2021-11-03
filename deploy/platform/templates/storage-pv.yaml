@@ -18,7 +18,7 @@ spec:
     path: {{ .nfs.path }}
     readOnly: false
   {{- else if eq .type "smb" }}
-  smb:
+  csi:
     driver: smb.csi.k8s.io
     readOnly: false
     volumeHandle: {{ include "platform.smb.volumeHandle" . }}
