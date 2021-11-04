@@ -212,7 +212,7 @@ async def delete(
 
     async with app.consul_client.lock_key(
         LOCK_KEY,
-        b"platform-deploying",
+        b"platform-deleting",
         session_ttl_s=15 * 60,
         sleep_s=3,
     ):

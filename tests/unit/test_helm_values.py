@@ -1540,6 +1540,65 @@ class TestHelmValuesFactory:
             },
         }
 
+    def test_create_on_prem_platform_monitoring_values_with_emc_ecs(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_monitoring_values(
+            replace(
+                on_prem_platform_config,
+                buckets=BucketsConfig(
+                    provider=BucketsProvider.EMC_ECS,
+                    emc_ecs_access_key_id="emc_ecs_access_key",
+                    emc_ecs_secret_access_key="emc_ecs_secret_key",
+                    emc_ecs_s3_endpoint=URL("https://emc-ecs.s3"),
+                    emc_ecs_management_endpoint=URL("https://emc-ecs.management"),
+                    emc_ecs_s3_assumable_role="s3-role",
+                ),
+            )
+        )
+
+        assert result["logs"] == {
+            "persistence": {
+                "type": "aws",
+                "aws": {
+                    "endpoint": "https://emc-ecs.s3",
+                    "accessKeyId": "emc_ecs_access_key",
+                    "secretAccessKey": "emc_ecs_secret_key",
+                    "bucket": "job-logs",
+                },
+            },
+        }
+
+    def test_create_on_prem_platform_monitoring_values_with_open_stack(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_monitoring_values(
+            replace(
+                on_prem_platform_config,
+                buckets=BucketsConfig(
+                    provider=BucketsProvider.OPEN_STACK,
+                    open_stack_username="os_user",
+                    open_stack_password="os_password",
+                    open_stack_s3_endpoint=URL("https://os.s3"),
+                    open_stack_endpoint=URL("https://os.management"),
+                    open_stack_region_name="os_region",
+                ),
+            )
+        )
+
+        assert result["logs"] == {
+            "persistence": {
+                "type": "aws",
+                "aws": {
+                    "endpoint": "https://os.s3",
+                    "accessKeyId": "os_user",
+                    "secretAccessKey": "os_password",
+                    "region": "os_region",
+                    "bucket": "job-logs",
+                },
+            },
+        }
+
     def test_create_gcp_platform_container_runtime_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:

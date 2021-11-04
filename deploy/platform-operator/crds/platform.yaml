@@ -321,8 +321,10 @@ spec:
                 - required: [aws]
                 - required: [gcp]
                 - required: [azure]
-                - required: [kubernetes]
+                - required: [emcEcs]
+                - required: [openStack]
                 - required: [minio]
+                - required: [kubernetes]
               monitoring:
                 type: object
                 required: [logs, metrics]

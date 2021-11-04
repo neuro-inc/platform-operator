@@ -764,6 +764,31 @@ class HelmValuesFactory:
                     },
                 }
             }
+        elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+            result["logs"] = {
+                "persistence": {
+                    "type": "aws",
+                    "aws": {
+                        "endpoint": str(platform.buckets.emc_ecs_s3_endpoint),
+                        "accessKeyId": platform.buckets.emc_ecs_access_key_id,
+                        "secretAccessKey": platform.buckets.emc_ecs_secret_access_key,
+                        "bucket": platform.monitoring.logs_bucket_name,
+                    },
+                }
+            }
+        elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+            result["logs"] = {
+                "persistence": {
+                    "type": "aws",
+                    "aws": {
+                        "endpoint": str(platform.buckets.open_stack_s3_endpoint),
+                        "accessKeyId": platform.buckets.open_stack_username,
+                        "secretAccessKey": platform.buckets.open_stack_password,
+                        "region": platform.buckets.open_stack_region_name,
+                        "bucket": platform.monitoring.logs_bucket_name,
+                    },
+                }
+            }
         elif platform.buckets.provider == BucketsProvider.MINIO:
             result["logs"] = {
                 "persistence": {

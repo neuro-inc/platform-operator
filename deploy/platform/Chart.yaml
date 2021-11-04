@@ -25,7 +25,7 @@ dependencies:
     repository: "@neuro"
     alias: platform-registry
   - name: platformmonitoringapi
-    version: "21.10.1"
+    version: "21.11.0"
     repository: "@neuro"
     alias: platform-monitoring
   - name: platform-container-runtime
