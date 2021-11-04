@@ -1565,6 +1565,7 @@ class TestHelmValuesFactory:
                     "accessKeyId": "emc_ecs_access_key",
                     "secretAccessKey": "emc_ecs_secret_key",
                     "bucket": "job-logs",
+                    "forcePathStyle": True,
                 },
             },
         }
@@ -1595,6 +1596,7 @@ class TestHelmValuesFactory:
                     "secretAccessKey": "os_password",
                     "region": "os_region",
                     "bucket": "job-logs",
+                    "forcePathStyle": True,
                 },
             },
         }
@@ -2023,7 +2025,7 @@ class TestHelmValuesFactory:
             "config": {
                 "bucket": "job-metrics",
                 "region": "minio",
-                "endpoint": "http://platform-minio:9000",
+                "endpoint": "platform-minio:9000",
                 "access_key": "minio_access_key",
                 "secret_key": "minio_secret_key",
             },
@@ -2055,7 +2057,7 @@ class TestHelmValuesFactory:
             "type": "S3",
             "config": {
                 "bucket": "job-metrics",
-                "endpoint": "https://emc-ecs.s3",
+                "endpoint": "emc-ecs.s3",
                 "access_key": "emc_ecs_access_key",
                 "secret_key": "emc_ecs_secret_key",
             },
@@ -2088,7 +2090,7 @@ class TestHelmValuesFactory:
             "config": {
                 "bucket": "job-metrics",
                 "region": "os_region",
-                "endpoint": "https://os.s3",
+                "endpoint": "os.s3",
                 "access_key": "os_user",
                 "secret_key": "os_password",
             },

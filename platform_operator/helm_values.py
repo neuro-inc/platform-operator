@@ -3,6 +3,7 @@ from hashlib import sha256
 from typing import Any, Dict, Optional
 
 import bcrypt
+from yarl import URL
 
 from .models import (
     BucketsProvider,
@@ -773,6 +774,7 @@ class HelmValuesFactory:
                         "accessKeyId": platform.buckets.emc_ecs_access_key_id,
                         "secretAccessKey": platform.buckets.emc_ecs_secret_access_key,
                         "bucket": platform.monitoring.logs_bucket_name,
+                        "forcePathStyle": True,
                     },
                 }
             }
@@ -786,6 +788,7 @@ class HelmValuesFactory:
                         "secretAccessKey": platform.buckets.open_stack_password,
                         "region": platform.buckets.open_stack_region_name,
                         "bucket": platform.monitoring.logs_bucket_name,
+                        "forcePathStyle": True,
                     },
                 }
             }
@@ -1128,32 +1131,39 @@ class HelmValuesFactory:
                 },
             }
         elif platform.buckets.provider == BucketsProvider.MINIO:
+            assert platform.buckets.minio_url
             result["thanos"]["objstore"] = {
                 "type": "S3",
                 "config": {
                     "bucket": platform.monitoring.metrics_bucket_name,
-                    "endpoint": str(platform.buckets.minio_url),
+                    "endpoint": self._get_url_authority(platform.buckets.minio_url),
                     "region": platform.buckets.minio_region,
                     "access_key": platform.buckets.minio_access_key,
                     "secret_key": platform.buckets.minio_secret_key,
                 },
             }
         elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+            assert platform.buckets.emc_ecs_s3_endpoint
             result["thanos"]["objstore"] = {
                 "type": "S3",
                 "config": {
                     "bucket": platform.monitoring.metrics_bucket_name,
-                    "endpoint": str(platform.buckets.emc_ecs_s3_endpoint),
+                    "endpoint": self._get_url_authority(
+                        platform.buckets.emc_ecs_s3_endpoint
+                    ),
                     "access_key": platform.buckets.emc_ecs_access_key_id,
                     "secret_key": platform.buckets.emc_ecs_secret_access_key,
                 },
             }
         elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+            assert platform.buckets.open_stack_s3_endpoint
             result["thanos"]["objstore"] = {
                 "type": "S3",
                 "config": {
                     "bucket": platform.monitoring.metrics_bucket_name,
-                    "endpoint": str(platform.buckets.open_stack_s3_endpoint),
+                    "endpoint": self._get_url_authority(
+                        platform.buckets.open_stack_s3_endpoint
+                    ),
                     "region": platform.buckets.open_stack_region_name,
                     "access_key": platform.buckets.open_stack_username,
                     "secret_key": platform.buckets.open_stack_password,
@@ -1194,6 +1204,11 @@ class HelmValuesFactory:
 
     def _convert_label_to_reports_value(self, value: str) -> str:
         return "label_" + value.replace(".", "_").replace("/", "_").replace("-", "_")
+
+    def _get_url_authority(self, url: URL) -> str:
+        assert url.is_absolute(), "Absolute url is required"
+        assert url.host
+        return url.host if url.is_default_port() else f"{url.host}:{url.port}"
 
     def create_platform_disk_api_values(
         self, platform: PlatformConfig
