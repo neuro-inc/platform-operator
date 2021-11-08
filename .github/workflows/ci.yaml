@@ -88,7 +88,7 @@ jobs:
     - name: Push chart to Artifactory
       run: make artifactory_helm_push
     - name: Build Docker image
-      run: make build
+      run: make docker_build
     - name: Upload image artifact
       uses: neuro-inc/upload-image-action@v21.9.2
       with:
