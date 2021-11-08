@@ -87,3 +87,10 @@ jobs:
         make helm_repo_add
     - name: Push chart to Artifactory
       run: make artifactory_helm_push
+    - name: Build Docker image
+      run: make build
+    - name: Upload image artifact
+      uses: neuro-inc/upload-image-action@v21.9.2
+      with:
+        image: platform-operator-controller
+        token: ${{ secrets.GITHUB_TOKEN }}
