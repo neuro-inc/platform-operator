@@ -91,9 +91,9 @@ class HelmChartNames:
     platform_container_runtime: str = "platform-container-runtime"
     platform_secrets: str = "platform-secrets"
     platform_reports: str = "platform-reports"
-    platform_disk_api: str = "platform-disk-api"
+    platform_disks: str = "platform-disks"
     platform_api_poller: str = "platform-api-poller"
-    platform_bucket_api: str = "platform-buckets-api"
+    platform_buckets: str = "platform-buckets"
 
 
 @dataclass(frozen=True)
@@ -117,6 +117,7 @@ class Config:
     platform_auth_url: URL
     platform_ingress_auth_url: URL
     platform_config_url: URL
+    platform_admin_url: URL
     platform_config_watch_interval_s: float
     platform_api_url: URL
     platform_namespace: str
@@ -165,6 +166,7 @@ class Config:
             platform_auth_url=URL(env["NP_PLATFORM_AUTH_URL"]),
             platform_ingress_auth_url=URL(env["NP_PLATFORM_INGRESS_AUTH_URL"]),
             platform_config_url=URL(env["NP_PLATFORM_CONFIG_URL"]),
+            platform_admin_url=URL(env["NP_PLATFORM_ADMIN_URL"]),
             platform_config_watch_interval_s=float(
                 env.get("NP_PLATFORM_CONFIG_WATCH_INTERVAL_S", "15")
             ),
@@ -719,6 +721,7 @@ class PlatformConfig:
     auth_url: URL
     ingress_auth_url: URL
     config_url: URL
+    admin_url: URL
     api_url: URL
     token: str
     cluster_name: str
@@ -781,6 +784,10 @@ class PlatformConfig:
         if path:
             name += path.replace("/", "-")
         return name
+
+    def get_image(self, name: str) -> str:
+        url = str(self.docker_config.url / name)
+        return url.replace("http://", "").replace("https://", "")
 
     def create_dns_config(
         self,
@@ -925,6 +932,7 @@ class PlatformConfigFactory:
             auth_url=self._config.platform_auth_url,
             ingress_auth_url=self._config.platform_ingress_auth_url,
             config_url=self._config.platform_config_url,
+            admin_url=self._config.platform_admin_url,
             api_url=self._config.platform_api_url,
             token=spec.token,
             cluster_name=metadata.name,
@@ -1023,8 +1031,8 @@ class PlatformConfigFactory:
         return HelmRepo(
             name=HelmRepoName.NEURO,
             url=URL(neuro_helm["url"]),
-            username=neuro_helm["username"],
-            password=neuro_helm["password"],
+            username=neuro_helm.get("username", ""),
+            password=neuro_helm.get("password", ""),
         )
 
     def _create_neuro_docker_config(

@@ -2,9 +2,9 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ .Release.Name }}-nvidia-gpu-driver
+  name: nvidia-gpu-driver
   labels: {{ include "platform.labels.standard" . | nindent 4 }}
-    component: nvidia-gpu-driver
+    service: nvidia-gpu-driver
 spec:
   updateStrategy:
     type: RollingUpdate
@@ -12,7 +12,7 @@ spec:
     matchLabels:
       app: {{ include "platform.name" . }}
       release: {{ .Release.Name }}
-      component: nvidia-gpu-driver
+      service: nvidia-gpu-driver
   template:
     metadata:
       # Mark this pod as a critical add-on; when enabled, the critical add-on scheduler
@@ -23,7 +23,7 @@ spec:
       labels:
         app: {{ include "platform.name" . }}
         release: {{ .Release.Name }}
-        component: nvidia-gpu-driver
+        service: nvidia-gpu-driver
     spec:
       affinity:
         nodeAffinity:

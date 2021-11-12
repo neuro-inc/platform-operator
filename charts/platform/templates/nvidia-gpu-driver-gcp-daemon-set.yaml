@@ -2,21 +2,21 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ .Release.Name }}-nvidia-gpu-driver
+  name: nvidia-gpu-driver
   labels: {{ include "platform.labels.standard" . | nindent 4 }}
-    component: nvidia-gpu-driver
+    service: nvidia-gpu-driver
 spec:
   selector:
     matchLabels:
       app: {{ include "platform.name" . }}
       release: {{ .Release.Name }}
-      component: nvidia-gpu-driver
+      service: nvidia-gpu-driver
   template:
     metadata:
       labels:
         app: {{ include "platform.name" . }}
         release: {{ .Release.Name }}
-        component: nvidia-gpu-driver
+        service: nvidia-gpu-driver
     spec:
       affinity:
         nodeAffinity:

@@ -41,8 +41,9 @@ class TestHelmValuesFactory:
             "traefikEnabled": True,
             "consulEnabled": False,
             "alpineImage": {"repository": "neuro.io/alpine"},
-            "pauseImage": {"repository": "neuro.io/google_containers/pause"},
+            "pauseImage": {"repository": "neuro.io/pause"},
             "crictlImage": {"repository": "neuro.io/crictl"},
+            "kubectlImage": {"repository": "neuro.io/kubectl"},
             "serviceToken": "token",
             "nodePools": [
                 {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "gpu": 1}
@@ -53,7 +54,7 @@ class TestHelmValuesFactory:
                 "gpu": "platform.neuromation.io/accelerator",
             },
             "nvidiaGpuDriver": {
-                "image": {"repository": "neuro.io/nvidia/k8s-device-plugin"},
+                "image": {"repository": "neuro.io/k8s-device-plugin"},
             },
             "imagesPrepull": {
                 "refreshInterval": "1h",
@@ -114,9 +115,9 @@ class TestHelmValuesFactory:
             "platform-container-runtime": mock.ANY,
             "platform-secrets": mock.ANY,
             "platform-reports": mock.ANY,
-            "platform-disk-api": mock.ANY,
+            "platform-disks": mock.ANY,
             "platform-api-poller": mock.ANY,
-            "platform-buckets-api": mock.ANY,
+            "platform-buckets": mock.ANY,
         }
 
     def test_create_gcp_platform_values_idle_jobs(
@@ -461,7 +462,7 @@ class TestHelmValuesFactory:
 
         assert result == {
             "image": {
-                "repository": "neuro.io/minio/minio",
+                "repository": "neuro.io/minio",
                 "tag": "RELEASE.2021-08-25T00-41-18Z",
             },
             "imagePullSecrets": [
@@ -524,17 +525,7 @@ class TestHelmValuesFactory:
             "Image": "neuro.io/consul",
             "Replicas": 3,
             "StorageClass": "platform-standard-topology-aware",
-        }
-
-    def test_create_on_prem_consul_values(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_consul_values(on_prem_platform_config)
-
-        assert result == {
-            "Image": "neuro.io/consul",
-            "Replicas": 1,
-            "StorageClass": "standard",
+            "Storage": "2Gi",
         }
 
     def test_create_gcp_traefik_values(
@@ -546,10 +537,16 @@ class TestHelmValuesFactory:
         result = factory.create_traefik_values(gcp_platform_config)
 
         assert result == {
+            "nameOverride": "traefik",
+            "fullnameOverride": "traefik",
             "replicas": 3,
             "deploymentStrategy": {
                 "type": "RollingUpdate",
                 "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
+            },
+            "deployment": {
+                "labels": {"service": "traefik"},
+                "podLabels": {"service": "traefik"},
             },
             "image": "neuro.io/traefik",
             "imageTag": "1.7.20-alpine",
@@ -603,10 +600,6 @@ class TestHelmValuesFactory:
                 "namespaces": ["platform", "platform-jobs"],
             },
             "rbac": {"enabled": True},
-            "deployment": {
-                "labels": {"platform.neuromation.io/app": "ingress"},
-                "podLabels": {"platform.neuromation.io/app": "ingress"},
-            },
             "extraVolumes": [
                 {
                     "name": "dns-challenge",
@@ -686,6 +679,8 @@ class TestHelmValuesFactory:
         result = factory.create_platform_storage_values(gcp_platform_config)
 
         assert result == {
+            "nameOverride": "platform-storage",
+            "fullnameOverride": "platform-storage",
             "image": {"repository": "neuro.io/platformstorageapi"},
             "ingress": {
                 "enabled": True,
@@ -773,12 +768,14 @@ class TestHelmValuesFactory:
             "clusterName": gcp_platform_config.cluster_name,
         }
 
-    def test_create_aws_buckets_api_values(
+    def test_create_aws_buckets_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_buckets_api_values(aws_platform_config)
+        result = factory.create_platform_buckets_values(aws_platform_config)
 
         assert result == {
+            "nameOverride": "platform-buckets",
+            "fullnameOverride": "platform-buckets",
             "bucketNamespace": "platform-jobs",
             "bucketProvider": {
                 "type": "aws",
@@ -814,30 +811,30 @@ class TestHelmValuesFactory:
             "disableCreation": False,
         }
 
-    def test_create_aws_buckets_api_values_without_cors(
+    def test_create_aws_buckets_values_without_cors(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_buckets_api_values(
+        result = factory.create_platform_buckets_values(
             replace(aws_platform_config, ingress_cors_origins=[])
         )
 
         assert "cors" not in result
 
-    def test_create_aws_platform_buckets_api_values_with_role(
+    def test_create_aws_platform_buckets_values_with_role(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_buckets_api_values(
+        result = factory.create_platform_buckets_values(
             replace(aws_platform_config, aws_role_arn="s3_role")
         )
 
         assert result["annotations"] == {"iam.amazonaws.com/role": "s3_role"}
 
-    def test_create_emc_ecs_buckets_api_values(
+    def test_create_emc_ecs_buckets_values(
         self,
         on_prem_platform_config: PlatformConfig,
         factory: HelmValuesFactory,
     ) -> None:
-        result = factory.create_platform_buckets_api_values(
+        result = factory.create_platform_buckets_values(
             replace(
                 on_prem_platform_config,
                 buckets=BucketsConfig(
@@ -852,6 +849,8 @@ class TestHelmValuesFactory:
         )
 
         assert result == {
+            "nameOverride": "platform-buckets",
+            "fullnameOverride": "platform-buckets",
             "bucketNamespace": "platform-jobs",
             "bucketProvider": {
                 "type": "emc_ecs",
@@ -911,12 +910,12 @@ class TestHelmValuesFactory:
             "disableCreation": False,
         }
 
-    def test_create_open_stack_buckets_api_values(
+    def test_create_open_stack_buckets_values(
         self,
         on_prem_platform_config: PlatformConfig,
         factory: HelmValuesFactory,
     ) -> None:
-        result = factory.create_platform_buckets_api_values(
+        result = factory.create_platform_buckets_values(
             replace(
                 on_prem_platform_config,
                 buckets=BucketsConfig(
@@ -931,6 +930,8 @@ class TestHelmValuesFactory:
         )
 
         assert result == {
+            "nameOverride": "platform-buckets",
+            "fullnameOverride": "platform-buckets",
             "bucketNamespace": "platform-jobs",
             "bucketProvider": {
                 "type": "open_stack",
@@ -990,13 +991,15 @@ class TestHelmValuesFactory:
             "disableCreation": False,
         }
 
-    def test_create_on_prem_buckets_api_values(
+    def test_create_on_prem_buckets_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_buckets_api_values(on_prem_platform_config)
+        result = factory.create_platform_buckets_values(on_prem_platform_config)
         cluster_name = on_prem_platform_config.cluster_name
 
         assert result == {
+            "nameOverride": "platform-buckets",
+            "fullnameOverride": "platform-buckets",
             "bucketNamespace": "platform-jobs",
             "bucketProvider": {
                 "type": "minio",
@@ -1038,12 +1041,14 @@ class TestHelmValuesFactory:
             "disableCreation": False,
         }
 
-    def test_create_gcp_buckets_api_values(
+    def test_create_gcp_buckets_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_buckets_api_values(gcp_platform_config)
+        result = factory.create_platform_buckets_values(gcp_platform_config)
 
         assert result == {
+            "nameOverride": "platform-buckets",
+            "fullnameOverride": "platform-buckets",
             "bucketNamespace": "platform-jobs",
             "bucketProvider": {
                 "type": "gcp",
@@ -1089,12 +1094,14 @@ class TestHelmValuesFactory:
             "disableCreation": False,
         }
 
-    def test_create_azure_buckets_api_values(
+    def test_create_azure_buckets_values(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_buckets_api_values(azure_platform_config)
+        result = factory.create_platform_buckets_values(azure_platform_config)
 
         assert result == {
+            "nameOverride": "platform-buckets",
+            "fullnameOverride": "platform-buckets",
             "bucketNamespace": "platform-jobs",
             "bucketProvider": {
                 "type": "azure",
@@ -1150,14 +1157,16 @@ class TestHelmValuesFactory:
         result = factory.create_platform_registry_values(gcp_platform_config)
 
         assert result == {
-            "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
-            "NP_REGISTRY_AUTH_URL": "https://dev.neu.ro",
+            "nameOverride": "platform-registry",
+            "fullnameOverride": "platform-registry",
             "image": {"repository": "neuro.io/platformregistryapi"},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"registry.{gcp_platform_config.cluster_name}.org.neu.ro"],
             },
             "platform": {
+                "clusterName": gcp_platform_config.cluster_name,
+                "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -1165,7 +1174,7 @@ class TestHelmValuesFactory:
                             "key": "token",
                         }
                     }
-                }
+                },
             },
             "secrets": [
                 {
@@ -1217,15 +1226,16 @@ class TestHelmValuesFactory:
         result = factory.create_platform_registry_values(aws_platform_config)
 
         assert result == {
-            "NP_CLUSTER_NAME": aws_platform_config.cluster_name,
-            "NP_REGISTRY_AUTH_URL": "https://dev.neu.ro",
-            "AWS_DEFAULT_REGION": "us-east-1",
+            "nameOverride": "platform-registry",
+            "fullnameOverride": "platform-registry",
             "image": {"repository": "neuro.io/platformregistryapi"},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"registry.{aws_platform_config.cluster_name}.org.neu.ro"],
             },
             "platform": {
+                "clusterName": aws_platform_config.cluster_name,
+                "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -1233,7 +1243,7 @@ class TestHelmValuesFactory:
                             "key": "token",
                         }
                     }
-                }
+                },
             },
             "secrets": [
                 {
@@ -1244,6 +1254,7 @@ class TestHelmValuesFactory:
             "upstreamRegistry": {
                 "url": "https://platform.dkr.ecr.us-east-1.amazonaws.com",
                 "type": "aws_ecr",
+                "region": "us-east-1",
                 "maxCatalogEntries": 1000,
                 "project": "neuro",
             },
@@ -1265,14 +1276,16 @@ class TestHelmValuesFactory:
         result = factory.create_platform_registry_values(azure_platform_config)
 
         assert result == {
-            "NP_CLUSTER_NAME": azure_platform_config.cluster_name,
-            "NP_REGISTRY_AUTH_URL": "https://dev.neu.ro",
+            "nameOverride": "platform-registry",
+            "fullnameOverride": "platform-registry",
             "image": {"repository": "neuro.io/platformregistryapi"},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"registry.{azure_platform_config.cluster_name}.org.neu.ro"],
             },
             "platform": {
+                "clusterName": azure_platform_config.cluster_name,
+                "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -1280,7 +1293,7 @@ class TestHelmValuesFactory:
                             "key": "token",
                         }
                     }
-                }
+                },
             },
             "secrets": [
                 {
@@ -1328,8 +1341,8 @@ class TestHelmValuesFactory:
         result = factory.create_platform_registry_values(on_prem_platform_config)
 
         assert result == {
-            "NP_CLUSTER_NAME": on_prem_platform_config.cluster_name,
-            "NP_REGISTRY_AUTH_URL": "https://dev.neu.ro",
+            "nameOverride": "platform-registry",
+            "fullnameOverride": "platform-registry",
             "image": {"repository": "neuro.io/platformregistryapi"},
             "ingress": {
                 "enabled": True,
@@ -1338,6 +1351,8 @@ class TestHelmValuesFactory:
                 ],
             },
             "platform": {
+                "clusterName": on_prem_platform_config.cluster_name,
+                "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -1345,7 +1360,7 @@ class TestHelmValuesFactory:
                             "name": "platform-registry-token",
                         }
                     }
-                }
+                },
             },
             "secrets": [
                 {
@@ -1391,23 +1406,23 @@ class TestHelmValuesFactory:
         result = factory.create_platform_monitoring_values(gcp_platform_config)
 
         assert result == {
-            "NP_MONITORING_CLUSTER_NAME": gcp_platform_config.cluster_name,
-            "NP_MONITORING_K8S_NS": "platform-jobs",
-            "NP_MONITORING_PLATFORM_API_URL": "https://dev.neu.ro/api/v1",
-            "NP_MONITORING_PLATFORM_AUTH_URL": "https://dev.neu.ro",
-            "NP_MONITORING_PLATFORM_CONFIG_URL": "https://dev.neu.ro",
-            "NP_MONITORING_REGISTRY_URL": (
-                f"https://registry.{gcp_platform_config.cluster_name}.org.neu.ro"
-            ),
-            "NP_CORS_ORIGINS": (
-                "https://release--neuro-web.netlify.app,https://app.neu.ro"
-            ),
+            "nameOverride": "platform-monitoring",
+            "fullnameOverride": "platform-monitoring",
             "image": {"repository": "neuro.io/platformmonitoringapi"},
+            "kubeletPort": 10250,
+            "jobsNamespace": "platform-jobs",
             "nodeLabels": {
                 "job": "platform.neuromation.io/job",
                 "nodePool": "platform.neuromation.io/nodepool",
             },
             "platform": {
+                "clusterName": gcp_platform_config.cluster_name,
+                "apiUrl": "https://dev.neu.ro/api/v1",
+                "authUrl": "https://dev.neu.ro",
+                "configUrl": "https://dev.neu.ro",
+                "registryUrl": (
+                    f"https://registry.{gcp_platform_config.cluster_name}.org.neu.ro"
+                ),
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -1415,11 +1430,17 @@ class TestHelmValuesFactory:
                             "name": "platform-monitoring-token",
                         }
                     }
-                }
+                },
             },
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "cors": {
+                "origins": [
+                    "https://release--neuro-web.netlify.app",
+                    "https://app.neu.ro",
+                ]
             },
             "secrets": [
                 {
@@ -1429,16 +1450,16 @@ class TestHelmValuesFactory:
             ],
             "containerRuntime": {"name": "docker"},
             "fluentbit": {
-                "image": {"repository": "neuro.io/fluent/fluent-bit"},
+                "image": {"repository": "neuro.io/fluent-bit"},
             },
             "fluentd": {
-                "image": {"repository": "neuro.io/bitnami/fluentd"},
+                "image": {"repository": "neuro.io/fluentd"},
                 "persistence": {
                     "enabled": True,
                     "storageClassName": "platform-standard-topology-aware",
                 },
             },
-            "minio": {"image": {"repository": "neuro.io/minio/minio"}},
+            "minio": {"image": {"repository": "neuro.io/minio"}},
             "logs": {
                 "persistence": {
                     "type": "gcp",
@@ -1526,7 +1547,6 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_monitoring_values(on_prem_platform_config)
 
-        assert result["NP_MONITORING_K8S_KUBELET_PORT"] == 10250
         assert result["logs"] == {
             "persistence": {
                 "type": "minio",
@@ -1607,6 +1627,8 @@ class TestHelmValuesFactory:
         result = factory.create_platform_container_runtime_values(gcp_platform_config)
 
         assert result == {
+            "nameOverride": "platform-container-runtime",
+            "fullnameOverride": "platform-container-runtime",
             "affinity": {
                 "nodeAffinity": {
                     "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -1636,18 +1658,17 @@ class TestHelmValuesFactory:
         result = factory.create_platform_secrets_values(gcp_platform_config)
 
         assert result == {
-            "NP_CLUSTER_NAME": gcp_platform_config.cluster_name,
-            "NP_SECRETS_K8S_NS": "platform-jobs",
-            "NP_SECRETS_PLATFORM_AUTH_URL": "https://dev.neu.ro",
-            "NP_CORS_ORIGINS": (
-                "https://release--neuro-web.netlify.app,https://app.neu.ro"
-            ),
+            "nameOverride": "platform-secrets",
+            "fullnameOverride": "platform-secrets",
             "image": {"repository": "neuro.io/platformsecrets"},
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
             },
+            "secretsNamespace": "platform-jobs",
             "platform": {
+                "clusterName": gcp_platform_config.cluster_name,
+                "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -1655,7 +1676,13 @@ class TestHelmValuesFactory:
                             "key": "token",
                         }
                     }
-                }
+                },
+            },
+            "cors": {
+                "origins": [
+                    "https://release--neuro-web.netlify.app",
+                    "https://app.neu.ro",
+                ]
             },
             "secrets": [
                 {
@@ -1687,7 +1714,7 @@ class TestHelmValuesFactory:
                 "configMapName": "thanos-object-storage-config",
             },
             "image": {"repository": "neuro.io/platform-reports"},
-            "nvidiaDCGMExporterImage": {"repository": "neuro.io/nvidia/dcgm-exporter"},
+            "nvidiaDCGMExporter": {"image": {"repository": "neuro.io/dcgm-exporter"}},
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
@@ -1734,10 +1761,10 @@ class TestHelmValuesFactory:
                 },
                 "prometheus": {
                     "prometheusSpec": {
-                        "image": {"repository": "neuro.io/prometheus/prometheus"},
+                        "image": {"repository": "neuro.io/prometheus"},
                         "retention": "15d",
                         "thanos": {
-                            "image": "neuro.io/thanos/thanos:v0.14.0",
+                            "image": "neuro.io/thanos:v0.14.0",
                             "version": "v0.14.0",
                             "objectStorageConfig": {
                                 "name": "thanos-object-storage-config",
@@ -1756,21 +1783,15 @@ class TestHelmValuesFactory:
                     }
                 },
                 "prometheusOperator": {
-                    "image": {"repository": "neuro.io/coreos/prometheus-operator"},
+                    "image": {"repository": "neuro.io/prometheus-operator"},
                     "prometheusConfigReloaderImage": {
-                        "repository": ("neuro.io/coreos/prometheus-config-reloader")
+                        "repository": ("neuro.io/prometheus-config-reloader")
                     },
-                    "configmapReloadImage": {
-                        "repository": "neuro.io/coreos/configmap-reload"
-                    },
-                    "tlsProxy": {
-                        "image": {"repository": "neuro.io/squareup/ghostunnel"}
-                    },
+                    "configmapReloadImage": {"repository": "neuro.io/configmap-reload"},
+                    "tlsProxy": {"image": {"repository": "neuro.io/ghostunnel"}},
                     "admissionWebhooks": {
                         "patch": {
-                            "image": {
-                                "repository": "neuro.io/jettech/kube-webhook-certgen"
-                            }
+                            "image": {"repository": "neuro.io/kube-webhook-certgen"}
                         }
                     },
                     "kubeletService": {"namespace": "platform"},
@@ -1789,7 +1810,7 @@ class TestHelmValuesFactory:
                     }
                 },
                 "kube-state-metrics": {
-                    "image": {"repository": "neuro.io/coreos/kube-state-metrics"},
+                    "image": {"repository": "neuro.io/kube-state-metrics"},
                     "serviceAccount": {
                         "imagePullSecrets": [
                             {"name": "platform-docker-config"},
@@ -1798,7 +1819,7 @@ class TestHelmValuesFactory:
                     },
                 },
                 "prometheus-node-exporter": {
-                    "image": {"repository": "neuro.io/prometheus/node-exporter"},
+                    "image": {"repository": "neuro.io/node-exporter"},
                     "serviceAccount": {
                         "imagePullSecrets": [
                             {"name": "platform-docker-config"},
@@ -1808,7 +1829,7 @@ class TestHelmValuesFactory:
                 },
             },
             "thanos": {
-                "image": {"repository": "neuro.io/thanos/thanos"},
+                "image": {"repository": "neuro.io/thanos"},
                 "store": {
                     "persistentVolumeClaim": {
                         "spec": {"storageClassName": "platform-standard-topology-aware"}
@@ -1834,7 +1855,7 @@ class TestHelmValuesFactory:
             },
             "grafana": {
                 "image": {
-                    "repository": "neuro.io/grafana/grafana",
+                    "repository": "neuro.io/grafana",
                     "pullSecrets": [
                         "platform-docker-config",
                         "platform-docker-hub-config",
@@ -1851,7 +1872,7 @@ class TestHelmValuesFactory:
                 },
                 "sidecar": {
                     "image": {
-                        "repository": "neuro.io/kiwigrid/k8s-sidecar",
+                        "repository": "neuro.io/k8s-sidecar",
                         "pullSecrets": [
                             "platform-docker-config",
                             "platform-docker-hub-config",
@@ -1938,7 +1959,7 @@ class TestHelmValuesFactory:
             replace(aws_platform_config, aws_role_arn="role_arn")
         )
 
-        assert result["metricsServer"]["podMetadata"]["annotations"] == {
+        assert result["metricsExporter"]["podMetadata"]["annotations"] == {
             "iam.amazonaws.com/role": "role_arn"
         }
         assert result["prometheus-operator"]["prometheus"]["prometheusSpec"][
@@ -2121,12 +2142,14 @@ class TestHelmValuesFactory:
             == "10GB"
         )
 
-    def test_create_platform_disk_api_values(
+    def test_create_platform_disks_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_disk_api_values(gcp_platform_config)
+        result = factory.create_platform_disks_values(gcp_platform_config)
 
         assert result == {
+            "nameOverride": "platform-disks",
+            "fullnameOverride": "platform-disks",
             "image": {"repository": "neuro.io/platformdiskapi"},
             "disks": {
                 "namespace": "platform-jobs",
@@ -2165,44 +2188,38 @@ class TestHelmValuesFactory:
             },
         }
 
-    def test_create_platform_disk_api_values_without_storage_class(
+    def test_create_platform_disks_values_without_storage_class(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_disk_api_values(
+        result = factory.create_platform_disks_values(
             replace(on_prem_platform_config, disks_storage_class_name="")
         )
 
         assert "storageClassName" not in result["disks"]
 
-    def test_create_on_prem_platform_disk_api_values_with_storage_class(
+    def test_create_on_prem_platform_disks_values_with_storage_class(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_disk_api_values(
+        result = factory.create_platform_disks_values(
             replace(on_prem_platform_config, disks_storage_class_name="openebs-cstor")
         )
 
         assert result["disks"]["storageClassName"] == "openebs-cstor"
 
-    def test_create_on_prem_platform_disk_api_values_without_cors_origins(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_disk_api_values(
-            replace(on_prem_platform_config, ingress_cors_origins=())
-        )
-
-        assert "cors" not in result
-
     def test_create_platform_api_poller_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platformapi_poller_values(gcp_platform_config)
+        result = factory.create_platform_api_poller_values(gcp_platform_config)
 
         assert result == {
+            "nameOverride": "platform-api-poller",
+            "fullnameOverride": "platform-api-poller",
             "image": {"repository": "neuro.io/platformapi"},
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
                 "configUrl": "https://dev.neu.ro/api/v1",
+                "adminUrl": "https://dev.neu.ro/apis/admin/v1",
                 "apiUrl": "https://dev.neu.ro/api/v1",
                 "registryUrl": (
                     f"https://registry.{gcp_platform_config.cluster_name}.org.neu.ro"
@@ -2251,7 +2268,7 @@ class TestHelmValuesFactory:
     def test_create_platform_api_poller_values_with_multiple_storages(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platformapi_poller_values(
+        result = factory.create_platform_api_poller_values(
             replace(
                 gcp_platform_config,
                 storages=[
@@ -2285,7 +2302,7 @@ class TestHelmValuesFactory:
     def test_create_azure_platform_api_poller_values(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platformapi_poller_values(azure_platform_config)
+        result = factory.create_platform_api_poller_values(azure_platform_config)
 
         assert (
             result["jobs"]["preemptibleTolerationKey"]

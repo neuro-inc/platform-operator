@@ -60,6 +60,7 @@ def config() -> Config:
         platform_ingress_auth_url=URL("https://platformingressauth"),
         platform_config_url=URL("https://dev.neu.ro"),
         platform_config_watch_interval_s=0.1,
+        platform_admin_url=URL("https://dev.neu.ro"),
         platform_api_url=URL("https://dev.neu.ro"),
         platform_namespace="platform",
         consul_url=URL("http://consul:8500"),
@@ -400,6 +401,7 @@ def gcp_platform_config(
     return PlatformConfig(
         auth_url=URL("https://dev.neu.ro"),
         config_url=URL("https://dev.neu.ro"),
+        admin_url=URL("https://dev.neu.ro"),
         api_url=URL("https://dev.neu.ro"),
         token="token",
         cluster_name=cluster_name,
