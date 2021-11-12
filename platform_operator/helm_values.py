@@ -31,14 +31,14 @@ class HelmValuesFactory:
         self._container_runtime = container_runtime
 
     def create_platform_values(self, platform: PlatformConfig) -> Dict[str, Any]:
-        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
             "kubernetesProvider": platform.kubernetes_provider,
             "traefikEnabled": platform.ingress_controller_install,
             "consulEnabled": platform.consul_install,
-            "alpineImage": {"repository": f"{docker_server}/alpine"},
-            "pauseImage": {"repository": f"{docker_server}/google_containers/pause"},
-            "crictlImage": {"repository": f"{docker_server}/crictl"},
+            "alpineImage": {"repository": platform.get_image("alpine")},
+            "pauseImage": {"repository": platform.get_image("pause")},
+            "crictlImage": {"repository": platform.get_image("crictl")},
+            "kubectlImage": {"repository": platform.get_image("kubectl")},
             "serviceToken": platform.token,
             "nodePools": platform.jobs_node_pools,
             "nodeLabels": {
@@ -47,7 +47,7 @@ class HelmValuesFactory:
                 "gpu": platform.node_labels.accelerator,
             },
             "nvidiaGpuDriver": {
-                "image": {"repository": f"{docker_server}/nvidia/k8s-device-plugin"},
+                "image": {"repository": platform.get_image("k8s-device-plugin")},
             },
             "imagesPrepull": {
                 "refreshInterval": "1h",
@@ -91,14 +91,14 @@ class HelmValuesFactory:
             self._chart_names.platform_reports: (
                 self.create_platform_reports_values(platform)
             ),
-            self._chart_names.platform_disk_api: (
-                self.create_platform_disk_api_values(platform)
+            self._chart_names.platform_disks: (
+                self.create_platform_disks_values(platform)
             ),
             self._chart_names.platform_api_poller: (
-                self.create_platformapi_poller_values(platform)
+                self.create_platform_api_poller_values(platform)
             ),
-            self._chart_names.platform_bucket_api: (
-                self.create_platform_buckets_api_values(platform)
+            self._chart_names.platform_buckets: (
+                self.create_platform_buckets_values(platform)
             ),
         }
         if platform.docker_config.create_secret:
@@ -213,7 +213,7 @@ class HelmValuesFactory:
 
     def create_obs_csi_driver_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         result = {
-            "image": f"{platform.docker_config.url.host}/obs-csi-driver",
+            "image": platform.get_image("obs-csi-driver"),
             "driverName": "obs.csi.neu.ro",
             "credentialsSecret": {
                 "create": True,
@@ -239,7 +239,7 @@ class HelmValuesFactory:
 
     def create_docker_registry_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         result: Dict[str, Any] = {
-            "image": {"repository": f"{platform.docker_config.url.host}/registry"},
+            "image": {"repository": platform.get_image("registry")},
             "ingress": {"enabled": False},
             "persistence": {
                 "enabled": True,
@@ -267,7 +267,7 @@ class HelmValuesFactory:
         assert platform.buckets.minio_public_url
         return {
             "image": {
-                "repository": f"{platform.docker_config.url.host}/minio/minio",
+                "repository": platform.get_image("minio"),
                 "tag": "RELEASE.2021-08-25T00-41-18Z",
             },
             "imagePullSecrets": [
@@ -298,24 +298,28 @@ class HelmValuesFactory:
         }
 
     def create_consul_values(self, platform: PlatformConfig) -> Dict[str, Any]:
-        result = {
-            "Image": f"{platform.docker_config.url.host}/consul",
+        return {
+            "Image": platform.get_image("consul"),
             "StorageClass": platform.standard_storage_class_name,
+            "Storage": "2Gi",
             "Replicas": 3,
         }
-        if not CloudProvider.has_value(platform.kubernetes_provider):
-            result["Replicas"] = 1
-        return result
 
     def create_traefik_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         dns_challenge_script_name = "resolve_dns_challenge.sh"
         result: Dict[str, Any] = {
+            "nameOverride": "traefik",
+            "fullnameOverride": "traefik",
             "replicas": 3,
             "deploymentStrategy": {
                 "type": "RollingUpdate",
                 "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
             },
-            "image": f"{platform.docker_config.url.host}/traefik",
+            "deployment": {
+                "labels": {"service": "traefik"},
+                "podLabels": {"service": "traefik"},
+            },
+            "image": platform.get_image("traefik"),
             "imageTag": "1.7.20-alpine",
             "imagePullSecrets": platform.image_pull_secret_names,
             "logLevel": "debug",
@@ -364,10 +368,6 @@ class HelmValuesFactory:
                 "namespaces": [platform.namespace, platform.jobs_namespace],
             },
             "rbac": {"enabled": True},
-            "deployment": {
-                "labels": {"platform.neuromation.io/app": "ingress"},
-                "podLabels": {"platform.neuromation.io/app": "ingress"},
-            },
             "extraVolumes": [
                 # Mounted secret and configmap volumes are updated automatically
                 # by kubelet
@@ -461,6 +461,12 @@ class HelmValuesFactory:
             }
         return result
 
+    def _create_cors_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+        result: Dict[str, Any] = {}
+        if platform.ingress_cors_origins:
+            result["cors"] = {"origins": platform.ingress_cors_origins}
+        return result
+
     def _create_tracing_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         if not platform.sentry_dsn:
             return {}
@@ -480,9 +486,10 @@ class HelmValuesFactory:
     def create_platform_storage_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
-        docker_server = platform.docker_config.url.host
         result = {
-            "image": {"repository": f"{docker_server}/platformstorageapi"},
+            "nameOverride": f"{self._release_names.platform}-storage",
+            "fullnameOverride": f"{self._release_names.platform}-storage",
+            "image": {"repository": platform.get_image("platformstorageapi")},
             "platform": {
                 "clusterName": platform.cluster_name,
                 "authUrl": str(platform.auth_url),
@@ -511,20 +518,22 @@ class HelmValuesFactory:
                 }
             ],
         }
-        if platform.ingress_cors_origins:
-            result["cors"] = {"origins": platform.ingress_cors_origins}
-        result.update(**self._create_tracing_values(platform))
+        result.update(
+            **self._create_cors_values(platform),
+            **self._create_tracing_values(platform),
+        )
         return result
 
     def create_platform_registry_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
-        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
-            "NP_CLUSTER_NAME": platform.cluster_name,
-            "NP_REGISTRY_AUTH_URL": str(platform.auth_url),
-            "image": {"repository": f"{docker_server}/platformregistryapi"},
+            "nameOverride": f"{self._release_names.platform}-registry",
+            "fullnameOverride": f"{self._release_names.platform}-registry",
+            "image": {"repository": platform.get_image("platformregistryapi")},
             "platform": {
+                "clusterName": platform.cluster_name,
+                "authUrl": str(platform.auth_url),
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -532,7 +541,7 @@ class HelmValuesFactory:
                             "key": "token",
                         }
                     }
-                }
+                },
             },
             "ingress": {"enabled": True, "hosts": [platform.ingress_registry_url.host]},
             "secrets": [
@@ -579,13 +588,13 @@ class HelmValuesFactory:
                 }
             )
         elif platform.registry.provider == RegistryProvider.AWS:
-            result["AWS_DEFAULT_REGION"] = platform.registry.aws_region
             result["upstreamRegistry"] = {
                 "type": "aws_ecr",
                 "url": (
                     f"https://{platform.registry.aws_account_id}.dkr.ecr"
                     f".{platform.registry.aws_region}.amazonaws.com"
                 ),
+                "region": platform.registry.aws_region,
                 "project": "neuro",
                 "maxCatalogEntries": 1000,
             }
@@ -673,21 +682,22 @@ class HelmValuesFactory:
     def create_platform_monitoring_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
-        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
-            "NP_MONITORING_CLUSTER_NAME": platform.cluster_name,
-            "NP_MONITORING_K8S_NS": platform.jobs_namespace,
-            "NP_MONITORING_PLATFORM_API_URL": str(platform.api_url / "api/v1"),
-            "NP_MONITORING_PLATFORM_AUTH_URL": str(platform.auth_url),
-            "NP_MONITORING_PLATFORM_CONFIG_URL": str(platform.config_url),
-            "NP_MONITORING_REGISTRY_URL": str(platform.ingress_registry_url),
-            "NP_CORS_ORIGINS": ",".join(platform.ingress_cors_origins),
-            "image": {"repository": f"{docker_server}/platformmonitoringapi"},
+            "nameOverride": f"{self._release_names.platform}-monitoring",
+            "fullnameOverride": f"{self._release_names.platform}-monitoring",
+            "image": {"repository": platform.get_image("platformmonitoringapi")},
+            "jobsNamespace": platform.jobs_namespace,
+            "kubeletPort": platform.kubelet_port,
             "nodeLabels": {
                 "job": platform.node_labels.job,
                 "nodePool": platform.node_labels.node_pool,
             },
             "platform": {
+                "clusterName": platform.cluster_name,
+                "apiUrl": str(platform.api_url / "api/v1"),
+                "authUrl": str(platform.auth_url),
+                "configUrl": str(platform.config_url),
+                "registryUrl": str(platform.ingress_registry_url),
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -695,21 +705,19 @@ class HelmValuesFactory:
                             "key": "token",
                         }
                     }
-                }
+                },
             },
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
             "containerRuntime": {"name": self._container_runtime},
-            "fluentbit": {
-                "image": {"repository": f"{docker_server}/fluent/fluent-bit"}
-            },
+            "fluentbit": {"image": {"repository": platform.get_image("fluent-bit")}},
             "fluentd": {
-                "image": {"repository": f"{docker_server}/bitnami/fluentd"},
+                "image": {"repository": platform.get_image("fluentd")},
                 "persistence": {
                     "enabled": True,
                     "storageClassName": platform.standard_storage_class_name,
                 },
             },
-            "minio": {"image": {"repository": f"{docker_server}/minio/minio"}},
+            "minio": {"image": {"repository": platform.get_image("minio")}},
             "secrets": [
                 {
                     "name": f"{self._release_names.platform}-monitoring-token",
@@ -717,7 +725,10 @@ class HelmValuesFactory:
                 }
             ],
         }
-        result.update(**self._create_tracing_values(platform))
+        result.update(
+            **self._create_cors_values(platform),
+            **self._create_tracing_values(platform),
+        )
         if platform.buckets.provider == BucketsProvider.GCP:
             result["logs"] = {
                 "persistence": {
@@ -805,7 +816,6 @@ class HelmValuesFactory:
                     },
                 }
             }
-            result["NP_MONITORING_K8S_KUBELET_PORT"] = platform.kubelet_port
         else:
             assert False, "was unable to construct monitoring config"
         return result
@@ -814,6 +824,8 @@ class HelmValuesFactory:
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
         return {
+            "nameOverride": f"{self._release_names.platform}-container-runtime",
+            "fullnameOverride": f"{self._release_names.platform}-container-runtime",
             "affinity": {
                 "nodeAffinity": {
                     "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -836,14 +848,13 @@ class HelmValuesFactory:
     def create_platform_secrets_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
-        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
-            "NP_CLUSTER_NAME": platform.cluster_name,
-            "NP_SECRETS_K8S_NS": platform.jobs_namespace,
-            "NP_SECRETS_PLATFORM_AUTH_URL": str(platform.auth_url),
-            "NP_CORS_ORIGINS": ",".join(platform.ingress_cors_origins),
-            "image": {"repository": f"{docker_server}/platformsecrets"},
+            "nameOverride": f"{self._release_names.platform}-secrets",
+            "fullnameOverride": f"{self._release_names.platform}-secrets",
+            "image": {"repository": platform.get_image("platformsecrets")},
             "platform": {
+                "clusterName": platform.cluster_name,
+                "authUrl": str(platform.auth_url),
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -851,8 +862,9 @@ class HelmValuesFactory:
                             "key": "token",
                         }
                     }
-                }
+                },
             },
+            "secretsNamespace": platform.jobs_namespace,
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
             "secrets": [
                 {
@@ -861,7 +873,10 @@ class HelmValuesFactory:
                 }
             ],
         }
-        result.update(**self._create_tracing_values(platform))
+        result.update(
+            **self._create_cors_values(platform),
+            **self._create_tracing_values(platform),
+        )
         return result
 
     def create_platform_reports_values(
@@ -894,11 +909,10 @@ class HelmValuesFactory:
                     "node.kubernetes.io/instance-type",
                 )
             )
-        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
-            "image": {"repository": f"{docker_server}/platform-reports"},
-            "nvidiaDCGMExporterImage": {
-                "repository": f"{docker_server}/nvidia/dcgm-exporter"
+            "image": {"repository": platform.get_image("platform-reports")},
+            "nvidiaDCGMExporter": {
+                "image": {"repository": platform.get_image("dcgm-exporter")}
             },
             "nodePoolLabels": {
                 "job": platform.node_labels.job,
@@ -946,12 +960,10 @@ class HelmValuesFactory:
                 },
                 "prometheus": {
                     "prometheusSpec": {
-                        "image": {
-                            "repository": f"{docker_server}/prometheus/prometheus"
-                        },
+                        "image": {"repository": platform.get_image("prometheus")},
                         "retention": platform.monitoring.metrics_retention_time,
                         "thanos": {
-                            "image": f"{docker_server}/thanos/thanos:v0.14.0",
+                            "image": platform.get_image("thanos:v0.14.0"),
                             "version": "v0.14.0",
                             "objectStorageConfig": {
                                 "name": object_store_config_map_name,
@@ -970,26 +982,20 @@ class HelmValuesFactory:
                     }
                 },
                 "prometheusOperator": {
-                    "image": {
-                        "repository": f"{docker_server}/coreos/prometheus-operator"
-                    },
+                    "image": {"repository": platform.get_image("prometheus-operator")},
                     "prometheusConfigReloaderImage": {
-                        "repository": (
-                            f"{docker_server}/coreos/prometheus-config-reloader"
-                        )
+                        "repository": platform.get_image("prometheus-config-reloader")
                     },
                     "configmapReloadImage": {
-                        "repository": f"{docker_server}/coreos/configmap-reload"
+                        "repository": platform.get_image("configmap-reload")
                     },
                     "tlsProxy": {
-                        "image": {"repository": f"{docker_server}/squareup/ghostunnel"}
+                        "image": {"repository": platform.get_image("ghostunnel")}
                     },
                     "admissionWebhooks": {
                         "patch": {
                             "image": {
-                                "repository": (
-                                    f"{docker_server}/jettech/kube-webhook-certgen"
-                                )
+                                "repository": platform.get_image("kube-webhook-certgen")
                             }
                         }
                     },
@@ -1000,9 +1006,7 @@ class HelmValuesFactory:
                     "serviceMonitor": {"metricRelabelings": relabelings}
                 },
                 "kube-state-metrics": {
-                    "image": {
-                        "repository": f"{docker_server}/coreos/kube-state-metrics"
-                    },
+                    "image": {"repository": platform.get_image("kube-state-metrics")},
                     "serviceAccount": {
                         "imagePullSecrets": [
                             {"name": name} for name in platform.image_pull_secret_names
@@ -1010,9 +1014,7 @@ class HelmValuesFactory:
                     },
                 },
                 "prometheus-node-exporter": {
-                    "image": {
-                        "repository": f"{docker_server}/prometheus/node-exporter"
-                    },
+                    "image": {"repository": platform.get_image("node-exporter")},
                     "serviceAccount": {
                         "imagePullSecrets": [
                             {"name": name} for name in platform.image_pull_secret_names
@@ -1021,7 +1023,7 @@ class HelmValuesFactory:
                 },
             },
             "thanos": {
-                "image": {"repository": f"{docker_server}/thanos/thanos"},
+                "image": {"repository": platform.get_image("thanos")},
                 "store": {
                     "persistentVolumeClaim": {
                         "spec": {
@@ -1039,18 +1041,18 @@ class HelmValuesFactory:
             },
             "grafana": {
                 "image": {
-                    "repository": f"{docker_server}/grafana/grafana",
+                    "repository": platform.get_image("grafana"),
                     "pullSecrets": platform.image_pull_secret_names,
                 },
                 "initChownData": {
                     "image": {
-                        "repository": f"{docker_server}/busybox",
+                        "repository": platform.get_image("busybox"),
                         "pullSecrets": platform.image_pull_secret_names,
                     }
                 },
                 "sidecar": {
                     "image": {
-                        "repository": f"{docker_server}/kiwigrid/k8s-sidecar",
+                        "repository": platform.get_image("k8s-sidecar"),
                         "pullSecrets": platform.image_pull_secret_names,
                     }
                 },
@@ -1097,7 +1099,7 @@ class HelmValuesFactory:
             )
         elif platform.buckets.provider == BucketsProvider.AWS:
             if platform.aws_role_arn:
-                result["metricsServer"] = {
+                result["metricsExporter"] = {
                     "podMetadata": {
                         "annotations": {"iam.amazonaws.com/role": platform.aws_role_arn}
                     }
@@ -1210,12 +1212,11 @@ class HelmValuesFactory:
         assert url.host
         return url.host if url.is_default_port() else f"{url.host}:{url.port}"
 
-    def create_platform_disk_api_values(
-        self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
-        docker_server = platform.docker_config.url.host
+    def create_platform_disks_values(self, platform: PlatformConfig) -> Dict[str, Any]:
         result: Dict[str, Any] = {
-            "image": {"repository": f"{docker_server}/platformdiskapi"},
+            "nameOverride": f"{self._release_names.platform}-disks",
+            "fullnameOverride": f"{self._release_names.platform}-disks",
+            "image": {"repository": platform.get_image("platformdiskapi")},
             "disks": {
                 "namespace": platform.jobs_namespace,
                 "limitPerUser": str(
@@ -1242,23 +1243,26 @@ class HelmValuesFactory:
                 }
             ],
         }
-        if platform.ingress_cors_origins:
-            result["cors"] = {"origins": platform.ingress_cors_origins}
         if platform.disks_storage_class_name:
             result["disks"]["storageClassName"] = platform.disks_storage_class_name
-        result.update(**self._create_tracing_values(platform))
+        result.update(
+            **self._create_cors_values(platform),
+            **self._create_tracing_values(platform),
+        )
         return result
 
-    def create_platformapi_poller_values(
+    def create_platform_api_poller_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
-        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
-            "image": {"repository": f"{docker_server}/platformapi"},
+            "nameOverride": f"{self._release_names.platform}-api-poller",
+            "fullnameOverride": f"{self._release_names.platform}-api-poller",
+            "image": {"repository": platform.get_image("platformapi")},
             "platform": {
                 "clusterName": platform.cluster_name,
                 "authUrl": str(platform.auth_url),
                 "configUrl": str(platform.config_url / "api/v1"),
+                "adminUrl": str(platform.admin_url / "apis/admin/v1"),
                 "apiUrl": str(platform.api_url / "api/v1"),
                 "registryUrl": str(platform.ingress_registry_url),
                 "token": {
@@ -1308,12 +1312,13 @@ class HelmValuesFactory:
             result["jobs"]["imagePullSecret"] = platform.docker_hub_config.secret_name
         return result
 
-    def create_platform_buckets_api_values(
+    def create_platform_buckets_values(
         self, platform: PlatformConfig
     ) -> Dict[str, Any]:
-        docker_server = platform.docker_config.url.host
         result: Dict[str, Any] = {
-            "image": {"repository": f"{docker_server}/platformbucketsapi"},
+            "nameOverride": f"{self._release_names.platform}-buckets",
+            "fullnameOverride": f"{self._release_names.platform}-buckets",
+            "image": {"repository": platform.get_image("platformbucketsapi")},
             "bucketNamespace": platform.jobs_namespace,
             "platform": {
                 "clusterName": platform.cluster_name,
@@ -1338,9 +1343,10 @@ class HelmValuesFactory:
             ],
             "disableCreation": platform.buckets.disable_creation,
         }
-        if platform.ingress_cors_origins:
-            result["cors"] = {"origins": platform.ingress_cors_origins}
-        result.update(**self._create_tracing_values(platform))
+        result.update(
+            **self._create_cors_values(platform),
+            **self._create_tracing_values(platform),
+        )
         if platform.buckets.provider == BucketsProvider.AWS:
             result["bucketProvider"] = {
                 "type": "aws",

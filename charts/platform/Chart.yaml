@@ -1,0 +1,51 @@
+apiVersion: v2
+name: platform
+description: Neu.ro platform services
+version: $CHART_VERSION
+appVersion: $APP_VERSION
+dependencies:
+  - name: traefik
+    version: "1.85.1"
+    repository: "@stable"
+    condition: traefikEnabled
+  - name: docker-registry
+    version: "1.9.2"
+    repository: "@stable"
+    condition: dockerRegistryEnabled
+  - name: minio
+    version: "5.0.33"
+    repository: "@stable"
+    condition: minioEnabled
+  - name: platform-storage
+    version: "21.11.2"
+    repository: https://neuro-inc.github.io/platform-storage-api
+  - name: platform-registry
+    version: "21.11.3"
+    repository: https://neuro-inc.github.io/platform-registry-api
+  - name: platform-monitoring
+    version: "21.11.4"
+    repository: https://neuro-inc.github.io/platform-monitoring
+  - name: platform-container-runtime
+    version: "21.11.2"
+    repository: https://neuro-inc.github.io/platform-container-runtime
+  - name: platform-secrets
+    version: "21.11.25"
+    repository: https://neuro-inc.github.io/platform-secrets
+  - name: platform-reports
+    version: "21.11.3"
+    repository: https://neuro-inc.github.io/platform-reports
+  - name: platform-disks
+    version: "21.11.4"
+    repository: https://neuro-inc.github.io/platform-disk-api
+  - name: platform-api-poller
+    version: "21.11.3"
+    repository: https://neuro-inc.github.io/platform-api
+  - name: platform-buckets
+    version: "21.11.3"
+    repository: https://neuro-inc.github.io/platform-buckets-api
+
+  # Deprecated, left for backward compatibility with old clusters
+  - name: consul
+    version: "3.9.6"
+    repository: https://charts.helm.sh/stable
+    condition: consulEnabled

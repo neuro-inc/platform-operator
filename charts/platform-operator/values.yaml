@@ -5,7 +5,7 @@ image:
 imagePullSecrets: []
 
 kubectlImage:
-  repository: $DOCKER_SERVER/bitnami/kubectl
+  repository: $IMAGE_REPO_BASE/kubectl
   tag: 1.16
 
 controller:
@@ -19,6 +19,7 @@ platform:
   ingressAuthUrl: https://staging.neu.ro
   configUrl: https://staging.neu.ro
   apiUrl: https://staging.neu.ro
+  adminUrl: https://staging.neu.ro
 
 # For backward compatibility with old clusters set to `false`
 consulEnabled: true
@@ -26,13 +27,16 @@ consulEnabled: true
 consul:
   global:
     enabled: false
-    image: $DOCKER_SERVER/hashicorp/consul:1.9.2
+    image: $IMAGE_REPO_BASE/consul:1.9.2
 
   nameOverride: consul
   fullnameOverride: consul
 
   server:
     enabled: true
+
+    extraLabels:
+      service: consul
 
     resources:
       requests:

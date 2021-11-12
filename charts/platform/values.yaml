@@ -1,17 +1,17 @@
 pauseImage:
-  repository: $DOCKER_SERVER/google_containers/pause
+  repository: $IMAGE_REPO_BASE/pause
   tag: "3.0"
 
 alpineImage:
-  repository: $DOCKER_SERVER/alpine
+  repository: $IMAGE_REPO_BASE/alpine
   tag: latest
 
 crictlImage:
-  repository: $DOCKER_SERVER/crictl
+  repository: $IMAGE_REPO_BASE/crictl
   tag: "1.22.0"
 
 kubectlImage:
-  repository: $DOCKER_SERVER/bitnami/kubectl
+  repository: $IMAGE_REPO_BASE/kubectl
   tag: "1.16"
 
 serviceToken: ""
@@ -27,7 +27,7 @@ inotify:
 
 nvidiaGpuDriver:
   image:
-    repository: $DOCKER_SERVER/nvidia/k8s-device-plugin
+    repository: $IMAGE_REPO_BASE/k8s-device-plugin
     tag: 1.0.0-beta6
 
 imagesPrepull:

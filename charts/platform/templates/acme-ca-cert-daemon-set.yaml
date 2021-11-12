@@ -4,19 +4,19 @@ kind: DaemonSet
 metadata:
   name: {{ .Release.Name }}-acme-ca-cert
   labels: {{ include "platform.labels.standard" . | nindent 4 }}
-    component: acme-ca-cert
+    service: acme-ca-cert
 spec:
   selector:
     matchLabels:
       app: {{ include "platform.name" . }}
       release: {{ .Release.Name }}
-      component: acme-ca-cert
+      service: acme-ca-cert
   template:
     metadata:
       labels:
         app: {{ include "platform.name" . }}
         release: {{ .Release.Name }}
-        component: acme-ca-cert
+        service: acme-ca-cert
     spec:
       tolerations:
       - operator: Exists

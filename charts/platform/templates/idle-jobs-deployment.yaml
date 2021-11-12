@@ -3,9 +3,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $.Release.Name }}-idle-jobs-{{ .name | lower }}
+  name: {{ $.Release.Name }}-idle-{{ .name | lower }}
   labels: {{ include "platform.labels.standard" $ | nindent 4 }}
-    component: idle-jobs
+    service: idle-jobs
     idle-job: {{ .name | lower | quote }}
 spec:
   replicas: {{ .count }}
@@ -13,7 +13,7 @@ spec:
     matchLabels:
       app: {{ include "platform.name" $ }}
       release: {{ $.Release.Name }}
-      component: idle-jobs
+      service: idle-jobs
       idle-job: {{ .name | lower | quote }}
   strategy:
     rollingUpdate:
@@ -25,7 +25,7 @@ spec:
       labels:
         app: {{ include "platform.name" $ }}
         release: {{ $.Release.Name }}
-        component: idle-jobs
+        service: idle-jobs
         idle-job: {{ .name | lower | quote }}
     spec:
       containers:

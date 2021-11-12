@@ -130,4 +130,5 @@ dmypy.json
 
 .vscode/
 
-temp_deploy/
+# Helm chart releaser
+.cr-release-packages
