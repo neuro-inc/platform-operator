@@ -41,9 +41,9 @@ jobs:
       if: ${{ ! steps.release.outputs.skip }}
       run: |
         if [[ -n $PRERELEASE ]]; then
-          gh release create "$TAG" --prerelease --notes "docker pull ghcr.io/neuro-inc/platformsecrets:$VERSION"
+          gh release create "$TAG" --prerelease --notes "docker pull ghcr.io/neuro-inc/platform-operator-controller:$VERSION"
         else
-          gh release create "$TAG" --notes "docker pull ghcr.io/neuro-inc/platformsecrets:$VERSION"
+          gh release create "$TAG" --notes "docker pull ghcr.io/neuro-inc/platform-operator-controller:$VERSION"
         fi
       shell: bash
       env:

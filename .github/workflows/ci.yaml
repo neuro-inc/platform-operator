@@ -57,3 +57,8 @@ jobs:
         sudo find /root/.minikube -name id_rsa -exec chmod 600 {} \;
     - name: Run integration tests
       run: make test_integration
+    - name: Upload image artifact
+      uses: neuro-inc/upload-image-action@v21.9.2
+      with:
+        image: platform-operator-controller
+        token: ${{ secrets.GITHUB_TOKEN }}
