@@ -915,12 +915,12 @@ class PlatformConfigFactory:
             cluster,
             (
                 spec.kubernetes.docker_config_secret_name
-                or f"{self._config.platform_namespace}-docker-config"
+                or f"{self._config.helm_release_names.platform}-docker-config"
             ),
             spec.kubernetes.docker_config_secret_create,
         )
         docker_hub_config = self._create_docker_hub_config(
-            cluster, f"{self._config.platform_namespace}-docker-hub-config"
+            cluster, f"{self._config.helm_release_names.platform}-docker-hub-config"
         )
         jobs_namespace = (
             spec.kubernetes.jobs_namespace_name
@@ -966,7 +966,7 @@ class PlatformConfigFactory:
             ingress_controller_install=spec.kubernetes.ingress_controller_enabled,
             ingress_public_ips=spec.kubernetes.ingress_public_ips,
             ingress_cors_origins=cluster["ingress"].get("cors_origins", ()),
-            ingress_service_name=f"{self._config.platform_namespace}-traefik",
+            ingress_service_name="traefik",
             ingress_http_node_port=30080,
             ingress_https_node_port=30443,
             jobs_namespace_create=spec.kubernetes.jobs_namespace_create,
@@ -983,7 +983,7 @@ class PlatformConfigFactory:
             jobs_schedule_scale_up_timeout_s=cluster["orchestrator"][
                 "job_schedule_scale_up_timeout_s"
             ],
-            jobs_priority_class_name=f"{self._config.platform_namespace}-job",
+            jobs_priority_class_name=f"{self._config.helm_release_names.platform}-job",
             jobs_host_template=f"{{job_id}}.jobs.{cluster.dns_name}",
             jobs_internal_host_template=f"{{job_id}}.{jobs_namespace}",
             jobs_fallback_host=cluster["orchestrator"]["job_fallback_hostname"],
@@ -1000,7 +1000,7 @@ class PlatformConfigFactory:
             ],
             disks_storage_class_name=(
                 spec.disks.storage_class_name
-                or f"{self._config.platform_namespace}-disk"
+                or f"{self._config.helm_release_names.platform}-disk"
             ),
             helm_repo=self._create_helm_repo(cluster),
             docker_config=docker_config,

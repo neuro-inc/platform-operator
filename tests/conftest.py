@@ -455,7 +455,7 @@ def gcp_platform_config(
             "https://release--neuro-web.netlify.app",
             "https://app.neu.ro",
         ],
-        ingress_service_name="platform-traefik",
+        ingress_service_name="traefik",
         ingress_http_node_port=30080,
         ingress_https_node_port=30443,
         storages=[

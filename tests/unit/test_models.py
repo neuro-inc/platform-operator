@@ -181,14 +181,14 @@ class TestPlatformConfig:
     @pytest.fixture
     def traefik_service(self) -> Dict[str, Any]:
         return {
-            "metadata": {"name", "platform-traefik"},
+            "metadata": {"name", "traefik"},
             "status": {"loadBalancer": {"ingress": [{"ip": "192.168.0.1"}]}},
         }
 
     @pytest.fixture
     def aws_traefik_service(self) -> Dict[str, Any]:
         return {
-            "metadata": {"name", "platform-traefik"},
+            "metadata": {"name", "traefik"},
             "status": {"loadBalancer": {"ingress": [{"hostname": "traefik"}]}},
         }
 

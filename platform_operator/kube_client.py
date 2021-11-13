@@ -445,10 +445,10 @@ class PlatformStatusManager:
     def _now(self) -> str:
         return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
-    async def start_deployment(self, name: str, retry: int = 0) -> None:
+    async def start_deployment(self, name: str, retry: Optional[int] = None) -> None:
         await self._load(name)
         self._status[name].phase = PlatformPhase.DEPLOYING.value
-        self._status[name].retries = retry
+        self._status[name].retries = retry or 0
         await self._save(name)
 
     async def complete_deployment(self, name: str) -> None:
