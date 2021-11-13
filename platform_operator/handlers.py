@@ -277,6 +277,8 @@ async def watch_config(
 
     await app.consul_client.wait_healthy(sleep_s=0.5)
 
+    logger.info("Started watching platform config")
+
     while True:
         # Async daemons do not need the `stopped` signal.
         # They can rely on `asyncio.CancelledError` raised.
@@ -299,6 +301,7 @@ async def watch_config(
             ):
                 await _update(name, body, logger)
         except asyncio.CancelledError:
+            logger.info("Stopped watching platform config")
             raise
         except Exception as exc:
             logger.warning("Watch iteration failed", exc_info=exc)

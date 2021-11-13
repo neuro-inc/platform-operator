@@ -32,7 +32,7 @@ dependencies:
     version: "21.11.25"
     repository: https://neuro-inc.github.io/platform-secrets
   - name: platform-reports
-    version: "21.11.3"
+    version: "21.11.4"
     repository: https://neuro-inc.github.io/platform-reports
   - name: platform-disks
     version: "21.11.4"

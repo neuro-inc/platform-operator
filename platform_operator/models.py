@@ -113,7 +113,6 @@ class Config:
     helm_release_names: HelmReleaseNames
     helm_chart_names: HelmChartNames
     helm_chart_versions: HelmChartVersions
-    helm_service_account: str
     platform_auth_url: URL
     platform_ingress_auth_url: URL
     platform_config_url: URL
@@ -153,7 +152,6 @@ class Config:
             helm_stable_repo=HelmRepo(
                 name=HelmRepoName.STABLE, url=URL(env["NP_HELM_STABLE_REPO_URL"])
             ),
-            helm_service_account=env["NP_HELM_SERVICE_ACCOUNT_NAME"],
             helm_release_names=HelmReleaseNames(
                 platform=platform_release_name,
                 obs_csi_driver="platform-obs-csi-driver",

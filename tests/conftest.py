@@ -48,14 +48,13 @@ def config() -> Config:
             auth_type=KubeClientAuthType.NONE,
         ),
         helm_stable_repo=HelmRepo(
-            name="stable", url=URL("https://kubernetes-charts.storage.googleapis.com")
+            name="stable", url=URL("https://charts.helm.sh/stable")
         ),
         helm_release_names=HelmReleaseNames(
             platform="platform", obs_csi_driver="platform-obs-csi-driver"
         ),
         helm_chart_names=HelmChartNames(),
         helm_chart_versions=HelmChartVersions(platform="1.0.0", obs_csi_driver="2.0.0"),
-        helm_service_account="default",
         platform_auth_url=URL("https://dev.neu.ro"),
         platform_ingress_auth_url=URL("https://platformingressauth"),
         platform_config_url=URL("https://dev.neu.ro"),
