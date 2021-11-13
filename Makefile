@@ -50,16 +50,9 @@ docker_build:
 		--build-arg PYTHON_BASE=slim-buster \
 		-t $(IMAGE_NAME):latest .
 
-docker_push: docker_build
-	docker tag $(IMAGE_NAME):latest $(IMAGE_REPO):https://charts.helm.sh/stable
-	docker push $(IMAGE_REPO):https://charts.helm.sh/stable
-
-	docker tag $(IMAGE_NAME):latest $(IMAGE_REPO):latest
-	docker push $(IMAGE_REPO):latest
-
 helm_create_chart:
 	export IMAGE_REPO=$(IMAGE_REPO); \
-	export IMAGE_TAG=https://charts.helm.sh/stable; \
+	export IMAGE_TAG=$(IMAGE_TAG); \
 	export IMAGE_REPO_BASE=$(IMAGE_REPO_BASE); \
 	export CHART_VERSION=$(HELM_CHART_VERSION); \
 	export APP_VERSION=$(HELM_APP_VERSION); \
