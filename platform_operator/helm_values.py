@@ -66,12 +66,6 @@ class HelmValuesFactory:
             },
             "idleJobs": [self._create_idle_job(job) for job in platform.idle_jobs],
             "storages": [self._create_storage_values(s) for s in platform.storages],
-            "disks": {
-                "storageClass": {
-                    "create": CloudProvider.has_value(platform.kubernetes_provider),
-                    "name": platform.disks_storage_class_name,
-                }
-            },
             self._chart_names.traefik: self.create_traefik_values(platform),
             self._chart_names.platform_storage: self.create_platform_storage_values(
                 platform

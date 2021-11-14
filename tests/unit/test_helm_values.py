@@ -99,7 +99,6 @@ class TestHelmValuesFactory:
                     "nodeSelector": {},
                 }
             ],
-            "disks": {"storageClass": {"create": True, "name": "platform-disk"}},
             "storages": [
                 {
                     "type": "nfs",
@@ -2192,7 +2191,7 @@ class TestHelmValuesFactory:
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_disks_values(
-            replace(on_prem_platform_config, disks_storage_class_name="")
+            replace(on_prem_platform_config, disks_storage_class_name=None)
         )
 
         assert "storageClassName" not in result["disks"]

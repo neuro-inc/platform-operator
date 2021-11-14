@@ -21,7 +21,7 @@ spec:
       type: string
     - jsonPath: .status.retries
       name: Retries
-      type: string
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -36,6 +36,8 @@ spec:
             properties:
               phase:
                 type: string
+              retries:
+                type: integer
               conditions:
                 type: array
                 items:

@@ -458,7 +458,6 @@ class PlatformStatusManager:
 
     async def fail_deployment(self, name: str) -> None:
         await self._load(name)
-        assert self._status
         self._status[name].phase = PlatformPhase.FAILED.value
         await self._save(name)
 

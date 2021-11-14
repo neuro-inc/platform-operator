@@ -744,7 +744,7 @@ class PlatformConfig:
     ingress_https_node_port: int
     ingress_service_name: str
     disks_storage_limit_per_user_gb: int
-    disks_storage_class_name: str
+    disks_storage_class_name: Optional[str]
     jobs_namespace_create: bool
     jobs_namespace: str
     jobs_node_pools: Sequence[Dict[str, Any]]
@@ -998,10 +998,7 @@ class PlatformConfigFactory:
             disks_storage_limit_per_user_gb=cluster["disks"][
                 "storage_limit_per_user_gb"
             ],
-            disks_storage_class_name=(
-                spec.disks.storage_class_name
-                or f"{self._config.helm_release_names.platform}-disk"
-            ),
+            disks_storage_class_name=spec.disks.storage_class_name or None,
             helm_repo=self._create_helm_repo(cluster),
             docker_config=docker_config,
             docker_hub_config=docker_hub_config,

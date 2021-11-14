@@ -519,6 +519,18 @@ class TestPlatformConfigFactory:
         assert result.docker_config.secret_name == "secret"
         assert "secret" in result.image_pull_secret_names
 
+    def test_on_prem_platform_config_without_disks_storage_class_name(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: kopf.Body,
+        gcp_cluster: Cluster,
+    ) -> None:
+        del gcp_platform_body["spec"]["disks"]
+
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result.disks_storage_class_name is None
+
     def test_gcp_platform_config_without_tracing(
         self,
         factory: PlatformConfigFactory,
@@ -788,18 +800,6 @@ class TestPlatformConfigFactory:
         result = factory.create(on_prem_platform_body, on_prem_cluster)
 
         assert result.monitoring.metrics_retention_time == "1d"
-
-    def test_on_prem_platform_config_without_disks_storage_class_name(
-        self,
-        factory: PlatformConfigFactory,
-        on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
-    ) -> None:
-        del on_prem_platform_body["spec"]["disks"]
-
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
-
-        assert result.disks_storage_class_name == "platform-disk"
 
     def test_on_prem_platform_config_with_docker_registry(
         self,

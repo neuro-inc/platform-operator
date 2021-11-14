@@ -246,6 +246,13 @@ def gcp_platform_body(cluster_name: str) -> kopf.Body:
                     "blobStorage": {"bucket": "job-metrics"},
                 },
             },
+            "disks": {
+                "kubernetes": {
+                    "persistence": {
+                        "storageClassName": "platform-disk",
+                    }
+                }
+            },
         },
     }
     return kopf.Body(payload)
@@ -272,6 +279,13 @@ def aws_platform_body(cluster_name: str) -> kopf.Body:
                     "region": "us-east-1",
                     "blobStorage": {"bucket": "job-metrics"},
                 },
+            },
+            "disks": {
+                "kubernetes": {
+                    "persistence": {
+                        "storageClassName": "platform-disk",
+                    }
+                }
             },
         },
     }
@@ -318,6 +332,13 @@ def azure_platform_body(cluster_name: str) -> kopf.Body:
                     "region": "westus",
                     "blobStorage": {"bucket": "job-metrics"},
                 },
+            },
+            "disks": {
+                "kubernetes": {
+                    "persistence": {
+                        "storageClassName": "platform-disk",
+                    }
+                }
             },
         },
     }

@@ -53,11 +53,6 @@ dockerHubConfigSecret:
   #   username: username
   #   password: password
 
-
-standardStorageClass:
-  create: true
-  name: ""
-
 ingress: {}
   # jobFallbackHost: default.jobs-dev.neu.ro
   # registryHost: registry.default.org.neu.ro
@@ -88,11 +83,6 @@ storage: []
 
 #   gcs:
 #     bucketName: bucket
-
-disks:
-  storageClass:
-    create: true
-    name: ""
 
 traefikEnabled: true
 consulEnabled: false
