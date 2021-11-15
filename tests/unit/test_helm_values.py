@@ -451,6 +451,7 @@ class TestHelmValuesFactory:
             },
             "secrets": {"haSharedSecret": mock.ANY},
             "configData": {"storage": {"delete": {"enabled": True}}},
+            "podLabels": {"service": "docker-registry"},
         }
         assert result["secrets"]["haSharedSecret"]
 
@@ -473,6 +474,7 @@ class TestHelmValuesFactory:
                 "maxUnavailable": 1,
                 "maxSurge": 0,
             },
+            "podLabels": {"service": "minio"},
             "mode": "standalone",
             "persistence": {
                 "enabled": True,

@@ -244,6 +244,7 @@ class HelmValuesFactory:
                 "haSharedSecret": sha256(platform.cluster_name.encode()).hexdigest()
             },
             "configData": {"storage": {"delete": {"enabled": True}}},
+            "podLabels": {"service": "docker-registry"},
         }
         if (
             platform.registry.docker_registry_username
@@ -272,6 +273,7 @@ class HelmValuesFactory:
                 "maxUnavailable": 1,
                 "maxSurge": 0,
             },
+            "podLabels": {"service": "minio"},
             "mode": "standalone",
             "persistence": {
                 "enabled": True,
