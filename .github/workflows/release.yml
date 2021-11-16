@@ -74,7 +74,7 @@ jobs:
     - name: Create platform chart
       run: make helm_create_chart
       env:
-        TAG: ${{ needs.publish_image.outputs.tag }}
+        IMAGE_TAG: ${{ needs.publish_image.outputs.version }}
         GITHUB_OWNER: ${{ github.repository_owner }}
         HELM_CHART: platform
         HELM_CHART_VERSION: ${{ needs.publish_image.outputs.version }}
