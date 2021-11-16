@@ -822,6 +822,7 @@ class HelmValuesFactory:
         return {
             "nameOverride": f"{self._release_names.platform}-container-runtime",
             "fullnameOverride": f"{self._release_names.platform}-container-runtime",
+            "image": {"repository": platform.get_image("platformcontainerruntime")},
             "affinity": {
                 "nodeAffinity": {
                     "requiredDuringSchedulingIgnoredDuringExecution": {

@@ -1630,6 +1630,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "platform-container-runtime",
             "fullnameOverride": "platform-container-runtime",
+            "image": {"repository": "neuro.io/platformcontainerruntime"},
             "affinity": {
                 "nodeAffinity": {
                     "requiredDuringSchedulingIgnoredDuringExecution": {
