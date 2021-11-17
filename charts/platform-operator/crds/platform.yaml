@@ -88,6 +88,10 @@ spec:
                     properties:
                       enabled:
                         type: boolean
+                      namespaces:
+                        type: array
+                        items:
+                          type: string
                   ingressPublicIPs:
                     type: array
                     items:

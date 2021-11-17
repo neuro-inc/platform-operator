@@ -259,6 +259,10 @@ class KubernetesSpec(Dict[str, Any]):
         return self._spec["ingressController"].get("enabled", True)
 
     @property
+    def ingress_controller_namespaces(self) -> Sequence[str]:
+        return self._spec["ingressController"].get("namespaces", ())
+
+    @property
     def ingress_public_ips(self) -> Sequence[IPv4Address]:
         return [IPv4Address(ip) for ip in self._spec.get("ingressPublicIPs", [])]
 
@@ -743,6 +747,7 @@ class PlatformConfig:
     ingress_http_node_port: int
     ingress_https_node_port: int
     ingress_service_name: str
+    ingress_namespaces: Sequence[str]
     disks_storage_limit_per_user_gb: int
     disks_storage_class_name: Optional[str]
     jobs_namespace_create: bool
@@ -967,6 +972,13 @@ class PlatformConfigFactory:
             ingress_public_ips=spec.kubernetes.ingress_public_ips,
             ingress_cors_origins=cluster["ingress"].get("cors_origins", ()),
             ingress_service_name="traefik",
+            ingress_namespaces=sorted(
+                {
+                    self._config.platform_namespace,
+                    jobs_namespace,
+                    *spec.kubernetes.ingress_controller_namespaces,
+                }
+            ),
             ingress_http_node_port=30080,
             ingress_https_node_port=30443,
             jobs_namespace_create=spec.kubernetes.jobs_namespace_create,

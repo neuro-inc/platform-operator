@@ -479,6 +479,7 @@ def gcp_platform_config(
         ingress_service_name="traefik",
         ingress_http_node_port=30080,
         ingress_https_node_port=30443,
+        ingress_namespaces=["platform", "platform-jobs"],
         storages=[
             StorageConfig(
                 type=StorageType.NFS,
