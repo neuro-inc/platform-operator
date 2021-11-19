@@ -87,7 +87,13 @@ jobs:
         HELM_CHART: platform-operator
         HELM_CHART_VERSION: ${{ needs.publish_image.outputs.version }}
         HELM_APP_VERSION: ${{ needs.publish_image.outputs.version }}
-    - name: Release charts
-      uses: helm/chart-releaser-action@v1.2.1
+    - name: Release chart
       env:
-        CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        HELM_EXPERIMENTAL_OCI: 1
+        HELM_REPO: ghcr.io/${{ github.repository_owner }}/helm-charts
+        HELM_CHART_VERSION: ${{ needs.publish_image.outputs.version }}
+        CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        echo $CR_TOKEN | helm registry login ghcr.io -u x-access-token --password-stdin
+        helm package charts/platform-operator -u
+        helm push platform-operator-$HELM_CHART_VERSION.tgz oci://$HELM_REPO
