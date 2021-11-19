@@ -18,31 +18,31 @@ dependencies:
     condition: minioEnabled
   - name: platform-storage
     version: "21.11.3"
-    repository: oci://ghcr.io/neuro-inc/helm-charts/platform-storage
+    repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-registry
     version: "21.11.4"
-    repository: oci://ghcr.io/neuro-inc/helm-charts/platform-registry
+    repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-monitoring
     version: "21.11.5"
-    repository: oci://ghcr.io/neuro-inc/helm-charts/platform-monitoring
+    repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-container-runtime
     version: "21.11.3"
-    repository: oci://ghcr.io/neuro-inc/helm-charts/platform-container-runtime
+    repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-secrets
     version: "21.11.26"
-    repository: oci://ghcr.io/neuro-inc/helm-charts/platform-secrets
+    repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-reports
     version: "21.11.5"
-    repository: oci://ghcr.io/neuro-inc/helm-charts/platform-reports
+    repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-disks
     version: "21.11.5"
-    repository: oci://ghcr.io/neuro-inc/helm-charts/platform-disks
+    repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-api-poller
     version: "21.11.9"
-    repository: oci://ghcr.io/neuro-inc/helm-charts/platform-api-poller
+    repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-buckets
     version: "21.11.4"
-    repository: oci://ghcr.io/neuro-inc/helm-charts/platform-buckets
+    repository: oci://ghcr.io/neuro-inc/helm-charts
 
   # Deprecated, left for backward compatibility with old clusters
   - name: consul

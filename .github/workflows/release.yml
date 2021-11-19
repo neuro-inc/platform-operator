@@ -86,7 +86,8 @@ jobs:
     - name: Release platform chart
       run: |
         echo $CR_TOKEN | helm registry login ghcr.io -u x-access-token --password-stdin
-        helm package charts/platform -u
+        helm dependency update charts/platform
+        helm package charts/platform
         helm push platform-$HELM_CHART_VERSION.tgz oci://$HELM_REPO
     - name: Create platform-operator chart
       run: make helm_create_chart
