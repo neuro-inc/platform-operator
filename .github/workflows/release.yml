@@ -87,7 +87,17 @@ jobs:
         HELM_CHART: platform-operator
         HELM_CHART_VERSION: ${{ needs.publish_image.outputs.version }}
         HELM_APP_VERSION: ${{ needs.publish_image.outputs.version }}
-    - name: Release chart
+    - name: Release platform chart
+      env:
+        HELM_EXPERIMENTAL_OCI: 1
+        HELM_REPO: ghcr.io/${{ github.repository_owner }}/helm-charts
+        HELM_CHART_VERSION: ${{ needs.publish_image.outputs.version }}
+        CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        echo $CR_TOKEN | helm registry login ghcr.io -u x-access-token --password-stdin
+        helm package charts/platform -u
+        helm push platform-$HELM_CHART_VERSION.tgz oci://$HELM_REPO
+    - name: Release platform-operator chart
       env:
         HELM_EXPERIMENTAL_OCI: 1
         HELM_REPO: ghcr.io/${{ github.repository_owner }}/helm-charts
