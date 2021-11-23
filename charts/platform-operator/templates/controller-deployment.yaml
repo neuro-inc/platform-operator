@@ -56,6 +56,8 @@ spec:
           value: token
         - name: NP_KUBE_AUTH_TOKEN_PATH
           value: /var/run/secrets/kubernetes.io/serviceaccount/token
+        - name: HELM_EXPERIMENTAL_OCI
+          value: "1"
         - name: NP_HELM_PLATFORM_CHART_VERSION
           value: {{ .Chart.Version | quote }}
         - name: NP_HELM_OBS_CSI_DRIVER_CHART_VERSION
