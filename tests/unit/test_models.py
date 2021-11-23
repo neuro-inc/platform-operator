@@ -14,7 +14,6 @@ from platform_operator.models import (
     HelmChartNames,
     HelmChartVersions,
     HelmReleaseNames,
-    HelmRepo,
     KubeClientAuthType,
     KubeConfig,
     LabelsConfig,
@@ -53,7 +52,6 @@ class TestConfig:
             "NP_LABEL_NODE_POOL": "platform.neuromation.io/nodepool",
             "NP_LABEL_ACCELERATOR": "platform.neuromation.io/accelerator",
             "NP_LABEL_PREEMPTIBLE": "platform.neuromation.io/preemptible",
-            "NP_HELM_STABLE_REPO_URL": ("https://charts.helm.sh/stable"),
             "NP_HELM_PLATFORM_CHART_VERSION": "1.0.0",
             "NP_HELM_OBS_CSI_DRIVER_CHART_VERSION": "2.0.0",
             "NP_PLATFORM_NAMESPACE": "platform",
@@ -79,10 +77,6 @@ class TestConfig:
                 conn_timeout_s=300,
                 read_timeout_s=100,
                 conn_pool_size=100,
-            ),
-            helm_stable_repo=HelmRepo(
-                name="stable",
-                url=URL("https://charts.helm.sh/stable"),
             ),
             helm_release_names=HelmReleaseNames(
                 platform="platform", obs_csi_driver="platform-obs-csi-driver"
@@ -117,7 +111,6 @@ class TestConfig:
             "NP_LABEL_NODE_POOL": "platform.neuromation.io/nodepool",
             "NP_LABEL_ACCELERATOR": "platform.neuromation.io/accelerator",
             "NP_LABEL_PREEMPTIBLE": "platform.neuromation.io/preemptible",
-            "NP_HELM_STABLE_REPO_URL": ("https://charts.helm.sh/stable"),
             "NP_HELM_PLATFORM_CHART_VERSION": "1.0.0",
             "NP_HELM_OBS_CSI_DRIVER_CHART_VERSION": "2.0.0",
             "NP_PLATFORM_NAMESPACE": "platform",
@@ -136,10 +129,6 @@ class TestConfig:
                 conn_timeout_s=300,
                 read_timeout_s=100,
                 conn_pool_size=100,
-            ),
-            helm_stable_repo=HelmRepo(
-                name="stable",
-                url=URL("https://charts.helm.sh/stable"),
             ),
             helm_release_names=HelmReleaseNames(
                 platform="platform", obs_csi_driver="platform-obs-csi-driver"

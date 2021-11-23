@@ -592,18 +592,16 @@ async def test_deploy(
         image_pull_secrets=gcp_platform_config.image_pull_secret_names,
     )
 
-    helm_client.add_repo.assert_has_awaits(
-        [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
-    )
-    helm_client.update_repo.assert_awaited_once()
     helm_client.upgrade.assert_awaited_once_with(
         "platform",
-        "neuro/platform",
+        "https://ghcr.io/neuro-inc/helm-charts/platform",
         values=mock.ANY,
         version="1.0.0",
         install=True,
         wait=True,
         timeout_s=600,
+        username=gcp_platform_config.helm_repo.username,
+        password=gcp_platform_config.helm_repo.password,
     )
 
     certificate_store.wait_till_certificate_created.assert_awaited_once()
@@ -660,18 +658,16 @@ async def test_deploy_with_ingress_controller_disabled(
         token=gcp_platform_body["spec"]["token"],
     )
 
-    helm_client.add_repo.assert_has_awaits(
-        [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
-    )
-    helm_client.update_repo.assert_awaited_once()
     helm_client.upgrade.assert_awaited_once_with(
         "platform",
-        "neuro/platform",
+        "https://ghcr.io/neuro-inc/helm-charts/platform",
         values=mock.ANY,
         version="1.0.0",
         install=True,
         wait=True,
         timeout_s=600,
+        username=gcp_platform_config.helm_repo.username,
+        password=gcp_platform_config.helm_repo.password,
     )
 
     certificate_store.wait_till_certificate_created.assert_not_awaited()
@@ -727,12 +723,14 @@ async def test_deploy_gcp_with_gcs_storage(
 
     helm_client.upgrade.assert_any_await(
         "platform-obs-csi-driver",
-        "neuro/obs-csi-driver",
+        "https://ghcr.io/neuro-inc/helm-charts/obs-csi-driver",
         values=mock.ANY,
         version="2.0.0",
         install=True,
         wait=True,
         timeout_s=600,
+        username=gcp_platform_config.helm_repo.username,
+        password=gcp_platform_config.helm_repo.password,
     )
 
 
@@ -772,10 +770,6 @@ async def test_deploy_all_charts_deployed(
 
     kube_client.update_service_account_image_pull_secrets.assert_not_awaited()
 
-    helm_client.add_repo.assert_has_awaits(
-        [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
-    )
-    helm_client.update_repo.assert_awaited_once()
     helm_client.upgrade.assert_not_awaited()
 
     certificate_store.wait_till_certificate_created.assert_awaited_once()
@@ -885,10 +879,6 @@ async def test_deploy_no_changes(
         token=gcp_platform_body["spec"]["token"],
     )
 
-    helm_client.add_repo.assert_has_awaits(
-        [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
-    )
-    helm_client.update_repo.assert_awaited_once()
     helm_client.upgrade.assert_not_awaited()
 
     certificate_store.wait_till_certificate_created.assert_not_awaited()
@@ -1125,29 +1115,29 @@ async def test_watch_config(
         image_pull_secrets=gcp_platform_config.image_pull_secret_names,
     )
 
-    helm_client.add_repo.assert_has_awaits(
-        [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
-    )
-    helm_client.update_repo.assert_awaited_once()
     helm_client.upgrade.assert_has_awaits(
         [
             mock.call(
                 "platform-obs-csi-driver",
-                "neuro/obs-csi-driver",
+                "https://ghcr.io/neuro-inc/helm-charts/obs-csi-driver",
                 values=mock.ANY,
                 version="2.0.0",
                 install=True,
                 wait=True,
                 timeout_s=600,
+                username=gcp_platform_config.helm_repo.username,
+                password=gcp_platform_config.helm_repo.password,
             ),
             mock.call(
                 "platform",
-                "neuro/platform",
+                "https://ghcr.io/neuro-inc/helm-charts/platform",
                 values=mock.ANY,
                 version="1.0.0",
                 install=True,
                 wait=True,
                 timeout_s=600,
+                username=gcp_platform_config.helm_repo.username,
+                password=gcp_platform_config.helm_repo.password,
             ),
         ]
     )
@@ -1208,10 +1198,6 @@ async def test_watch_config_all_charts_deployed(
         token=gcp_platform_config.token,
     )
 
-    helm_client.add_repo.assert_has_awaits(
-        [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
-    )
-    helm_client.update_repo.assert_awaited_once()
     helm_client.upgrade.assert_not_awaited()
 
     certificate_store.wait_till_certificate_created.assert_awaited_once()
@@ -1265,11 +1251,6 @@ async def test_watch_config_no_changes(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_config.token,
     )
-
-    helm_client.add_repo.assert_has_awaits(
-        [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
-    )
-    helm_client.update_repo.assert_awaited_once()
 
     status_manager.start_deployment.assert_not_awaited()
 
@@ -1347,11 +1328,6 @@ async def test_watch_config_helm_release_failed(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_config.token,
     )
-
-    helm_client.add_repo.assert_has_awaits(
-        [mock.call(config.helm_stable_repo), mock.call(gcp_platform_config.helm_repo)]
-    )
-    helm_client.update_repo.assert_awaited_once()
 
     status_manager.start_deployment.assert_not_awaited()
 

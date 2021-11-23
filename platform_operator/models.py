@@ -49,21 +49,10 @@ class LabelsConfig:
     preemptible: str = "platform.neuromation.io/preemptible"
 
 
-class HelmRepoName(str, Enum):
-    STABLE = "stable"
-    NEURO = "neuro"
-
-    def __repr__(self) -> str:
-        return repr(self.value)
-
-    def __str__(self) -> str:
-        return self.value
-
-
 @dataclass(frozen=True)
 class HelmRepo:
-    name: str
     url: URL
+    name: str = ""
     username: str = ""
     password: str = ""
 
@@ -109,7 +98,6 @@ class Config:
     retries: int
     backoff: int
     kube_config: KubeConfig
-    helm_stable_repo: HelmRepo
     helm_release_names: HelmReleaseNames
     helm_chart_names: HelmChartNames
     helm_chart_versions: HelmChartVersions
@@ -148,9 +136,6 @@ class Config:
                     env.get("NP_KUBE_AUTH_TOKEN_PATH")
                 ),
                 auth_token=env.get("NP_KUBE_AUTH_TOKEN"),
-            ),
-            helm_stable_repo=HelmRepo(
-                name=HelmRepoName.STABLE, url=URL(env["NP_HELM_STABLE_REPO_URL"])
             ),
             helm_release_names=HelmReleaseNames(
                 platform=platform_release_name,
@@ -1036,7 +1021,6 @@ class PlatformConfigFactory:
     def _create_helm_repo(self, cluster: Cluster) -> HelmRepo:
         neuro_helm = cluster["credentials"]["neuro_helm"]
         return HelmRepo(
-            name=HelmRepoName.NEURO,
             url=URL(neuro_helm["url"]),
             username=neuro_helm.get("username", ""),
             password=neuro_helm.get("password", ""),

@@ -18,7 +18,6 @@ from platform_operator.models import (
     HelmChartVersions,
     HelmReleaseNames,
     HelmRepo,
-    HelmRepoName,
     KubeClientAuthType,
     KubeConfig,
     LabelsConfig,
@@ -46,9 +45,6 @@ def config() -> Config:
             version="1.16.10",
             url=URL("https://kubernetes.default"),
             auth_type=KubeClientAuthType.NONE,
-        ),
-        helm_stable_repo=HelmRepo(
-            name="stable", url=URL("https://charts.helm.sh/stable")
         ),
         helm_release_names=HelmReleaseNames(
             platform="platform", obs_csi_driver="platform-obs-csi-driver"
@@ -148,9 +144,9 @@ def cluster_factory(
                     "email": f"{name}@neuromation.io",
                 },
                 "neuro_helm": {
+                    "url": "https://ghcr.io/neuro-inc/helm-charts",
                     "username": name,
                     "password": "password",
-                    "url": "https://neuro.jfrog.io/neuro/helm-virtual-public",
                 },
                 "neuro": {
                     "token": "token",
@@ -502,8 +498,7 @@ def gcp_platform_config(
         disks_storage_limit_per_user_gb=10240,
         disks_storage_class_name="platform-disk",
         helm_repo=HelmRepo(
-            name=HelmRepoName.NEURO,
-            url=URL("https://neuro.jfrog.io/neuro/helm-virtual-public"),
+            url=URL("https://ghcr.io/neuro-inc/helm-charts"),
             username=cluster_name,
             password="password",
         ),

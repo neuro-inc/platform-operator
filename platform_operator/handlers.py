@@ -27,7 +27,6 @@ from .kube_client import (
 from .models import (
     CloudProvider,
     Config,
-    HelmRepoName,
     PlatformConfig,
     PlatformConfigFactory,
     StorageType,
@@ -159,8 +158,6 @@ async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> Non
     except Exception as ex:
         await fail_deployment(name, body)
         raise kopf.PermanentError(f"Invalid platform configuration: {ex!s}")
-
-    await initialize_helm(platform)
 
     obs_csi_driver_deploy_failed = await is_obs_csi_driver_deploy_failed()
     platform_deploy_failed = await is_platform_deploy_failed()
@@ -320,8 +317,6 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
 
     platform = await get_platform_config(name, body)
 
-    await initialize_helm(platform)
-
     obs_csi_driver_deploy_failed = await is_obs_csi_driver_deploy_failed()
     platform_deploy_failed = await is_platform_deploy_failed()
 
@@ -466,24 +461,20 @@ async def fail_deployment(name: str, body: kopf.Body) -> None:
     )
 
 
-async def initialize_helm(platform: PlatformConfig) -> None:
-    await app.helm_client.add_repo(config.helm_stable_repo)
-    await app.helm_client.add_repo(platform.helm_repo)
-    await app.helm_client.update_repo()
-
-
 async def upgrade_obs_csi_driver_helm_release(platform: PlatformConfig) -> None:
     async with app.status_manager.transition(
         platform.cluster_name, PlatformConditionType.OBS_CSI_DRIVER_DEPLOYED
     ):
         await app.helm_client.upgrade(
             config.helm_release_names.obs_csi_driver,
-            f"{HelmRepoName.NEURO}/{config.helm_chart_names.obs_csi_driver}",
+            str(platform.helm_repo.url / config.helm_chart_names.obs_csi_driver),
             values=app.helm_values_factory.create_obs_csi_driver_values(platform),
             version=config.helm_chart_versions.obs_csi_driver,
             install=True,
             wait=True,
             timeout_s=600,
+            username=platform.helm_repo.username,
+            password=platform.helm_repo.password,
         )
 
 
@@ -498,12 +489,14 @@ async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
         )
         await app.helm_client.upgrade(
             config.helm_release_names.platform,
-            f"{HelmRepoName.NEURO}/{config.helm_chart_names.platform}",
+            str(platform.helm_repo.url / config.helm_chart_names.platform),
             values=app.helm_values_factory.create_platform_values(platform),
             version=config.helm_chart_versions.platform,
             install=True,
             wait=True,
             timeout_s=600,
+            username=platform.helm_repo.username,
+            password=platform.helm_repo.password,
         )
 
 
