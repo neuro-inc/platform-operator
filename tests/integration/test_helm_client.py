@@ -27,7 +27,7 @@ class TestHelmClient:
         config_map: Dict[str, Any],
     ) -> None:
         await helm_client.add_repo(
-            HelmRepo("incubator", URL("https://charts.helm.sh/incubator"))
+            HelmRepo(URL("https://charts.helm.sh/incubator"), name="incubator")
         )
         await helm_client.update_repo()
         release_name = str(uuid.uuid4())
@@ -62,7 +62,7 @@ class TestHelmClient:
             HelmException,
             match="Failed to add helm repo unknown https://unknown",
         ):
-            await helm_client.add_repo(HelmRepo("unknown", URL("https://unknown")))
+            await helm_client.add_repo(HelmRepo(URL("https://unknown"), name="unknown"))
 
     @pytest.mark.asyncio
     async def test_install_unknown_chart(self, helm_client: HelmClient) -> None:
