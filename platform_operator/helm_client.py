@@ -193,13 +193,17 @@ class HelmClient:
         install: bool = False,
         wait: bool = False,
         timeout_s: Optional[int] = None,
+        username: str = "",
+        password: str = "",
     ) -> None:
         options = self._global_options.add(
-            version=version,
+            version=version or None,
             values="-",
             install=install,
             wait=wait,
             timeout=f"{timeout_s}s" if timeout_s is not None else None,
+            username=username or None,
+            password=password or None,
         )
         logger.info(
             "Running helm upgrade %s %s %s",
