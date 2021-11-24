@@ -30,7 +30,7 @@ jobs:
       with:
         version: v3.7.0
     - name: Cache packages
-      uses: actions/cache@v2.1.6
+      uses: actions/cache@v2.1.7
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-py-3.8-${{ hashFiles('pyproject.toml', 'setup.cfg')
