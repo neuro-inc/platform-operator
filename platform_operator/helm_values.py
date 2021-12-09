@@ -949,7 +949,7 @@ class HelmValuesFactory:
                     "hosts": [platform.ingress_metrics_url.host],
                 }
             },
-            "prometheus-operator": {
+            "kube-prometheus-stack": {
                 "global": {
                     "imagePullSecrets": [
                         {"name": name} for name in platform.image_pull_secret_names
@@ -986,6 +986,7 @@ class HelmValuesFactory:
                     "configmapReloadImage": {
                         "repository": platform.get_image("configmap-reload")
                     },
+                    "kubectlImage": {"repository": platform.get_image("kubectl")},
                     "tlsProxy": {
                         "image": {"repository": platform.get_image("ghostunnel")}
                     },
@@ -1058,7 +1059,9 @@ class HelmValuesFactory:
             },
         }
         result.update(**self._create_tracing_values(platform))
-        prometheus_spec = result["prometheus-operator"]["prometheus"]["prometheusSpec"]
+        prometheus_spec = result["kube-prometheus-stack"]["prometheus"][
+            "prometheusSpec"
+        ]
         if platform.monitoring.metrics_storage_type == MetricsStorageType.KUBERNETES:
             result["objectStore"] = {"supported": False}
             result["prometheusProxy"] = {

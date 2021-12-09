@@ -1754,7 +1754,7 @@ class TestHelmValuesFactory:
                     "hosts": [f"metrics.{gcp_platform_config.cluster_name}.org.neu.ro"],
                 }
             },
-            "prometheus-operator": {
+            "kube-prometheus-stack": {
                 "global": {
                     "imagePullSecrets": [
                         {"name": "platform-docker-config"},
@@ -1790,6 +1790,7 @@ class TestHelmValuesFactory:
                         "repository": ("neuro.io/prometheus-config-reloader")
                     },
                     "configmapReloadImage": {"repository": "neuro.io/configmap-reload"},
+                    "kubectlImage": {"repository": "neuro.io/kubectl"},
                     "tlsProxy": {"image": {"repository": "neuro.io/ghostunnel"}},
                     "admissionWebhooks": {
                         "patch": {
@@ -1894,7 +1895,7 @@ class TestHelmValuesFactory:
         )
 
         assert (
-            result["prometheus-operator"]["kubeStateMetrics"]["serviceMonitor"][
+            result["kube-prometheus-stack"]["kubeStateMetrics"]["serviceMonitor"][
                 "metricRelabelings"
             ]
             == []
@@ -1915,7 +1916,7 @@ class TestHelmValuesFactory:
             )
         )
 
-        assert result["prometheus-operator"]["kubeStateMetrics"]["serviceMonitor"][
+        assert result["kube-prometheus-stack"]["kubeStateMetrics"]["serviceMonitor"][
             "metricRelabelings"
         ] == [
             {
@@ -1964,7 +1965,7 @@ class TestHelmValuesFactory:
         assert result["metricsExporter"]["podMetadata"]["annotations"] == {
             "iam.amazonaws.com/role": "role_arn"
         }
-        assert result["prometheus-operator"]["prometheus"]["prometheusSpec"][
+        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
             "podMetadata"
         ] == {"annotations": {"iam.amazonaws.com/role": "role_arn"}}
         assert result["thanos"]["store"]["annotations"] == {
@@ -2010,11 +2011,11 @@ class TestHelmValuesFactory:
             "prometheus": {"host": "prometheus-prometheus", "port": 9090}
         }
         assert (
-            result["prometheus-operator"]["prometheus"]["prometheusSpec"]["retention"]
+            result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]["retention"]
             == "15d"
         )
         assert (
-            result["prometheus-operator"]["prometheus"]["prometheusSpec"]["thanos"]
+            result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]["thanos"]
             == ""
         )
         assert "cloudProvider" not in result
@@ -2134,11 +2135,11 @@ class TestHelmValuesFactory:
         result = factory.create_platform_reports_values(on_prem_platform_config)
 
         assert (
-            result["prometheus-operator"]["prometheus"]["prometheusSpec"]["retention"]
+            result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]["retention"]
             == "1d"
         )
         assert (
-            result["prometheus-operator"]["prometheus"]["prometheusSpec"][
+            result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
                 "retentionSize"
             ]
             == "10GB"

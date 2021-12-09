@@ -11,7 +11,7 @@ spec:
   - name: https
     port: 443
 ---
-apiVersion: {{ include "platform.ingress.apiVersion" . }}
+apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
   name: {{ .Release.Name }}-error-pages
@@ -30,7 +30,7 @@ spec:
           serviceName: {{ .Release.Name }}-fallback
           servicePort: https
 ---
-apiVersion: {{ include "platform.ingress.apiVersion" . }}
+apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
   name: {{ .Release.Name }}-fallback
