@@ -156,16 +156,20 @@ def aws_elb_client() -> Iterator[mock.Mock]:
 
 
 @pytest.fixture
-def traefik_service() -> dict[str, Any]:
-    return {
-        "status": {"loadBalancer": {"ingress": [{"ip": "192.168.0.1"}]}},
-    }
+def traefik_service() -> Service:
+    return Service(
+        {
+            "spec": {"type": "LoadBalancer"},
+            "status": {"loadBalancer": {"ingress": [{"ip": "192.168.0.1"}]}},
+        }
+    )
 
 
 @pytest.fixture
 def aws_traefik_service() -> Service:
     return Service(
         {
+            "spec": {"type": "LoadBalancer"},
             "status": {"loadBalancer": {"ingress": [{"hostname": "traefik"}]}},
         }
     )
@@ -475,7 +479,7 @@ async def test_configure_aws_cluster(
     await _configure_cluster(aws_platform_config)
 
     kube_client.get_service.assert_has_awaits(
-        [mock.call(namespace="platform", name="traefik")]
+        [mock.call(namespace="platform", name="platform-traefik")]
     )
     aws_elb_client.get_load_balancer_by_dns_name.assert_has_awaits(
         [mock.call("traefik")]
@@ -504,7 +508,7 @@ async def test_configure_cluster(
     await _configure_cluster(gcp_platform_config)
 
     kube_client.get_service.assert_has_awaits(
-        [mock.call(namespace="platform", name="traefik")]
+        [mock.call(namespace="platform", name="platform-traefik")]
     )
     config_client.patch_cluster.assert_awaited_with(
         cluster_name=gcp_platform_config.cluster_name,
@@ -635,14 +639,13 @@ async def test_deploy_with_ingress_controller_disabled(
     configure_cluster: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
-    config: Config,
     gcp_cluster: Cluster,
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import deploy
 
-    gcp_platform_body["spec"]["kubernetes"]["ingressController"] = {"enabled": False}
+    gcp_platform_body["spec"]["ingressController"] = {"enabled": False}
     gcp_platform_config = replace(gcp_platform_config, ingress_controller_install=False)
 
     is_platform_deploy_required.return_value = True
@@ -960,7 +963,7 @@ async def test_delete(
         [
             mock.call(namespace="platform-jobs"),
             mock.call(
-                namespace="platform", label_selector={"service": "platformstorageapi"}
+                namespace="platform", label_selector={"service": "platform-storage"}
             ),
         ]
     )

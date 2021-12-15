@@ -14,6 +14,10 @@ kubectlImage:
   repository: $IMAGE_REPO_BASE/kubectl
   tag: "1.16"
 
+nginxImage:
+  repository: $IMAGE_REPO_BASE/nginx
+  tag: latest
+
 serviceToken: ""
 
 nodePools: []
@@ -54,6 +58,7 @@ dockerHubConfigSecret:
   #   password: password
 
 ingress: {}
+  # host: default.org.neu.ro
   # jobFallbackHost: default.jobs-dev.neu.ro
   # registryHost: registry.default.org.neu.ro
 
@@ -65,7 +70,7 @@ jobs:
 
 idleJobs: []
 
-storage: []
+storages: []
 # - type: kubernetes # nfs, gcs, azureFile
 #   path:
 #   size: 10Gi
@@ -88,6 +93,7 @@ traefikEnabled: true
 consulEnabled: false
 dockerRegistryEnabled: false
 minioEnabled: false
+platformReportsEnabled: true
 
 tags:
   gcp: false

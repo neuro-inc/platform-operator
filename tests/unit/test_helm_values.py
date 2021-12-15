@@ -10,6 +10,7 @@ from platform_operator.models import (
     BucketsProvider,
     Config,
     DockerConfig,
+    IngressServiceType,
     LabelsConfig,
     MetricsStorageType,
     MonitoringConfig,
@@ -22,11 +23,7 @@ from platform_operator.models import (
 class TestHelmValuesFactory:
     @pytest.fixture
     def factory(self, config: Config) -> HelmValuesFactory:
-        return HelmValuesFactory(
-            config.helm_release_names,
-            config.helm_chart_names,
-            container_runtime="docker",
-        )
+        return HelmValuesFactory(config.helm_chart_names, container_runtime="docker")
 
     def test_create_gcp_platform_values_with_nfs_storage(
         self,
@@ -214,18 +211,6 @@ class TestHelmValuesFactory:
                 "gcs": {"bucketName": "platform-storage"},
             }
         ]
-
-    def test_create_gcp_platform_values_without_namespace(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(
-            replace(gcp_platform_config, jobs_namespace_create=False)
-        )
-
-        assert result["jobs"]["namespace"] == {
-            "create": False,
-            "name": gcp_platform_config.jobs_namespace,
-        }
 
     def test_create_gcp_platform_values_without_docker_config_secret(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -538,9 +523,7 @@ class TestHelmValuesFactory:
         result = factory.create_traefik_values(gcp_platform_config)
 
         assert result == {
-            "nameOverride": "traefik",
-            "fullnameOverride": "traefik",
-            "replicas": 3,
+            "replicas": 2,
             "deploymentStrategy": {
                 "type": "RollingUpdate",
                 "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
@@ -555,7 +538,7 @@ class TestHelmValuesFactory:
                 "platform-docker-config",
                 "platform-docker-hub-config",
             ],
-            "logLevel": "debug",
+            "logLevel": "error",
             "serviceType": "LoadBalancer",
             "externalTrafficPolicy": "Cluster",
             "ssl": {"enabled": True, "enforced": True},
@@ -627,11 +610,28 @@ class TestHelmValuesFactory:
                 },
             ],
             "resources": {
-                "requests": {"cpu": "1200m", "memory": "5Gi"},
-                "limits": {"cpu": "1200m", "memory": "5Gi"},
+                "requests": {"cpu": "500m", "memory": "1Gi"},
+                "limits": {"cpu": "1000m", "memory": "4Gi"},
             },
             "timeouts": {"responding": {"idleTimeout": "660s"}},
         }
+
+    def test_create_gcp_traefik_values_with_ssl_cert(
+        self,
+        gcp_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_traefik_values(
+            replace(
+                gcp_platform_config,
+                ingress_ssl_cert_data="default-cert",
+                ingress_ssl_cert_key_data="default-key",
+            )
+        )
+
+        assert "acme" not in result
+        assert result["ssl"]["defaultCert"] == "default-cert"
+        assert result["ssl"]["defaultKey"] == "default-key"
 
     def test_create_aws_traefik_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -660,19 +660,28 @@ class TestHelmValuesFactory:
             }
         }
 
-    def test_create_on_prem_traefik_values(
+    def test_create_on_prem_traefik_values_with_custom_ports(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_traefik_values(on_prem_platform_config)
+        result = factory.create_traefik_values(
+            replace(
+                on_prem_platform_config,
+                ingress_service_type=IngressServiceType.NODE_PORT,
+                ingress_node_port_http=30080,
+                ingress_node_port_https=30443,
+                ingress_host_port_http=80,
+                ingress_host_port_https=443,
+            )
+        )
 
-        assert result["replicas"] == 1
         assert result["serviceType"] == "NodePort"
         assert result["service"] == {"nodePorts": {"http": 30080, "https": 30443}}
         assert result["deployment"]["hostPort"] == {
             "httpEnabled": True,
             "httpsEnabled": True,
+            "httpPort": 80,
+            "httpsPort": 443,
         }
-        assert result["timeouts"] == {"responding": {"idleTimeout": "600s"}}
 
     def test_create_platform_storage_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory

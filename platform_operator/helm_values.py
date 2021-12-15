@@ -11,7 +11,7 @@ from .models import (
     BucketsProvider,
     CloudProvider,
     HelmChartNames,
-    HelmReleaseNames,
+    IngressServiceType,
     LabelsConfig,
     MetricsStorageType,
     PlatformConfig,
@@ -23,12 +23,8 @@ from .models import (
 
 class HelmValuesFactory:
     def __init__(
-        self,
-        helm_release_names: HelmReleaseNames,
-        helm_chart_names: HelmChartNames,
-        container_runtime: str,
+        self, helm_chart_names: HelmChartNames, container_runtime: str
     ) -> None:
-        self._release_names = helm_release_names
         self._chart_names = helm_chart_names
         self._container_runtime = container_runtime
 
@@ -61,7 +57,7 @@ class HelmValuesFactory:
             },
             "jobs": {
                 "namespace": {
-                    "create": platform.jobs_namespace_create,
+                    "create": True,
                     "name": platform.jobs_namespace,
                 },
                 "label": platform.node_labels.job,
@@ -306,9 +302,7 @@ class HelmValuesFactory:
     def create_traefik_values(self, platform: PlatformConfig) -> dict[str, Any]:
         dns_challenge_script_name = "resolve_dns_challenge.sh"
         result: dict[str, Any] = {
-            "nameOverride": "traefik",
-            "fullnameOverride": "traefik",
-            "replicas": 3,
+            "replicas": 2,
             "deploymentStrategy": {
                 "type": "RollingUpdate",
                 "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
@@ -320,11 +314,64 @@ class HelmValuesFactory:
             "image": platform.get_image("traefik"),
             "imageTag": "1.7.20-alpine",
             "imagePullSecrets": platform.image_pull_secret_names,
-            "logLevel": "debug",
-            "serviceType": "LoadBalancer",
+            "logLevel": "error",
+            "serviceType": platform.ingress_service_type.value,
             "externalTrafficPolicy": "Cluster",
             "ssl": {"enabled": True, "enforced": True},
-            "acme": {
+            "kvprovider": {
+                "consul": {
+                    "watch": True,
+                    "endpoint": str(platform.consul_url),
+                    "prefix": "traefik",
+                },
+                "storeAcme": True,
+                "acmeStorageLocation": "traefik/acme/account",
+            },
+            "kubernetes": {
+                "ingressClass": "traefik",
+                "namespaces": [platform.namespace, platform.jobs_namespace],
+            },
+            "rbac": {"enabled": True},
+            "extraVolumes": [
+                # Mounted secret and configmap volumes are updated automatically
+                # by kubelet
+                # https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically
+                # https://kubernetes.io/docs/concepts/configuration/secret/#mounted-secrets-are-updated-automatically
+                {
+                    "name": "dns-challenge",
+                    "configMap": {
+                        "name": f"{platform.release_name}-dns-challenge",
+                        "defaultMode": 0o777,
+                    },
+                },
+                {
+                    "name": "dns-challenge-secret",
+                    "secret": {"secretName": f"{platform.release_name}-dns-challenge"},
+                },
+            ],
+            "extraVolumeMounts": [
+                {"name": "dns-challenge", "mountPath": "/dns-01/challenge"},
+                {"name": "dns-challenge-secret", "mountPath": "/dns-01/secret"},
+            ],
+            "env": [
+                {"name": "NP_PLATFORM_CONFIG_URL", "value": str(platform.config_url)},
+                {"name": "NP_CLUSTER_NAME", "value": platform.cluster_name},
+                {
+                    "name": "NP_DNS_CHALLENGE_SCRIPT_NAME",
+                    "value": dns_challenge_script_name,
+                },
+            ],
+            "resources": {
+                "requests": {"cpu": "500m", "memory": "1Gi"},
+                "limits": {"cpu": "1000m", "memory": "4Gi"},
+            },
+            "timeouts": {"responding": {"idleTimeout": "600s"}},
+        }
+        if platform.ingress_ssl_cert_data and platform.ingress_ssl_cert_key_data:
+            result["ssl"]["defaultCert"] = platform.ingress_ssl_cert_data
+            result["ssl"]["defaultKey"] = platform.ingress_ssl_cert_key_data
+        else:
+            result["acme"] = {
                 "enabled": True,
                 "onHostRule": False,
                 "staging": platform.ingress_acme_environment == "staging",
@@ -351,58 +398,7 @@ class HelmValuesFactory:
                         },
                     ],
                 },
-            },
-            "kvprovider": {
-                "consul": {
-                    "watch": True,
-                    "endpoint": str(platform.consul_url),
-                    "prefix": "traefik",
-                },
-                "storeAcme": True,
-                "acmeStorageLocation": "traefik/acme/account",
-            },
-            "kubernetes": {
-                "ingressClass": "traefik",
-                "namespaces": [platform.namespace, platform.jobs_namespace],
-            },
-            "rbac": {"enabled": True},
-            "extraVolumes": [
-                # Mounted secret and configmap volumes are updated automatically
-                # by kubelet
-                # https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically
-                # https://kubernetes.io/docs/concepts/configuration/secret/#mounted-secrets-are-updated-automatically
-                {
-                    "name": "dns-challenge",
-                    "configMap": {
-                        "name": f"{self._release_names.platform}-dns-challenge",
-                        "defaultMode": 0o777,
-                    },
-                },
-                {
-                    "name": "dns-challenge-secret",
-                    "secret": {
-                        "secretName": f"{self._release_names.platform}-dns-challenge"
-                    },
-                },
-            ],
-            "extraVolumeMounts": [
-                {"name": "dns-challenge", "mountPath": "/dns-01/challenge"},
-                {"name": "dns-challenge-secret", "mountPath": "/dns-01/secret"},
-            ],
-            "env": [
-                {"name": "NP_PLATFORM_CONFIG_URL", "value": str(platform.config_url)},
-                {"name": "NP_CLUSTER_NAME", "value": platform.cluster_name},
-                {
-                    "name": "NP_DNS_CHALLENGE_SCRIPT_NAME",
-                    "value": dns_challenge_script_name,
-                },
-            ],
-            "resources": {
-                "requests": {"cpu": "1200m", "memory": "5Gi"},
-                "limits": {"cpu": "1200m", "memory": "5Gi"},
-            },
-            "timeouts": {"responding": {"idleTimeout": "600s"}},
-        }
+            }
         if platform.kubernetes_provider == CloudProvider.GCP:
             result["timeouts"] = {
                 "responding": {
@@ -444,19 +440,21 @@ class HelmValuesFactory:
                     "idleTimeout": "660s"  # must be greater than lb timeout
                 }
             }
-        if platform.ingress_public_ips:
-            result["replicas"] = 1
-            result["serviceType"] = "NodePort"
-            result["service"] = {
-                "nodePorts": {
-                    "http": platform.ingress_http_node_port,
-                    "https": platform.ingress_https_node_port,
+        if platform.ingress_service_type == IngressServiceType.NODE_PORT:
+            if platform.ingress_node_port_http and platform.ingress_node_port_https:
+                result["service"] = {
+                    "nodePorts": {
+                        "http": platform.ingress_node_port_http,
+                        "https": platform.ingress_node_port_https,
+                    }
                 }
-            }
-            result["deployment"]["hostPort"] = {
-                "httpEnabled": True,
-                "httpsEnabled": True,
-            }
+            if platform.ingress_host_port_http and platform.ingress_host_port_https:
+                result["deployment"]["hostPort"] = {
+                    "httpEnabled": True,
+                    "httpsEnabled": True,
+                    "httpPort": platform.ingress_host_port_http,
+                    "httpsPort": platform.ingress_host_port_https,
+                }
         return result
 
     def _create_cors_values(self, platform: PlatformConfig) -> dict[str, Any]:
@@ -485,8 +483,8 @@ class HelmValuesFactory:
         self, platform: PlatformConfig
     ) -> dict[str, Any]:
         result = {
-            "nameOverride": f"{self._release_names.platform}-storage",
-            "fullnameOverride": f"{self._release_names.platform}-storage",
+            "nameOverride": f"{platform.release_name}-storage",
+            "fullnameOverride": f"{platform.release_name}-storage",
             "image": {"repository": platform.get_image("platformstorageapi")},
             "platform": {
                 "clusterName": platform.cluster_name,
@@ -494,7 +492,7 @@ class HelmValuesFactory:
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": f"{self._release_names.platform}-storage-token",
+                            "name": f"{platform.release_name}-storage-token",
                             "key": "token",
                         }
                     }
@@ -511,7 +509,7 @@ class HelmValuesFactory:
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
             "secrets": [
                 {
-                    "name": f"{self._release_names.platform}-storage-token",
+                    "name": f"{platform.release_name}-storage-token",
                     "data": {"token": platform.token},
                 }
             ],
@@ -526,8 +524,8 @@ class HelmValuesFactory:
         self, platform: PlatformConfig
     ) -> dict[str, Any]:
         result: dict[str, Any] = {
-            "nameOverride": f"{self._release_names.platform}-registry",
-            "fullnameOverride": f"{self._release_names.platform}-registry",
+            "nameOverride": f"{platform.release_name}-registry",
+            "fullnameOverride": f"{platform.release_name}-registry",
             "image": {"repository": platform.get_image("platformregistryapi")},
             "platform": {
                 "clusterName": platform.cluster_name,
@@ -535,7 +533,7 @@ class HelmValuesFactory:
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": f"{self._release_names.platform}-registry-token",
+                            "name": f"{platform.release_name}-registry-token",
                             "key": "token",
                         }
                     }
@@ -544,14 +542,14 @@ class HelmValuesFactory:
             "ingress": {"enabled": True, "hosts": [platform.ingress_registry_url.host]},
             "secrets": [
                 {
-                    "name": f"{self._release_names.platform}-registry-token",
+                    "name": f"{platform.release_name}-registry-token",
                     "data": {"token": platform.token},
                 }
             ],
         }
         result.update(**self._create_tracing_values(platform))
         if platform.registry.provider == RegistryProvider.GCP:
-            gcp_key_secret_name = f"{self._release_names.platform}-registry-gcp-key"
+            gcp_key_secret_name = f"{platform.release_name}-registry-gcp-key"
             result["upstreamRegistry"] = {
                 "type": "oauth",
                 "url": "https://gcr.io",
@@ -603,7 +601,7 @@ class HelmValuesFactory:
         elif platform.registry.provider == RegistryProvider.AZURE:
             assert platform.registry.azure_url
             azure_credentials_secret_name = (
-                f"{self._release_names.platform}-registry-azure-credentials"
+                f"{platform.release_name}-registry-azure-credentials"
             )
             result["upstreamRegistry"] = {
                 "type": "oauth",
@@ -640,7 +638,7 @@ class HelmValuesFactory:
             )
         elif platform.registry.provider == RegistryProvider.DOCKER:
             docker_registry_credentials_secret_name = (
-                f"{self._release_names.platform}-docker-registry"
+                f"{platform.release_name}-docker-registry"
             )
             result["upstreamRegistry"] = {
                 "type": "basic",
@@ -681,8 +679,8 @@ class HelmValuesFactory:
         self, platform: PlatformConfig
     ) -> dict[str, Any]:
         result: dict[str, Any] = {
-            "nameOverride": f"{self._release_names.platform}-monitoring",
-            "fullnameOverride": f"{self._release_names.platform}-monitoring",
+            "nameOverride": f"{platform.release_name}-monitoring",
+            "fullnameOverride": f"{platform.release_name}-monitoring",
             "image": {"repository": platform.get_image("platformmonitoringapi")},
             "jobsNamespace": platform.jobs_namespace,
             "kubeletPort": platform.kubelet_port,
@@ -699,7 +697,7 @@ class HelmValuesFactory:
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": f"{self._release_names.platform}-monitoring-token",
+                            "name": f"{platform.release_name}-monitoring-token",
                             "key": "token",
                         }
                     }
@@ -718,7 +716,7 @@ class HelmValuesFactory:
             "minio": {"image": {"repository": platform.get_image("minio")}},
             "secrets": [
                 {
-                    "name": f"{self._release_names.platform}-monitoring-token",
+                    "name": f"{platform.release_name}-monitoring-token",
                     "data": {"token": platform.token},
                 }
             ],
@@ -822,8 +820,8 @@ class HelmValuesFactory:
         self, platform: PlatformConfig
     ) -> dict[str, Any]:
         return {
-            "nameOverride": f"{self._release_names.platform}-container-runtime",
-            "fullnameOverride": f"{self._release_names.platform}-container-runtime",
+            "nameOverride": f"{platform.release_name}-container-runtime",
+            "fullnameOverride": f"{platform.release_name}-container-runtime",
             "image": {"repository": platform.get_image("platformcontainerruntime")},
             "affinity": {
                 "nodeAffinity": {
@@ -848,8 +846,8 @@ class HelmValuesFactory:
         self, platform: PlatformConfig
     ) -> dict[str, Any]:
         result: dict[str, Any] = {
-            "nameOverride": f"{self._release_names.platform}-secrets",
-            "fullnameOverride": f"{self._release_names.platform}-secrets",
+            "nameOverride": f"{platform.release_name}-secrets",
+            "fullnameOverride": f"{platform.release_name}-secrets",
             "image": {"repository": platform.get_image("platformsecrets")},
             "platform": {
                 "clusterName": platform.cluster_name,
@@ -857,7 +855,7 @@ class HelmValuesFactory:
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": f"{self._release_names.platform}-secrets-token",
+                            "name": f"{platform.release_name}-secrets-token",
                             "key": "token",
                         }
                     }
@@ -867,7 +865,7 @@ class HelmValuesFactory:
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
             "secrets": [
                 {
-                    "name": f"{self._release_names.platform}-secrets-token",
+                    "name": f"{platform.release_name}-secrets-token",
                     "data": {"token": platform.token},
                 }
             ],
@@ -932,7 +930,7 @@ class HelmValuesFactory:
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": f"{self._release_names.platform}-reports-token",
+                            "name": f"{platform.release_name}-reports-token",
                             "key": "token",
                         }
                     }
@@ -940,7 +938,7 @@ class HelmValuesFactory:
             },
             "secrets": [
                 {
-                    "name": f"{self._release_names.platform}-reports-token",
+                    "name": f"{platform.release_name}-reports-token",
                     "data": {"token": platform.token},
                 }
             ],
@@ -1095,7 +1093,7 @@ class HelmValuesFactory:
             }
             result["secrets"].append(
                 {
-                    "name": f"{self._release_names.platform}-reports-gcp-key",
+                    "name": f"{platform.release_name}-reports-gcp-key",
                     "data": {"key.json": platform.gcp_service_account_key},
                 }
             )
@@ -1180,7 +1178,7 @@ class HelmValuesFactory:
                 "type": "gcp",
                 "region": platform.monitoring.metrics_region,
                 "serviceAccountSecret": {
-                    "name": f"{self._release_names.platform}-reports-gcp-key",
+                    "name": f"{platform.release_name}-reports-gcp-key",
                     "key": "key.json",
                 },
             }
@@ -1216,8 +1214,8 @@ class HelmValuesFactory:
 
     def create_platform_disks_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {
-            "nameOverride": f"{self._release_names.platform}-disks",
-            "fullnameOverride": f"{self._release_names.platform}-disks",
+            "nameOverride": f"{platform.release_name}-disks",
+            "fullnameOverride": f"{platform.release_name}-disks",
             "image": {"repository": platform.get_image("platformdiskapi")},
             "disks": {
                 "namespace": platform.jobs_namespace,
@@ -1231,7 +1229,7 @@ class HelmValuesFactory:
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": f"{self._release_names.platform}-disks-token",
+                            "name": f"{platform.release_name}-disks-token",
                             "key": "token",
                         }
                     }
@@ -1240,7 +1238,7 @@ class HelmValuesFactory:
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
             "secrets": [
                 {
-                    "name": f"{self._release_names.platform}-disks-token",
+                    "name": f"{platform.release_name}-disks-token",
                     "data": {"token": platform.token},
                 }
             ],
@@ -1257,8 +1255,8 @@ class HelmValuesFactory:
         self, platform: PlatformConfig
     ) -> dict[str, Any]:
         result: dict[str, Any] = {
-            "nameOverride": f"{self._release_names.platform}-api-poller",
-            "fullnameOverride": f"{self._release_names.platform}-api-poller",
+            "nameOverride": f"{platform.release_name}-api-poller",
+            "fullnameOverride": f"{platform.release_name}-api-poller",
             "image": {"repository": platform.get_image("platformapi")},
             "platform": {
                 "clusterName": platform.cluster_name,
@@ -1270,7 +1268,7 @@ class HelmValuesFactory:
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": f"{self._release_names.platform}-poller-token",
+                            "name": f"{platform.release_name}-poller-token",
                             "key": "token",
                         }
                     }
@@ -1300,7 +1298,7 @@ class HelmValuesFactory:
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
             "secrets": [
                 {
-                    "name": f"{self._release_names.platform}-poller-token",
+                    "name": f"{platform.release_name}-poller-token",
                     "data": {"token": platform.token},
                 }
             ],
@@ -1318,8 +1316,8 @@ class HelmValuesFactory:
         self, platform: PlatformConfig
     ) -> dict[str, Any]:
         result: dict[str, Any] = {
-            "nameOverride": f"{self._release_names.platform}-buckets",
-            "fullnameOverride": f"{self._release_names.platform}-buckets",
+            "nameOverride": f"{platform.release_name}-buckets",
+            "fullnameOverride": f"{platform.release_name}-buckets",
             "image": {"repository": platform.get_image("platformbucketsapi")},
             "bucketNamespace": platform.jobs_namespace,
             "platform": {
@@ -1328,9 +1326,7 @@ class HelmValuesFactory:
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": (
-                                f"{self._release_names.platform}-buckets-api-token"
-                            ),
+                            "name": (f"{platform.release_name}-buckets-api-token"),
                             "key": "token",
                         }
                     }
@@ -1339,7 +1335,7 @@ class HelmValuesFactory:
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
             "secrets": [
                 {
-                    "name": f"{self._release_names.platform}-buckets-api-token",
+                    "name": f"{platform.release_name}-buckets-api-token",
                     "data": {"token": platform.token},
                 }
             ],
@@ -1362,7 +1358,7 @@ class HelmValuesFactory:
                     "iam.amazonaws.com/role": platform.aws_role_arn
                 }
         elif platform.buckets.provider == BucketsProvider.EMC_ECS:
-            secret_name = f"{self._release_names.platform}-buckets-emc-ecs-key"
+            secret_name = f"{platform.release_name}-buckets-emc-ecs-key"
             result["secrets"].append(
                 {
                     "name": secret_name,
@@ -1399,7 +1395,7 @@ class HelmValuesFactory:
                 },
             }
         elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
-            secret_name = f"{self._release_names.platform}-buckets-open-stack-key"
+            secret_name = f"{platform.release_name}-buckets-open-stack-key"
             result["secrets"].append(
                 {
                     "name": secret_name,
@@ -1445,9 +1441,7 @@ class HelmValuesFactory:
                 },
             }
         elif platform.buckets.provider == BucketsProvider.AZURE:
-            secret_name = (
-                f"{self._release_names.platform}-buckets-azure-storage-account-key"
-            )
+            secret_name = f"{platform.release_name}-buckets-azure-storage-account-key"
             result["secrets"].append(
                 {
                     "name": secret_name,
@@ -1472,7 +1466,7 @@ class HelmValuesFactory:
                 },
             }
         elif platform.buckets.provider == BucketsProvider.GCP:
-            secret_name = f"{self._release_names.platform}-buckets-gcp-sa-key"
+            secret_name = f"{platform.release_name}-buckets-gcp-sa-key"
             result["secrets"].append(
                 {
                     "name": secret_name,

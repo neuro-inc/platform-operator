@@ -113,6 +113,7 @@ class Config:
     platform_namespace: str
     consul_url: URL
     consul_installed: bool
+    is_standalone: bool
 
     @classmethod
     def load_from_env(cls, env: Mapping[str, str] | None = None) -> Config:
@@ -160,6 +161,7 @@ class Config:
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
             consul_url=URL(env["NP_CONSUL_URL"]),
             consul_installed=env.get("NP_CONSUL_INSTALLED", "false").lower() == "true",
+            is_standalone=env.get("NP_STANDALONE", "false").lower() == "true",
         )
 
     @classmethod
@@ -241,26 +243,6 @@ class KubernetesSpec(dict[str, Any]):
     @property
     def kubelet_port(self) -> int | None:
         return self.get("kubeletPort")
-
-    @property
-    def ingress_controller_enabled(self) -> bool:
-        return self._spec["ingressController"].get("enabled", True)
-
-    @property
-    def ingress_controller_namespaces(self) -> Sequence[str]:
-        return self._spec["ingressController"].get("namespaces", ())
-
-    @property
-    def ingress_public_ips(self) -> Sequence[IPv4Address]:
-        return [IPv4Address(ip) for ip in self._spec.get("ingressPublicIPs", [])]
-
-    @property
-    def jobs_namespace_create(self) -> bool:
-        return self._spec["jobsNamespace"].get("create", True)
-
-    @property
-    def jobs_namespace_name(self) -> str:
-        return self._spec["jobsNamespace"].get("name", "")
 
     @property
     def docker_config_secret_create(self) -> bool:
@@ -514,6 +496,53 @@ class DisksSpec(dict[str, Any]):
         return self._spec["kubernetes"]["persistence"].get("storageClassName", "")
 
 
+class IngressControllerSpec(dict[str, Any]):
+    def __init__(self, spec: dict[str, Any]) -> None:
+        super().__init__(spec)
+
+        self._spec = defaultdict(_spec_default_factory, spec)
+
+    @property
+    def enabled(self) -> bool:
+        return self._spec.get("enabled", True)
+
+    @property
+    def namespaces(self) -> Sequence[str]:
+        return self._spec.get("namespaces", ())
+
+    @property
+    def service_type(self) -> str:
+        return self._spec.get("serviceType", "")
+
+    @property
+    def public_ips(self) -> Sequence[IPv4Address]:
+        return [IPv4Address(ip) for ip in self._spec.get("publicIPs", [])]
+
+    @property
+    def node_port_http(self) -> int | None:
+        return self._spec["nodePorts"].get("http")
+
+    @property
+    def node_port_https(self) -> int | None:
+        return self._spec["nodePorts"].get("https")
+
+    @property
+    def host_port_http(self) -> int | None:
+        return self._spec["hostPorts"].get("http")
+
+    @property
+    def host_port_https(self) -> int | None:
+        return self._spec["hostPorts"].get("https")
+
+    @property
+    def ssl_cert_data(self) -> str:
+        return self._spec["ssl"].get("certificateData", "")
+
+    @property
+    def ssl_cert_key_data(self) -> str:
+        return self._spec["ssl"].get("certificateKeyData", "")
+
+
 class Spec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
@@ -522,6 +551,7 @@ class Spec(dict[str, Any]):
         self._token = spec["token"]
         self._iam = IamSpec(spec["iam"])
         self._kubernetes = KubernetesSpec(spec["kubernetes"])
+        self._ingress_controller = IngressControllerSpec(spec["ingressController"])
         self._registry = RegistrySpec(spec["registry"])
         self._storages = [StorageSpec(s) for s in spec["storages"]]
         self._blob_storage = BlobStorageSpec(spec["blobStorage"])
@@ -539,6 +569,10 @@ class Spec(dict[str, Any]):
     @property
     def kubernetes(self) -> KubernetesSpec:
         return self._kubernetes
+
+    @property
+    def ingress_controller(self) -> IngressControllerSpec:
+        return self._ingress_controller
 
     @property
     def registry(self) -> RegistrySpec:
@@ -588,6 +622,11 @@ class DockerConfig:
     password: str = ""
     secret_name: str = ""
     create_secret: bool = False
+
+
+class IngressServiceType(str, Enum):
+    LOAD_BALANCER = "LoadBalancer"
+    NODE_PORT = "NodePort"
 
 
 class StorageType(str, Enum):
@@ -697,6 +736,7 @@ class MetricsStorageType(Enum):
 class MonitoringConfig:
     logs_bucket_name: str
     logs_region: str = ""
+    metrics_enabled: bool = True
     metrics_storage_type: MetricsStorageType = MetricsStorageType.BUCKETS
     metrics_bucket_name: str = ""
     metrics_storage_class_name: str = ""
@@ -708,6 +748,7 @@ class MonitoringConfig:
 
 @dataclass(frozen=True)
 class PlatformConfig:
+    release_name: str
     auth_url: URL
     ingress_auth_url: URL
     config_url: URL
@@ -732,13 +773,17 @@ class PlatformConfig:
     ingress_controller_install: bool
     ingress_public_ips: Sequence[IPv4Address]
     ingress_cors_origins: Sequence[str]
-    ingress_http_node_port: int
-    ingress_https_node_port: int
+    ingress_node_port_http: int | None
+    ingress_node_port_https: int | None
+    ingress_host_port_http: int | None
+    ingress_host_port_https: int | None
+    ingress_service_type: IngressServiceType
     ingress_service_name: str
     ingress_namespaces: Sequence[str]
+    ingress_ssl_cert_data: str
+    ingress_ssl_cert_key_data: str
     disks_storage_limit_per_user_gb: int
     disks_storage_class_name: str | None
-    jobs_namespace_create: bool
     jobs_namespace: str
     jobs_node_pools: Sequence[dict[str, Any]]
     jobs_schedule_timeout_s: float
@@ -771,7 +816,7 @@ class PlatformConfig:
     gcp_service_account_key_base64: str = ""
 
     def get_storage_claim_name(self, path: str) -> str:
-        name = f"{self.namespace}-storage"
+        name = f"{self.release_name}-storage"
         if path:
             name += path.replace("/", "-")
         return name
@@ -831,7 +876,7 @@ class PlatformConfig:
                     },
                 )
             )
-        elif ingress_service:
+        elif ingress_service and ingress_service["spec"]["type"] == "LoadBalancer":
             ingress_host = ingress_service["status"]["loadBalancer"]["ingress"][0]["ip"]
             result["a_records"].extend(
                 (
@@ -857,6 +902,8 @@ class PlatformConfig:
                 result["a_records"].extend(
                     ({"name": f"blob.{self.ingress_dns_name}.", "ips": [ingress_host]},)
                 )
+        else:
+            return None
         return result
 
     def create_cluster_config(
@@ -904,22 +951,21 @@ class PlatformConfigFactory:
     def create(self, platform_body: kopf.Body, cluster: Cluster) -> PlatformConfig:
         metadata = Metadata(platform_body["metadata"])
         spec = Spec(platform_body["spec"])
+        release_name = self._config.helm_release_names.platform
         docker_config = self._create_neuro_docker_config(
             cluster,
             (
                 spec.kubernetes.docker_config_secret_name
-                or f"{self._config.helm_release_names.platform}-docker-config"
+                or f"{release_name}-docker-config"
             ),
             spec.kubernetes.docker_config_secret_create,
         )
         docker_hub_config = self._create_docker_hub_config(
-            cluster, f"{self._config.helm_release_names.platform}-docker-hub-config"
+            cluster, f"{release_name}-docker-hub-config"
         )
-        jobs_namespace = (
-            spec.kubernetes.jobs_namespace_name
-            or self._config.platform_namespace + "-jobs"
-        )
+        jobs_namespace = self._config.platform_namespace + "-jobs"
         return PlatformConfig(
+            release_name=release_name,
             auth_url=self._config.platform_auth_url,
             ingress_auth_url=self._config.platform_ingress_auth_url,
             config_url=self._config.platform_config_url,
@@ -956,20 +1002,26 @@ class PlatformConfigFactory:
             ingress_registry_url=URL(f"https://registry.{cluster.dns_name}"),
             ingress_metrics_url=URL(f"https://metrics.{cluster.dns_name}"),
             ingress_acme_environment=cluster.acme_environment,
-            ingress_controller_install=spec.kubernetes.ingress_controller_enabled,
-            ingress_public_ips=spec.kubernetes.ingress_public_ips,
+            ingress_controller_install=spec.ingress_controller.enabled,
+            ingress_public_ips=spec.ingress_controller.public_ips,
             ingress_cors_origins=cluster["ingress"].get("cors_origins", ()),
-            ingress_service_name="traefik",
+            ingress_service_type=IngressServiceType(
+                spec.ingress_controller.service_type or IngressServiceType.LOAD_BALANCER
+            ),
+            ingress_service_name=f"{release_name}-traefik",
             ingress_namespaces=sorted(
                 {
                     self._config.platform_namespace,
                     jobs_namespace,
-                    *spec.kubernetes.ingress_controller_namespaces,
+                    *spec.ingress_controller.namespaces,
                 }
             ),
-            ingress_http_node_port=30080,
-            ingress_https_node_port=30443,
-            jobs_namespace_create=spec.kubernetes.jobs_namespace_create,
+            ingress_node_port_http=spec.ingress_controller.node_port_http,
+            ingress_node_port_https=spec.ingress_controller.node_port_https,
+            ingress_host_port_http=spec.ingress_controller.host_port_http,
+            ingress_host_port_https=spec.ingress_controller.host_port_https,
+            ingress_ssl_cert_data=spec.ingress_controller.ssl_cert_data,
+            ingress_ssl_cert_key_data=spec.ingress_controller.ssl_cert_key_data,
             jobs_namespace=jobs_namespace,
             jobs_node_pools=self._create_node_pools(
                 cluster["orchestrator"].get("resource_pool_types", ())
@@ -1240,10 +1292,13 @@ class PlatformConfigFactory:
         if not spec:
             raise ValueError("Monitoring spec is empty")
 
+        metrics_enabled = not self._config.is_standalone
+
         if "blobStorage" in spec.metrics:
             return MonitoringConfig(
                 logs_region=spec.logs_region,
                 logs_bucket_name=spec.logs_bucket,
+                metrics_enabled=metrics_enabled,
                 metrics_storage_type=MetricsStorageType.BUCKETS,
                 metrics_region=spec.metrics_region,
                 metrics_bucket_name=spec.metrics_bucket,
@@ -1255,6 +1310,7 @@ class PlatformConfigFactory:
         elif "kubernetes" in spec.metrics:
             return MonitoringConfig(
                 logs_bucket_name=spec.logs_bucket,
+                metrics_enabled=metrics_enabled,
                 metrics_storage_type=MetricsStorageType.KUBERNETES,
                 metrics_storage_class_name=spec.metrics_storage_class_name,
                 metrics_storage_size=spec.metrics_storage_size or "10Gi",

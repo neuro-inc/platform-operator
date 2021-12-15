@@ -78,7 +78,11 @@ spec:
           value: {{ include "platformOperator.consul.url" . | quote }}
         {{- if .Values.consulEnabled }}
         - name: NP_CONSUL_INSTALLED
-          value: {{ .Values.consulEnabled | quote }}
+          value: "true"
+        {{- end }}
+        {{- if .Values.standalone }}
+        - name: NP_STANDALONE
+          value: "true"
         {{- end }}
         ports:
         - name: liveness-port

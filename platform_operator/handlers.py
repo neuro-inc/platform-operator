@@ -67,7 +67,6 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
     )
     node = await app.kube_client.get_node(config.node_name)
     app.helm_values_factory = HelmValuesFactory(
-        config.helm_release_names,
         config.helm_chart_names,
         container_runtime=node.container_runtime,
     )
@@ -250,7 +249,7 @@ async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
         await asyncio.wait_for(
             app.kube_client.wait_till_pods_deleted(
                 namespace=platform.namespace,
-                label_selector={"service": "platformstorageapi"},
+                label_selector={"service": "platform-storage"},
             ),
             600,
         )

@@ -9,3 +9,10 @@ dependencies:
     version: "0.29.0"
     repository: https://helm.releases.hashicorp.com
     condition: consulEnabled
+  - name: postgresql
+    version: "10.13.11"
+    repository: https://charts.bitnami.com/bitnami
+    condition: standalone
+  - name: postgres-db-init-script
+    version: "1.0.5"
+    repository: https://neuro-inc.github.io/helm-charts

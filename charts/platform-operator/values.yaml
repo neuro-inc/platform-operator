@@ -1,12 +1,16 @@
 image:
-  repository: "$IMAGE_REPO"
-  tag: "$IMAGE_TAG"
+  repository: $IMAGE_REPO
+  tag: $IMAGE_TAG
 
 imagePullSecrets: []
 
 kubectlImage:
   repository: $IMAGE_REPO_BASE/kubectl
   tag: 1.16
+
+nginxImage:
+  repository: $IMAGE_REPO_BASE/nginx
+  tag: latest
 
 controller:
   retries: 3
@@ -34,6 +38,8 @@ consul:
 
   server:
     enabled: true
+
+    replicas: 3
 
     extraLabels:
       service: consul
