@@ -14,6 +14,7 @@ from platform_operator.models import (
     HelmChartNames,
     HelmChartVersions,
     HelmReleaseNames,
+    IngressServiceType,
     KubeClientAuthType,
     KubeConfig,
     LabelsConfig,
@@ -58,6 +59,7 @@ class TestConfig:
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
             "NP_CONSUL_URL": "http://consul:8500",
             "NP_CONSUL_INSTALLED": "true",
+            "NP_STANDALONE": "true",
         }
         assert Config.load_from_env(env) == Config(
             node_name="minikube",
@@ -94,6 +96,7 @@ class TestConfig:
             platform_namespace="platform",
             consul_url=URL("http://consul:8500"),
             consul_installed=True,
+            is_standalone=True,
         )
 
     def test_config_defaults(self) -> None:
@@ -146,6 +149,7 @@ class TestConfig:
             platform_namespace="platform",
             consul_url=URL("http://consul:8500"),
             consul_installed=False,
+            is_standalone=False,
         )
 
 
@@ -171,13 +175,22 @@ class TestPlatformConfig:
     def traefik_service(self) -> Dict[str, Any]:
         return {
             "metadata": {"name", "traefik"},
+            "spec": {"type": "LoadBalancer"},
             "status": {"loadBalancer": {"ingress": [{"ip": "192.168.0.1"}]}},
+        }
+
+    @pytest.fixture
+    def traefik_node_port_service(self) -> Dict[str, Any]:
+        return {
+            "metadata": {"name", "traefik"},
+            "spec": {"type": "NodePort"},
         }
 
     @pytest.fixture
     def aws_traefik_service(self) -> Dict[str, Any]:
         return {
             "metadata": {"name", "traefik"},
+            "spec": {"type": "LoadBalancer"},
             "status": {"loadBalancer": {"ingress": [{"hostname": "traefik"}]}},
         }
 
@@ -187,7 +200,7 @@ class TestPlatformConfig:
             "CanonicalHostedZoneNameID": "/hostedzone/traefik",
         }
 
-    def test_create_dns_config_from_traefik_service(
+    def test_create_dns_config_from_traefik_load_balancer_service(
         self, gcp_platform_config: PlatformConfig, traefik_service: Dict[str, Any]
     ) -> None:
         result = gcp_platform_config.create_dns_config(ingress_service=traefik_service)
@@ -202,6 +215,17 @@ class TestPlatformConfig:
                 {"name": f"metrics.{dns_name}.", "ips": ["192.168.0.1"]},
             ],
         }
+
+    def test_create_dns_config_from_traefik_node_port_service(
+        self,
+        gcp_platform_config: PlatformConfig,
+        traefik_node_port_service: Dict[str, Any],
+    ) -> None:
+        result = gcp_platform_config.create_dns_config(
+            ingress_service=traefik_node_port_service
+        )
+
+        assert result is None
 
     def test_create_dns_config_from_ingress_public_ips(
         self, on_prem_platform_config: PlatformConfig
@@ -456,12 +480,60 @@ class TestPlatformConfigFactory:
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
-        gcp_platform_body["spec"]["kubernetes"]["ingressController"] = {
-            "enabled": False
-        }
+        gcp_platform_body["spec"]["ingressController"] = {"enabled": False}
         result = factory.create(gcp_platform_body, gcp_cluster)
 
         assert result == replace(gcp_platform_config, ingress_controller_install=False)
+
+    def test_gcp_platform_config_with_ingress_ssl_cert(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: kopf.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        gcp_platform_body["spec"]["ingressController"] = {
+            "ssl": {
+                "certificateData": "cert-data",
+                "certificateKeyData": "cert-key-data",
+            }
+        }
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result == replace(
+            gcp_platform_config,
+            ingress_ssl_cert_data="cert-data",
+            ingress_ssl_cert_key_data="cert-key-data",
+        )
+
+    def test_gcp_platform_config_with_ingress_service_type_node_port(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: kopf.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        gcp_platform_body["spec"]["ingressController"] = {
+            "serviceType": "NodePort",
+            "nodePorts": {
+                "http": 30080,
+                "https": 30443,
+            },
+            "hostPorts": {
+                "http": 80,
+                "https": 443,
+            },
+        }
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result == replace(
+            gcp_platform_config,
+            ingress_service_type=IngressServiceType.NODE_PORT,
+            ingress_node_port_http=30080,
+            ingress_node_port_https=30443,
+            ingress_host_port_http=80,
+            ingress_host_port_https=443,
+        )
 
     def test_gcp_platform_config_with_ingress_controller_namespaces_unique(
         self,
@@ -470,27 +542,12 @@ class TestPlatformConfigFactory:
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
-        gcp_platform_body["spec"]["kubernetes"]["ingressController"] = {
+        gcp_platform_body["spec"]["ingressController"] = {
             "namespaces": [gcp_platform_config.namespace, "default"]
         }
         result = factory.create(gcp_platform_body, gcp_cluster)
 
         assert result.ingress_namespaces == ["default", "platform", "platform-jobs"]
-
-    def test_gcp_platform_config_with_custom_jobs_namespace(
-        self,
-        factory: PlatformConfigFactory,
-        gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
-    ) -> None:
-        gcp_platform_body["spec"]["kubernetes"]["jobsNamespace"] = {
-            "create": False,
-            "name": "jobs-namespace",
-        }
-        result = factory.create(gcp_platform_body, gcp_cluster)
-
-        assert result.jobs_namespace_create is False
-        assert result.jobs_namespace == "jobs-namespace"
 
     def test_gcp_platform_config_with_docker_config_secret_without_credentials(
         self,

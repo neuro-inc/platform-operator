@@ -18,6 +18,7 @@ from platform_operator.models import (
     HelmChartVersions,
     HelmReleaseNames,
     HelmRepo,
+    IngressServiceType,
     KubeClientAuthType,
     KubeConfig,
     LabelsConfig,
@@ -60,6 +61,7 @@ def config() -> Config:
         platform_namespace="platform",
         consul_url=URL("http://consul:8500"),
         consul_installed=True,
+        is_standalone=False,
     )
 
 
@@ -352,7 +354,9 @@ def on_prem_platform_body(cluster_name: str) -> kopf.Body:
             "kubernetes": {
                 "provider": "kubeadm",
                 "standardStorageClassName": "standard",
-                "ingressPublicIPs": ["192.168.0.3"],
+            },
+            "ingressController": {
+                "publicIPs": ["192.168.0.3"],
             },
             "registry": {
                 "kubernetes": {
@@ -415,6 +419,7 @@ def gcp_platform_config(
     resource_preset_factory: Callable[[], Dict[str, Any]],
 ) -> PlatformConfig:
     return PlatformConfig(
+        release_name="platform",
         auth_url=URL("https://dev.neu.ro"),
         config_url=URL("https://dev.neu.ro"),
         admin_url=URL("https://dev.neu.ro"),
@@ -438,7 +443,6 @@ def gcp_platform_config(
             accelerator="platform.neuromation.io/accelerator",
             preemptible="platform.neuromation.io/preemptible",
         ),
-        jobs_namespace_create=True,
         jobs_namespace="platform-jobs",
         jobs_node_pools=[{"name": "n1-highmem-8", "idleSize": 0, "cpu": 1, "gpu": 1}],
         jobs_resource_pool_types=[
@@ -472,10 +476,15 @@ def gcp_platform_config(
             "https://release--neuro-web.netlify.app",
             "https://app.neu.ro",
         ],
-        ingress_service_name="traefik",
-        ingress_http_node_port=30080,
-        ingress_https_node_port=30443,
+        ingress_service_type=IngressServiceType.LOAD_BALANCER,
+        ingress_service_name="platform-traefik",
+        ingress_node_port_http=None,
+        ingress_node_port_https=None,
+        ingress_host_port_http=None,
+        ingress_host_port_https=None,
         ingress_namespaces=["platform", "platform-jobs"],
+        ingress_ssl_cert_data="",
+        ingress_ssl_cert_key_data="",
         storages=[
             StorageConfig(
                 type=StorageType.NFS,

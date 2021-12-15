@@ -1,0 +1,53 @@
+{{- if .Values.standalone }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platformOperator.platformConfig.fullname" . }}
+  labels: {{ include "platformOperator.labels.standard" . | nindent 4 }}
+    service: platform-config
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "platformOperator.name" . }}
+      release: {{ .Release.Name }}
+      service: platform-config
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: {{ include "platformOperator.name" . }}
+        release: {{ .Release.Name }}
+        service: platform-config
+    spec:
+      containers:
+      - name: platform-config
+        image: {{ .Values.nginxImage.repository }}:{{ .Values.nginxImage.tag }}
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: nginx-conf
+          mountPath: /etc/nginx/conf.d
+        - name: clusters
+          mountPath: /etc/platform-config/clusters
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: {{ include "platformOperator.platformConfig.fullname" . }}-nginx-conf
+      - name: clusters
+        configMap:
+          name: {{ include "platformOperator.platformConfig.fullname" . }}-clusters
+{{- end }}

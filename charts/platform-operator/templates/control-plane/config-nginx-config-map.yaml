@@ -1,0 +1,35 @@
+{{- if .Values.standalone }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "platformOperator.platformConfig.fullname" . }}-nginx-conf
+  labels: {{ include "platformOperator.labels.standard" . | nindent 4 }}
+    service: platform-config
+data:
+  nginx.conf: |
+    server {
+      listen 8080 default_server;
+
+      root /etc/platform-config/clusters;
+
+      default_type application/json;
+
+      location = /api/v1/clusters/{{ .Values.platformConfig.clusterName }} {
+        if ($request_method = GET ) {
+          rewrite ^.+$ /cluster.json break;
+          return 200;
+        }
+
+        if ($request_method = PUT ) {
+          return 200;
+        }
+      }
+
+      location = /api/v1/clusters {
+        if ($request_method = GET ) {
+          rewrite ^.+$ /clusters.json break;
+          return 200;
+        }
+      }
+    }
+{{- end }}
