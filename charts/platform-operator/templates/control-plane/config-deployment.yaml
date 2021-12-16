@@ -23,6 +23,9 @@ spec:
         app: {{ include "platformOperator.name" . }}
         release: {{ .Release.Name }}
         service: platform-config
+      annotations:
+        checksum/clusters: {{ include (print $.Template.BasePath "/control-plane/config-clusters-config-map.yaml") . | sha256sum }}
+        checksum/nginx-conf: {{ include (print $.Template.BasePath "/control-plane/config-nginx-config-map.yaml") . | sha256sum }}
     spec:
       containers:
       - name: platform-config
