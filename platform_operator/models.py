@@ -1291,11 +1291,17 @@ class PlatformConfigFactory:
 
         metrics_enabled = not self._config.is_standalone
 
-        if "blobStorage" in spec.metrics:
+        if not metrics_enabled:
             return MonitoringConfig(
                 logs_region=spec.logs_region,
                 logs_bucket_name=spec.logs_bucket,
-                metrics_enabled=metrics_enabled,
+                metrics_enabled=False,
+            )
+        elif "blobStorage" in spec.metrics:
+            return MonitoringConfig(
+                logs_region=spec.logs_region,
+                logs_bucket_name=spec.logs_bucket,
+                metrics_enabled=True,
                 metrics_storage_type=MetricsStorageType.BUCKETS,
                 metrics_region=spec.metrics_region,
                 metrics_bucket_name=spec.metrics_bucket,
@@ -1307,7 +1313,7 @@ class PlatformConfigFactory:
         elif "kubernetes" in spec.metrics:
             return MonitoringConfig(
                 logs_bucket_name=spec.logs_bucket,
-                metrics_enabled=metrics_enabled,
+                metrics_enabled=True,
                 metrics_storage_type=MetricsStorageType.KUBERNETES,
                 metrics_storage_class_name=spec.metrics_storage_class_name,
                 metrics_storage_size=spec.metrics_storage_size or "10Gi",

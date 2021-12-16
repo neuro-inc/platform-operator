@@ -31,6 +31,9 @@ class HelmValuesFactory:
             "kubernetesProvider": platform.kubernetes_provider,
             "traefikEnabled": platform.ingress_controller_install,
             "consulEnabled": platform.consul_install,
+            "dockerRegistryEnabled": platform.registry.docker_registry_install,
+            "minioEnabled": platform.buckets.minio_install,
+            "platformReportsEnabled": platform.monitoring.metrics_enabled,
             "alpineImage": {"repository": platform.get_image("alpine")},
             "pauseImage": {"repository": platform.get_image("pause")},
             "crictlImage": {"repository": platform.get_image("crictl")},
@@ -78,9 +81,6 @@ class HelmValuesFactory:
             self._chart_names.platform_secrets: (
                 self.create_platform_secrets_values(platform)
             ),
-            self._chart_names.platform_reports: (
-                self.create_platform_reports_values(platform)
-            ),
             self._chart_names.platform_disks: (
                 self.create_platform_disks_values(platform)
             ),
@@ -120,13 +120,15 @@ class HelmValuesFactory:
         if platform.consul_install:
             result[self._chart_names.consul] = self.create_consul_values(platform)
         if platform.registry.docker_registry_install:
-            result["dockerRegistryEnabled"] = True
             result[
                 self._chart_names.docker_registry
             ] = self.create_docker_registry_values(platform)
         if platform.buckets.minio_install:
-            result["minioEnabled"] = True
             result[self._chart_names.minio] = self.create_minio_values(platform)
+        if platform.monitoring.metrics_enabled:
+            result[
+                self._chart_names.platform_reports
+            ] = self.create_platform_reports_values(platform)
         return result
 
     def _create_idle_job(self, job: Dict[str, Any]) -> Dict[str, Any]:
