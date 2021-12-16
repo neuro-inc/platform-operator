@@ -49,6 +49,22 @@ spec:
         resources: {{ toYaml . | nindent 10 }}
         {{- end }}
         env:
+        {{- with .Values.platformApi.oauth }}
+        - name: NP_OAUTH_AUTH_URL
+          value: {{ .authUrl | quote }}
+        - name: NP_OAUTH_TOKEN_URL
+          value: {{ .tokenUrl | quote }}
+        - name: NP_OAUTH_LOGOUT_URL
+          value: {{ .logoutUrl | quote }}
+        - name: NP_OAUTH_CLIENT_ID
+          value: {{ .clientId | quote }}
+        - name: NP_OAUTH_AUDIENCE
+          value: {{ .audience | quote }}
+        - name: NP_OAUTH_SUCCESS_REDIRECT_URL
+          value: {{ .successRedirectUrl | quote }}
+        - name: NP_OAUTH_HEADLESS_CALLBACK_URL
+          value: {{ .headlessCallbackUrl | quote }}
+        {{- end }}
         - name: NP_PLATFORM_CONFIG_URI
           value: http://{{ include "platformOperator.platformConfig.fullname" . }}:8080/api/v1
         - name: NP_ENFORCER_PLATFORM_API_URL
