@@ -104,8 +104,13 @@ http://platform-consul:8500
 {{- printf "fallback.%s" .Values.ingress.host -}}
 {{- end -}}
 
+{{- define "platformOperator.cluster.name" -}}
+{{- print "default" -}}
+{{- end -}}
+
 {{- define "platformOperator.cluster.host" -}}
-{{- printf "%s.org.%s" .Values.platformConfig.clusterName .Values.ingress.host -}}
+{{ $clusterName := include "platformOperator.cluster.name" . }}
+{{- printf "%s.org.%s" $clusterName .Values.ingress.host -}}
 {{- end -}}
 
 {{- define "platformOperator.cluster.url" -}}

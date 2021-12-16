@@ -1,5 +1,12 @@
 standalone: true
 
+platform:
+  authUrl: http://platform-auth:8080
+  ingressAuthUrl: http://platform-ingress-auth:8080
+  configUrl: http://platform-config:8080
+  adminUrl: http://platform-admin:8080
+  apiUrl: http://platform-api:8080
+
 ingress:
   host: neu.ro.local
 
@@ -65,7 +72,6 @@ platformConfig:
   nameOverride: platform-config
   fullnameOverride: platform-config
 
-  clusterName: default
   resourcePools: []
   resourcePresets: []
 
