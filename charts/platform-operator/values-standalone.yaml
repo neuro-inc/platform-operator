@@ -81,7 +81,7 @@ platformApi:
 
   image:
     repository: ghcr.io/neuro-inc/platformapi
-    tag: latest
+    tag: 21.12.3
 
   oauth:
     authUrl: http://keycloak-http:80/auth/realms/neu.ro/protocol/openid-connect/auth
