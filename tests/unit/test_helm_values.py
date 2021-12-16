@@ -634,7 +634,7 @@ class TestHelmValuesFactory:
                 },
             ],
             "resources": {
-                "requests": {"cpu": "500m", "memory": "1Gi"},
+                "requests": {"cpu": "250m", "memory": "256Mi"},
                 "limits": {"cpu": "1000m", "memory": "4Gi"},
             },
             "timeouts": {"responding": {"idleTimeout": "660s"}},
