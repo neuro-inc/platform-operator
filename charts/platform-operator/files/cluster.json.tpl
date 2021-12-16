@@ -15,6 +15,9 @@
   "dns": {
     "name": "{{ include "platformOperator.cluster.host" . }}"
   },
+  "ingress": {
+    "acme_environment": "production"
+  },
   "orchestrator": {
     "is_http_ingress_secure": true,
     "job_hostname_template": "{job_id}.jobs.{{ .Values.ingress.host }}",
