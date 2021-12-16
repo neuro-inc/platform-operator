@@ -83,4 +83,13 @@ platformApi:
     repository: ghcr.io/neuro-inc/platformapi
     tag: latest
 
+  oauth:
+    authUrl: http://keycloak-http:80/auth/realms/neu.ro/protocol/openid-connect/auth
+    tokenUrl: http://keycloak-http:80/auth/realms/neu.ro/protocol/openid-connect/token
+    logoutUrl: http://keycloak-http:80/auth/realms/neu.ro/protocol/openid-connect/logout
+    clientId: neuro-client
+    audience: https://neu.ro
+    successRedirectUrl: http://platform-ingress-auth:8080/oauth/login
+    headlessCallbackUrl: http://platform-ingress-auth:8080/oauth/show-code
+
   enforcerRetentionDelayDays: 30

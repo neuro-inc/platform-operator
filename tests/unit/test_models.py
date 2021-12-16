@@ -883,6 +883,7 @@ class TestPlatformConfigFactory:
         on_prem_cluster: Cluster,
     ) -> None:
         config = replace(config, is_standalone=True)
+        del on_prem_platform_body["spec"]["monitoring"]["metrics"]
         factory = PlatformConfigFactory(config)
 
         result = factory.create(on_prem_platform_body, on_prem_cluster)
