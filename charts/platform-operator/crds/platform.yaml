@@ -352,7 +352,7 @@ spec:
                 - required: [kubernetes]
               monitoring:
                 type: object
-                required: [logs, metrics]
+                required: [logs]
                 properties:
                   logs:
                     type: object
