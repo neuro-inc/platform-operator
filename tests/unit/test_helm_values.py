@@ -37,6 +37,9 @@ class TestHelmValuesFactory:
             "kubernetesProvider": "gcp",
             "traefikEnabled": True,
             "consulEnabled": False,
+            "dockerRegistryEnabled": False,
+            "minioEnabled": False,
+            "platformReportsEnabled": True,
             "alpineImage": {"repository": "neuro.io/alpine"},
             "pauseImage": {"repository": "neuro.io/pause"},
             "crictlImage": {"repository": "neuro.io/crictl"},
@@ -398,7 +401,7 @@ class TestHelmValuesFactory:
             )
         )
 
-        assert "dockerRegistryEnabled" not in result
+        assert result["dockerRegistryEnabled"] is False
         assert "docker-registry" not in result
 
     def test_create_on_prem_platform_values_without_minio(
@@ -411,8 +414,23 @@ class TestHelmValuesFactory:
             )
         )
 
-        assert "minioEnabled" not in result
+        assert result["minioEnabled"] is False
         assert "minio" not in result
+
+    def test_create_on_prem_platform_values_without_platform_reports(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(
+                on_prem_platform_config,
+                monitoring=replace(
+                    on_prem_platform_config.monitoring, metrics_enabled=False
+                ),
+            )
+        )
+
+        assert result["platformReportsEnabled"] is False
+        assert "platform-reports" not in result
 
     def test_create_vcd_platform_values(
         self, vcd_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -809,14 +827,12 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-buckets-api-token",
+                            "name": "platform-buckets-token",
                         }
                     }
                 },
             },
-            "secrets": [
-                {"data": {"token": "token"}, "name": "platform-buckets-api-token"}
-            ],
+            "secrets": [{"data": {"token": "token"}, "name": "platform-buckets-token"}],
             "sentry": mock.ANY,
             "disableCreation": False,
         }
@@ -904,13 +920,13 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-buckets-api-token",
+                            "name": "platform-buckets-token",
                         }
                     }
                 },
             },
             "secrets": [
-                {"data": {"token": "token"}, "name": "platform-buckets-api-token"},
+                {"data": {"token": "token"}, "name": "platform-buckets-token"},
                 {
                     "data": {"key": "access_key", "secret": "secret_key"},
                     "name": "platform-buckets-emc-ecs-key",
@@ -985,13 +1001,13 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-buckets-api-token",
+                            "name": "platform-buckets-token",
                         }
                     }
                 },
             },
             "secrets": [
-                {"data": {"token": "token"}, "name": "platform-buckets-api-token"},
+                {"data": {"token": "token"}, "name": "platform-buckets-token"},
                 {
                     "data": {"accountId": "account_id", "password": "password"},
                     "name": "platform-buckets-open-stack-key",
@@ -1039,14 +1055,12 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-buckets-api-token",
+                            "name": "platform-buckets-token",
                         }
                     }
                 },
             },
-            "secrets": [
-                {"data": {"token": "token"}, "name": "platform-buckets-api-token"}
-            ],
+            "secrets": [{"data": {"token": "token"}, "name": "platform-buckets-token"}],
             "sentry": mock.ANY,
             "disableCreation": False,
         }
@@ -1091,13 +1105,13 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-buckets-api-token",
+                            "name": "platform-buckets-token",
                         }
                     }
                 },
             },
             "secrets": [
-                {"data": {"token": "token"}, "name": "platform-buckets-api-token"},
+                {"data": {"token": "token"}, "name": "platform-buckets-token"},
                 {"data": {"SAKeyB64": "e30="}, "name": "platform-buckets-gcp-sa-key"},
             ],
             "sentry": mock.ANY,
@@ -1145,13 +1159,13 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-buckets-api-token",
+                            "name": "platform-buckets-token",
                         }
                     }
                 },
             },
             "secrets": [
-                {"data": {"token": "token"}, "name": "platform-buckets-api-token"},
+                {"data": {"token": "token"}, "name": "platform-buckets-token"},
                 {
                     "data": {"key": "accountKey2"},
                     "name": "platform-buckets-azure-storage-account-key",
@@ -2240,7 +2254,7 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-poller-token",
+                            "name": "platform-api-poller-token",
                         }
                     }
                 },
@@ -2266,7 +2280,7 @@ class TestHelmValuesFactory:
             },
             "secrets": [
                 {
-                    "name": "platform-poller-token",
+                    "name": "platform-api-poller-token",
                     "data": {"token": gcp_platform_config.token},
                 }
             ],

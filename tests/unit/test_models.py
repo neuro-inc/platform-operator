@@ -381,6 +381,18 @@ class TestPlatformConfigFactory:
 
         assert result == gcp_platform_config
 
+    def test_gcp_platform_config_without_token(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: kopf.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        del gcp_platform_body["spec"]["token"]
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result == replace(gcp_platform_config, token="")
+
     def test_gcp_platform_config_with_empty_storage_class(
         self,
         factory: PlatformConfigFactory,
@@ -851,6 +863,19 @@ class TestPlatformConfigFactory:
                 )
             ],
         )
+
+    def test_on_prem_platform_config_without_metrics(
+        self,
+        config: Config,
+        on_prem_platform_body: kopf.Body,
+        on_prem_cluster: Cluster,
+    ) -> None:
+        config = replace(config, is_standalone=True)
+        factory = PlatformConfigFactory(config)
+
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result.monitoring.metrics_enabled is False
 
     def test_on_prem_platform_config_with_metrics_retention_time(
         self,

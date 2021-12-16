@@ -491,14 +491,7 @@ class HelmValuesFactory:
             "platform": {
                 "clusterName": platform.cluster_name,
                 "authUrl": str(platform.auth_url),
-                "token": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": f"{platform.release_name}-storage-token",
-                            "key": "token",
-                        }
-                    }
-                },
+                "token": {"value": ""},
             },
             "storages": [
                 {
@@ -509,17 +502,27 @@ class HelmValuesFactory:
                 for s in platform.storages
             ],
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
-            "secrets": [
-                {
-                    "name": f"{platform.release_name}-storage-token",
-                    "data": {"token": platform.token},
-                }
-            ],
+            "secrets": [],
         }
         result.update(
             **self._create_cors_values(platform),
             **self._create_tracing_values(platform),
         )
+        if platform.token:
+            result["secrets"].append(
+                {
+                    "name": f"{platform.release_name}-storage-token",
+                    "data": {"token": platform.token},
+                }
+            )
+            result["platform"]["token"] = {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": f"{platform.release_name}-storage-token",
+                        "key": "token",
+                    }
+                }
+            }
         return result
 
     def create_platform_registry_values(
@@ -532,24 +535,27 @@ class HelmValuesFactory:
             "platform": {
                 "clusterName": platform.cluster_name,
                 "authUrl": str(platform.auth_url),
-                "token": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": f"{platform.release_name}-registry-token",
-                            "key": "token",
-                        }
-                    }
-                },
+                "token": {"value": ""},
             },
             "ingress": {"enabled": True, "hosts": [platform.ingress_registry_url.host]},
-            "secrets": [
+            "secrets": [],
+        }
+        result.update(**self._create_tracing_values(platform))
+        if platform.token:
+            result["secrets"].append(
                 {
                     "name": f"{platform.release_name}-registry-token",
                     "data": {"token": platform.token},
                 }
-            ],
-        }
-        result.update(**self._create_tracing_values(platform))
+            )
+            result["platform"]["token"] = {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": f"{platform.release_name}-registry-token",
+                        "key": "token",
+                    }
+                }
+            }
         if platform.registry.provider == RegistryProvider.GCP:
             gcp_key_secret_name = f"{platform.release_name}-registry-gcp-key"
             result["upstreamRegistry"] = {
@@ -696,14 +702,7 @@ class HelmValuesFactory:
                 "authUrl": str(platform.auth_url),
                 "configUrl": str(platform.config_url),
                 "registryUrl": str(platform.ingress_registry_url),
-                "token": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": f"{platform.release_name}-monitoring-token",
-                            "key": "token",
-                        }
-                    }
-                },
+                "token": {"value": ""},
             },
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
             "containerRuntime": {"name": self._container_runtime},
@@ -716,17 +715,27 @@ class HelmValuesFactory:
                 },
             },
             "minio": {"image": {"repository": platform.get_image("minio")}},
-            "secrets": [
-                {
-                    "name": f"{platform.release_name}-monitoring-token",
-                    "data": {"token": platform.token},
-                }
-            ],
+            "secrets": [],
         }
         result.update(
             **self._create_cors_values(platform),
             **self._create_tracing_values(platform),
         )
+        if platform.token:
+            result["secrets"].append(
+                {
+                    "name": f"{platform.release_name}-monitoring-token",
+                    "data": {"token": platform.token},
+                }
+            )
+            result["platform"]["token"] = {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": f"{platform.release_name}-monitoring-token",
+                        "key": "token",
+                    }
+                }
+            }
         if platform.buckets.provider == BucketsProvider.GCP:
             result["logs"] = {
                 "persistence": {
@@ -854,28 +863,31 @@ class HelmValuesFactory:
             "platform": {
                 "clusterName": platform.cluster_name,
                 "authUrl": str(platform.auth_url),
-                "token": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": f"{platform.release_name}-secrets-token",
-                            "key": "token",
-                        }
-                    }
-                },
+                "token": {"value": ""},
             },
             "secretsNamespace": platform.jobs_namespace,
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
-            "secrets": [
-                {
-                    "name": f"{platform.release_name}-secrets-token",
-                    "data": {"token": platform.token},
-                }
-            ],
+            "secrets": [],
         }
         result.update(
             **self._create_cors_values(platform),
             **self._create_tracing_values(platform),
         )
+        if platform.token:
+            result["secrets"].append(
+                {
+                    "name": f"{platform.release_name}-secrets-token",
+                    "data": {"token": platform.token},
+                }
+            )
+            result["platform"]["token"] = {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": f"{platform.release_name}-secrets-token",
+                        "key": "token",
+                    }
+                }
+            }
         return result
 
     def create_platform_reports_values(
@@ -929,21 +941,9 @@ class HelmValuesFactory:
                 "ingressAuthUrl": str(platform.ingress_auth_url),
                 "configUrl": str(platform.config_url),
                 "apiUrl": str(platform.api_url / "api/v1"),
-                "token": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": f"{platform.release_name}-reports-token",
-                            "key": "token",
-                        }
-                    }
-                },
+                "token": {"value": ""},
             },
-            "secrets": [
-                {
-                    "name": f"{platform.release_name}-reports-token",
-                    "data": {"token": platform.token},
-                }
-            ],
+            "secrets": [],
             "platformJobs": {"namespace": platform.jobs_namespace},
             "grafanaProxy": {
                 "ingress": {
@@ -1061,6 +1061,21 @@ class HelmValuesFactory:
             },
         }
         result.update(**self._create_tracing_values(platform))
+        if platform.token:
+            result["secrets"].append(
+                {
+                    "name": f"{platform.release_name}-reports-token",
+                    "data": {"token": platform.token},
+                }
+            )
+            result["platform"]["token"] = {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": f"{platform.release_name}-reports-token",
+                        "key": "token",
+                    }
+                }
+            }
         prometheus_spec = result["kube-prometheus-stack"]["prometheus"][
             "prometheusSpec"
         ]
@@ -1228,22 +1243,10 @@ class HelmValuesFactory:
             "platform": {
                 "clusterName": platform.cluster_name,
                 "authUrl": str(platform.auth_url),
-                "token": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": f"{platform.release_name}-disks-token",
-                            "key": "token",
-                        }
-                    }
-                },
+                "token": {"value": ""},
             },
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
-            "secrets": [
-                {
-                    "name": f"{platform.release_name}-disks-token",
-                    "data": {"token": platform.token},
-                }
-            ],
+            "secrets": [],
         }
         if platform.disks_storage_class_name:
             result["disks"]["storageClassName"] = platform.disks_storage_class_name
@@ -1251,6 +1254,21 @@ class HelmValuesFactory:
             **self._create_cors_values(platform),
             **self._create_tracing_values(platform),
         )
+        if platform.token:
+            result["secrets"].append(
+                {
+                    "name": f"{platform.release_name}-disks-token",
+                    "data": {"token": platform.token},
+                }
+            )
+            result["platform"]["token"] = {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": f"{platform.release_name}-disks-token",
+                        "key": "token",
+                    }
+                }
+            }
         return result
 
     def create_platform_api_poller_values(
@@ -1267,14 +1285,7 @@ class HelmValuesFactory:
                 "adminUrl": str(platform.admin_url / "apis/admin/v1"),
                 "apiUrl": str(platform.api_url / "api/v1"),
                 "registryUrl": str(platform.ingress_registry_url),
-                "token": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": f"{platform.release_name}-poller-token",
-                            "key": "token",
-                        }
-                    }
-                },
+                "token": {"value": ""},
             },
             "jobs": {
                 "namespace": platform.jobs_namespace,
@@ -1298,14 +1309,24 @@ class HelmValuesFactory:
                 for s in platform.storages
             ],
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
-            "secrets": [
-                {
-                    "name": f"{platform.release_name}-poller-token",
-                    "data": {"token": platform.token},
-                }
-            ],
+            "secrets": [],
         }
         result.update(**self._create_tracing_values(platform))
+        if platform.token:
+            result["secrets"].append(
+                {
+                    "name": f"{platform.release_name}-api-poller-token",
+                    "data": {"token": platform.token},
+                }
+            )
+            result["platform"]["token"] = {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": f"{platform.release_name}-api-poller-token",
+                        "key": "token",
+                    }
+                }
+            }
         if platform.kubernetes_provider == CloudProvider.AZURE:
             result["jobs"][
                 "preemptibleTolerationKey"
@@ -1325,28 +1346,31 @@ class HelmValuesFactory:
             "platform": {
                 "clusterName": platform.cluster_name,
                 "authUrl": str(platform.auth_url),
-                "token": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": (f"{platform.release_name}-buckets-api-token"),
-                            "key": "token",
-                        }
-                    }
-                },
+                "token": {"value": ""},
             },
             "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
-            "secrets": [
-                {
-                    "name": f"{platform.release_name}-buckets-api-token",
-                    "data": {"token": platform.token},
-                }
-            ],
+            "secrets": [],
             "disableCreation": platform.buckets.disable_creation,
         }
         result.update(
             **self._create_cors_values(platform),
             **self._create_tracing_values(platform),
         )
+        if platform.token:
+            result["secrets"].append(
+                {
+                    "name": f"{platform.release_name}-buckets-token",
+                    "data": {"token": platform.token},
+                }
+            )
+            result["platform"]["token"] = {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": f"{platform.release_name}-buckets-token",
+                        "key": "token",
+                    }
+                }
+            }
         if platform.buckets.provider == BucketsProvider.AWS:
             result["bucketProvider"] = {
                 "type": "aws",
