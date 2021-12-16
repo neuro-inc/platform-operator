@@ -1,5 +1,5 @@
 {
-  "name": "{{ .Values.platformConfig.clusterName }}",
+  "name": "{{ include "platformOperator.cluster.name" . }}",
   "credentials": {
     "neuro_helm": {
       "url": "oci://ghcr.io/neuro-inc/helm-charts"
