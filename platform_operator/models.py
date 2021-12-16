@@ -548,7 +548,7 @@ class Spec(dict[str, Any]):
         super().__init__(spec)
 
         spec = defaultdict(_spec_default_factory, spec)
-        self._token = spec["token"]
+        self._token = spec.get("token", "")
         self._iam = IamSpec(spec["iam"])
         self._kubernetes = KubernetesSpec(spec["kubernetes"])
         self._ingress_controller = IngressControllerSpec(spec["ingressController"])

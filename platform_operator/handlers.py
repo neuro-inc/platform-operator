@@ -362,7 +362,7 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
 
 
 async def get_platform_config(name: str, body: kopf.Body) -> PlatformConfig:
-    token = body["spec"]["token"]
+    token = body["spec"].get("token")
     cluster = await app.config_client.get_cluster(cluster_name=name, token=token)
 
     return app.platform_config_factory.create(body, cluster)
@@ -439,7 +439,7 @@ async def start_deployment(name: str, body: kopf.Body, retry: int = 0) -> None:
     await app.status_manager.start_deployment(name, retry)
     await app.config_client.send_notification(
         cluster_name=name,
-        token=body["spec"]["token"],
+        token=body["spec"].get("token"),
         notification_type=NotificationType.CLUSTER_UPDATING,
     )
 
@@ -448,7 +448,7 @@ async def complete_deployment(name: str, body: kopf.Body) -> None:
     await app.status_manager.complete_deployment(name)
     await app.config_client.send_notification(
         cluster_name=name,
-        token=body["spec"]["token"],
+        token=body["spec"].get("token"),
         notification_type=NotificationType.CLUSTER_UPDATE_SUCCEEDED,
     )
 
@@ -457,7 +457,7 @@ async def fail_deployment(name: str, body: kopf.Body) -> None:
     await app.status_manager.fail_deployment(name)
     await app.config_client.send_notification(
         cluster_name=name,
-        token=body["spec"]["token"],
+        token=body["spec"].get("token"),
         notification_type=NotificationType.CLUSTER_UPDATE_FAILED,
     )
 
