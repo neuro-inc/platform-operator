@@ -606,6 +606,18 @@ class TestPlatformConfigFactory:
 
         assert result.disks_storage_class_name is None
 
+    def test_gcp_platform_config_without_grafana_credentials(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: kopf.Body,
+        gcp_cluster: Cluster,
+    ) -> None:
+        del gcp_cluster["credentials"]["grafana"]
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result.grafana_username == ""
+        assert result.grafana_password == ""
+
     def test_gcp_platform_config_without_tracing(
         self,
         factory: PlatformConfigFactory,

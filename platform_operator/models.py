@@ -182,6 +182,22 @@ class Cluster(dict[str, Any]):
     def dns_name(self) -> str:
         return self["dns"]["name"]
 
+    @property
+    def grafana_username(self) -> str:
+        return self["credentials"].get("grafana", {}).get("username", "")
+
+    @property
+    def grafana_password(self) -> str:
+        return self["credentials"].get("grafana", {}).get("password", "")
+
+    @property
+    def sentry_public_dsn(self) -> str:
+        return self["credentials"].get("sentry", {}).get("public_dsn", "")
+
+    @property
+    def sentry_sample_rate(self) -> float:
+        return self["credentials"].get("sentry", {}).get("sample_rate")
+
 
 def _spec_default_factory() -> dict[str, Any]:
     return defaultdict(_spec_default_factory)
@@ -1054,16 +1070,12 @@ class PlatformConfigFactory:
             helm_repo=self._create_helm_repo(cluster),
             docker_config=docker_config,
             docker_hub_config=docker_hub_config,
-            grafana_username=cluster["credentials"]["grafana"]["username"],
-            grafana_password=cluster["credentials"]["grafana"]["password"],
+            grafana_username=cluster.grafana_username,
+            grafana_password=cluster.grafana_password,
             consul_url=self._config.consul_url,
             consul_install=not self._config.consul_installed,
-            sentry_dsn=URL(
-                cluster["credentials"].get("sentry", {}).get("public_dsn", "")
-            ),
-            sentry_sample_rate=cluster["credentials"]
-            .get("sentry", {})
-            .get("sample_rate"),
+            sentry_dsn=URL(cluster.sentry_public_dsn),
+            sentry_sample_rate=cluster.sentry_sample_rate,
             aws_region=spec.iam.aws_region,
             aws_role_arn=spec.iam.aws_role_arn,
             aws_s3_role_arn=spec.iam.aws_s3_role_arn,

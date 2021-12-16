@@ -46,7 +46,8 @@
     "url": "{{ include "platformOperator.cluster.url" . }}/api/v1/secrets"
   },
   "disks": {
-    "url": "{{ include "platformOperator.cluster.url" . }}/api/v1/disk"
+    "url": "{{ include "platformOperator.cluster.url" . }}/api/v1/disk",
+    "storage_limit_per_user_gb": 500
   },
   "buckets": {
     "url": "{{ include "platformOperator.cluster.url" . }}/api/v1/buckets",
