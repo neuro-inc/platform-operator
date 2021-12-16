@@ -477,6 +477,12 @@ class TestHelmValuesFactory:
                 "maxUnavailable": 1,
                 "maxSurge": 0,
             },
+            "resources": {
+                "requests": {
+                    "cpu": "100m",
+                    "memory": "1Gi",
+                }
+            },
             "podLabels": {"service": "minio"},
             "mode": "standalone",
             "persistence": {
