@@ -29,19 +29,19 @@ dependencies:
     version: "21.11.3"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-secrets
-    version: "21.12.0"
+    version: "21.12.3"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-reports
     version: "21.12.2"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-disks
-    version: "21.12.1"
+    version: "21.12.4"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-api-poller
     version: "21.12.1"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-buckets
-    version: "21.12.0"
+    version: "21.12.3"
     repository: oci://ghcr.io/neuro-inc/helm-charts
 
   # Deprecated, left for backward compatibility with old clusters
