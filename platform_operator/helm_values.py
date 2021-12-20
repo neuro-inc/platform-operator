@@ -338,35 +338,6 @@ class HelmValuesFactory:
                 "namespaces": [platform.namespace, platform.jobs_namespace],
             },
             "rbac": {"enabled": True},
-            "extraVolumes": [
-                # Mounted secret and configmap volumes are updated automatically
-                # by kubelet
-                # https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically
-                # https://kubernetes.io/docs/concepts/configuration/secret/#mounted-secrets-are-updated-automatically
-                {
-                    "name": "dns-challenge",
-                    "configMap": {
-                        "name": f"{platform.release_name}-dns-challenge",
-                        "defaultMode": 0o777,
-                    },
-                },
-                {
-                    "name": "dns-challenge-secret",
-                    "secret": {"secretName": f"{platform.release_name}-dns-challenge"},
-                },
-            ],
-            "extraVolumeMounts": [
-                {"name": "dns-challenge", "mountPath": "/dns-01/challenge"},
-                {"name": "dns-challenge-secret", "mountPath": "/dns-01/secret"},
-            ],
-            "env": [
-                {"name": "NP_PLATFORM_CONFIG_URL", "value": str(platform.config_url)},
-                {"name": "NP_CLUSTER_NAME", "value": platform.cluster_name},
-                {
-                    "name": "NP_DNS_CHALLENGE_SCRIPT_NAME",
-                    "value": dns_challenge_script_name,
-                },
-            ],
             "resources": {
                 "requests": {"cpu": "250m", "memory": "256Mi"},
                 "limits": {"cpu": "1000m", "memory": "4Gi"},
@@ -407,6 +378,35 @@ class HelmValuesFactory:
                     ],
                 },
             }
+            result["extraVolumes"] = [
+                # Mounted secret and configmap volumes are updated automatically
+                # by kubelet
+                # https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically
+                # https://kubernetes.io/docs/concepts/configuration/secret/#mounted-secrets-are-updated-automatically
+                {
+                    "name": "dns-challenge",
+                    "configMap": {
+                        "name": f"{platform.release_name}-dns-challenge",
+                        "defaultMode": 0o777,
+                    },
+                },
+                {
+                    "name": "dns-challenge-secret",
+                    "secret": {"secretName": f"{platform.release_name}-dns-challenge"},
+                },
+            ]
+            result["extraVolumeMounts"] = [
+                {"name": "dns-challenge", "mountPath": "/dns-01/challenge"},
+                {"name": "dns-challenge-secret", "mountPath": "/dns-01/secret"},
+            ]
+            result["env"] = [
+                {"name": "NP_PLATFORM_CONFIG_URL", "value": str(platform.config_url)},
+                {"name": "NP_CLUSTER_NAME", "value": platform.cluster_name},
+                {
+                    "name": "NP_DNS_CHALLENGE_SCRIPT_NAME",
+                    "value": dns_challenge_script_name,
+                },
+            ]
         if platform.kubernetes_provider == CloudProvider.GCP:
             result["timeouts"] = {
                 "responding": {
