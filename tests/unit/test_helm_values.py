@@ -656,6 +656,7 @@ class TestHelmValuesFactory:
         assert "acme" not in result
         assert result["ssl"]["defaultCert"] == "default-cert"
         assert result["ssl"]["defaultKey"] == "default-key"
+        assert "storeAcme" not in result["kvprovider"]
 
     def test_create_aws_traefik_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory

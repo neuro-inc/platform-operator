@@ -330,8 +330,6 @@ class HelmValuesFactory:
                     "endpoint": str(platform.consul_url),
                     "prefix": "traefik",
                 },
-                "storeAcme": True,
-                "acmeStorageLocation": "traefik/acme/account",
             },
             "kubernetes": {
                 "ingressClass": "traefik",
@@ -377,6 +375,8 @@ class HelmValuesFactory:
             result["ssl"]["defaultCert"] = platform.ingress_ssl_cert_data
             result["ssl"]["defaultKey"] = platform.ingress_ssl_cert_key_data
         else:
+            result["kvprovider"]["storeAcme"] = True
+            result["kvprovider"]["acmeStorageLocation"] = "traefik/acme/account"
             result["acme"] = {
                 "enabled": True,
                 "onHostRule": False,

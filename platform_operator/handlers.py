@@ -503,6 +503,9 @@ async def wait_for_certificate_created(platform: PlatformConfig) -> None:
     if not platform.ingress_controller_install:
         return
 
+    if platform.ingress_ssl_cert_data and platform.ingress_ssl_cert_key_data:
+        return
+
     async with app.status_manager.transition(
         platform.cluster_name, PlatformConditionType.CERTIFICATE_CREATED
     ):

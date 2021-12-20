@@ -1389,3 +1389,36 @@ async def test_watch_config_update_failed(
         token=gcp_platform_config.token,
         notification_type=NotificationType.CLUSTER_UPDATE_FAILED,
     )
+
+
+async def test_wait_for_certificate_created_without_ingress_controller(
+    certificate_store: mock.AsyncMock,
+    gcp_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import wait_for_certificate_created
+
+    await wait_for_certificate_created(
+        replace(
+            gcp_platform_config,
+            ingress_controller_install=False,
+        )
+    )
+
+    certificate_store.wait_till_certificate_created.assert_not_awaited()
+
+
+async def test_wait_for_certificate_created_with_manual_certs(
+    certificate_store: mock.AsyncMock,
+    gcp_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import wait_for_certificate_created
+
+    await wait_for_certificate_created(
+        replace(
+            gcp_platform_config,
+            ingress_ssl_cert_data="ssl-cert",
+            ingress_ssl_cert_key_data="ssl-cert-key",
+        )
+    )
+
+    certificate_store.wait_till_certificate_created.assert_not_awaited()
