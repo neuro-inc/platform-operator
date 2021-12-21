@@ -523,6 +523,10 @@ class IngressControllerSpec(dict[str, Any]):
         return self._spec.get("enabled", True)
 
     @property
+    def replicas(self) -> Optional[int]:
+        return self._spec.get("replicas")
+
+    @property
     def namespaces(self) -> Sequence[str]:
         return self._spec.get("namespaces", ())
 
@@ -787,6 +791,7 @@ class PlatformConfig:
     ingress_metrics_url: URL
     ingress_acme_environment: str
     ingress_controller_install: bool
+    ingress_controller_replicas: int
     ingress_public_ips: Sequence[IPv4Address]
     ingress_cors_origins: Sequence[str]
     ingress_node_port_http: int | None
@@ -1019,6 +1024,7 @@ class PlatformConfigFactory:
             ingress_metrics_url=URL(f"https://metrics.{cluster.dns_name}"),
             ingress_acme_environment=cluster.acme_environment,
             ingress_controller_install=spec.ingress_controller.enabled,
+            ingress_controller_replicas=spec.ingress_controller.replicas or 2,
             ingress_public_ips=spec.ingress_controller.public_ips,
             ingress_cors_origins=cluster["ingress"].get("cors_origins", ()),
             ingress_service_type=IngressServiceType(

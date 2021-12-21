@@ -87,6 +87,11 @@ http://platform-consul:8500
 {{- end -}}
 {{- end -}}
 
+{{- define "platformOperator.platformConfig.url" -}}
+{{- $serviceName := include "platformOperator.platformConfig.fullname" . -}}
+{{- printf "http://%s:8080" $serviceName -}}
+{{- end -}}
+
 {{- define "platformOperator.platformApi.fullname" -}}
 {{- if .Values.platformApi.fullnameOverride -}}
 {{- .Values.platformApi.fullnameOverride | trunc 63 | trimSuffix "-" -}}

@@ -117,6 +117,8 @@ spec:
                 properties:
                   enabled:
                     type: boolean
+                  replicas:
+                    type: number
                   namespaces:
                     type: array
                     items:

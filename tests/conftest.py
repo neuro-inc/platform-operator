@@ -473,6 +473,7 @@ def gcp_platform_config(
         ingress_metrics_url=URL(f"https://metrics.{cluster_name}.org.neu.ro"),
         ingress_acme_environment="staging",
         ingress_controller_install=True,
+        ingress_controller_replicas=2,
         ingress_public_ips=[],
         ingress_cors_origins=[
             "https://release--neuro-web.netlify.app",

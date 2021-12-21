@@ -310,7 +310,9 @@ class HelmValuesFactory:
     def create_traefik_values(self, platform: PlatformConfig) -> dict[str, Any]:
         dns_challenge_script_name = "resolve_dns_challenge.sh"
         result: dict[str, Any] = {
-            "replicas": 2,
+            "nameOverride": "traefik",
+            "fullnameOverride": "traefik",
+            "replicas": platform.ingress_controller_replicas,
             "deploymentStrategy": {
                 "type": "RollingUpdate",
                 "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
