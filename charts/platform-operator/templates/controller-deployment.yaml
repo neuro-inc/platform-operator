@@ -63,15 +63,15 @@ spec:
         - name: NP_HELM_OBS_CSI_DRIVER_CHART_VERSION
           value: "1.0.5"
         - name: NP_PLATFORM_AUTH_URL
-          value: {{ .Values.platform.authUrl }}
+          value: {{ .Values.platform.authUrl | quote }}
         - name: NP_PLATFORM_INGRESS_AUTH_URL
-          value: {{ .Values.platform.ingressAuthUrl }}
+          value: {{ .Values.platform.ingressAuthUrl | quote }}
         - name: NP_PLATFORM_CONFIG_URL
-          value: {{ .Values.platform.configUrl }}
+          value: {{ .Values.platform.configUrl | quote }}
         - name: NP_PLATFORM_ADMIN_URL
-          value: {{ .Values.platform.adminUrl }}
+          value: {{ .Values.platform.adminUrl | quote }}
         - name: NP_PLATFORM_API_URL
-          value: {{ .Values.platform.apiUrl }}
+          value: {{ .Values.platform.apiUrl | quote }}
         - name: NP_PLATFORM_NAMESPACE
           value: {{ .Release.Namespace }}
         - name: NP_CONSUL_URL
