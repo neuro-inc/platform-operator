@@ -27,7 +27,19 @@
     "job_schedule_scale_up_timeout_s": 900,
     "allow_privileged_mode": false,
     "resource_pool_types": {{ .Values.platformConfig.resourcePools | mustToPrettyJson | indent 4 | trim }},
-    "resource_presets": {{ .Values.platformConfig.resourcePresets | mustToPrettyJson | indent 4 | trim }},
+    {{- if .Values.platformConfig.resourcePresets }}
+    "resource_presets": [
+        {{- with first .Values.platformConfig.resourcePresets -}}
+        {{ dict "credits_per_hour" "0" | merge . | mustToPrettyJson | nindent 8 }}
+        {{- end -}}
+        {{- range rest .Values.platformConfig.resourcePresets -}}
+        ,
+        {{- dict "credits_per_hour" "0" | merge . | mustToPrettyJson | nindent 8 }}
+        {{- end }}
+    ],
+    {{- else }}
+    "resource_presets": [],
+    {{- end }}
     "pre_pull_images": []
   },
   "storage": {
