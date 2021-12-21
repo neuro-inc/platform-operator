@@ -497,6 +497,18 @@ class TestPlatformConfigFactory:
 
         assert result == replace(gcp_platform_config, ingress_controller_install=False)
 
+    def test_gcp_platform_config_with_custom_ingress_controller_replicas(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: kopf.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        gcp_platform_body["spec"]["ingressController"] = {"replicas": 3}
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result == replace(gcp_platform_config, ingress_controller_replicas=3)
+
     def test_gcp_platform_config_with_ingress_ssl_cert(
         self,
         factory: PlatformConfigFactory,

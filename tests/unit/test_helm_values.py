@@ -547,6 +547,8 @@ class TestHelmValuesFactory:
         result = factory.create_traefik_values(gcp_platform_config)
 
         assert result == {
+            "nameOverride": "traefik",
+            "fullnameOverride": "traefik",
             "replicas": 2,
             "deploymentStrategy": {
                 "type": "RollingUpdate",
