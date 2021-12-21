@@ -1,11 +1,11 @@
 standalone: true
 
 platform:
-  authUrl: http://platform-auth:8080
-  ingressAuthUrl: http://platform-ingress-auth:8080
   configUrl: http://platform-config:8080
-  adminUrl: http://platform-admin:8080
   apiUrl: http://platform-api:8080
+  authUrl: "-"
+  ingressAuthUrl: "-"
+  adminUrl: "-"
 
 ingress:
   host: neu.ro.local
@@ -81,7 +81,7 @@ platformApi:
 
   image:
     repository: ghcr.io/neuro-inc/platformapi
-    tag: 21.12.3
+    tag: 21.12.6
 
   oauth:
     authUrl: http://keycloak-http:80/auth/realms/neu.ro/protocol/openid-connect/auth

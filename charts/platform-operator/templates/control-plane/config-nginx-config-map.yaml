@@ -28,7 +28,7 @@ data:
           return 200;
         }
 
-        if ($request_method = PUT ) {
+        if ($request_method = PATCH ) {
           return 200;
         }
       }
