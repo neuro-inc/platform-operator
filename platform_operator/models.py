@@ -167,7 +167,7 @@ class Config:
         return Path(value) if value else None
 
 
-class Cluster(Dict[str, Any]):
+class Cluster(dict[str, Any]):
     @property
     def name(self) -> str:
         return self["name"]
@@ -185,7 +185,7 @@ def _spec_default_factory() -> dict[str, Any]:
     return defaultdict(_spec_default_factory)
 
 
-class IamSpec(Dict[str, Any]):
+class IamSpec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
@@ -208,7 +208,7 @@ class IamSpec(Dict[str, Any]):
         return self._spec["gcp"].get("serviceAccountKeyBase64", "")
 
 
-class KubernetesSpec(Dict[str, Any]):
+class KubernetesSpec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
@@ -275,7 +275,7 @@ class KubernetesSpec(Dict[str, Any]):
         return IPv4Network(self["tpuIPv4CIDR"]) if self.get("tpuIPv4CIDR") else None
 
 
-class StorageSpec(Dict[str, Any]):
+class StorageSpec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
@@ -332,7 +332,7 @@ class StorageSpec(Dict[str, Any]):
         return self["azureFile"].get("shareName", "")
 
 
-class BlobStorageSpec(Dict[str, Any]):
+class BlobStorageSpec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
@@ -417,7 +417,7 @@ class BlobStorageSpec(Dict[str, Any]):
         return self["kubernetes"]["persistence"].get("size", "")
 
 
-class RegistrySpec(Dict[str, Any]):
+class RegistrySpec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
@@ -466,7 +466,7 @@ class RegistrySpec(Dict[str, Any]):
         return self["kubernetes"]["persistence"].get("size", "")
 
 
-class MonitoringSpec(Dict[str, Any]):
+class MonitoringSpec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
@@ -503,7 +503,7 @@ class MonitoringSpec(Dict[str, Any]):
         return self["metrics"]["kubernetes"]["persistence"].get("storageClassName", "")
 
 
-class DisksSpec(Dict[str, Any]):
+class DisksSpec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
@@ -514,7 +514,7 @@ class DisksSpec(Dict[str, Any]):
         return self._spec["kubernetes"]["persistence"].get("storageClassName", "")
 
 
-class Spec(Dict[str, Any]):
+class Spec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
@@ -561,7 +561,7 @@ class Spec(Dict[str, Any]):
         return self._monitoring
 
 
-class Metadata(Dict[str, Any]):
+class Metadata(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 

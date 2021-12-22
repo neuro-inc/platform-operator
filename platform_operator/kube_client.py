@@ -107,7 +107,7 @@ class Node:
         return version[0:end]
 
 
-class Service(Dict[str, Any]):
+class Service(dict[str, Any]):
     def __init__(self, payload: dict[str, Any]) -> None:
         super().__init__(payload)
 
@@ -324,7 +324,7 @@ class KubeClient:
             response.raise_for_status()
 
 
-class PlatformCondition(Dict[str, Any]):
+class PlatformCondition(dict[str, Any]):
     def __init__(self, payload: dict[str, Any]) -> None:
         super().__init__(payload)
 
@@ -353,7 +353,7 @@ class PlatformCondition(Dict[str, Any]):
         self["lastTransitionTime"] = value
 
 
-class PlatformStatus(Dict[str, Any]):
+class PlatformStatus(dict[str, Any]):
     def __init__(self, payload: dict[str, Any]) -> None:
         super().__init__(payload)
 
