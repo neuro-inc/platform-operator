@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import asyncio
 import gzip
 import json
-from typing import Any, Awaitable, Callable, Dict, Optional
+from collections.abc import Awaitable, Callable
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -14,7 +17,7 @@ from platform_operator.models import Certificate
 
 
 class CertificateStoreApp:
-    def __init__(self, account: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(self, account: dict[str, Any] | None = None) -> None:
         self.web_app = web.Application()
         self._account = account
 

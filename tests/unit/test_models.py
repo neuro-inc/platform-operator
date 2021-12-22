@@ -1,6 +1,9 @@
+from __future__ import annotations
+
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any
 
 import kopf
 import pytest
@@ -168,27 +171,27 @@ class TestCluster:
 
 class TestPlatformConfig:
     @pytest.fixture
-    def traefik_service(self) -> Dict[str, Any]:
+    def traefik_service(self) -> dict[str, Any]:
         return {
             "metadata": {"name", "traefik"},
             "status": {"loadBalancer": {"ingress": [{"ip": "192.168.0.1"}]}},
         }
 
     @pytest.fixture
-    def aws_traefik_service(self) -> Dict[str, Any]:
+    def aws_traefik_service(self) -> dict[str, Any]:
         return {
             "metadata": {"name", "traefik"},
             "status": {"loadBalancer": {"ingress": [{"hostname": "traefik"}]}},
         }
 
     @pytest.fixture
-    def aws_traefik_lb(self) -> Dict[str, Any]:
+    def aws_traefik_lb(self) -> dict[str, Any]:
         return {
             "CanonicalHostedZoneNameID": "/hostedzone/traefik",
         }
 
     def test_create_dns_config_from_traefik_service(
-        self, gcp_platform_config: PlatformConfig, traefik_service: Dict[str, Any]
+        self, gcp_platform_config: PlatformConfig, traefik_service: dict[str, Any]
     ) -> None:
         result = gcp_platform_config.create_dns_config(ingress_service=traefik_service)
         dns_name = gcp_platform_config.ingress_dns_name
@@ -223,8 +226,8 @@ class TestPlatformConfig:
     def test_create_aws_dns_config(
         self,
         aws_platform_config: PlatformConfig,
-        aws_traefik_service: Dict[str, Any],
-        aws_traefik_lb: Dict[str, Any],
+        aws_traefik_service: dict[str, Any],
+        aws_traefik_lb: dict[str, Any],
     ) -> None:
         result = aws_platform_config.create_dns_config(
             ingress_service=aws_traefik_service, aws_ingress_lb=aws_traefik_lb
@@ -261,9 +264,9 @@ class TestPlatformConfig:
         self,
         cluster_name: str,
         gcp_platform_config: PlatformConfig,
-        traefik_service: Dict[str, Any],
-        resource_pool_type_factory: Callable[..., Dict[str, Any]],
-        resource_preset_factory: Callable[[], Dict[str, Any]],
+        traefik_service: dict[str, Any],
+        resource_pool_type_factory: Callable[..., dict[str, Any]],
+        resource_preset_factory: Callable[[], dict[str, Any]],
     ) -> None:
         resource_preset = resource_preset_factory()
         resource_preset.pop("resource_affinity", None)
@@ -384,7 +387,7 @@ class TestPlatformConfigFactory:
         gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
-        resource_pool_type_factory: Callable[..., Dict[str, Any]],
+        resource_pool_type_factory: Callable[..., dict[str, Any]],
     ) -> None:
         del gcp_platform_body["spec"]["kubernetes"]["tpuIPv4CIDR"]
         gcp_cluster["orchestrator"]["resource_pool_types"] = [

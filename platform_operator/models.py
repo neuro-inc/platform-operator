@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 import copy
 import os
 from base64 import b64decode, b64encode
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from enum import Enum
 from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any
 
 import kopf
 from yarl import URL
@@ -29,13 +32,13 @@ class KubeClientAuthType(str, Enum):
 class KubeConfig:
     version: str
     url: URL
-    cert_authority_path: Optional[Path] = None
-    cert_authority_data_pem: Optional[str] = None
+    cert_authority_path: Path | None = None
+    cert_authority_data_pem: str | None = None
     auth_type: KubeClientAuthType = KubeClientAuthType.NONE
-    auth_cert_path: Optional[Path] = None
-    auth_cert_key_path: Optional[Path] = None
-    auth_token_path: Optional[Path] = None
-    auth_token: Optional[str] = None
+    auth_cert_path: Path | None = None
+    auth_cert_key_path: Path | None = None
+    auth_token_path: Path | None = None
+    auth_token: str | None = None
     conn_timeout_s: int = 300
     read_timeout_s: int = 100
     conn_pool_size: int = 100
@@ -112,7 +115,7 @@ class Config:
     consul_installed: bool
 
     @classmethod
-    def load_from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Config":
+    def load_from_env(cls, env: Mapping[str, str] | None = None) -> Config:
         env = env or os.environ
         platform_release_name = "platform"
         return cls(
@@ -160,7 +163,7 @@ class Config:
         )
 
     @classmethod
-    def _convert_to_path(cls, value: Optional[str]) -> Optional[Path]:
+    def _convert_to_path(cls, value: str | None) -> Path | None:
         return Path(value) if value else None
 
 
@@ -178,12 +181,12 @@ class Cluster(Dict[str, Any]):
         return self["dns"]["name"]
 
 
-def _spec_default_factory() -> Dict[str, Any]:
+def _spec_default_factory() -> dict[str, Any]:
     return defaultdict(_spec_default_factory)
 
 
 class IamSpec(Dict[str, Any]):
-    def __init__(self, spec: Dict[str, Any]) -> None:
+    def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
         self._spec = defaultdict(_spec_default_factory, spec)
@@ -206,7 +209,7 @@ class IamSpec(Dict[str, Any]):
 
 
 class KubernetesSpec(Dict[str, Any]):
-    def __init__(self, spec: Dict[str, Any]) -> None:
+    def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
         self._spec = defaultdict(_spec_default_factory, spec)
@@ -236,7 +239,7 @@ class KubernetesSpec(Dict[str, Any]):
         return self._spec["nodeLabels"].get("preemptible", "")
 
     @property
-    def kubelet_port(self) -> Optional[int]:
+    def kubelet_port(self) -> int | None:
         return self.get("kubeletPort")
 
     @property
@@ -268,12 +271,12 @@ class KubernetesSpec(Dict[str, Any]):
         return self._spec["dockerConfigSecret"].get("name", "")
 
     @property
-    def tpu_network(self) -> Optional[IPv4Network]:
+    def tpu_network(self) -> IPv4Network | None:
         return IPv4Network(self["tpuIPv4CIDR"]) if self.get("tpuIPv4CIDR") else None
 
 
 class StorageSpec(Dict[str, Any]):
-    def __init__(self, spec: Dict[str, Any]) -> None:
+    def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
     @property
@@ -330,7 +333,7 @@ class StorageSpec(Dict[str, Any]):
 
 
 class BlobStorageSpec(Dict[str, Any]):
-    def __init__(self, spec: Dict[str, Any]) -> None:
+    def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
     @property
@@ -415,7 +418,7 @@ class BlobStorageSpec(Dict[str, Any]):
 
 
 class RegistrySpec(Dict[str, Any]):
-    def __init__(self, spec: Dict[str, Any]) -> None:
+    def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
     @property
@@ -464,7 +467,7 @@ class RegistrySpec(Dict[str, Any]):
 
 
 class MonitoringSpec(Dict[str, Any]):
-    def __init__(self, spec: Dict[str, Any]) -> None:
+    def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
     @property
@@ -476,7 +479,7 @@ class MonitoringSpec(Dict[str, Any]):
         return self["logs"]["blobStorage"]["bucket"]
 
     @property
-    def metrics(self) -> Dict[str, Any]:
+    def metrics(self) -> dict[str, Any]:
         return self["metrics"]
 
     @property
@@ -501,7 +504,7 @@ class MonitoringSpec(Dict[str, Any]):
 
 
 class DisksSpec(Dict[str, Any]):
-    def __init__(self, spec: Dict[str, Any]) -> None:
+    def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
         self._spec = defaultdict(_spec_default_factory, spec)
@@ -512,7 +515,7 @@ class DisksSpec(Dict[str, Any]):
 
 
 class Spec(Dict[str, Any]):
-    def __init__(self, spec: Dict[str, Any]) -> None:
+    def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
         spec = defaultdict(_spec_default_factory, spec)
@@ -559,7 +562,7 @@ class Spec(Dict[str, Any]):
 
 
 class Metadata(Dict[str, Any]):
-    def __init__(self, spec: Dict[str, Any]) -> None:
+    def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
 
     @property
@@ -629,12 +632,12 @@ class RegistryConfig:
 
     gcp_project: str = ""
 
-    azure_url: Optional[URL] = None
+    azure_url: URL | None = None
     azure_username: str = ""
     azure_password: str = ""
 
     docker_registry_install: bool = False
-    docker_registry_url: Optional[URL] = None
+    docker_registry_url: URL | None = None
     docker_registry_username: str = ""
     docker_registry_password: str = ""
     docker_registry_storage_class_name: str = ""
@@ -664,8 +667,8 @@ class BucketsConfig:
     azure_storage_account_key: str = ""
 
     minio_install: bool = False
-    minio_url: Optional[URL] = None
-    minio_public_url: Optional[URL] = None
+    minio_url: URL | None = None
+    minio_public_url: URL | None = None
     minio_region: str = ""
     minio_access_key: str = ""
     minio_secret_key: str = ""
@@ -674,14 +677,14 @@ class BucketsConfig:
 
     emc_ecs_access_key_id: str = ""
     emc_ecs_secret_access_key: str = ""
-    emc_ecs_s3_endpoint: Optional[URL] = None
-    emc_ecs_management_endpoint: Optional[URL] = None
+    emc_ecs_s3_endpoint: URL | None = None
+    emc_ecs_management_endpoint: URL | None = None
     emc_ecs_s3_assumable_role: str = ""
 
     open_stack_username: str = ""
     open_stack_password: str = ""
-    open_stack_endpoint: Optional[URL] = None
-    open_stack_s3_endpoint: Optional[URL] = None
+    open_stack_endpoint: URL | None = None
+    open_stack_s3_endpoint: URL | None = None
     open_stack_region_name: str = ""
 
 
@@ -715,7 +718,7 @@ class PlatformConfig:
     service_account_name: str
     image_pull_secret_names: Sequence[str]
     pre_pull_images: Sequence[str]
-    standard_storage_class_name: Optional[str]
+    standard_storage_class_name: str | None
     kubernetes_provider: str
     kubernetes_version: str
     node_labels: LabelsConfig
@@ -734,20 +737,20 @@ class PlatformConfig:
     ingress_service_name: str
     ingress_namespaces: Sequence[str]
     disks_storage_limit_per_user_gb: int
-    disks_storage_class_name: Optional[str]
+    disks_storage_class_name: str | None
     jobs_namespace_create: bool
     jobs_namespace: str
-    jobs_node_pools: Sequence[Dict[str, Any]]
+    jobs_node_pools: Sequence[dict[str, Any]]
     jobs_schedule_timeout_s: float
     jobs_schedule_scale_up_timeout_s: float
-    jobs_resource_pool_types: Sequence[Dict[str, Any]]
-    jobs_resource_presets: Sequence[Dict[str, Any]]
+    jobs_resource_pool_types: Sequence[dict[str, Any]]
+    jobs_resource_presets: Sequence[dict[str, Any]]
     jobs_priority_class_name: str
     jobs_host_template: str
     jobs_internal_host_template: str
     jobs_fallback_host: str
     jobs_allow_privileged_mode: bool
-    idle_jobs: Sequence[Dict[str, Any]]
+    idle_jobs: Sequence[dict[str, Any]]
     storages: Sequence[StorageConfig]
     buckets: BucketsConfig
     registry: RegistryConfig
@@ -759,8 +762,8 @@ class PlatformConfig:
     consul_url: URL
     consul_install: bool
     sentry_dsn: URL = URL("")
-    sentry_sample_rate: Optional[float] = None
-    docker_hub_config: Optional[DockerConfig] = None
+    sentry_sample_rate: float | None = None
+    docker_hub_config: DockerConfig | None = None
     aws_region: str = ""
     aws_role_arn: str = ""
     aws_s3_role_arn: str = ""
@@ -779,12 +782,12 @@ class PlatformConfig:
 
     def create_dns_config(
         self,
-        ingress_service: Optional[Dict[str, Any]] = None,
-        aws_ingress_lb: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        ingress_service: dict[str, Any] | None = None,
+        aws_ingress_lb: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         if not ingress_service and not self.ingress_public_ips:
             return None
-        result: Dict[str, Any] = {"name": self.ingress_dns_name, "a_records": []}
+        result: dict[str, Any] = {"name": self.ingress_dns_name, "a_records": []}
         if self.ingress_public_ips:
             ips = [str(ip) for ip in self.ingress_public_ips]
             result["a_records"].extend(
@@ -858,10 +861,10 @@ class PlatformConfig:
 
     def create_cluster_config(
         self,
-        ingress_service: Optional[Dict[str, Any]] = None,
-        aws_ingress_lb: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+        ingress_service: dict[str, Any] | None = None,
+        aws_ingress_lb: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "orchestrator": {
                 "is_http_ingress_secure": True,
                 "job_hostname_template": self.jobs_host_template,
@@ -885,7 +888,7 @@ class PlatformConfig:
             result["dns"] = dns
         return result
 
-    def _create_resource_presets(self) -> Sequence[Dict[str, Any]]:
+    def _create_resource_presets(self) -> Sequence[dict[str, Any]]:
         result = []
         for preset in self.jobs_resource_presets:
             new_preset = deepcopy(preset)
@@ -898,7 +901,7 @@ class PlatformConfigFactory:
     def __init__(self, config: Config) -> None:
         self._config = config
 
-    def create(self, platform_body: kopf.Body, cluster: Cluster) -> "PlatformConfig":
+    def create(self, platform_body: kopf.Body, cluster: Cluster) -> PlatformConfig:
         metadata = Metadata(platform_body["metadata"])
         spec = Spec(platform_body["spec"])
         docker_config = self._create_neuro_docker_config(
@@ -1006,9 +1009,9 @@ class PlatformConfigFactory:
             sentry_dsn=URL(
                 cluster["credentials"].get("sentry", {}).get("public_dsn", "")
             ),
-            sentry_sample_rate=(
-                cluster["credentials"].get("sentry", {}).get("sample_rate")
-            ),
+            sentry_sample_rate=cluster["credentials"]
+            .get("sentry", {})
+            .get("sample_rate"),
             aws_region=spec.iam.aws_region,
             aws_role_arn=spec.iam.aws_role_arn,
             aws_s3_role_arn=spec.iam.aws_s3_role_arn,
@@ -1035,7 +1038,7 @@ class PlatformConfigFactory:
 
     def _create_docker_hub_config(
         self, cluster: Cluster, secret_name: str
-    ) -> Optional[DockerConfig]:
+    ) -> DockerConfig | None:
         docker_hub_data = cluster["credentials"].get("docker_hub")
         if docker_hub_data is None:
             return None
@@ -1059,9 +1062,9 @@ class PlatformConfigFactory:
         )
 
     def _create_image_pull_secret_names(
-        self, *docker_config: Optional[DockerConfig]
+        self, *docker_config: DockerConfig | None
     ) -> Sequence[str]:
-        result: List[str] = []
+        result: list[str] = []
         for config in docker_config:
             if config and config.secret_name:
                 result.append(config.secret_name)
@@ -1269,7 +1272,7 @@ class PlatformConfigFactory:
         return b64encode(value.encode("utf-8")).decode("utf-8")
 
     @classmethod
-    def _base64_decode(cls, value: Optional[str]) -> str:
+    def _base64_decode(cls, value: str | None) -> str:
         if not value:
             return ""
         return b64decode(value.encode("utf-8")).decode("utf-8")
@@ -1277,9 +1280,9 @@ class PlatformConfigFactory:
     @classmethod
     def _update_tpu_network(
         cls,
-        resource_pools_types: Sequence[Dict[str, Any]],
-        tpu_network: Optional[IPv4Network],
-    ) -> Sequence[Dict[str, Any]]:
+        resource_pools_types: Sequence[dict[str, Any]],
+        tpu_network: IPv4Network | None,
+    ) -> Sequence[dict[str, Any]]:
         resource_pools_types = copy.deepcopy(resource_pools_types)
         for rpt in resource_pools_types:
             if "tpu" in rpt and tpu_network:
@@ -1289,11 +1292,11 @@ class PlatformConfigFactory:
     @classmethod
     def _create_node_pools(
         cls, node_pools: Sequence[Mapping[str, Any]]
-    ) -> Sequence[Dict[str, Any]]:
+    ) -> Sequence[dict[str, Any]]:
         return [cls._create_node_pool(np) for np in node_pools]
 
     @classmethod
-    def _create_node_pool(cls, resource_pool: Mapping[str, Any]) -> Dict[str, Any]:
+    def _create_node_pool(cls, resource_pool: Mapping[str, Any]) -> dict[str, Any]:
         return {
             "name": resource_pool["name"],
             "idleSize": resource_pool.get("idle_size", 0),

@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 import gzip
 import json
 import logging
 from base64 import b64decode
-from typing import Any, Dict, Optional
+from typing import Any
 
 from aiohttp.client import ClientResponseError
 from aiohttp.client_exceptions import ClientError
@@ -13,7 +15,6 @@ from platform_operator.consul_client import ConsulClient
 
 from .models import Certificate
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -21,7 +22,7 @@ class CertificateStore:
     def __init__(self, consul_client: ConsulClient) -> None:
         self._consul_client = consul_client
 
-    async def _get_acme_account(self) -> Optional[Dict[str, Any]]:
+    async def _get_acme_account(self) -> dict[str, Any] | None:
         try:
             value = await self._consul_client.get_key(
                 "traefik/acme/account/object", raw=True
@@ -36,7 +37,7 @@ class CertificateStore:
         value_decompressed = gzip.decompress(value)
         return json.loads(value_decompressed.decode())
 
-    async def get_certificate(self) -> Optional[Certificate]:
+    async def get_certificate(self) -> Certificate | None:
         account = await self._get_acme_account()
         if not account:
             return None

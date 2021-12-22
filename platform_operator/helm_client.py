@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import enum
 import json
@@ -5,12 +7,11 @@ import logging
 import shlex
 from asyncio import subprocess
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import yaml
 
 from .models import HelmRepo
-
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class Release:
     status: ReleaseStatus
 
     @classmethod
-    def parse(cls, payload: Dict[str, Any]) -> "Release":
+    def parse(cls, payload: dict[str, Any]) -> Release:
         return cls(
             name=payload["name"],
             namespace=payload["namespace"],
@@ -50,8 +51,8 @@ class Release:
 
 class HelmOptions:
     def __init__(self, **kwargs: Any) -> None:
-        self._options_dict: Dict[str, Any] = {}
-        options: List[str] = []
+        self._options_dict: dict[str, Any] = {}
+        options: list[str] = []
         for key, value in kwargs.items():
             if value is None:
                 continue
@@ -64,13 +65,13 @@ class HelmOptions:
                 options.extend((option_name, shlex.quote(str(value))))
         self._options_str = " ".join(options)
 
-    def add(self, **kwargs: Any) -> "HelmOptions":
+    def add(self, **kwargs: Any) -> HelmOptions:
         new_options = dict(**self._options_dict)
         new_options.update(**kwargs)
         return HelmOptions(**new_options)
 
     @property
-    def masked(self) -> "HelmOptions":
+    def masked(self) -> HelmOptions:
         if "password" not in self._options_dict:
             return self
         new_options = dict(**self._options_dict)
@@ -93,7 +94,7 @@ class HelmClient:
         input_text: str = "",
         capture_stdout: bool = False,
         capture_stderr: bool = False,
-    ) -> Tuple[subprocess.Process, str, str]:
+    ) -> tuple[subprocess.Process, str, str]:
         input_bytes = input_text.encode("utf-8")
         process = await asyncio.create_subprocess_shell(
             cmd,
@@ -148,7 +149,7 @@ class HelmClient:
             raise HelmException("Failed to update helm repositories")
         logger.info("Updated helm repo")
 
-    async def get_release(self, release_name: str) -> Optional[Release]:
+    async def get_release(self, release_name: str) -> Release | None:
         options = self._global_options.add(filter=f"^{release_name}$", output="json")
         cmd = f"helm list {options!s}"
         logger.info("Running %s", cmd)
@@ -165,7 +166,7 @@ class HelmClient:
         releases = json.loads(stdout_text)
         return Release.parse(releases[0]) if releases else None
 
-    async def get_release_values(self, release_name: str) -> Optional[Dict[str, Any]]:
+    async def get_release_values(self, release_name: str) -> dict[str, Any] | None:
         options = self._global_options.add(output="json")
         cmd = f"helm get values {release_name} {options!s}"
         logger.info("Running %s", cmd)
@@ -189,10 +190,10 @@ class HelmClient:
         chart_name: str,
         *,
         version: str = "",
-        values: Optional[Dict[str, Any]] = None,
+        values: dict[str, Any] | None = None,
         install: bool = False,
         wait: bool = False,
-        timeout_s: Optional[int] = None,
+        timeout_s: int | None = None,
         username: str = "",
         password: str = "",
     ) -> None:
@@ -232,7 +233,7 @@ class HelmClient:
         self,
         release_name: str,
         wait: bool = False,
-        timeout_s: Optional[int] = None,  # default 5m
+        timeout_s: int | None = None,  # default 5m
     ) -> None:
         options = self._global_options.add(
             wait=wait,

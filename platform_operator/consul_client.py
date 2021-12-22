@@ -1,14 +1,16 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import re
 import time
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Dict, List, Optional, Sequence, Union
+from typing import Any
 
 import aiohttp
 import aiohttp.web
 from yarl import URL
-
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +22,12 @@ class SessionExpiredError(Exception):
 class ConsulClient:
     def __init__(
         self,
-        url: Union[str, URL],
-        trace_configs: Optional[List[aiohttp.TraceConfig]] = None,
+        url: str | URL,
+        trace_configs: list[aiohttp.TraceConfig] | None = None,
     ) -> None:
         self._url = URL(url)
         self._trace_configs = trace_configs
-        self._client: Optional[aiohttp.ClientSession] = None
+        self._client: aiohttp.ClientSession | None = None
 
     async def __aenter__(self) -> "ConsulClient":
         self._client = aiohttp.ClientSession(trace_configs=self._trace_configs)
@@ -53,7 +55,7 @@ class ConsulClient:
 
     async def get_key(
         self, key: str, *, recurse: bool = False, raw: bool = False
-    ) -> Union[Sequence[Dict[str, Any]], bytes]:
+    ) -> Sequence[dict[str, Any]] | bytes:
         assert self._client
         query = {}
         if recurse:
@@ -92,7 +94,7 @@ class ConsulClient:
             text = await response.text()
             return text.strip() == "true"
 
-    async def get_sessions(self) -> Sequence[Dict[str, Any]]:
+    async def get_sessions(self) -> Sequence[dict[str, Any]]:
         assert self._client
         async with self._client.get(self._url / "v1/session/list") as response:
             response.raise_for_status()
@@ -103,7 +105,7 @@ class ConsulClient:
         self,
         *,
         ttl_s: int,
-        lock_delay_s: Optional[int] = None,
+        lock_delay_s: int | None = None,
         name: str = "",
         behavior: str = "",
     ) -> str:
@@ -140,9 +142,9 @@ class ConsulClient:
         value: bytes,
         *,
         session_ttl_s: int,
-        lock_delay_s: Optional[int] = None,
+        lock_delay_s: int | None = None,
         sleep_s: float = 0.1,
-        timeout_s: Optional[float] = None,
+        timeout_s: float | None = None,
     ) -> AsyncIterator[None]:
         attempt = 0
         while True:

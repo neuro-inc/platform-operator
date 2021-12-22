@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import uuid
-from typing import Any, AsyncIterator, Dict
+from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
 
@@ -10,7 +13,7 @@ class TestAwsElbClient:
     @pytest.fixture
     async def load_balancer(
         self, elb_client: AwsElbClient
-    ) -> AsyncIterator[Dict[str, Any]]:
+    ) -> AsyncIterator[dict[str, Any]]:
         name = str(uuid.uuid4())
         response = await elb_client.create_load_balancer(
             LoadBalancerName=name,
@@ -28,7 +31,7 @@ class TestAwsElbClient:
 
     @pytest.mark.asyncio
     async def test_get_load_balancer_by_dns_name(
-        self, load_balancer: Dict[str, Any], elb_client: AwsElbClient
+        self, load_balancer: dict[str, Any], elb_client: AwsElbClient
     ) -> None:
         result = await elb_client.get_load_balancer_by_dns_name(
             load_balancer["DNSName"]

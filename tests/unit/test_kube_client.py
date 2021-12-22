@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from copy import deepcopy
-from typing import Any, Dict
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -10,7 +12,6 @@ from platform_operator.kube_client import (
     PlatformPhase,
     PlatformStatusManager,
 )
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -25,7 +26,7 @@ class TestPlatformStatusManager:
         return PlatformStatusManager(kube_client, namespace="default")
 
     @pytest.fixture
-    def status(self) -> Dict[str, Any]:
+    def status(self) -> dict[str, Any]:
         return {
             "phase": "Deployed",
             "retries": 0,
@@ -68,7 +69,7 @@ class TestPlatformStatusManager:
         self,
         kube_client: mock.AsyncMock,
         manager: PlatformStatusManager,
-        status: Dict[str, Any],
+        status: dict[str, Any],
     ) -> None:
         status["phase"] = "Deploying"
         kube_client.get_platform_status.return_value = deepcopy(status)
@@ -179,7 +180,7 @@ class TestPlatformStatusManager:
         self,
         kube_client: mock.AsyncMock,
         manager: PlatformStatusManager,
-        status: Dict[str, Any],
+        status: dict[str, Any],
     ) -> None:
         status["phase"] = "Deploying"
         kube_client.get_platform_status.return_value = deepcopy(status)
@@ -206,7 +207,7 @@ class TestPlatformStatusManager:
         self,
         kube_client: mock.AsyncMock,
         manager: PlatformStatusManager,
-        status: Dict[str, Any],
+        status: dict[str, Any],
     ) -> None:
         status["phase"] = "Deploying"
         kube_client.get_platform_status.return_value = deepcopy(status)
@@ -224,7 +225,7 @@ class TestPlatformStatusManager:
         self,
         kube_client: mock.AsyncMock,
         manager: PlatformStatusManager,
-        status: Dict[str, Any],
+        status: dict[str, Any],
     ) -> None:
         kube_client.get_platform_status.return_value = deepcopy(status)
 

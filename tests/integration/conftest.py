@@ -1,4 +1,6 @@
-from typing import AsyncIterator
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
 
 import pytest
 from yarl import URL

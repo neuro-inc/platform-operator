@@ -5,7 +5,6 @@ import aiohttp
 
 from .consul_client import ConsulClient
 
-
 LOCK_KEY = "platform"
 RELEASE_NAME = "platform-operator"
 

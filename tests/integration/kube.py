@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import os
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, Optional
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -17,7 +20,7 @@ def kube_context() -> str:
 
 
 @pytest.fixture(scope="session")
-def _kube_config_payload() -> Dict[str, Any]:
+def _kube_config_payload() -> dict[str, Any]:
     kube_config_path = os.path.expanduser("~/.kube/config")
     with open(kube_config_path) as kube_config:
         return yaml.safe_load(kube_config)
@@ -25,8 +28,8 @@ def _kube_config_payload() -> Dict[str, Any]:
 
 @pytest.fixture(scope="session")
 def _kube_config_cluster_payload(
-    _kube_config_payload: Dict[str, Any]
-) -> Dict[str, Any]:
+    _kube_config_payload: dict[str, Any]
+) -> dict[str, Any]:
     cluster_name = "minikube"
     clusters = {
         cluster["name"]: cluster["cluster"]
@@ -36,14 +39,14 @@ def _kube_config_cluster_payload(
 
 
 @pytest.fixture(scope="session")
-def _kube_config_user_payload(_kube_config_payload: Dict[str, Any]) -> Dict[str, Any]:
+def _kube_config_user_payload(_kube_config_payload: dict[str, Any]) -> dict[str, Any]:
     user_name = "minikube"
     users = {user["name"]: user["user"] for user in _kube_config_payload["users"]}
     return users[user_name]
 
 
 @pytest.fixture(scope="session")
-def _cert_authority_data_pem(_kube_config_cluster_payload: Dict[str, Any]) -> str:
+def _cert_authority_data_pem(_kube_config_cluster_payload: dict[str, Any]) -> str:
     if "certificate-authority" in _kube_config_cluster_payload:
         return Path(_kube_config_cluster_payload["certificate-authority"]).read_text()
     return _kube_config_cluster_payload["certificate-authority-data"]
@@ -51,9 +54,9 @@ def _cert_authority_data_pem(_kube_config_cluster_payload: Dict[str, Any]) -> st
 
 @pytest.fixture(scope="session")
 def kube_config(
-    _kube_config_cluster_payload: Dict[str, Any],
-    _kube_config_user_payload: Dict[str, Any],
-    _cert_authority_data_pem: Optional[str],
+    _kube_config_cluster_payload: dict[str, Any],
+    _kube_config_user_payload: dict[str, Any],
+    _cert_authority_data_pem: str | None,
 ) -> KubeConfig:
     return KubeConfig(
         version="1.14.10",

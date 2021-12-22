@@ -1,4 +1,6 @@
-from typing import Any, Dict, Optional
+from __future__ import annotations
+
+from typing import Any
 
 import aiobotocore.session
 from yarl import URL
@@ -12,7 +14,7 @@ class AwsElbClient:
         region: str,
         access_key_id: str = "",
         secret_access_key: str = "",
-        endpoint_url: Optional[URL] = None,
+        endpoint_url: URL | None = None,
     ) -> None:
         self._region = region
         self._access_key_id = access_key_id
@@ -36,7 +38,7 @@ class AwsElbClient:
     async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
         await self._client.__aexit__(*args, **kwargs)
 
-    async def create_load_balancer(self, **kwargs: Any) -> Dict[str, str]:
+    async def create_load_balancer(self, **kwargs: Any) -> dict[str, str]:
         return await self._client.create_load_balancer(**kwargs)
 
     async def delete_load_balancer(self, **kwargs: Any) -> None:
@@ -44,7 +46,7 @@ class AwsElbClient:
 
     async def get_load_balancer_by_dns_name(
         self, dns_name: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         paginator = self._client.get_paginator("describe_load_balancers")
         async for page in paginator.paginate():
             for lb in page.get("LoadBalancerDescriptions", []):
