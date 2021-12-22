@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from base64 import b64decode
 from hashlib import sha256
-from typing import Any, Dict, Optional
+from typing import Any
 
 import bcrypt
 from yarl import URL
@@ -30,8 +32,8 @@ class HelmValuesFactory:
         self._chart_names = helm_chart_names
         self._container_runtime = container_runtime
 
-    def create_platform_values(self, platform: PlatformConfig) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    def create_platform_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "kubernetesProvider": platform.kubernetes_provider,
             "traefikEnabled": platform.ingress_controller_install,
             "consulEnabled": platform.consul_install,
@@ -73,26 +75,26 @@ class HelmValuesFactory:
             self._chart_names.platform_registry: self.create_platform_registry_values(
                 platform
             ),
-            self._chart_names.platform_monitoring: (
-                self.create_platform_monitoring_values(platform)
+            self._chart_names.platform_monitoring: self.create_platform_monitoring_values(
+                platform
             ),
-            self._chart_names.platform_container_runtime: (
-                self.create_platform_container_runtime_values(platform)
+            self._chart_names.platform_container_runtime: self.create_platform_container_runtime_values(
+                platform
             ),
-            self._chart_names.platform_secrets: (
-                self.create_platform_secrets_values(platform)
+            self._chart_names.platform_secrets: self.create_platform_secrets_values(
+                platform
             ),
-            self._chart_names.platform_reports: (
-                self.create_platform_reports_values(platform)
+            self._chart_names.platform_reports: self.create_platform_reports_values(
+                platform
             ),
-            self._chart_names.platform_disks: (
-                self.create_platform_disks_values(platform)
+            self._chart_names.platform_disks: self.create_platform_disks_values(
+                platform
             ),
-            self._chart_names.platform_api_poller: (
-                self.create_platform_api_poller_values(platform)
+            self._chart_names.platform_api_poller: self.create_platform_api_poller_values(
+                platform
             ),
-            self._chart_names.platform_buckets: (
-                self.create_platform_buckets_values(platform)
+            self._chart_names.platform_buckets: self.create_platform_buckets_values(
+                platform
             ),
         }
         if platform.docker_config.create_secret:
@@ -133,7 +135,7 @@ class HelmValuesFactory:
             result[self._chart_names.minio] = self.create_minio_values(platform)
         return result
 
-    def _create_idle_job(self, job: Dict[str, Any]) -> Dict[str, Any]:
+    def _create_idle_job(self, job: dict[str, Any]) -> dict[str, Any]:
         resources = job["resources"]
         result = {
             "name": job["name"],
@@ -153,7 +155,7 @@ class HelmValuesFactory:
             result["resources"]["nvidia.com/gpu"] = resources["gpu"]
         return result
 
-    def _create_storage_values(self, storage: StorageConfig) -> Dict[str, Any]:
+    def _create_storage_values(self, storage: StorageConfig) -> dict[str, Any]:
         if storage.type == StorageType.KUBERNETES:
             return {
                 "type": StorageType.KUBERNETES.value,
@@ -205,7 +207,7 @@ class HelmValuesFactory:
             }
         raise ValueError(f"Storage type {storage.type.value!r} is not supported")
 
-    def create_obs_csi_driver_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+    def create_obs_csi_driver_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result = {
             "image": platform.get_image("obs-csi-driver"),
             "driverName": "obs.csi.neu.ro",
@@ -231,8 +233,8 @@ class HelmValuesFactory:
             }
         return result
 
-    def create_docker_registry_values(self, platform: PlatformConfig) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    def create_docker_registry_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "image": {"repository": platform.get_image("registry")},
             "ingress": {"enabled": False},
             "persistence": {
@@ -258,7 +260,7 @@ class HelmValuesFactory:
             result["secrets"]["htpasswd"] = f"{username}:{password_hash}"
         return result
 
-    def create_minio_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+    def create_minio_values(self, platform: PlatformConfig) -> dict[str, Any]:
         assert platform.buckets.minio_public_url
         return {
             "image": {
@@ -293,7 +295,7 @@ class HelmValuesFactory:
             "environment": {"MINIO_REGION_NAME": platform.buckets.minio_region},
         }
 
-    def create_consul_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+    def create_consul_values(self, platform: PlatformConfig) -> dict[str, Any]:
         return {
             "Image": platform.get_image("consul"),
             "StorageClass": platform.standard_storage_class_name,
@@ -301,9 +303,9 @@ class HelmValuesFactory:
             "Replicas": 3,
         }
 
-    def create_traefik_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+    def create_traefik_values(self, platform: PlatformConfig) -> dict[str, Any]:
         dns_challenge_script_name = "resolve_dns_challenge.sh"
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "nameOverride": "traefik",
             "fullnameOverride": "traefik",
             "replicas": 3,
@@ -457,17 +459,17 @@ class HelmValuesFactory:
             }
         return result
 
-    def _create_cors_values(self, platform: PlatformConfig) -> Dict[str, Any]:
-        result: Dict[str, Any] = {}
+    def _create_cors_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        result: dict[str, Any] = {}
         if platform.ingress_cors_origins:
             result["cors"] = {"origins": platform.ingress_cors_origins}
         return result
 
-    def _create_tracing_values(self, platform: PlatformConfig) -> Dict[str, Any]:
+    def _create_tracing_values(self, platform: PlatformConfig) -> dict[str, Any]:
         if not platform.sentry_dsn:
             return {}
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "sentry": {
                 "dsn": str(platform.sentry_dsn),
                 "clusterName": platform.cluster_name,
@@ -481,7 +483,7 @@ class HelmValuesFactory:
 
     def create_platform_storage_values(
         self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         result = {
             "nameOverride": f"{self._release_names.platform}-storage",
             "fullnameOverride": f"{self._release_names.platform}-storage",
@@ -522,8 +524,8 @@ class HelmValuesFactory:
 
     def create_platform_registry_values(
         self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "nameOverride": f"{self._release_names.platform}-registry",
             "fullnameOverride": f"{self._release_names.platform}-registry",
             "image": {"repository": platform.get_image("platformregistryapi")},
@@ -672,13 +674,13 @@ class HelmValuesFactory:
                 }
             )
         else:
-            assert False, "was unable to construct registry config"
+            raise AssertionError("was unable to construct registry config")
         return result
 
     def create_platform_monitoring_values(
         self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "nameOverride": f"{self._release_names.platform}-monitoring",
             "fullnameOverride": f"{self._release_names.platform}-monitoring",
             "image": {"repository": platform.get_image("platformmonitoringapi")},
@@ -813,12 +815,12 @@ class HelmValuesFactory:
                 }
             }
         else:
-            assert False, "was unable to construct monitoring config"
+            raise AssertionError("was unable to construct monitoring config")
         return result
 
     def create_platform_container_runtime_values(
         self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return {
             "nameOverride": f"{self._release_names.platform}-container-runtime",
             "fullnameOverride": f"{self._release_names.platform}-container-runtime",
@@ -844,8 +846,8 @@ class HelmValuesFactory:
 
     def create_platform_secrets_values(
         self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "nameOverride": f"{self._release_names.platform}-secrets",
             "fullnameOverride": f"{self._release_names.platform}-secrets",
             "image": {"repository": platform.get_image("platformsecrets")},
@@ -878,7 +880,7 @@ class HelmValuesFactory:
 
     def create_platform_reports_values(
         self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         object_store_config_map_name = "thanos-object-storage-config"
         relabelings = [
             self._relabel_reports_label(
@@ -906,7 +908,7 @@ class HelmValuesFactory:
                     "node.kubernetes.io/instance-type",
                 )
             )
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "image": {"repository": platform.get_image("platform-reports")},
             "nvidiaDCGMExporter": {
                 "image": {"repository": platform.get_image("dcgm-exporter")}
@@ -1172,7 +1174,7 @@ class HelmValuesFactory:
                 },
             }
         else:
-            assert False, "was unable to construct thanos object store config"
+            raise AssertionError("was unable to construct thanos object store config")
         if platform.kubernetes_provider == CloudProvider.GCP:
             result["cloudProvider"] = {
                 "type": "gcp",
@@ -1196,7 +1198,7 @@ class HelmValuesFactory:
 
     def _relabel_reports_label(
         self, source_label: str, target_label: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         if source_label == target_label:
             return None
         return {
@@ -1212,8 +1214,8 @@ class HelmValuesFactory:
         assert url.host
         return url.host if url.is_default_port() else f"{url.host}:{url.port}"
 
-    def create_platform_disks_values(self, platform: PlatformConfig) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    def create_platform_disks_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "nameOverride": f"{self._release_names.platform}-disks",
             "fullnameOverride": f"{self._release_names.platform}-disks",
             "image": {"repository": platform.get_image("platformdiskapi")},
@@ -1253,8 +1255,8 @@ class HelmValuesFactory:
 
     def create_platform_api_poller_values(
         self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "nameOverride": f"{self._release_names.platform}-api-poller",
             "fullnameOverride": f"{self._release_names.platform}-api-poller",
             "image": {"repository": platform.get_image("platformapi")},
@@ -1314,8 +1316,8 @@ class HelmValuesFactory:
 
     def create_platform_buckets_values(
         self, platform: PlatformConfig
-    ) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "nameOverride": f"{self._release_names.platform}-buckets",
             "fullnameOverride": f"{self._release_names.platform}-buckets",
             "image": {"repository": platform.get_image("platformbucketsapi")},
@@ -1491,5 +1493,5 @@ class HelmValuesFactory:
                 },
             }
         else:
-            assert False, "was unable to construct bucket provider"
+            raise AssertionError("was unable to construct bucket provider")
         return result

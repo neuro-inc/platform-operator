@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import uuid
+from collections.abc import Callable
 from dataclasses import replace
 from ipaddress import IPv4Address
-from typing import Any, Callable, Dict
+from typing import Any
 
 import kopf
 import pytest
@@ -29,7 +32,6 @@ from platform_operator.models import (
     StorageConfig,
     StorageType,
 )
-
 
 pytest_plugins = ["tests.integration.kube", "tests.integration.aws"]
 
@@ -69,8 +71,8 @@ def cluster_name() -> str:
 
 
 @pytest.fixture
-def resource_pool_type_factory() -> Callable[..., Dict[str, Any]]:
-    def _factory(name: str, tpu_ipv4_cidr_block: str = "") -> Dict[str, Any]:
+def resource_pool_type_factory() -> Callable[..., dict[str, Any]]:
+    def _factory(name: str, tpu_ipv4_cidr_block: str = "") -> dict[str, Any]:
         result = {
             "name": name,
             "is_preemptible": False,
@@ -92,8 +94,8 @@ def resource_pool_type_factory() -> Callable[..., Dict[str, Any]]:
 
 
 @pytest.fixture
-def resource_preset_factory() -> Callable[[], Dict[str, Any]]:
-    def _factory() -> Dict[str, Any]:
+def resource_preset_factory() -> Callable[[], dict[str, Any]]:
+    def _factory() -> dict[str, Any]:
         return {
             "name": "gpu-small",
             "cpu": 1,
@@ -108,8 +110,8 @@ def resource_preset_factory() -> Callable[[], Dict[str, Any]]:
 
 @pytest.fixture
 def cluster_factory(
-    resource_pool_type_factory: Callable[..., Dict[str, Any]],
-    resource_preset_factory: Callable[[], Dict[str, Any]],
+    resource_pool_type_factory: Callable[..., dict[str, Any]],
+    resource_preset_factory: Callable[[], dict[str, Any]],
 ) -> Callable[..., Cluster]:
     def _factory(name: str, resource_pool_name: str) -> Cluster:
         payload = {
@@ -411,8 +413,8 @@ def vcd_platform_body(on_prem_platform_body: kopf.Body) -> kopf.Body:
 @pytest.fixture
 def gcp_platform_config(
     cluster_name: str,
-    resource_pool_type_factory: Callable[..., Dict[str, Any]],
-    resource_preset_factory: Callable[[], Dict[str, Any]],
+    resource_pool_type_factory: Callable[..., dict[str, Any]],
+    resource_preset_factory: Callable[[], dict[str, Any]],
 ) -> PlatformConfig:
     return PlatformConfig(
         auth_url=URL("https://dev.neu.ro"),
@@ -532,7 +534,7 @@ def gcp_platform_config(
 @pytest.fixture
 def aws_platform_config(
     gcp_platform_config: PlatformConfig,
-    resource_pool_type_factory: Callable[..., Dict[str, Any]],
+    resource_pool_type_factory: Callable[..., dict[str, Any]],
 ) -> PlatformConfig:
     return replace(
         gcp_platform_config,
@@ -562,7 +564,7 @@ def aws_platform_config(
 @pytest.fixture
 def azure_platform_config(
     gcp_platform_config: PlatformConfig,
-    resource_pool_type_factory: Callable[..., Dict[str, Any]],
+    resource_pool_type_factory: Callable[..., dict[str, Any]],
 ) -> PlatformConfig:
     return replace(
         gcp_platform_config,
@@ -602,7 +604,7 @@ def azure_platform_config(
 @pytest.fixture
 def on_prem_platform_config(
     gcp_platform_config: PlatformConfig,
-    resource_pool_type_factory: Callable[..., Dict[str, Any]],
+    resource_pool_type_factory: Callable[..., dict[str, Any]],
     cluster_name: str,
 ) -> PlatformConfig:
     return replace(

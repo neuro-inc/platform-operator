@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import uuid
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from yarl import URL
@@ -9,7 +11,7 @@ from platform_operator.models import HelmRepo
 
 
 @pytest.fixture
-def config_map() -> Dict[str, Any]:
+def config_map() -> dict[str, Any]:
     return {
         "apiVersion": "v1",
         "kind": "ConfigMap",
@@ -24,7 +26,7 @@ class TestHelmClient:
         self,
         kube_namespace: str,
         helm_client: HelmClient,
-        config_map: Dict[str, Any],
+        config_map: dict[str, Any],
     ) -> None:
         await helm_client.add_repo(
             HelmRepo(URL("https://charts.helm.sh/incubator"), name="incubator")

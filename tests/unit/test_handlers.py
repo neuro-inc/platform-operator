@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import logging
+from collections.abc import Iterator
 from dataclasses import replace
-from typing import Any, Dict, Iterator
+from typing import Any
 from unittest import mock
 
 import kopf
@@ -27,7 +30,6 @@ from platform_operator.models import (
     StorageConfig,
     StorageType,
 )
-
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.usefixtures("setup_app")]
 
@@ -154,7 +156,7 @@ def aws_elb_client() -> Iterator[mock.Mock]:
 
 
 @pytest.fixture
-def traefik_service() -> Dict[str, Any]:
+def traefik_service() -> dict[str, Any]:
     return {
         "status": {"loadBalancer": {"ingress": [{"ip": "192.168.0.1"}]}},
     }
@@ -170,7 +172,7 @@ def aws_traefik_service() -> Service:
 
 
 @pytest.fixture
-def aws_traefik_lb() -> Dict[str, Any]:
+def aws_traefik_lb() -> dict[str, Any]:
     return {
         "CanonicalHostedZoneNameID": "/hostedzone/traefik",
     }
@@ -462,8 +464,8 @@ async def test_configure_aws_cluster(
     config_client: mock.Mock,
     aws_elb_client: mock.Mock,
     aws_platform_config: PlatformConfig,
-    aws_traefik_service: Dict[str, Any],
-    aws_traefik_lb: Dict[str, Any],
+    aws_traefik_service: dict[str, Any],
+    aws_traefik_lb: dict[str, Any],
 ) -> None:
     from platform_operator.handlers import configure_cluster as _configure_cluster
 
@@ -493,7 +495,7 @@ async def test_configure_cluster(
     gcp_platform_config: PlatformConfig,
     kube_client: mock.Mock,
     config_client: mock.Mock,
-    traefik_service: Dict[str, Any],
+    traefik_service: dict[str, Any],
 ) -> None:
     from platform_operator.handlers import configure_cluster as _configure_cluster
 

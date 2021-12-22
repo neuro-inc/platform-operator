@@ -1,18 +1,20 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
 import ssl
 from base64 import b64decode
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, AsyncIterator, Dict, List, Optional, Sequence
+from typing import Any
 
 import aiohttp
 from yarl import URL
 
 from .models import KubeClientAuthType, KubeConfig
-
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +97,7 @@ class Endpoints:
 
 
 class Node:
-    def __init__(self, payload: Dict[str, Any]) -> None:
+    def __init__(self, payload: dict[str, Any]) -> None:
         self._payload = payload
 
     @property
@@ -106,7 +108,7 @@ class Node:
 
 
 class Service(Dict[str, Any]):
-    def __init__(self, payload: Dict[str, Any]) -> None:
+    def __init__(self, payload: dict[str, Any]) -> None:
         super().__init__(payload)
 
     @property
@@ -122,18 +124,18 @@ class KubeClient:
     def __init__(
         self,
         config: KubeConfig,
-        trace_configs: Optional[List[aiohttp.TraceConfig]] = None,
+        trace_configs: list[aiohttp.TraceConfig] | None = None,
     ) -> None:
         self._config = config
         self._trace_configs = trace_configs
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
         self._endpoints = Endpoints(config.url)
 
     @property
     def _is_ssl(self) -> bool:
         return self._config.url.scheme == "https"
 
-    def _create_ssl_context(self) -> Optional[ssl.SSLContext]:
+    def _create_ssl_context(self) -> ssl.SSLContext | None:
         if not self._is_ssl:
             return None
         cert_authority_data_pem = ""
@@ -211,7 +213,7 @@ class KubeClient:
             payload = await response.json()
             return Service(payload)
 
-    async def get_service_account(self, namespace: str, name: str) -> Dict[str, Any]:
+    async def get_service_account(self, namespace: str, name: str) -> dict[str, Any]:
         assert self._session
         async with self._session.get(
             self._endpoints.service_account(namespace, name)
@@ -233,7 +235,7 @@ class KubeClient:
         ) as response:
             response.raise_for_status()
 
-    async def get_secret(self, namespace: str, name: str) -> Dict[str, Any]:
+    async def get_secret(self, namespace: str, name: str) -> dict[str, Any]:
         assert self._session
         async with self._session.get(
             self._endpoints.secret(namespace, name)
@@ -242,9 +244,9 @@ class KubeClient:
             payload = await response.json()
             return self._decode_secret_data(payload)
 
-    def _decode_secret_data(self, secret: Dict[str, Any]) -> Dict[str, Any]:
+    def _decode_secret_data(self, secret: dict[str, Any]) -> dict[str, Any]:
         secret = dict(**secret)
-        decoded_data: Dict[str, str] = {}
+        decoded_data: dict[str, str] = {}
         for key, value in secret["data"].items():
             decoded_data[key] = b64decode(value.encode("utf-8")).decode("utf-8")
         secret["data"] = decoded_data
@@ -253,9 +255,9 @@ class KubeClient:
     async def get_pods(
         self,
         namespace: str,
-        label_selector: Optional[Dict[str, str]] = None,
+        label_selector: dict[str, str] | None = None,
         limit: int = 100,
-    ) -> Sequence[Dict[str, Any]]:
+    ) -> Sequence[dict[str, Any]]:
         assert limit
         query = {"limit": str(limit)}
         if label_selector:
@@ -273,7 +275,7 @@ class KubeClient:
     async def wait_till_pods_deleted(
         self,
         namespace: str,
-        label_selector: Optional[Dict[str, str]] = None,
+        label_selector: dict[str, str] | None = None,
         interval_secs: int = 5,
     ) -> None:
         while True:
@@ -282,7 +284,7 @@ class KubeClient:
                 break
             await asyncio.sleep(interval_secs)
 
-    async def create_platform(self, namespace: str, payload: Dict[str, Any]) -> None:
+    async def create_platform(self, namespace: str, payload: dict[str, Any]) -> None:
         assert self._session
         async with self._session.post(
             self._endpoints.platforms(namespace=namespace), json=payload
@@ -298,7 +300,7 @@ class KubeClient:
 
     async def get_platform_status(
         self, namespace: str, name: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         assert self._session
         async with self._session.get(
             self._endpoints.platform(namespace, name) / "status"
@@ -311,7 +313,7 @@ class KubeClient:
             return status_payload
 
     async def update_platform_status(
-        self, namespace: str, name: str, payload: Dict[str, Any]
+        self, namespace: str, name: str, payload: dict[str, Any]
     ) -> None:
         assert self._session
         async with self._session.patch(
@@ -323,7 +325,7 @@ class KubeClient:
 
 
 class PlatformCondition(Dict[str, Any]):
-    def __init__(self, payload: Dict[str, Any]) -> None:
+    def __init__(self, payload: dict[str, Any]) -> None:
         super().__init__(payload)
 
     @property
@@ -352,7 +354,7 @@ class PlatformCondition(Dict[str, Any]):
 
 
 class PlatformStatus(Dict[str, Any]):
-    def __init__(self, payload: Dict[str, Any]) -> None:
+    def __init__(self, payload: dict[str, Any]) -> None:
         super().__init__(payload)
 
     @property
@@ -372,7 +374,7 @@ class PlatformStatus(Dict[str, Any]):
         self["retries"] = value
 
     @property
-    def conditions(self) -> Dict[str, PlatformCondition]:
+    def conditions(self) -> dict[str, PlatformCondition]:
         return self["conditions"]
 
 
@@ -380,7 +382,7 @@ class PlatformStatusManager:
     def __init__(self, kube_client: KubeClient, namespace: str) -> None:
         self._kube_client = kube_client
         self._namespace = namespace
-        self._status: Dict[str, PlatformStatus] = {}
+        self._status: dict[str, PlatformStatus] = {}
 
     async def _load(self, name: str) -> None:
         if self._status.get(name):
@@ -399,7 +401,7 @@ class PlatformStatusManager:
                 }
             )
 
-    def _deserialize(cls, payload: Dict[str, Any]) -> "PlatformStatus":
+    def _deserialize(cls, payload: dict[str, Any]) -> PlatformStatus:
         status = {
             "phase": payload["phase"],
             "retries": payload["retries"],
@@ -408,9 +410,9 @@ class PlatformStatusManager:
         return PlatformStatus(status)
 
     def _deserialize_conditions(
-        self, payload: Sequence[Dict[str, Any]]
-    ) -> Dict[str, PlatformCondition]:
-        result: Dict[str, PlatformCondition] = {}
+        self, payload: Sequence[dict[str, Any]]
+    ) -> dict[str, PlatformCondition]:
+        result: dict[str, PlatformCondition] = {}
 
         for p in payload:
             result[p["type"]] = PlatformCondition(p)
@@ -424,7 +426,7 @@ class PlatformStatusManager:
             payload=self._serialize(self._status[name]),
         )
 
-    def _serialize(self, status: PlatformStatus) -> Dict[str, Any]:
+    def _serialize(self, status: PlatformStatus) -> dict[str, Any]:
         return {
             "phase": status.phase,
             "retries": status.retries,
@@ -432,9 +434,9 @@ class PlatformStatusManager:
         }
 
     def _serialize_conditions(
-        self, conditions: Dict[str, PlatformCondition]
-    ) -> List[PlatformCondition]:
-        result: List[PlatformCondition] = []
+        self, conditions: dict[str, PlatformCondition]
+    ) -> list[PlatformCondition]:
+        result: list[PlatformCondition] = []
 
         for type in PlatformConditionType:
             if type in conditions:
@@ -445,7 +447,7 @@ class PlatformStatusManager:
     def _now(self) -> str:
         return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
-    async def start_deployment(self, name: str, retry: Optional[int] = None) -> None:
+    async def start_deployment(self, name: str, retry: int | None = None) -> None:
         await self._load(name)
         self._status[name].phase = PlatformPhase.DEPLOYING.value
         self._status[name].retries = retry or 0

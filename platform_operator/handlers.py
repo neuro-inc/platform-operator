@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from logging import Logger
-from typing import Any, Dict, Optional
+from typing import Any
 
 import aiohttp
 import kopf
@@ -402,7 +404,7 @@ async def is_helm_deploy_required(
     release_name: str,
     chart_name: str,
     chart_version: str,
-    values: Dict[str, Any],
+    values: dict[str, Any],
     install: bool = False,
 ) -> bool:
     old_release = await app.helm_client.get_release(release_name)
@@ -520,8 +522,8 @@ async def wait_for_cluster_configured(platform: PlatformConfig) -> None:
 
 
 async def configure_cluster(platform: PlatformConfig) -> None:
-    ingress_service: Optional[Dict[str, Any]] = None
-    aws_ingress_lb: Optional[Dict[str, Any]] = None
+    ingress_service: dict[str, Any] | None = None
+    aws_ingress_lb: dict[str, Any] | None = None
 
     if platform.ingress_controller_install:
         ingress_service = await app.kube_client.get_service(

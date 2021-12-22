@@ -1,12 +1,13 @@
+from __future__ import annotations
+
 import enum
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import aiohttp
 from yarl import URL
 
 from .models import Cluster
-
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +20,11 @@ class NotificationType(str, enum.Enum):
 
 class ConfigClient:
     def __init__(
-        self, url: URL, trace_configs: Optional[List[aiohttp.TraceConfig]] = None
+        self, url: URL, trace_configs: list[aiohttp.TraceConfig] | None = None
     ) -> None:
         self._base_url = url
         self._trace_configs = trace_configs
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
     async def __aenter__(self) -> "ConfigClient":
         self._session = aiohttp.ClientSession(trace_configs=self._trace_configs)
@@ -49,7 +50,7 @@ class ConfigClient:
             return Cluster(payload)
 
     async def patch_cluster(
-        self, cluster_name: str, token: str, payload: Dict[str, Any]
+        self, cluster_name: str, token: str, payload: dict[str, Any]
     ) -> None:
         assert self._session
         async with self._session.patch(

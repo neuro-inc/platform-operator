@@ -1,4 +1,6 @@
-from typing import Iterator
+from __future__ import annotations
+
+from collections.abc import Iterator
 from unittest import mock
 
 import aiohttp
@@ -6,7 +8,6 @@ import pytest
 from yarl import URL
 
 from platform_operator.consul_client import ConsulClient
-
 
 pytestmark = pytest.mark.usefixtures(
     "create_session", "create_session", "get_key", "put_key"

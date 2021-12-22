@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import os
 import threading
+from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Dict, Iterator
+from typing import Any
 
 import moto.server
 import pytest
@@ -53,7 +56,7 @@ def elb_endpoint_url() -> Iterator[URL]:
 
 
 @pytest.fixture(scope="session")
-def aws_config() -> Dict[str, str]:
+def aws_config() -> dict[str, str]:
     os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
     os.environ["AWS_ACCESS_KEY_ID"] = "testing"
     os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
@@ -69,7 +72,7 @@ def aws_config() -> Dict[str, str]:
 
 @pytest.fixture
 async def elb_client(
-    aws_config: Dict[str, str], elb_endpoint_url: URL
+    aws_config: dict[str, str], elb_endpoint_url: URL
 ) -> AsyncIterator[AwsElbClient]:
     async with AwsElbClient(
         region=aws_config["region"],

@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import asyncio
-from typing import Any, AsyncIterator, Dict
+from collections.abc import AsyncIterator
+from typing import Any
 
 import aiohttp
 import kopf
@@ -15,7 +18,7 @@ class TestKubeClient:
         kube_client: KubeClient,
         kube_namespace: str,
         gcp_platform_body: kopf.Body,
-    ) -> AsyncIterator[Dict[str, Any]]:
+    ) -> AsyncIterator[dict[str, Any]]:
         payload = dict(**gcp_platform_body)
         await kube_client.create_platform(kube_namespace, payload)
         yield payload
@@ -119,7 +122,7 @@ class TestKubeClient:
         self,
         kube_client: KubeClient,
         kube_namespace: str,
-        platform: Dict[str, Any],
+        platform: dict[str, Any],
     ) -> None:
         name = platform["metadata"]["name"]
         result = await kube_client.get_platform_status(
