@@ -523,7 +523,7 @@ class IngressControllerSpec(dict[str, Any]):
         return self._spec.get("enabled", True)
 
     @property
-    def replicas(self) -> Optional[int]:
+    def replicas(self) -> int | None:
         return self._spec.get("replicas")
 
     @property

@@ -39,7 +39,7 @@ dependencies:
     version: "21.12.6"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-api-poller
-    version: "21.12.9"
+    version: "21.12.10"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-buckets
     version: "21.12.6"
