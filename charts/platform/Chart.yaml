@@ -32,7 +32,7 @@ dependencies:
     version: "21.12.3"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-reports
-    version: "21.12.2"
+    version: "21.12.6"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-disks
     version: "21.12.4"
