@@ -479,7 +479,7 @@ async def test_configure_aws_cluster(
     await _configure_cluster(aws_platform_config)
 
     kube_client.get_service.assert_has_awaits(
-        [mock.call(namespace="platform", name="platform-traefik")]
+        [mock.call(namespace="platform", name="traefik")]
     )
     aws_elb_client.get_load_balancer_by_dns_name.assert_has_awaits(
         [mock.call("traefik")]
@@ -508,7 +508,7 @@ async def test_configure_cluster(
     await _configure_cluster(gcp_platform_config)
 
     kube_client.get_service.assert_has_awaits(
-        [mock.call(namespace="platform", name="platform-traefik")]
+        [mock.call(namespace="platform", name="traefik")]
     )
     config_client.patch_cluster.assert_awaited_with(
         cluster_name=gcp_platform_config.cluster_name,

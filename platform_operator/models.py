@@ -1030,7 +1030,7 @@ class PlatformConfigFactory:
             ingress_service_type=IngressServiceType(
                 spec.ingress_controller.service_type or IngressServiceType.LOAD_BALANCER
             ),
-            ingress_service_name=f"{release_name}-traefik",
+            ingress_service_name="traefik",
             ingress_namespaces=sorted(
                 {
                     self._config.platform_namespace,

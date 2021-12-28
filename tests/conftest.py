@@ -480,7 +480,7 @@ def gcp_platform_config(
             "https://app.neu.ro",
         ],
         ingress_service_type=IngressServiceType.LOAD_BALANCER,
-        ingress_service_name="platform-traefik",
+        ingress_service_name="traefik",
         ingress_node_port_http=None,
         ingress_node_port_https=None,
         ingress_host_port_http=None,
