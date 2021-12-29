@@ -118,29 +118,39 @@ spec:
                   enabled:
                     type: boolean
                   replicas:
-                    type: number
+                    type: integer
+                    minimum: 1
                   namespaces:
                     type: array
                     items:
                       type: string
                   serviceType:
                     type: string
+                    enum: [LoadBalancer, NodePort]
                   nodePorts:
                     type: object
                     required: [http, https]
                     properties:
                       http:
                         type: integer
+                        minimum: 30000
+                        maximum: 32767
                       https:
                         type: integer
+                        minimum: 30000
+                        maximum: 32767
                   hostPorts:
                     type: object
                     required: [http, https]
                     properties:
                       http:
                         type: integer
+                        minimum: 0
+                        maximum: 65535
                       https:
                         type: integer
+                        minimum: 0
+                        maximum: 65535
                   ssl:
                     type: object
                     required: [certificateData, certificateKeyData]
