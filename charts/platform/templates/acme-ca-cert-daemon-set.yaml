@@ -1,5 +1,4 @@
-{{- if .Values.traefik.acme.enabled }}
-{{- if .Values.traefik.acme.staging }}
+{{- if and .Values.traefik.acme.enabled .Values.traefik.acme.staging }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -44,5 +43,4 @@ spec:
       - name: certs
         hostPath:
           path: /etc/docker/certs.d
-{{- end }}
 {{- end }}
