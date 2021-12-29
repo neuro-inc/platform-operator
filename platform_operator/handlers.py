@@ -67,7 +67,6 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
     )
     node = await app.kube_client.get_node(config.node_name)
     app.helm_values_factory = HelmValuesFactory(
-        config.helm_release_names,
         config.helm_chart_names,
         container_runtime=node.container_runtime,
     )
@@ -250,7 +249,7 @@ async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
         await asyncio.wait_for(
             app.kube_client.wait_till_pods_deleted(
                 namespace=platform.namespace,
-                label_selector={"service": "platformstorageapi"},
+                label_selector={"service": "platform-storage"},
             ),
             600,
         )
@@ -363,7 +362,7 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
 
 
 async def get_platform_config(name: str, body: kopf.Body) -> PlatformConfig:
-    token = body["spec"]["token"]
+    token = body["spec"].get("token")
     cluster = await app.config_client.get_cluster(cluster_name=name, token=token)
 
     return app.platform_config_factory.create(body, cluster)
@@ -440,7 +439,7 @@ async def start_deployment(name: str, body: kopf.Body, retry: int = 0) -> None:
     await app.status_manager.start_deployment(name, retry)
     await app.config_client.send_notification(
         cluster_name=name,
-        token=body["spec"]["token"],
+        token=body["spec"].get("token"),
         notification_type=NotificationType.CLUSTER_UPDATING,
     )
 
@@ -449,7 +448,7 @@ async def complete_deployment(name: str, body: kopf.Body) -> None:
     await app.status_manager.complete_deployment(name)
     await app.config_client.send_notification(
         cluster_name=name,
-        token=body["spec"]["token"],
+        token=body["spec"].get("token"),
         notification_type=NotificationType.CLUSTER_UPDATE_SUCCEEDED,
     )
 
@@ -458,7 +457,7 @@ async def fail_deployment(name: str, body: kopf.Body) -> None:
     await app.status_manager.fail_deployment(name)
     await app.config_client.send_notification(
         cluster_name=name,
-        token=body["spec"]["token"],
+        token=body["spec"].get("token"),
         notification_type=NotificationType.CLUSTER_UPDATE_FAILED,
     )
 
@@ -504,6 +503,9 @@ async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
 
 async def wait_for_certificate_created(platform: PlatformConfig) -> None:
     if not platform.ingress_controller_install:
+        return
+
+    if platform.ingress_ssl_cert_data and platform.ingress_ssl_cert_key_data:
         return
 
     async with app.status_manager.transition(

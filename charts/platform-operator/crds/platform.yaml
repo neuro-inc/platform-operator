@@ -57,7 +57,7 @@ spec:
                       format: date-time
           spec:
             type: object
-            required: [token, storages, monitoring]
+            required: [storages, monitoring]
             properties:
               token:
                 type: string
@@ -83,27 +83,7 @@ spec:
                         type: string
                       preemptible:
                         type: string
-                  ingressController:
-                    type: object
-                    properties:
-                      enabled:
-                        type: boolean
-                      namespaces:
-                        type: array
-                        items:
-                          type: string
-                  ingressPublicIPs:
-                    type: array
-                    items:
-                      type: string
                   dockerConfigSecret:
-                    type: object
-                    properties:
-                      create:
-                        type: boolean
-                      name:
-                        type: string
-                  jobsNamespace:
                     type: object
                     properties:
                       create:
@@ -132,6 +112,57 @@ spec:
                 oneOf:
                 - required: [gcp]
                 - required: [aws]
+              ingressController:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  replicas:
+                    type: integer
+                    minimum: 1
+                  namespaces:
+                    type: array
+                    items:
+                      type: string
+                  serviceType:
+                    type: string
+                    enum: [LoadBalancer, NodePort]
+                  nodePorts:
+                    type: object
+                    required: [http, https]
+                    properties:
+                      http:
+                        type: integer
+                        minimum: 30000
+                        maximum: 32767
+                      https:
+                        type: integer
+                        minimum: 30000
+                        maximum: 32767
+                  hostPorts:
+                    type: object
+                    required: [http, https]
+                    properties:
+                      http:
+                        type: integer
+                        minimum: 0
+                        maximum: 65535
+                      https:
+                        type: integer
+                        minimum: 0
+                        maximum: 65535
+                  ssl:
+                    type: object
+                    required: [certificateData, certificateKeyData]
+                    properties:
+                      certificateData:
+                        type: string
+                      certificateKeyData:
+                        type: string
+                  publicIPs:
+                    type: array
+                    items:
+                      type: string
               registry:
                 type: object
                 properties:
@@ -333,7 +364,7 @@ spec:
                 - required: [kubernetes]
               monitoring:
                 type: object
-                required: [logs, metrics]
+                required: [logs]
                 properties:
                   logs:
                     type: object

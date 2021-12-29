@@ -1,0 +1,92 @@
+{{- if .Values.standalone }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platformOperator.platformApi.fullname" . }}
+  labels: {{ include "platformOperator.labels.standard" . | nindent 4 }}
+    service: platform-api
+spec:
+  replicas: {{ .Values.platformApi.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "platformOperator.name" . }}
+      release: {{ .Release.Name }}
+      service: platform-api
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: {{ include "platformOperator.name" . }}
+        release: {{ .Release.Name }}
+        service: platform-api
+      annotations:
+        checksum/clusters: {{ include (print $.Template.BasePath "/control-plane/config-clusters-config-map.yaml") . | sha256sum }}
+    spec:
+      containers:
+      - name: platform-api
+        {{- with .Values.platformApi.image }}
+        image: {{ .repository }}:{{ .tag }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /api/v1/ping
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /api/v1/ping
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        {{- with .Values.platformApi.resources }}
+        resources: {{ toYaml . | nindent 10 }}
+        {{- end }}
+        env:
+        {{- with .Values.platformApi.oauth }}
+        - name: NP_OAUTH_AUTH_URL
+          value: {{ .authUrl | quote }}
+        - name: NP_OAUTH_TOKEN_URL
+          value: {{ .tokenUrl | quote }}
+        - name: NP_OAUTH_LOGOUT_URL
+          value: {{ .logoutUrl | quote }}
+        - name: NP_OAUTH_CLIENT_ID
+          value: {{ .clientId | quote }}
+        - name: NP_OAUTH_AUDIENCE
+          value: {{ .audience | quote }}
+        - name: NP_OAUTH_SUCCESS_REDIRECT_URL
+          value: {{ .successRedirectUrl | quote }}
+        - name: NP_OAUTH_HEADLESS_CALLBACK_URL
+          value: {{ .headlessCallbackUrl | quote }}
+        {{- end }}
+        - name: NP_PLATFORM_CONFIG_URI
+          value: {{ include "platformOperator.platformConfig.url" . }}/api/v1
+        - name: NP_ENFORCER_PLATFORM_API_URL
+          value: http://localhost:8080/api/v1
+        - name: NP_ENFORCER_RETENTION_DELAY_DAYS
+          value: {{ .Values.platformApi.enforcerRetentionDelayDays | quote }}
+        - name: NP_DB_POSTGRES_DSN
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "platformOperator.postgresqlConfig.fullname" . }}-secrets
+              key: platform-api-service-dsn
+        - name: NP_API_URL
+          value: https://{{ .Values.ingress.host }}/api/v1
+        - name: NP_AUTH_URL
+          value: "-"
+        # TODO: required by cli but not used
+        - name: NP_AUTH_PUBLIC_URL
+          value: https://{{ .Values.ingress.host }}/api/v1/users
+        - name: NP_ADMIN_URL
+          value: "-"
+        - name: NP_ADMIN_PUBLIC_URL
+          value: "-"
+{{- end }}

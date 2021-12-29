@@ -10,6 +10,7 @@ from platform_operator.models import (
     BucketsProvider,
     Config,
     DockerConfig,
+    IngressServiceType,
     LabelsConfig,
     MetricsStorageType,
     MonitoringConfig,
@@ -22,11 +23,7 @@ from platform_operator.models import (
 class TestHelmValuesFactory:
     @pytest.fixture
     def factory(self, config: Config) -> HelmValuesFactory:
-        return HelmValuesFactory(
-            config.helm_release_names,
-            config.helm_chart_names,
-            container_runtime="docker",
-        )
+        return HelmValuesFactory(config.helm_chart_names, container_runtime="docker")
 
     def test_create_gcp_platform_values_with_nfs_storage(
         self,
@@ -40,6 +37,9 @@ class TestHelmValuesFactory:
             "kubernetesProvider": "gcp",
             "traefikEnabled": True,
             "consulEnabled": False,
+            "dockerRegistryEnabled": False,
+            "minioEnabled": False,
+            "platformReportsEnabled": True,
             "alpineImage": {"repository": "neuro.io/alpine"},
             "pauseImage": {"repository": "neuro.io/pause"},
             "crictlImage": {"repository": "neuro.io/crictl"},
@@ -214,18 +214,6 @@ class TestHelmValuesFactory:
                 "gcs": {"bucketName": "platform-storage"},
             }
         ]
-
-    def test_create_gcp_platform_values_without_namespace(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(
-            replace(gcp_platform_config, jobs_namespace_create=False)
-        )
-
-        assert result["jobs"]["namespace"] == {
-            "create": False,
-            "name": gcp_platform_config.jobs_namespace,
-        }
 
     def test_create_gcp_platform_values_without_docker_config_secret(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -413,7 +401,7 @@ class TestHelmValuesFactory:
             )
         )
 
-        assert "dockerRegistryEnabled" not in result
+        assert result["dockerRegistryEnabled"] is False
         assert "docker-registry" not in result
 
     def test_create_on_prem_platform_values_without_minio(
@@ -426,8 +414,23 @@ class TestHelmValuesFactory:
             )
         )
 
-        assert "minioEnabled" not in result
+        assert result["minioEnabled"] is False
         assert "minio" not in result
+
+    def test_create_on_prem_platform_values_without_platform_reports(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(
+                on_prem_platform_config,
+                monitoring=replace(
+                    on_prem_platform_config.monitoring, metrics_enabled=False
+                ),
+            )
+        )
+
+        assert result["platformReportsEnabled"] is False
+        assert "platform-reports" not in result
 
     def test_create_vcd_platform_values(
         self, vcd_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -473,6 +476,12 @@ class TestHelmValuesFactory:
                 "type": "RollingUpdate",
                 "maxUnavailable": 1,
                 "maxSurge": 0,
+            },
+            "resources": {
+                "requests": {
+                    "cpu": "100m",
+                    "memory": "1Gi",
+                }
             },
             "podLabels": {"service": "minio"},
             "mode": "standalone",
@@ -540,7 +549,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "traefik",
             "fullnameOverride": "traefik",
-            "replicas": 3,
+            "replicas": 2,
             "deploymentStrategy": {
                 "type": "RollingUpdate",
                 "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
@@ -555,7 +564,7 @@ class TestHelmValuesFactory:
                 "platform-docker-config",
                 "platform-docker-hub-config",
             ],
-            "logLevel": "debug",
+            "logLevel": "error",
             "serviceType": "LoadBalancer",
             "externalTrafficPolicy": "Cluster",
             "ssl": {"enabled": True, "enforced": True},
@@ -627,11 +636,29 @@ class TestHelmValuesFactory:
                 },
             ],
             "resources": {
-                "requests": {"cpu": "1200m", "memory": "5Gi"},
-                "limits": {"cpu": "1200m", "memory": "5Gi"},
+                "requests": {"cpu": "250m", "memory": "256Mi"},
+                "limits": {"cpu": "1000m", "memory": "4Gi"},
             },
             "timeouts": {"responding": {"idleTimeout": "660s"}},
         }
+
+    def test_create_gcp_traefik_values_with_ssl_cert(
+        self,
+        gcp_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_traefik_values(
+            replace(
+                gcp_platform_config,
+                ingress_ssl_cert_data="default-cert",
+                ingress_ssl_cert_key_data="default-key",
+            )
+        )
+
+        assert "acme" not in result
+        assert result["ssl"]["defaultCert"] == "default-cert"
+        assert result["ssl"]["defaultKey"] == "default-key"
+        assert "storeAcme" not in result["kvprovider"]
 
     def test_create_aws_traefik_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -660,19 +687,28 @@ class TestHelmValuesFactory:
             }
         }
 
-    def test_create_on_prem_traefik_values(
+    def test_create_on_prem_traefik_values_with_custom_ports(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_traefik_values(on_prem_platform_config)
+        result = factory.create_traefik_values(
+            replace(
+                on_prem_platform_config,
+                ingress_service_type=IngressServiceType.NODE_PORT,
+                ingress_node_port_http=30080,
+                ingress_node_port_https=30443,
+                ingress_host_port_http=80,
+                ingress_host_port_https=443,
+            )
+        )
 
-        assert result["replicas"] == 1
         assert result["serviceType"] == "NodePort"
         assert result["service"] == {"nodePorts": {"http": 30080, "https": 30443}}
         assert result["deployment"]["hostPort"] == {
             "httpEnabled": True,
             "httpsEnabled": True,
+            "httpPort": 80,
+            "httpsPort": 443,
         }
-        assert result["timeouts"] == {"responding": {"idleTimeout": "600s"}}
 
     def test_create_platform_storage_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -693,14 +729,13 @@ class TestHelmValuesFactory:
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": "platform-storage-token",
+                            "name": "platform-token",
                             "key": "token",
                         }
                     }
                 },
             },
             "storages": [{"type": "pvc", "path": "", "claimName": "platform-storage"}],
-            "secrets": [{"name": "platform-storage-token", "data": {"token": "token"}}],
             "cors": {
                 "origins": [
                     "https://release--neuro-web.netlify.app",
@@ -747,6 +782,16 @@ class TestHelmValuesFactory:
                 "claimName": "platform-storage-storage2",
             },
         ]
+
+    def test_create_platform_storage_without_auth_url(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        gcp_platform_config = replace(gcp_platform_config, auth_url=URL("-"), token="")
+
+        result = factory.create_platform_storage_values(gcp_platform_config)
+
+        assert result["platform"]["authUrl"] == "-"
+        assert result["platform"]["token"] == {"value": ""}
 
     def test_create_platform_storage_without_tracing_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -800,14 +845,12 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-buckets-api-token",
+                            "name": "platform-token",
                         }
                     }
                 },
             },
-            "secrets": [
-                {"data": {"token": "token"}, "name": "platform-buckets-api-token"}
-            ],
+            "secrets": [],
             "sentry": mock.ANY,
             "disableCreation": False,
         }
@@ -895,13 +938,12 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-buckets-api-token",
+                            "name": "platform-token",
                         }
                     }
                 },
             },
             "secrets": [
-                {"data": {"token": "token"}, "name": "platform-buckets-api-token"},
                 {
                     "data": {"key": "access_key", "secret": "secret_key"},
                     "name": "platform-buckets-emc-ecs-key",
@@ -976,13 +1018,12 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-buckets-api-token",
+                            "name": "platform-token",
                         }
                     }
                 },
             },
             "secrets": [
-                {"data": {"token": "token"}, "name": "platform-buckets-api-token"},
                 {
                     "data": {"accountId": "account_id", "password": "password"},
                     "name": "platform-buckets-open-stack-key",
@@ -1030,14 +1071,12 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-buckets-api-token",
+                            "name": "platform-token",
                         }
                     }
                 },
             },
-            "secrets": [
-                {"data": {"token": "token"}, "name": "platform-buckets-api-token"}
-            ],
+            "secrets": [],
             "sentry": mock.ANY,
             "disableCreation": False,
         }
@@ -1082,13 +1121,12 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-buckets-api-token",
+                            "name": "platform-token",
                         }
                     }
                 },
             },
             "secrets": [
-                {"data": {"token": "token"}, "name": "platform-buckets-api-token"},
                 {"data": {"SAKeyB64": "e30="}, "name": "platform-buckets-gcp-sa-key"},
             ],
             "sentry": mock.ANY,
@@ -1136,13 +1174,12 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-buckets-api-token",
+                            "name": "platform-token",
                         }
                     }
                 },
             },
             "secrets": [
-                {"data": {"token": "token"}, "name": "platform-buckets-api-token"},
                 {
                     "data": {"key": "accountKey2"},
                     "name": "platform-buckets-azure-storage-account-key",
@@ -1171,17 +1208,13 @@ class TestHelmValuesFactory:
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": "platform-registry-token",
+                            "name": "platform-token",
                             "key": "token",
                         }
                     }
                 },
             },
             "secrets": [
-                {
-                    "name": "platform-registry-token",
-                    "data": {"token": gcp_platform_config.token},
-                },
                 {
                     "name": "platform-registry-gcp-key",
                     "data": {
@@ -1240,18 +1273,13 @@ class TestHelmValuesFactory:
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": "platform-registry-token",
+                            "name": "platform-token",
                             "key": "token",
                         }
                     }
                 },
             },
-            "secrets": [
-                {
-                    "name": "platform-registry-token",
-                    "data": {"token": aws_platform_config.token},
-                }
-            ],
+            "secrets": [],
             "upstreamRegistry": {
                 "url": "https://platform.dkr.ecr.us-east-1.amazonaws.com",
                 "type": "aws_ecr",
@@ -1290,17 +1318,13 @@ class TestHelmValuesFactory:
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": "platform-registry-token",
+                            "name": "platform-token",
                             "key": "token",
                         }
                     }
                 },
             },
             "secrets": [
-                {
-                    "name": "platform-registry-token",
-                    "data": {"token": azure_platform_config.token},
-                },
                 {
                     "name": "platform-registry-azure-credentials",
                     "data": {
@@ -1358,16 +1382,12 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-registry-token",
+                            "name": "platform-token",
                         }
                     }
                 },
             },
             "secrets": [
-                {
-                    "name": "platform-registry-token",
-                    "data": {"token": on_prem_platform_config.token},
-                },
                 {
                     "name": "platform-docker-registry",
                     "data": {
@@ -1428,7 +1448,7 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-monitoring-token",
+                            "name": "platform-token",
                         }
                     }
                 },
@@ -1443,12 +1463,6 @@ class TestHelmValuesFactory:
                     "https://app.neu.ro",
                 ]
             },
-            "secrets": [
-                {
-                    "data": {"token": gcp_platform_config.token},
-                    "name": "platform-monitoring-token",
-                }
-            ],
             "containerRuntime": {"name": "docker"},
             "fluentbit": {
                 "image": {"repository": "neuro.io/fluent-bit"},
@@ -1478,6 +1492,16 @@ class TestHelmValuesFactory:
                 "sampleRate": 0.1,
             },
         }
+
+    def test_create_platform_storage_without_api_url(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        gcp_platform_config = replace(gcp_platform_config, api_url=URL("-"), token="")
+
+        result = factory.create_platform_monitoring_values(gcp_platform_config)
+
+        assert result["platform"]["apiUrl"] == "-"
+        assert result["platform"]["token"] == {"value": ""}
 
     def test_create_gcp_platform_monitoring_values_with_custom_logs_region(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -1674,7 +1698,7 @@ class TestHelmValuesFactory:
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": "platform-secrets-token",
+                            "name": "platform-token",
                             "key": "token",
                         }
                     }
@@ -1686,12 +1710,6 @@ class TestHelmValuesFactory:
                     "https://app.neu.ro",
                 ]
             },
-            "secrets": [
-                {
-                    "name": "platform-secrets-token",
-                    "data": {"token": gcp_platform_config.token},
-                }
-            ],
             "sentry": {
                 "dsn": "https://sentry",
                 "clusterName": gcp_platform_config.cluster_name,
@@ -1726,17 +1744,13 @@ class TestHelmValuesFactory:
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": "platform-reports-token",
+                            "name": "platform-token",
                             "key": "token",
                         }
                     }
                 },
             },
             "secrets": [
-                {
-                    "name": "platform-reports-token",
-                    "data": {"token": gcp_platform_config.token},
-                },
                 {
                     "name": "platform-reports-gcp-key",
                     "data": {"key.json": "{}"},
@@ -2164,7 +2178,7 @@ class TestHelmValuesFactory:
                 "authUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
-                        "secretKeyRef": {"key": "token", "name": "platform-disks-token"}
+                        "secretKeyRef": {"key": "token", "name": "platform-token"}
                     }
                 },
             },
@@ -2178,12 +2192,6 @@ class TestHelmValuesFactory:
                 "enabled": True,
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
             },
-            "secrets": [
-                {
-                    "name": "platform-disks-token",
-                    "data": {"token": gcp_platform_config.token},
-                }
-            ],
             "sentry": {
                 "dsn": "https://sentry",
                 "clusterName": gcp_platform_config.cluster_name,
@@ -2231,7 +2239,7 @@ class TestHelmValuesFactory:
                     "valueFrom": {
                         "secretKeyRef": {
                             "key": "token",
-                            "name": "platform-poller-token",
+                            "name": "platform-token",
                         }
                     }
                 },
@@ -2255,12 +2263,6 @@ class TestHelmValuesFactory:
                 "enabled": True,
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
             },
-            "secrets": [
-                {
-                    "name": "platform-poller-token",
-                    "data": {"token": gcp_platform_config.token},
-                }
-            ],
             "sentry": {
                 "dsn": "https://sentry",
                 "clusterName": gcp_platform_config.cluster_name,

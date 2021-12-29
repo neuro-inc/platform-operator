@@ -33,8 +33,8 @@ spec:
       roles:
         roleArn: arn:aws:iam::771188043543:role/neuro-a44a2ab779525184303d93f9583a3ceb
         s3RoleArn: arn:aws:iam::771188043543:role/s3-a44a2ab779525184303d93f9583a3ceb
-  storage:
-    nfs:
+  storages:
+  - nfs:
       path: /
       server: fs-84b34b07.efs.us-east-1.amazonaws.com
   registry:
@@ -42,7 +42,9 @@ spec:
       url: https://771188043543.dkr.ecr.us-east-1.amazonaws.com
   monitoring:
     logs:
-      bucket: neuro-job-logs-a44a2ab779525184303d93f9583a3ceb
+      blobStorage:
+        bucket: neuro-job-logs-a44a2ab779525184303d93f9583a3ceb
     metrics:
-      bucket: neuro-metrics-a44a2ab779525184303d93f9583a3ceb
+      blobStorage:
+        bucket: neuro-metrics-a44a2ab779525184303d93f9583a3ceb
 ```
