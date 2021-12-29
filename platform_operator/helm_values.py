@@ -74,10 +74,10 @@ class HelmValuesFactory:
             self._chart_names.platform_registry: self.create_platform_registry_values(
                 platform
             ),
-            self._chart_names.platform_monitoring: self.create_platform_monitoring_values(
+            self._chart_names.platform_monitoring: self.create_platform_monitoring_values(  # noqa
                 platform
             ),
-            self._chart_names.platform_container_runtime: self.create_platform_container_runtime_values(
+            self._chart_names.platform_container_runtime: self.create_platform_container_runtime_values(  # noqa
                 platform
             ),
             self._chart_names.platform_secrets: self.create_platform_secrets_values(
@@ -86,7 +86,7 @@ class HelmValuesFactory:
             self._chart_names.platform_disks: self.create_platform_disks_values(
                 platform
             ),
-            self._chart_names.platform_api_poller: self.create_platform_api_poller_values(
+            self._chart_names.platform_api_poller: self.create_platform_api_poller_values(  # noqa
                 platform
             ),
             self._chart_names.platform_buckets: self.create_platform_buckets_values(
