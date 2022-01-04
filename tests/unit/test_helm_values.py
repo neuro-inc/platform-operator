@@ -642,6 +642,24 @@ class TestHelmValuesFactory:
             "timeouts": {"responding": {"idleTimeout": "660s"}},
         }
 
+    def test_create_gcp_traefik_values_with_ingress_namespaces(
+        self,
+        gcp_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
+    ) -> None:
+        result = factory.create_traefik_values(
+            replace(
+                gcp_platform_config,
+                ingress_namespaces=["default", "platform", "platform-jobs"],
+            )
+        )
+
+        assert result["kubernetes"]["namespaces"] == [
+            "default",
+            "platform",
+            "platform-jobs",
+        ]
+
     def test_create_gcp_traefik_values_with_ssl_cert(
         self,
         gcp_platform_config: PlatformConfig,

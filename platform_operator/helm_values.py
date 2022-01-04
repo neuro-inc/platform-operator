@@ -337,7 +337,7 @@ class HelmValuesFactory:
             },
             "kubernetes": {
                 "ingressClass": "traefik",
-                "namespaces": [platform.namespace, platform.jobs_namespace],
+                "namespaces": platform.ingress_namespaces,
             },
             "rbac": {"enabled": True},
             "resources": {
