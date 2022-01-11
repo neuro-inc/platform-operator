@@ -936,7 +936,7 @@ class HelmValuesFactory:
                         "image": {"repository": platform.get_image("prometheus")},
                         "retention": platform.monitoring.metrics_retention_time,
                         "thanos": {
-                            "image": platform.get_image("thanos:v0.14.0"),
+                            "image": platform.get_image("thanos:v0.24.0"),
                             "version": "v0.14.0",
                             "objectStorageConfig": {
                                 "name": object_store_config_map_name,

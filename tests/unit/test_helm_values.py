@@ -1798,7 +1798,7 @@ class TestHelmValuesFactory:
                         "image": {"repository": "neuro.io/prometheus"},
                         "retention": "15d",
                         "thanos": {
-                            "image": "neuro.io/thanos:v0.14.0",
+                            "image": "neuro.io/thanos:v0.24.0",
                             "version": "v0.14.0",
                             "objectStorageConfig": {
                                 "name": "thanos-object-storage-config",
