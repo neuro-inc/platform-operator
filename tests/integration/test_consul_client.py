@@ -7,11 +7,9 @@ from platform_operator.consul_client import ConsulClient, SessionExpiredError
 
 
 class TestConsulClient:
-    @pytest.mark.asyncio
     async def test_wait_healthy(self, consul_client: ConsulClient) -> None:
         await asyncio.wait_for(consul_client.wait_healthy(), 5)
 
-    @pytest.mark.asyncio
     async def test_get_key(self, consul_client: ConsulClient) -> None:
         assert await consul_client.put_key("key/1", b"value1")
         result = await consul_client.get_key("key/1")
@@ -31,24 +29,20 @@ class TestConsulClient:
         assert result[0]["Value"] == "dmFsdWUx"
         assert result[1]["Value"] == "dmFsdWUy"
 
-    @pytest.mark.asyncio
     async def test_delete_key(self, consul_client: ConsulClient) -> None:
         assert await consul_client.put_key("key", b"value")
         assert await consul_client.delete_key("key")
 
-    @pytest.mark.asyncio
     async def test_get_sessions(self, consul_client: ConsulClient) -> None:
         session_id = await consul_client.create_session(ttl_s=10, name="test")
         result = await consul_client.get_sessions()
 
         assert any(r["ID"] == session_id and r["Name"] == "test" for r in result)
 
-    @pytest.mark.asyncio
     async def test_delete_session(self, consul_client: ConsulClient) -> None:
         session_id = await consul_client.create_session(ttl_s=10, name="test")
         assert await consul_client.delete_session(session_id)
 
-    @pytest.mark.asyncio
     async def test_sequential_lock(self, consul_client: ConsulClient) -> None:
         result = []
         i = 0
@@ -81,7 +75,6 @@ class TestConsulClient:
 
         assert result == ["1 start", "1 end", "2 start", "2 end", "3 start", "3 end"]
 
-    @pytest.mark.asyncio
     async def test_expired_lock(self, consul_client: ConsulClient) -> None:
         await consul_client.delete_key("lock")
 
@@ -103,7 +96,6 @@ class TestConsulClient:
         await asyncio.sleep(1)
         await asyncio.wait_for(run(), 11.1)  # ttl + lock_delay + 0.1
 
-    @pytest.mark.asyncio
     async def test_lock_raises_error(self, consul_client: ConsulClient) -> None:
         await consul_client.delete_key("lock")
 

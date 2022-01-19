@@ -21,7 +21,6 @@ def config_map() -> dict[str, Any]:
 
 
 class TestHelmClient:
-    @pytest.mark.asyncio
     async def test_upgrade_and_delete(
         self,
         kube_namespace: str,
@@ -58,7 +57,6 @@ class TestHelmClient:
         finally:
             await helm_client.delete(release_name)
 
-    @pytest.mark.asyncio
     async def test_add_unknown_repo(self, helm_client: HelmClient) -> None:
         with pytest.raises(
             HelmException,
@@ -66,7 +64,6 @@ class TestHelmClient:
         ):
             await helm_client.add_repo(HelmRepo(URL("https://unknown"), name="unknown"))
 
-    @pytest.mark.asyncio
     async def test_install_unknown_chart(self, helm_client: HelmClient) -> None:
         with pytest.raises(
             HelmException,
@@ -79,6 +76,5 @@ class TestHelmClient:
                 wait=True,
             )
 
-    @pytest.mark.asyncio
     async def test_delete_unknown_release(self, helm_client: HelmClient) -> None:
         await helm_client.delete("unknown")
