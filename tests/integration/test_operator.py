@@ -1,5 +1,3 @@
-import pytest
-
 from platform_operator.consul_client import ConsulClient
 from platform_operator.operator import (
     end_operator_deployment,
