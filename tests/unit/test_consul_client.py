@@ -47,7 +47,6 @@ class TestConsulClient:
     def consul_client(self) -> ConsulClient:
         return ConsulClient(URL("localhost"))
 
-    @pytest.mark.asyncio
     async def test_lock_key(
         self,
         consul_client: ConsulClient,
@@ -64,7 +63,6 @@ class TestConsulClient:
         get_key.assert_awaited_once()
         delete_session.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_lock_key_create_session_errors_ignored(
         self,
         consul_client: ConsulClient,
@@ -83,7 +81,6 @@ class TestConsulClient:
         get_key.assert_awaited_once()
         delete_session.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_lock_key_put_key_errors_ignored(
         self,
         consul_client: ConsulClient,
@@ -102,7 +99,6 @@ class TestConsulClient:
         get_key.assert_awaited_once()
         delete_session.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_release_lock_already_released(
         self,
         consul_client: ConsulClient,
@@ -116,7 +112,6 @@ class TestConsulClient:
         get_key.assert_awaited_once()
         delete_session.assert_awaited_once_with("test")
 
-    @pytest.mark.asyncio
     async def test_release_lock_key_not_found(
         self,
         consul_client: ConsulClient,
@@ -132,7 +127,6 @@ class TestConsulClient:
         get_key.assert_awaited_once()
         delete_session.assert_awaited_once_with("test")
 
-    @pytest.mark.asyncio
     async def test_release_lock_get_key_errors_ignored(
         self,
         consul_client: ConsulClient,
@@ -146,7 +140,6 @@ class TestConsulClient:
         get_key.assert_awaited()
         delete_session.assert_awaited_once_with("test")
 
-    @pytest.mark.asyncio
     async def test_release_lock_put_key_errors_ignored(
         self,
         consul_client: ConsulClient,
@@ -162,7 +155,6 @@ class TestConsulClient:
         put_key.assert_awaited_once_with("key", b"value", release="test")
         delete_session.assert_awaited_once_with("test")
 
-    @pytest.mark.asyncio
     async def test_release_lock_delete_session_errors_ignored(
         self,
         consul_client: ConsulClient,

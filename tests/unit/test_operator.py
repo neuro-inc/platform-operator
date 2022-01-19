@@ -17,13 +17,11 @@ class TestStartOperatorDeployment:
     def consul_client(self) -> mock.AsyncMock:
         return mock.AsyncMock(ConsulClient)
 
-    @pytest.mark.asyncio
     async def test_on_install(self, consul_client: mock.AsyncMock) -> None:
         await start_operator_deployment(consul_client, 1)
 
         consul_client.wait_healthy.assert_not_awaited()
 
-    @pytest.mark.asyncio
     async def test_on_upgrade(self, consul_client: mock.AsyncMock) -> None:
         consul_client.create_session.return_value = "test"
 
@@ -35,7 +33,6 @@ class TestStartOperatorDeployment:
             LOCK_KEY, b"platform-operator-2", session_id="test", sleep_s=mock.ANY
         )
 
-    @pytest.mark.asyncio
     async def test_ignores_errors(self, consul_client: mock.AsyncMock) -> None:
         consul_client.create_session.side_effect = [aiohttp.ClientError, "test"]
 
@@ -55,13 +52,11 @@ class TestEndOperatorDeployment:
     def consul_client(self) -> mock.AsyncMock:
         return mock.AsyncMock(ConsulClient)
 
-    @pytest.mark.asyncio
     async def test_on_install(self, consul_client: mock.AsyncMock) -> None:
         await end_operator_deployment(consul_client, 1)
 
         consul_client.wait_healthy.assert_not_awaited()
 
-    @pytest.mark.asyncio
     async def test_on_upgrade_lock_released(
         self, consul_client: mock.AsyncMock
     ) -> None:
@@ -78,7 +73,6 @@ class TestEndOperatorDeployment:
             LOCK_KEY, lock_value, session_id="test"
         )
 
-    @pytest.mark.asyncio
     async def test_on_upgrade_expired_session_ignored(
         self, consul_client: mock.AsyncMock
     ) -> None:
@@ -92,7 +86,6 @@ class TestEndOperatorDeployment:
         consul_client.get_key.assert_awaited_once_with(LOCK_KEY)
         consul_client.delete_session.assert_not_awaited()
 
-    @pytest.mark.asyncio
     async def test_ignores_errors(self, consul_client: mock.AsyncMock) -> None:
         lock_value = b"platform-operator-2"
         consul_client.get_key.side_effect = [
@@ -110,7 +103,6 @@ class TestEndOperatorDeployment:
             LOCK_KEY, lock_value, session_id="test"
         )
 
-    @pytest.mark.asyncio
     async def test_key_not_found(self, consul_client: mock.AsyncMock) -> None:
         consul_client.get_key.side_effect = aiohttp.ClientResponseError(
             mock.Mock(), mock.Mock(), status=404

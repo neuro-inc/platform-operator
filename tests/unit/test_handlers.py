@@ -189,7 +189,6 @@ def stopped() -> kopf.DaemonStopped:
     return stopped
 
 
-@pytest.mark.asyncio
 async def test_is_obs_csi_driver_deploy_required_on_install_true(
     config: Config,
     gcp_platform_config: PlatformConfig,
@@ -213,7 +212,6 @@ async def test_is_obs_csi_driver_deploy_required_on_install_true(
     assert result is True
 
 
-@pytest.mark.asyncio
 async def test_is_obs_csi_driver_deploy_required_on_install_false(
     gcp_platform_config: PlatformConfig,
     helm_client: mock.AsyncMock,
@@ -235,7 +233,6 @@ async def test_is_obs_csi_driver_deploy_required_on_install_false(
     assert result is False
 
 
-@pytest.mark.asyncio
 async def test_is_obs_csi_driver_deploy_required_on_version_update_true(
     config: Config,
     gcp_platform_config: PlatformConfig,
@@ -267,7 +264,6 @@ async def test_is_obs_csi_driver_deploy_required_on_version_update_true(
     assert result is True
 
 
-@pytest.mark.asyncio
 async def test_is_obs_csi_driver_deploy_required_on_values_update_true(
     config: Config,
     gcp_platform_config: PlatformConfig,
@@ -299,7 +295,6 @@ async def test_is_obs_csi_driver_deploy_required_on_values_update_true(
     assert result is True
 
 
-@pytest.mark.asyncio
 async def test_is_obs_csi_driver_deploy_required_no_update_false(
     config: Config,
     gcp_platform_config: PlatformConfig,
@@ -331,7 +326,6 @@ async def test_is_obs_csi_driver_deploy_required_no_update_false(
     assert result is False
 
 
-@pytest.mark.asyncio
 async def test_is_obs_csi_driver_deploy_required_for_nfs_false(
     gcp_platform_config: PlatformConfig,
 ) -> None:
@@ -344,7 +338,6 @@ async def test_is_obs_csi_driver_deploy_required_for_nfs_false(
     assert result is False
 
 
-@pytest.mark.asyncio
 async def test_is_platform_deploy_required_on_install_true(
     config: Config,
     gcp_platform_config: PlatformConfig,
@@ -362,7 +355,6 @@ async def test_is_platform_deploy_required_on_install_true(
     assert result is True
 
 
-@pytest.mark.asyncio
 async def test_is_platform_deploy_required_on_install_false(
     gcp_platform_config: PlatformConfig,
     helm_client: mock.AsyncMock,
@@ -378,7 +370,6 @@ async def test_is_platform_deploy_required_on_install_false(
     assert result is False
 
 
-@pytest.mark.asyncio
 async def test_is_platform_deploy_required_on_version_update_true(
     config: Config,
     gcp_platform_config: PlatformConfig,
@@ -406,7 +397,6 @@ async def test_is_platform_deploy_required_on_version_update_true(
     assert result is True
 
 
-@pytest.mark.asyncio
 async def test_is_platform_deploy_required_on_values_update_true(
     config: Config,
     gcp_platform_config: PlatformConfig,
@@ -434,7 +424,6 @@ async def test_is_platform_deploy_required_on_values_update_true(
     assert result is True
 
 
-@pytest.mark.asyncio
 async def test_is_platform_deploy_required_no_update_false(
     config: Config,
     gcp_platform_config: PlatformConfig,
@@ -462,7 +451,6 @@ async def test_is_platform_deploy_required_no_update_false(
     assert result is False
 
 
-@pytest.mark.asyncio
 async def test_configure_aws_cluster(
     kube_client: mock.Mock,
     config_client: mock.Mock,
@@ -494,7 +482,6 @@ async def test_configure_aws_cluster(
     )
 
 
-@pytest.mark.asyncio
 async def test_configure_cluster(
     gcp_platform_config: PlatformConfig,
     kube_client: mock.Mock,
@@ -519,7 +506,6 @@ async def test_configure_cluster(
     )
 
 
-@pytest.mark.asyncio
 async def test_configure_cluster_with_ingress_controller_disabled(
     gcp_platform_config: PlatformConfig,
     config_client: mock.Mock,
@@ -537,7 +523,6 @@ async def test_configure_cluster_with_ingress_controller_disabled(
     )
 
 
-@pytest.mark.asyncio
 async def test_deploy(
     status_manager: mock.AsyncMock,
     consul_client: mock.AsyncMock,
@@ -630,7 +615,6 @@ async def test_deploy(
     )
 
 
-@pytest.mark.asyncio
 async def test_deploy_with_ingress_controller_disabled(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -693,7 +677,6 @@ async def test_deploy_with_ingress_controller_disabled(
     )
 
 
-@pytest.mark.asyncio
 async def test_deploy_gcp_with_gcs_storage(
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -739,7 +722,6 @@ async def test_deploy_gcp_with_gcs_storage(
     )
 
 
-@pytest.mark.asyncio
 async def test_deploy_all_charts_deployed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -794,7 +776,6 @@ async def test_deploy_all_charts_deployed(
     )
 
 
-@pytest.mark.asyncio
 async def test_deploy_with_retries_exceeded(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -823,7 +804,6 @@ async def test_deploy_with_retries_exceeded(
     )
 
 
-@pytest.mark.asyncio
 async def test_deploy_with_invalid_spec(
     status_manager: mock.AsyncMock,
     logger: logging.Logger,
@@ -847,7 +827,6 @@ async def test_deploy_with_invalid_spec(
     )
 
 
-@pytest.mark.asyncio
 async def test_deploy_no_changes(
     status_manager: mock.AsyncMock,
     consul_client: mock.AsyncMock,
@@ -935,7 +914,6 @@ async def test_deploy_helm_release_failed(
     status_manager.start_deployment.assert_not_awaited()
 
 
-@pytest.mark.asyncio
 async def test_delete(
     status_manager: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -973,7 +951,6 @@ async def test_delete(
     )
 
 
-@pytest.mark.asyncio
 async def test_delete_gcp_with_gcs_storage(
     helm_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -1002,7 +979,6 @@ async def test_delete_gcp_with_gcs_storage(
     )
 
 
-@pytest.mark.asyncio
 async def test_delete_on_prem(
     helm_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -1029,7 +1005,6 @@ async def test_delete_on_prem(
     )
 
 
-@pytest.mark.asyncio
 async def test_delete_with_invalid_configuration(
     status_manager: mock.AsyncMock,
     logger: logging.Logger,
@@ -1054,7 +1029,6 @@ async def test_delete_with_invalid_configuration(
     helm_client.add_repo.assert_not_awaited()
 
 
-@pytest.mark.asyncio
 async def test_watch_config(
     status_manager: mock.AsyncMock,
     consul_client: mock.AsyncMock,
@@ -1337,7 +1311,6 @@ async def test_watch_config_helm_release_failed(
     status_manager.start_deployment.assert_not_awaited()
 
 
-@pytest.mark.asyncio
 async def test_watch_config_ignores_error(
     config_client: mock.AsyncMock,
     logger: logging.Logger,
@@ -1357,7 +1330,6 @@ async def test_watch_config_ignores_error(
     )
 
 
-@pytest.mark.asyncio
 async def test_watch_config_update_failed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,

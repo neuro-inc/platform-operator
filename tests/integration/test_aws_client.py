@@ -29,7 +29,6 @@ class TestAwsElbClient:
         yield {"LoadBalancerName": name, "DNSName": response["DNSName"]}
         await elb_client.delete_load_balancer(LoadBalancerName=name)
 
-    @pytest.mark.asyncio
     async def test_get_load_balancer_by_dns_name(
         self, load_balancer: dict[str, Any], elb_client: AwsElbClient
     ) -> None:
