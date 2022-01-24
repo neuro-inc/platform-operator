@@ -1,4 +1,5 @@
 {{- range .Values.storages }}
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

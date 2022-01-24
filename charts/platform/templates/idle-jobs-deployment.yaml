@@ -1,5 +1,6 @@
 {{- range .Values.idleJobs }}
 {{- if gt (.count | int) 0 }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -60,6 +61,5 @@ spec:
       {{- if .imagePullSecrets }}
       imagePullSecrets: {{ toYaml .imagePullSecrets | nindent 6 }}
       {{- end }}
----
 {{- end }}
 {{- end }}

@@ -1,6 +1,7 @@
 {{- range .Values.nodePools }}
 {{- if gt (.idleSize | int) 0 }}
 {{- $name := .name | replace "_" "-" | lower }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -132,6 +133,5 @@ spec:
                 values:
                 - idle-nodes
             topologyKey: kubernetes.io/hostname
----
 {{- end }}
 {{- end }}

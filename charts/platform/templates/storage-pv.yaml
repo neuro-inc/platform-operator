@@ -1,5 +1,6 @@
 {{- range .Values.storages }}
 {{- if ne .type "kubernetes" }}
+---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
