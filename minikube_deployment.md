@@ -21,7 +21,7 @@ openssl req \
     -keyout server.key \
     -new \
     -out server.crt \
-    -subj /CN=$(domain) \
+    -subj /CN=$domain \
     -reqexts SAN \
     -extensions SAN \
     -config <(cat /System/Library/OpenSSL/openssl.cnf \
@@ -42,7 +42,7 @@ openssl req \
     -keyout server.key \
     -new \
     -out server.crt \
-    -subj /CN=$(domain) \
+    -subj /CN=$domain \
     -reqexts SAN \
     -extensions SAN \
     -config <(cat /usr/lib/ssl/openssl.cnf \
