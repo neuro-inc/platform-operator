@@ -1,5 +1,9 @@
 standalone: true
 
+consul:
+  server:
+    replicas: 1
+
 platform:
   configUrl: http://platform-config:8080
   apiUrl: http://platform-api:8080
