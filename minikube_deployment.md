@@ -1,10 +1,18 @@
 # Standalone deployment of platform in Minikube
 
+## Prerequisites
+Before starting you need to have already installed:
+- openssl
+- minikube 1.22.0 and above
+- docker (to be used for minikube if Virtualization support is disabled on your machine)
+- helm 3.7.0 and above
+- nivida/cuda + nvidia-docker2 (if GPU card is present)
+
 ## Self-signed SSL Certificate Generation
-Generate self-signed certificate:
+### MacOS
 ```shell
-domain=neu.ro.local
-cluster=default
+export domain=neu.ro.local
+export cluster=default
 
 openssl req \
     -newkey rsa:2048 \
@@ -13,10 +21,31 @@ openssl req \
     -keyout server.key \
     -new \
     -out server.crt \
-    -subj /CN=$(domain) \
+    -subj /CN=$domain \
     -reqexts SAN \
     -extensions SAN \
     -config <(cat /System/Library/OpenSSL/openssl.cnf \
+        <(printf "[SAN]\nsubjectAltName=DNS:$domain,DNS:$cluster.org.$domain,DNS:*.$cluster.org.$domain,DNS:*.jobs.$cluster.org.$domain")) \
+    -sha256 \
+    -days 365
+```
+
+### Ubuntu
+```shell
+export domain=neu.ro.local
+export cluster=default
+
+openssl req \
+    -newkey rsa:2048 \
+    -x509 \
+    -nodes \
+    -keyout server.key \
+    -new \
+    -out server.crt \
+    -subj /CN=$domain \
+    -reqexts SAN \
+    -extensions SAN \
+    -config <(cat /usr/lib/ssl/openssl.cnf \
         <(printf "[SAN]\nsubjectAltName=DNS:$domain,DNS:$cluster.org.$domain,DNS:*.$cluster.org.$domain,DNS:*.jobs.$cluster.org.$domain")) \
     -sha256 \
     -days 365
@@ -29,9 +58,9 @@ Copy generated certificate to minikube's docker daemon certificates folder:
 mkdir -p ~/.minikube/files/etc/docker/certs.d/registry.$cluster.org.$domain
 cp server.crt ~/.minikube/files/etc/docker/certs.d/registry.$cluster.org.$domain
 ```
-Start minikube:
+Start minikube with CNI enabled. Platform supports Kubernetes versions 1.16.\*-1.21.\*:
 ```shell
-minikube start --vm=true --cpus="6" --memory="8g" --kubernetes-version="1.20.9"
+minikube start --cpus="6" --memory="8g" --kubernetes-version="1.20.9" --network-plugin=cni --cni=calico
 ```
 Configure minikube node labels:
 ```shell
@@ -43,16 +72,17 @@ If you have gpu device installed you need to add additional label:
 kubectl label node minikube platform.neuromation.io/accelerator=$gpu_model
 ```
 
-## DNS Configuration (MacOS)
-Install dnsmasq:
+## DNS Configuration
+### MacOS
+Install Dnsmasq:
 ```shell
 brew install dnsmasq
 ```
-Configure dnsmasq to resolve your local domain to the Minikube ip:
+Configure Dnsmasq to resolve your local domain to the Minikube ip:
 ```shell
 minikube_ip=$(minikube ip)
 {
-    echo "address=/.neu.ro.local/$minikube_ip";
+    echo "address=/.$domain/$minikube_ip";
     echo "port=53";
 } >> $(brew --prefix)/etc/dnsmasq.conf
 ```
@@ -62,9 +92,38 @@ sudo tee /etc/resolver/$domain >/dev/null <<EOF
 nameserver 127.0.0.1
 EOF
 ```
-Start dnsmasq service:
+Start Dnsmasq service:
 ```shell
 sudo brew services start dnsmasq
+```
+
+### Ubuntu
+Ubuntu 18.04+ comes with systemd-resolve which you need to disable since it binds to port 53 which will conflict with Dnsmasq port. Run the following commands to disable the resolved service:
+```shell
+sudo systemctl disable systemd-resolved
+sudo systemctl stop systemd-resolved
+```
+Install Dnsmasq:
+```shell
+sudo apt-get install dnsmasq
+```
+Configure Dnsmasq to resolve your local domain to the Minikube ip:
+```shell
+minikube_ip=$(minikube ip)
+{
+    echo "address=/.$domain/$minikube_ip";
+    echo "port=53";
+} >> /etc/dnsmasq.conf
+```
+Set your local machine as a DNS resolver:
+```shell
+sudo tee /etc/resolver/$domain >/dev/null <<EOF
+nameserver 127.0.0.1
+EOF
+```
+Restart Dnsmasq service:
+```shell
+sudo systemctl restart dnsmasq
 ```
 
 ## Kubernetes Configuration
@@ -74,35 +133,31 @@ kubectl create namespace neuro
 ```
 Install nfs-server helm chart:
 ```shell
-helm upgrade nfs-server neuro/nfs-server -f values.yaml -n neuro --install --wait
+helm repo add neuro https://neuro-inc.github.io/helm-charts
+helm upgrade nfs-server neuro/nfs-server -f nfs-server-values.yaml -n neuro --install --wait
 ```
-nfs-server values file:
+nfs-server-values.yaml file:
 ```yaml
 args: [/exports/neuro]
-
 resources:
   requests:
     cpu: 100m
     memory: 256Mi
-
 persistence:
 - accessMode: ReadWriteOnce
   mountPath: /exports/neuro
   size: 100Gi
 ```
-Install platform-operator helm chart (before installation please that chart version is the latest):
+Install platform-operator helm chart:
 ```shell
 export HELM_EXPERIMENTAL_OCI=1
-export version=21.12.29
 
-curl -o values-standalone.yaml https://raw.githubusercontent.com/neuro-inc/platform-operator/v$version/chart/platform-operator/values-standalone.yaml
-
-helm upgrade platform-operator oci://ghcr.io/neuro-inc/helm-charts/platform-operator \
-    -f values-standalone.yaml \
-    -f values.yaml \
-    -n=neuro --install --wait --version $version
+cat platform-operator-values.yaml | envsubst | helm install \
+    platform-operator oci://ghcr.io/neuro-inc/helm-charts/platform-operator \
+    -f https://raw.githubusercontent.com/neuro-inc/platform-operator/master/charts/platform-operator/values-standalone.yaml \
+    -f - -n=neuro --wait
 ```
-platform-operator values file:
+platform-operator-values.yaml file:
 ```yaml
 consul:
   server:
@@ -114,10 +169,8 @@ consul:
       limits:
         cpu: 200m
         memory: 256Mi
-
 ingress:
   host: $domain
-
 platformConfig:
   resourcePools:
   - name: minikube
@@ -133,18 +186,18 @@ platformConfig:
 ```
 Get base64 representation of self-signed certificate which will be used in platform resource file:
 ```shell
-cert_data=$(cat server.crt | base64)
-cert_key_data=$(cat server.key | base64)
+export cert_data=$(cat server.crt | base64)
+export cert_key_data=$(cat server.key | base64)
 ```
 Get NFS server service IP address:
 ```shell
-nfs_server_ip=$(kubectl get svc nfs-server -o json | jq -r .spec.clusterIP)
+export nfs_server_ip=$(kubectl -n neuro get svc nfs-server -o=jsonpath='{.spec.clusterIP}')
 ```
 Create platform resource:
 ```shell
-kubectl apply -f platform.yaml
+cat platform.yaml | envsubst | kubectl apply -f -
 ```
-Platform resource file:
+platform.yaml file:
 ```yaml
 apiVersion: neuromation.io/v1
 kind: Platform
