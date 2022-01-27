@@ -57,10 +57,9 @@ Copy generated certificate to minikube's docker daemon certificates folder:
 mkdir -p ~/.minikube/files/etc/docker/certs.d/registry.$cluster.org.$domain
 cp server.crt ~/.minikube/files/etc/docker/certs.d/registry.$cluster.org.$domain
 ```
-Start minikube. Platform supports Kubernetes versions 1.16.\*-1.21.\*:
+Start minikube with CNI enabled. Platform supports Kubernetes versions 1.16.\*-1.21.\*:
 ```shell
-minikube start --cpus="6" --memory="8g" \
-    --kubernetes-version="1.20.9" --network-plugin=cni --cni=calico
+minikube start --cpus="6" --memory="8g" --kubernetes-version="1.20.9" --network-plugin=cni --cni=calico
 ```
 Configure minikube node labels:
 ```shell
