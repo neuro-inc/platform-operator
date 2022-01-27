@@ -8,7 +8,8 @@ Before starting you need to have already installed:
 - helm 3.7.0 and above
 - nivida/cuda + nvidia-docker2 (if GPU card is present)
 
-## Self-signed SSL Certificate Generation (MacOS)
+## Self-signed SSL Certificate Generation
+### MacOS
 ```shell
 export domain=neu.ro.local
 export cluster=default
@@ -29,7 +30,7 @@ openssl req \
     -days 365
 ```
 
-## Self-signed SSL Certificate Generation (Ubuntu)
+### Ubuntu
 ```shell
 export domain=neu.ro.local
 export cluster=default
@@ -71,7 +72,7 @@ If you have gpu device installed you need to add additional label:
 kubectl label node minikube platform.neuromation.io/accelerator=$gpu_model
 ```
 
-## DNS Configuration (MacOS)
+## DNS Configuration
 ### MacOS
 Install Dnsmasq:
 ```shell
@@ -96,7 +97,7 @@ Start Dnsmasq service:
 sudo brew services start dnsmasq
 ```
 
-## DNS Configuration (Ubuntu)
+### Ubuntu
 Ubuntu 18.04+ comes with systemd-resolve which you need to disable since it binds to port 53 which will conflict with Dnsmasq port. Run the following commands to disable the resolved service:
 ```shell
 sudo systemctl disable systemd-resolved
