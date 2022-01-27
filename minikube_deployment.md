@@ -72,6 +72,7 @@ kubectl label node minikube platform.neuromation.io/accelerator=$gpu_model
 ```
 
 ## DNS Configuration (MacOS)
+### MacOS
 Install Dnsmasq:
 ```shell
 brew install dnsmasq
