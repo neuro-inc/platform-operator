@@ -1196,7 +1196,7 @@ class HelmValuesFactory:
             "disks": {
                 "namespace": platform.jobs_namespace,
                 "limitPerUser": str(
-                    platform.disks_storage_limit_per_user_gb * 1024 ** 3
+                    platform.disks_storage_limit_per_user_gb * 1024**3
                 ),
             },
             "platform": {
