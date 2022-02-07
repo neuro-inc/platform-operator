@@ -85,7 +85,7 @@ async def end_operator_deployment(
 
 
 async def _backoff_sleep(attempt: int) -> None:
-    await asyncio.sleep(0.1 * 2 ** attempt)
+    await asyncio.sleep(0.1 * 2**attempt)
 
 
 def _get_lock_value(release_revision: int) -> bytes:

@@ -233,5 +233,5 @@ class ConsulClient:
                 attempt += 1
 
     async def _backoff_sleep(self, attempt: int) -> None:
-        delay_s = min(0.1 * 2 ** attempt, 60)
+        delay_s = min(0.1 * 2**attempt, 60)
         await asyncio.sleep(delay_s)
