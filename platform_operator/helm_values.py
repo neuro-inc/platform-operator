@@ -534,7 +534,24 @@ class HelmValuesFactory:
                 }
                 for s in platform.storages
             ],
-            "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_STORAGEAPI_SESSION"
+                    ),
+                    # TODO: remove traefik v1 annotations
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_STORAGEAPI_SESSION"
+                    ),
+                }
+            },
+            "ingress": {
+                "enabled": True,
+                "hosts": [platform.ingress_url.host],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
+            },
         }
         result.update(
             **self._create_cors_values(platform),
@@ -554,7 +571,24 @@ class HelmValuesFactory:
                 **self._create_platform_url_value("authUrl", platform.auth_url),
                 **self._create_platform_token_value(platform),
             },
-            "ingress": {"enabled": True, "hosts": [platform.ingress_registry_url.host]},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_REGISTRYAPI_SESSION"
+                    ),
+                    # TODO: remove traefik v1 annotations
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_REGISTRYAPI_SESSION"
+                    ),
+                }
+            },
+            "ingress": {
+                "enabled": True,
+                "hosts": [platform.ingress_registry_url.host],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
+            },
             "secrets": [],
         }
         result.update(**self._create_tracing_values(platform))
@@ -708,7 +742,24 @@ class HelmValuesFactory:
                 ),
                 **self._create_platform_token_value(platform),
             },
-            "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_MONITORINGAPI_SESSION"
+                    ),
+                    # TODO: remove traefik v1 annotations
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_MONITORINGAPI_SESSION"
+                    ),
+                }
+            },
+            "ingress": {
+                "enabled": True,
+                "hosts": [platform.ingress_url.host],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
+            },
             "containerRuntime": {"name": self._container_runtime},
             "fluentbit": {"image": {"repository": platform.get_image("fluent-bit")}},
             "fluentd": {
@@ -854,7 +905,24 @@ class HelmValuesFactory:
                 **self._create_platform_token_value(platform),
             },
             "secretsNamespace": platform.jobs_namespace,
-            "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_SECRETS_SESSION"
+                    ),
+                    # TODO: remove traefik v1 annotations
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_SECRETS_SESSION"
+                    ),
+                }
+            },
+            "ingress": {
+                "enabled": True,
+                "hosts": [platform.ingress_url.host],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
+            },
         }
         result.update(
             **self._create_cors_values(platform),
@@ -923,6 +991,19 @@ class HelmValuesFactory:
                 "ingress": {
                     "enabled": True,
                     "hosts": [platform.ingress_metrics_url.host],
+                    "annotations": {
+                        "kubernetes.io/ingress.class": "traefik",
+                        "traefik.ingress.kubernetes.io/router.middlewares": (
+                            f"{platform.namespace}-{platform.release_name}-ingress-auth"
+                            "@kubernetescrd"
+                        ),
+                        # TODO: remove traefik v1 annotations
+                        "ingress.kubernetes.io/auth-trust-headers": "true",
+                        "ingress.kubernetes.io/auth-type": "forward",
+                        "ingress.kubernetes.io/auth-url": str(
+                            platform.ingress_auth_url / "oauth/authorize"
+                        ),
+                    },
                 }
             },
             "kube-prometheus-stack": {
@@ -1204,7 +1285,24 @@ class HelmValuesFactory:
                 **self._create_platform_url_value("authUrl", platform.auth_url),
                 **self._create_platform_token_value(platform),
             },
-            "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_DISK_API_SESSION"
+                    ),
+                    # TODO: remove traefik v1 annotations
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_DISK_API_SESSION"
+                    ),
+                }
+            },
+            "ingress": {
+                "enabled": True,
+                "hosts": [platform.ingress_url.host],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
+            },
         }
         if platform.disks_storage_class_name:
             result["disks"]["storageClassName"] = platform.disks_storage_class_name
@@ -1239,6 +1337,14 @@ class HelmValuesFactory:
             "jobs": {
                 "namespace": platform.jobs_namespace,
                 "ingressClass": "traefik",
+                "ingressAuthMiddleware": (
+                    f"{platform.namespace}-{platform.release_name}-ingress-auth"
+                    "@kubernetescrd"
+                ),
+                "ingressErrorPageMiddleware": (
+                    f"{platform.namespace}-{platform.release_name}-error-page"
+                    "@kubernetescrd"
+                ),
                 "ingressOAuthAuthorizeUrl": str(
                     platform.ingress_auth_url / "oauth/authorize"
                 ),
@@ -1257,7 +1363,11 @@ class HelmValuesFactory:
                 }
                 for s in platform.storages
             ],
-            "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
+            "ingress": {
+                "enabled": True,
+                "hosts": [platform.ingress_url.host],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
+            },
         }
         result.update(**self._create_tracing_values(platform))
         if platform.kubernetes_provider == CloudProvider.AZURE:
@@ -1281,7 +1391,24 @@ class HelmValuesFactory:
                 **self._create_platform_url_value("authUrl", platform.auth_url),
                 **self._create_platform_token_value(platform),
             },
-            "ingress": {"enabled": True, "hosts": [platform.ingress_url.host]},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_BUCKETS_API_SESSION"
+                    ),
+                    # TODO: remove traefik v1 annotations
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_BUCKETS_API_SESSION"
+                    ),
+                }
+            },
+            "ingress": {
+                "enabled": True,
+                "hosts": [platform.ingress_url.host],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
+            },
             "secrets": [],
             "disableCreation": platform.buckets.disable_creation,
         }
