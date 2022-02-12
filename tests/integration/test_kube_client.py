@@ -8,7 +8,7 @@ import aiohttp
 import kopf
 import pytest
 
-from platform_operator.kube_client import KubeClient
+from platform_operator.kube_client import LOCK_EXPIRES_AT, LOCK_KEY, KubeClient
 
 
 class TestKubeClient:
@@ -127,3 +127,71 @@ class TestKubeClient:
         )
 
         assert result == {"phase": "Deployed"}
+
+    async def test_lock(self, kube_client: KubeClient) -> None:
+        messages = []
+
+        async def lock(key: str, delay: float | None = None) -> None:
+            if delay is not None:
+                await asyncio.sleep(delay)
+
+            async with kube_client.lock("kube-system", "coredns", key, ttl_s=5):
+                messages.append(f"start {key}")
+                await asyncio.sleep(0.5)
+                messages.append(f"end {key}")
+
+        tasks = [
+            asyncio.create_task(lock("1")),
+            asyncio.create_task(lock("2", delay=0.1)),
+        ]
+        await asyncio.wait(tasks)
+
+        assert messages == ["start 1", "end 1", "start 2", "end 2"]
+
+    async def test_lock_released_on_error(self, kube_client: KubeClient) -> None:
+        try:
+            async with kube_client.lock("kube-system", "coredns", "test", ttl_s=5):
+                raise asyncio.CancelledError()
+        except asyncio.CancelledError:
+            pass
+        deployment = await kube_client.get_deployment("kube-system", "coredns")
+        assert LOCK_KEY not in deployment.metadata.annotations
+        assert LOCK_EXPIRES_AT not in deployment.metadata.annotations
+
+    async def test_lock_reenter(self, kube_client: KubeClient) -> None:
+        async with kube_client.lock("kube-system", "coredns", "test", ttl_s=1):
+            async with kube_client.lock("kube-system", "coredns", "test", ttl_s=1):
+                pass
+            deployment = await kube_client.get_deployment("kube-system", "coredns")
+            assert LOCK_KEY not in deployment.metadata.annotations
+            assert LOCK_EXPIRES_AT not in deployment.metadata.annotations
+
+    async def test_lock_expired(self, kube_client: KubeClient) -> None:
+        await kube_client.acquire_lock("kube-system", "coredns", "test1", ttl_s=0.5)
+
+        await asyncio.sleep(1)
+
+        async with kube_client.lock("kube-system", "coredns", "test2", ttl_s=0.5):
+            deployment = await kube_client.get_deployment("kube-system", "coredns")
+            assert deployment.metadata.annotations[LOCK_KEY] == "test2"
+            assert LOCK_EXPIRES_AT in deployment.metadata.annotations
+
+    async def test_lock_not_found(self, kube_client: KubeClient) -> None:
+        with pytest.raises(aiohttp.ClientError):
+            async with kube_client.lock("kube-system", "unknown", "test", ttl_s=0.5):
+                pass
+
+    async def test_release_other_lock(self, kube_client: KubeClient) -> None:
+        async with kube_client.lock("kube-system", "coredns", "test", ttl_s=0.5):
+            await kube_client.release_lock("kube-system", "coredns", "test_other")
+
+            deployment = await kube_client.get_deployment("kube-system", "coredns")
+            assert deployment.metadata.annotations[LOCK_KEY] == "test"
+            assert LOCK_EXPIRES_AT in deployment.metadata.annotations
+
+    async def test_release_not_acquired_lock(self, kube_client: KubeClient) -> None:
+        deployment = await kube_client.get_deployment("kube-system", "coredns")
+        assert LOCK_KEY not in deployment.metadata.annotations
+        assert LOCK_EXPIRES_AT not in deployment.metadata.annotations
+
+        await kube_client.release_lock("kube-system", "coredns", "test")

@@ -14,7 +14,6 @@ from neuro_logging import make_request_logging_trace_config
 
 from .aws_client import AwsElbClient
 from .config_client import ConfigClient, NotificationType
-from .consul_client import ConsulClient
 from .helm_client import HelmClient, ReleaseStatus
 from .helm_values import HelmValuesFactory
 from .kube_client import (
@@ -33,7 +32,6 @@ from .models import (
     PlatformConfigFactory,
     StorageType,
 )
-from .operator import LOCK_KEY
 
 
 @dataclass
@@ -43,7 +41,6 @@ class App:
     helm_client: HelmClient = None  # type: ignore
     kube_client: KubeClient = None  # type: ignore
     status_manager: PlatformStatusManager = None  # type: ignore
-    consul_client: ConsulClient = None  # type: ignore
     config_client: ConfigClient = None  # type: ignore
     raw_client: aiohttp.ClientSession = None  # type: ignore
     exit_stack: AsyncExitStack = field(default_factory=AsyncExitStack)
@@ -75,9 +72,6 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
     )
     app.config_client = await app.exit_stack.enter_async_context(
         ConfigClient(config.platform_config_url, trace_configs)
-    )
-    app.consul_client = await app.exit_stack.enter_async_context(
-        ConsulClient(config.consul_url, trace_configs)
     )
     app.raw_client = await app.exit_stack.enter_async_context(
         aiohttp.ClientSession(trace_configs=trace_configs)
@@ -140,12 +134,11 @@ async def deploy(
             f"Platform deployment has exceeded {config.retries} retries"
         )
 
-    await app.consul_client.wait_healthy(sleep_s=0.5)
-
-    async with app.consul_client.lock_key(
-        LOCK_KEY,
-        b"platform-deploying",
-        session_ttl_s=15 * 60,
+    async with app.kube_client.lock(
+        config.platform_namespace,
+        config.platform_operator_deployment_name,
+        "platform-deploy",
+        ttl_s=15 * 60,
         sleep_s=3,
     ):
         await _deploy(name, body, logger, retry)
@@ -215,10 +208,11 @@ async def delete(
     if retry == 0:
         await app.status_manager.start_deletion(name)
 
-    async with app.consul_client.lock_key(
-        LOCK_KEY,
-        b"platform-deleting",
-        session_ttl_s=15 * 60,
+    async with app.kube_client.lock(
+        config.platform_namespace,
+        config.platform_operator_deployment_name,
+        "platform-delete",
+        ttl_s=15 * 60,
         sleep_s=3,
     ):
         await _delete(name, body, logger)
@@ -280,8 +274,6 @@ async def watch_config(
 ) -> None:
     logger = logging.getLogger("watch_config")
 
-    await app.consul_client.wait_healthy(sleep_s=0.5)
-
     logger.info("Started watching platform config")
 
     while True:
@@ -298,10 +290,11 @@ async def watch_config(
         await asyncio.sleep(config.platform_config_watch_interval_s)
 
         try:
-            async with app.consul_client.lock_key(
-                LOCK_KEY,
-                b"platform-config-updating",
-                session_ttl_s=15 * 60,
+            async with app.kube_client.lock(
+                config.platform_namespace,
+                config.platform_operator_deployment_name,
+                "platform-watch",
+                ttl_s=15 * 60,
                 sleep_s=3,
             ):
                 await _update(name, body, logger)

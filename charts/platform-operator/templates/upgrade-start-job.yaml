@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "platformOperator.fullname" . }}-upgrade-start
+  labels: {{ include "platformOperator.labels.standard" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: start-upgrade
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        command: [python]
+        args:
+        - -c
+        - |
+          from platform_operator.helm_hooks import start_helm_chart_upgrade_hook
+
+          deployment_namespace = "{{ .Release.Namespace }}"
+          deployment_name = "{{ include "platformOperator.fullname" . }}-controller"
+
+          start_helm_chart_upgrade_hook(deployment_namespace, deployment_name)
+        env:
+        - name: NP_KUBE_URL
+          value: https://kubernetes.default.svc
+        - name: NP_KUBE_CERT_AUTHORITY_PATH
+          value: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        - name: NP_KUBE_AUTH_TYPE
+          value: token
+        - name: NP_KUBE_AUTH_TOKEN_PATH
+          value: /var/run/secrets/kubernetes.io/serviceaccount/token
+        - name: NP_KUBE_VERSION
+          value: {{ .Capabilities.KubeVersion.Version | toString | quote }}

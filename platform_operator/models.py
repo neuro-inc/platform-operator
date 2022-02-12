@@ -134,6 +134,7 @@ class Config:
     platform_config_watch_interval_s: float
     platform_api_url: URL
     platform_namespace: str
+    platform_operator_deployment_name: str
     acme_ca_staging_path: str
     consul_url: URL
     consul_installed: bool
@@ -142,7 +143,6 @@ class Config:
     @classmethod
     def load_from_env(cls, env: Mapping[str, str] | None = None) -> Config:
         env = env or os.environ
-        platform_release_name = "platform"
         return cls(
             node_name=env["NP_NODE_NAME"],
             log_level=(env.get("NP_CONTROLLER_LOG_LEVEL") or "INFO").upper(),
@@ -150,7 +150,7 @@ class Config:
             backoff=int(env.get("NP_CONTROLLER_BACKOFF") or "60"),
             kube_config=KubeConfig.load_from_env(env),
             helm_release_names=HelmReleaseNames(
-                platform=platform_release_name,
+                platform="platform",
                 obs_csi_driver="platform-obs-csi-driver",
             ),
             helm_chart_names=HelmChartNames(),
@@ -167,6 +167,7 @@ class Config:
             ),
             platform_api_url=URL(env["NP_PLATFORM_API_URL"]),
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
+            platform_operator_deployment_name=env["NP_PLATFORM_OPERATOR_DEPLOYMENT"],
             acme_ca_staging_path=env["NP_ACME_CA_STAGING_PATH"],
             consul_url=URL(env["NP_CONSUL_URL"]),
             consul_installed=env.get("NP_CONSUL_INSTALLED", "false").lower() == "true",
