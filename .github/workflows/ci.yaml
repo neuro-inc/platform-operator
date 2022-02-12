@@ -51,7 +51,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y conntrack
         sudo install minikube-linux-amd64 /usr/local/bin/minikube
-        minikube start --driver="none" --wait
+        minikube start --driver="none" --wait=true
         sudo chown -R $USER $HOME/.kube /root/.minikube
         sudo chmod -R a+r $HOME/.kube /root/.minikube
         sudo find /root/.minikube -name id_rsa -exec chmod 600 {} \;
