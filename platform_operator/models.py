@@ -43,6 +43,29 @@ class KubeConfig:
     read_timeout_s: int = 100
     conn_pool_size: int = 100
 
+    @classmethod
+    def load_from_env(cls, env: Mapping[str, str] | None = None) -> KubeConfig:
+        env = env or os.environ
+        return cls(
+            version=env["NP_KUBE_VERSION"].lstrip("v"),
+            url=URL(env["NP_KUBE_URL"]),
+            cert_authority_path=cls._convert_to_path(
+                env.get("NP_KUBE_CERT_AUTHORITY_PATH")
+            ),
+            cert_authority_data_pem=env.get("NP_KUBE_CERT_AUTHORITY_DATA_PEM"),
+            auth_type=KubeClientAuthType(env["NP_KUBE_AUTH_TYPE"]),
+            auth_cert_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_CERT_PATH")),
+            auth_cert_key_path=cls._convert_to_path(
+                env.get("NP_KUBE_AUTH_CERT_KEY_PATH")
+            ),
+            auth_token_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_TOKEN_PATH")),
+            auth_token=env.get("NP_KUBE_AUTH_TOKEN"),
+        )
+
+    @classmethod
+    def _convert_to_path(cls, value: str | None) -> Path | None:
+        return Path(value) if value else None
+
 
 @dataclass(frozen=True)
 class LabelsConfig:
@@ -125,23 +148,7 @@ class Config:
             log_level=(env.get("NP_CONTROLLER_LOG_LEVEL") or "INFO").upper(),
             retries=int(env.get("NP_CONTROLLER_RETRIES") or "3"),
             backoff=int(env.get("NP_CONTROLLER_BACKOFF") or "60"),
-            kube_config=KubeConfig(
-                version=env["NP_KUBE_VERSION"].lstrip("v"),
-                url=URL(env["NP_KUBE_URL"]),
-                cert_authority_path=cls._convert_to_path(
-                    env.get("NP_KUBE_CERT_AUTHORITY_PATH")
-                ),
-                cert_authority_data_pem=env.get("NP_KUBE_CERT_AUTHORITY_DATA_PEM"),
-                auth_type=KubeClientAuthType(env["NP_KUBE_AUTH_TYPE"]),
-                auth_cert_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_CERT_PATH")),
-                auth_cert_key_path=cls._convert_to_path(
-                    env.get("NP_KUBE_AUTH_CERT_KEY_PATH")
-                ),
-                auth_token_path=cls._convert_to_path(
-                    env.get("NP_KUBE_AUTH_TOKEN_PATH")
-                ),
-                auth_token=env.get("NP_KUBE_AUTH_TOKEN"),
-            ),
+            kube_config=KubeConfig.load_from_env(env),
             helm_release_names=HelmReleaseNames(
                 platform=platform_release_name,
                 obs_csi_driver="platform-obs-csi-driver",
@@ -165,10 +172,6 @@ class Config:
             consul_installed=env.get("NP_CONSUL_INSTALLED", "false").lower() == "true",
             is_standalone=env.get("NP_STANDALONE", "false").lower() == "true",
         )
-
-    @classmethod
-    def _convert_to_path(cls, value: str | None) -> Path | None:
-        return Path(value) if value else None
 
 
 class Cluster(dict[str, Any]):
