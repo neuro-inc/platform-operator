@@ -12,7 +12,7 @@ dependencies:
   - name: postgresql
     version: "10.13.11"
     repository: https://charts.bitnami.com/bitnami
-    condition: standalone
+    condition: platform.standalone
   - name: postgres-db-init-script
-    version: "1.0.5"
+    version: "1.0.8"
     repository: https://neuro-inc.github.io/helm-charts

@@ -1,10 +1,9 @@
-standalone: true
-
 consul:
   server:
     replicas: 1
 
 platform:
+  standalone: true
   configUrl: http://platform-config:8080
   apiUrl: http://platform-api:8080
   authUrl: "-"
@@ -52,7 +51,7 @@ postgresql:
   initdbScriptsConfigMap: postgresql-init-script
 
   extraEnv:
-  - name: NP_POSTGRES_ADMIN_PASSWORD
+  - name: NP_ADMIN_PASSWORD
     valueFrom:
       secretKeyRef:
         name: postgresql-config-secrets

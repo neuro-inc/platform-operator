@@ -737,9 +737,22 @@ class TestHelmValuesFactory:
             "nameOverride": "platform-storage",
             "fullnameOverride": "platform-storage",
             "image": {"repository": "neuro.io/platformstorageapi"},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_STORAGEAPI_SESSION"
+                    ),
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_STORAGEAPI_SESSION"
+                    ),
+                }
+            },
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
@@ -852,9 +865,22 @@ class TestHelmValuesFactory:
                 ]
             },
             "image": {"repository": "neuro.io/platformbucketsapi"},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_BUCKETS_API_SESSION"
+                    ),
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_BUCKETS_API_SESSION"
+                    ),
+                }
+            },
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{aws_platform_config.cluster_name}.org.neu.ro"],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": aws_platform_config.cluster_name,
@@ -945,9 +971,22 @@ class TestHelmValuesFactory:
                 ]
             },
             "image": {"repository": "neuro.io/platformbucketsapi"},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_BUCKETS_API_SESSION"
+                    ),
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_BUCKETS_API_SESSION"
+                    ),
+                }
+            },
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{on_prem_platform_config.cluster_name}.org.neu.ro"],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": on_prem_platform_config.cluster_name,
@@ -1025,9 +1064,22 @@ class TestHelmValuesFactory:
                 ]
             },
             "image": {"repository": "neuro.io/platformbucketsapi"},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_BUCKETS_API_SESSION"
+                    ),
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_BUCKETS_API_SESSION"
+                    ),
+                }
+            },
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{on_prem_platform_config.cluster_name}.org.neu.ro"],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": on_prem_platform_config.cluster_name,
@@ -1078,9 +1130,22 @@ class TestHelmValuesFactory:
                 ]
             },
             "image": {"repository": "neuro.io/platformbucketsapi"},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_BUCKETS_API_SESSION"
+                    ),
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_BUCKETS_API_SESSION"
+                    ),
+                }
+            },
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{cluster_name}.org.neu.ro"],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": cluster_name,
@@ -1128,9 +1193,22 @@ class TestHelmValuesFactory:
                 ]
             },
             "image": {"repository": "neuro.io/platformbucketsapi"},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_BUCKETS_API_SESSION"
+                    ),
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_BUCKETS_API_SESSION"
+                    ),
+                }
+            },
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
@@ -1181,9 +1259,22 @@ class TestHelmValuesFactory:
                 ]
             },
             "image": {"repository": "neuro.io/platformbucketsapi"},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_BUCKETS_API_SESSION"
+                    ),
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_BUCKETS_API_SESSION"
+                    ),
+                }
+            },
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{azure_platform_config.cluster_name}.org.neu.ro"],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": azure_platform_config.cluster_name,
@@ -1216,9 +1307,22 @@ class TestHelmValuesFactory:
             "nameOverride": "platform-registry",
             "fullnameOverride": "platform-registry",
             "image": {"repository": "neuro.io/platformregistryapi"},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_REGISTRYAPI_SESSION"
+                    ),
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_REGISTRYAPI_SESSION"
+                    ),
+                }
+            },
             "ingress": {
                 "enabled": True,
                 "hosts": [f"registry.{gcp_platform_config.cluster_name}.org.neu.ro"],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
@@ -1281,9 +1385,22 @@ class TestHelmValuesFactory:
             "nameOverride": "platform-registry",
             "fullnameOverride": "platform-registry",
             "image": {"repository": "neuro.io/platformregistryapi"},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_REGISTRYAPI_SESSION"
+                    ),
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_REGISTRYAPI_SESSION"
+                    ),
+                }
+            },
             "ingress": {
                 "enabled": True,
                 "hosts": [f"registry.{aws_platform_config.cluster_name}.org.neu.ro"],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": aws_platform_config.cluster_name,
@@ -1326,9 +1443,22 @@ class TestHelmValuesFactory:
             "nameOverride": "platform-registry",
             "fullnameOverride": "platform-registry",
             "image": {"repository": "neuro.io/platformregistryapi"},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_REGISTRYAPI_SESSION"
+                    ),
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_REGISTRYAPI_SESSION"
+                    ),
+                }
+            },
             "ingress": {
                 "enabled": True,
                 "hosts": [f"registry.{azure_platform_config.cluster_name}.org.neu.ro"],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": azure_platform_config.cluster_name,
@@ -1387,11 +1517,24 @@ class TestHelmValuesFactory:
             "nameOverride": "platform-registry",
             "fullnameOverride": "platform-registry",
             "image": {"repository": "neuro.io/platformregistryapi"},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_REGISTRYAPI_SESSION"
+                    ),
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_REGISTRYAPI_SESSION"
+                    ),
+                }
+            },
             "ingress": {
                 "enabled": True,
                 "hosts": [
                     f"registry.{on_prem_platform_config.cluster_name}.org.neu.ro"
                 ],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": on_prem_platform_config.cluster_name,
@@ -1471,9 +1614,22 @@ class TestHelmValuesFactory:
                     }
                 },
             },
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_MONITORINGAPI_SESSION"
+                    ),
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_MONITORINGAPI_SESSION"
+                    ),
+                }
+            },
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "cors": {
                 "origins": [
@@ -1705,9 +1861,22 @@ class TestHelmValuesFactory:
             "nameOverride": "platform-secrets",
             "fullnameOverride": "platform-secrets",
             "image": {"repository": "neuro.io/platformsecrets"},
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_SECRETS_SESSION"
+                    ),
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_SECRETS_SESSION"
+                    ),
+                }
+            },
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "secretsNamespace": "platform-jobs",
             "platform": {
@@ -1784,6 +1953,17 @@ class TestHelmValuesFactory:
                 "ingress": {
                     "enabled": True,
                     "hosts": [f"metrics.{gcp_platform_config.cluster_name}.org.neu.ro"],
+                    "annotations": {
+                        "kubernetes.io/ingress.class": "traefik",
+                        "traefik.ingress.kubernetes.io/router.middlewares": (
+                            "platform-platform-ingress-auth@kubernetescrd"
+                        ),
+                        "ingress.kubernetes.io/auth-type": "forward",
+                        "ingress.kubernetes.io/auth-url": (
+                            "https://platformingressauth/oauth/authorize"
+                        ),
+                        "ingress.kubernetes.io/auth-trust-headers": "true",
+                    },
                 }
             },
             "kube-prometheus-stack": {
@@ -2206,9 +2386,22 @@ class TestHelmValuesFactory:
                     "https://app.neu.ro",
                 ]
             },
+            "service": {
+                "annotations": {
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
+                    "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
+                        "NEURO_DISK_API_SESSION"
+                    ),
+                    "traefik.ingress.kubernetes.io/affinity": "true",
+                    "traefik.ingress.kubernetes.io/session-cookie-name": (
+                        "NEURO_DISK_API_SESSION"
+                    ),
+                }
+            },
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "sentry": {
                 "dsn": "https://sentry",
@@ -2265,6 +2458,12 @@ class TestHelmValuesFactory:
             "jobs": {
                 "namespace": "platform-jobs",
                 "ingressClass": "traefik",
+                "ingressAuthMiddleware": (
+                    "platform-platform-ingress-auth@kubernetescrd"
+                ),
+                "ingressErrorPageMiddleware": (
+                    "platform-platform-error-page@kubernetescrd"
+                ),
                 "ingressOAuthAuthorizeUrl": (
                     "https://platformingressauth/oauth/authorize"
                 ),
@@ -2280,6 +2479,7 @@ class TestHelmValuesFactory:
             "ingress": {
                 "enabled": True,
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "sentry": {
                 "dsn": "https://sentry",
