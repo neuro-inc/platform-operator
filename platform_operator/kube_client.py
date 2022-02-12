@@ -4,10 +4,10 @@ import asyncio
 import json
 import logging
 import ssl
-from base64 import b64decode
+from base64 import b64decode, b64encode
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 
@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 PLATFORM_GROUP = "neuromation.io"
 PLATFORM_API_VERSION = "v1"
 PLATFORM_PLURAL = "platforms"
+
+LOCK_KEY = "neu.ro/lock-key"
+LOCK_EXPIRES_AT = "neu.ro/lock-expires-at"
 
 
 class PlatformPhase(str, Enum):
@@ -96,21 +99,26 @@ class Endpoints:
         return self.platforms(namespace) / name
 
 
-class Node:
+class Metadata:
     def __init__(self, payload: dict[str, Any]) -> None:
         self._payload = payload
 
     @property
+    def annotations(self) -> dict[str, Any]:
+        if "annotations" not in self._payload:
+            self._payload["annotations"] = {}
+        return self._payload["annotations"]
+
+
+class Node(dict[str, Any]):
+    @property
     def container_runtime(self) -> str:
-        version = self._payload["status"]["nodeInfo"]["containerRuntimeVersion"]
+        version = self["status"]["nodeInfo"]["containerRuntimeVersion"]
         end = version.find("://")
         return version[0:end]
 
 
 class Service(dict[str, Any]):
-    def __init__(self, payload: dict[str, Any]) -> None:
-        super().__init__(payload)
-
     @property
     def cluster_ip(self) -> str:
         return self["spec"]["clusterIP"]
@@ -118,6 +126,12 @@ class Service(dict[str, Any]):
     @property
     def load_balancer_host(self) -> str:
         return self["status"]["loadBalancer"]["ingress"][0]["hostname"]
+
+
+class Secret(dict[str, Any]):
+    @property
+    def metadata(self) -> Metadata:
+        return Metadata(self["metadata"])
 
 
 class KubeClient:
@@ -235,21 +249,54 @@ class KubeClient:
         ) as response:
             response.raise_for_status()
 
-    async def get_secret(self, namespace: str, name: str) -> dict[str, Any]:
+    async def create_secret(self, namespace: str, payload: dict[str, Any]) -> None:
+        assert self._session
+        async with self._session.post(
+            self._endpoints.secrets(namespace), json=payload
+        ) as response:
+            response.raise_for_status()
+
+    async def update_secret(
+        self, namespace: str, name: str, payload: dict[str, Any]
+    ) -> None:
+        assert self._session
+        async with self._session.put(
+            self._endpoints.secret(namespace, name), json=payload
+        ) as response:
+            response.raise_for_status()
+
+    async def delete_secret(self, namespace: str, name: str) -> None:
+        assert self._session
+        async with self._session.delete(
+            self._endpoints.secret(namespace, name)
+        ) as response:
+            response.raise_for_status()
+
+    async def get_secret(self, namespace: str, name: str) -> Secret:
         assert self._session
         async with self._session.get(
             self._endpoints.secret(namespace, name)
         ) as response:
             response.raise_for_status()
             payload = await response.json()
-            return self._decode_secret_data(payload)
+            return Secret(self._decode_secret_data(payload))
+
+    def _encode_secret_data(self, secret: dict[str, Any]) -> dict[str, Any]:
+        secret = dict(**secret)
+        encoded_data: dict[str, str] = {}
+        for key, value in secret.get("data", {}).items():
+            encoded_data[key] = b64encode(value.encode("utf-8")).decode("utf-8")
+        if encoded_data:
+            secret["data"] = encoded_data
+        return secret
 
     def _decode_secret_data(self, secret: dict[str, Any]) -> dict[str, Any]:
         secret = dict(**secret)
         decoded_data: dict[str, str] = {}
-        for key, value in secret["data"].items():
-            decoded_data[key] = b64decode(value.encode("utf-8")).decode("utf-8")
-        secret["data"] = decoded_data
+        for key, value in secret.get("data", {}).items():
+            decoded_data[key] = b64decode(value).decode("utf-8")
+        if decoded_data:
+            secret["data"] = decoded_data
         return secret
 
     async def get_pods(
@@ -323,11 +370,92 @@ class KubeClient:
         ) as response:
             response.raise_for_status()
 
+    async def acquire_lock(
+        self,
+        namespace: str,
+        name: str,
+        lock_key: str,
+        *,
+        ttl_s: float = 15 * 60,
+        sleep_s: float = 0.1,
+    ) -> None:
+        while True:
+            try:
+                resource = await self.get_secret(namespace, name)
+                expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_s)
+                annotations = resource.metadata.annotations
+                old_lock_key = annotations.get(LOCK_KEY)
+                if (
+                    old_lock_key is None
+                    or old_lock_key == lock_key
+                    or datetime.fromisoformat(annotations[LOCK_EXPIRES_AT])
+                    <= datetime.now(timezone.utc)
+                ):
+                    annotations[LOCK_KEY] = lock_key
+                    annotations[LOCK_EXPIRES_AT] = expires_at.isoformat()
+                    await self.update_secret(namespace, name, resource)
+                    logger.debug(
+                        "Lock %r acquired, expires at %r",
+                        lock_key,
+                        expires_at.isoformat(),
+                    )
+                    return
+            except aiohttp.ClientResponseError as ex:
+                if ex.status == 409:
+                    logger.debug(
+                        "Failed to acquire lock %r: resource modified", lock_key
+                    )
+                else:
+                    logger.debug(
+                        "Failed to acquire lock %r: unexpected error", lock_key
+                    )
+                    raise
+            logger.debug("Waiting for %rs until next attempt", sleep_s)
+            await asyncio.sleep(sleep_s)
+
+    async def release_lock(self, namespace: str, name: str, lock_key: str) -> None:
+        while True:
+            try:
+                resource = await self.get_secret(namespace, name)
+                annotations = resource.metadata.annotations
+                old_lock_key = annotations.get(LOCK_KEY)
+                if old_lock_key is None or lock_key == old_lock_key:
+                    annotations.pop(LOCK_KEY, None)
+                    annotations.pop(LOCK_EXPIRES_AT, None)
+                    await self.update_secret(namespace, name, resource)
+                    logger.debug("Lock %r released", lock_key)
+                return
+            except aiohttp.ClientResponseError as ex:
+                if ex.status == 409:
+                    logger.debug(
+                        "Failed to release lock %r: resource modified", lock_key
+                    )
+                else:
+                    logger.debug(
+                        "Failed to release lock %r: unexpected error", lock_key
+                    )
+                    raise
+
+    @asynccontextmanager
+    async def lock(
+        self,
+        namespace: str,
+        name: str,
+        lock_key: str,
+        *,
+        ttl_s: float = 15 * 60,
+        sleep_s: float = 0.1,
+    ) -> AsyncIterator[None]:
+        try:
+            await self.acquire_lock(
+                namespace, name, lock_key, ttl_s=ttl_s, sleep_s=sleep_s
+            )
+            yield
+        finally:
+            await asyncio.shield(self.release_lock(namespace, name, lock_key))
+
 
 class PlatformCondition(dict[str, Any]):
-    def __init__(self, payload: dict[str, Any]) -> None:
-        super().__init__(payload)
-
     @property
     def type(self) -> str:
         return self["type"]
@@ -354,9 +482,6 @@ class PlatformCondition(dict[str, Any]):
 
 
 class PlatformStatus(dict[str, Any]):
-    def __init__(self, payload: dict[str, Any]) -> None:
-        super().__init__(payload)
-
     @property
     def phase(self) -> str:
         return self["phase"]

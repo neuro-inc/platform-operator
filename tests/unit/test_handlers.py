@@ -12,7 +12,6 @@ import pytest
 
 from platform_operator.aws_client import AwsElbClient
 from platform_operator.config_client import ConfigClient, NotificationType
-from platform_operator.consul_client import ConsulClient
 from platform_operator.helm_client import HelmClient, Release, ReleaseStatus
 from platform_operator.helm_values import HelmValuesFactory
 from platform_operator.kube_client import (
@@ -37,13 +36,12 @@ pytestmark = [pytest.mark.asyncio, pytest.mark.usefixtures("setup_app")]
 @pytest.fixture
 def setup_app(
     config: Config,
-    consul_client: ConsulClient,
     kube_client: KubeClient,
     status_manager: PlatformStatusManager,
     config_client: ConfigClient,
     helm_client: HelmClient,
-    helm_values_factory: HelmValuesFactory,
     raw_client: aiohttp.ClientSession,
+    helm_values_factory: HelmValuesFactory,
 ) -> Iterator[None]:
     with mock.patch.object(Config, "load_from_env") as method:
         method.return_value = config
@@ -51,7 +49,6 @@ def setup_app(
         from platform_operator.handlers import App
 
         with mock.patch("platform_operator.handlers.app", spec=App) as app:
-            app.consul_client = consul_client
             app.kube_client = kube_client
             app.status_manager = status_manager
             app.config_client = config_client
@@ -60,11 +57,6 @@ def setup_app(
             app.platform_config_factory = PlatformConfigFactory(config)
             app.helm_values_factory = helm_values_factory
             yield
-
-
-@pytest.fixture
-def consul_client() -> mock.AsyncMock:
-    return mock.AsyncMock(ConsulClient)
 
 
 @pytest.fixture
@@ -525,7 +517,6 @@ async def test_configure_cluster_with_ingress_controller_disabled(
 
 async def test_deploy(
     status_manager: mock.AsyncMock,
-    consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -554,8 +545,6 @@ async def test_deploy(
     is_platform_deploy_required.assert_awaited_once_with(
         gcp_platform_config, install=True
     )
-
-    consul_client.wait_healthy.assert_called_once()
 
     config_client.get_cluster.assert_awaited_once_with(
         cluster_name=gcp_platform_config.cluster_name,
@@ -731,7 +720,6 @@ async def test_deploy_all_charts_deployed(
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
-    config: Config,
     gcp_cluster: Cluster,
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
@@ -828,7 +816,6 @@ async def test_deploy_with_invalid_spec(
 
 async def test_deploy_no_changes(
     status_manager: mock.AsyncMock,
-    consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
     raw_client: mock.AsyncMock,
@@ -854,8 +841,6 @@ async def test_deploy_no_changes(
         retry=0,
     )
 
-    consul_client.wait_healthy.assert_called_once()
-
     config_client.get_cluster.assert_awaited_once_with(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_body["spec"]["token"],
@@ -876,7 +861,6 @@ async def test_deploy_no_changes(
 )
 async def test_deploy_helm_release_failed(
     status_manager: mock.AsyncMock,
-    consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     is_obs_csi_driver_deploy_failed: mock.AsyncMock,
     is_platform_deploy_failed: mock.AsyncMock,
@@ -901,8 +885,6 @@ async def test_deploy_helm_release_failed(
             logger=logger,
             retry=0,
         )
-
-    consul_client.wait_healthy.assert_called_once()
 
     config_client.get_cluster.assert_awaited_once_with(
         cluster_name=gcp_platform_config.cluster_name,
@@ -1029,7 +1011,6 @@ async def test_delete_with_invalid_configuration(
 
 async def test_watch_config(
     status_manager: mock.AsyncMock,
-    consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -1057,8 +1038,6 @@ async def test_watch_config(
         logger=logger,
         stopped=stopped,
     )
-
-    consul_client.wait_healthy.assert_called_once()
 
     config_client.get_cluster.assert_awaited_once_with(
         cluster_name=gcp_platform_config.cluster_name,
@@ -1140,7 +1119,6 @@ async def test_watch_config(
 
 async def test_watch_config_all_charts_deployed(
     status_manager: mock.AsyncMock,
-    consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
     raw_client: mock.AsyncMock,
@@ -1165,8 +1143,6 @@ async def test_watch_config_all_charts_deployed(
         logger=logger,
         stopped=stopped,
     )
-
-    consul_client.wait_healthy.assert_called_once()
 
     config_client.get_cluster.assert_awaited_once_with(
         cluster_name=gcp_platform_config.cluster_name,
@@ -1194,14 +1170,11 @@ async def test_watch_config_all_charts_deployed(
 
 async def test_watch_config_no_changes(
     status_manager: mock.AsyncMock,
-    consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
-    helm_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
-    config: Config,
     gcp_cluster: Cluster,
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
@@ -1220,8 +1193,6 @@ async def test_watch_config_no_changes(
         stopped=stopped,
     )
 
-    consul_client.wait_healthy.assert_called_once()
-
     config_client.get_cluster.assert_awaited_once_with(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_config.token,
@@ -1236,7 +1207,6 @@ async def test_watch_config_no_changes(
 )
 async def test_watch_config_platform_deploying_deleting(
     status_manager: mock.AsyncMock,
-    consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
@@ -1258,7 +1228,6 @@ async def test_watch_config_platform_deploying_deleting(
         stopped=stopped,
     )
 
-    consul_client.wait_healthy.assert_called_once()
     helm_client.add_repo.assert_not_awaited()
     status_manager.start_deployment.assert_not_awaited()
 
@@ -1269,14 +1238,11 @@ async def test_watch_config_platform_deploying_deleting(
 )
 async def test_watch_config_helm_release_failed(
     status_manager: mock.AsyncMock,
-    consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
-    helm_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
     is_obs_csi_driver_deploy_failed: mock.AsyncMock,
     is_platform_deploy_failed: mock.AsyncMock,
     logger: logging.Logger,
-    config: Config,
     gcp_cluster: Cluster,
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
@@ -1296,8 +1262,6 @@ async def test_watch_config_helm_release_failed(
         logger=logger,
         stopped=stopped,
     )
-
-    consul_client.wait_healthy.assert_called_once()
 
     config_client.get_cluster.assert_awaited_once_with(
         cluster_name=gcp_platform_config.cluster_name,
