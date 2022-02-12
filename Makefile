@@ -33,14 +33,8 @@ test_unit:
 	pytest -vv tests/unit
 
 test_integration:
-	docker-compose -f tests/integration/docker/docker-compose.yaml pull -q
-	docker-compose -f tests/integration/docker/docker-compose.yaml up -d
-	@$(WAIT_FOR_IT) 0.0.0.0:8500 -- echo "consul is up"
 	kubectl --context minikube apply -f charts/platform-operator/crds
-	@pytest -vv --log-level=INFO tests/integration; \
-	exit_code=$$?; \
-	docker-compose -f tests/integration/docker/docker-compose.yaml down -v; \
-	exit $$exit_code
+	pytest -vv --log-level=INFO tests/integration
 
 docker_build:
 	rm -rf build dist
