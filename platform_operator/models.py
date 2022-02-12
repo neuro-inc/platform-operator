@@ -134,7 +134,7 @@ class Config:
     platform_config_watch_interval_s: float
     platform_api_url: URL
     platform_namespace: str
-    platform_operator_deployment_name: str
+    platform_lock_secret_name: str
     acme_ca_staging_path: str
     consul_url: URL
     consul_installed: bool
@@ -167,7 +167,7 @@ class Config:
             ),
             platform_api_url=URL(env["NP_PLATFORM_API_URL"]),
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
-            platform_operator_deployment_name=env["NP_PLATFORM_OPERATOR_DEPLOYMENT"],
+            platform_lock_secret_name=env["NP_PLATFORM_LOCK_SECRET_NAME"],
             acme_ca_staging_path=env["NP_ACME_CA_STAGING_PATH"],
             consul_url=URL(env["NP_CONSUL_URL"]),
             consul_installed=env.get("NP_CONSUL_INSTALLED", "false").lower() == "true",

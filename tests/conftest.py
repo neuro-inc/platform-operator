@@ -61,7 +61,7 @@ def config() -> Config:
         platform_admin_url=URL("https://dev.neu.ro"),
         platform_api_url=URL("https://dev.neu.ro"),
         platform_namespace="platform",
-        platform_operator_deployment_name="platform-operator-conftroller",
+        platform_lock_secret_name="platform-operator-lock",
         acme_ca_staging_path="/ca.pem",
         consul_url=URL("http://consul:8500"),
         consul_installed=True,

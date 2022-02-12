@@ -136,7 +136,7 @@ async def deploy(
 
     async with app.kube_client.lock(
         config.platform_namespace,
-        config.platform_operator_deployment_name,
+        config.platform_lock_secret_name,
         "platform-deploy",
         ttl_s=15 * 60,
         sleep_s=3,
@@ -210,7 +210,7 @@ async def delete(
 
     async with app.kube_client.lock(
         config.platform_namespace,
-        config.platform_operator_deployment_name,
+        config.platform_lock_secret_name,
         "platform-delete",
         ttl_s=15 * 60,
         sleep_s=3,
@@ -292,7 +292,7 @@ async def watch_config(
         try:
             async with app.kube_client.lock(
                 config.platform_namespace,
-                config.platform_operator_deployment_name,
+                config.platform_lock_secret_name,
                 "platform-watch",
                 ttl_s=15 * 60,
                 sleep_s=3,

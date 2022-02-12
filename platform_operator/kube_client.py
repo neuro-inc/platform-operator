@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import ssl
-from base64 import b64decode
+from base64 import b64decode, b64encode
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -67,13 +67,6 @@ class Endpoints:
     def namespace(self, name: str) -> URL:
         return self.namespaces / name
 
-    @property
-    def apps_namespaces(self) -> URL:
-        return self._url / "apis/apps/v1/namespaces"
-
-    def apps_namespace(self, name: str) -> URL:
-        return self.apps_namespaces / name
-
     def services(self, namespace: str) -> URL:
         return self.namespace(namespace) / "services"
 
@@ -105,11 +98,16 @@ class Endpoints:
     def platform(self, namespace: str, name: str) -> URL:
         return self.platforms(namespace) / name
 
-    def deployments(self, namespace: str) -> URL:
-        return self.apps_namespace(namespace) / "deployments"
 
-    def deployment(self, namespace: str, name: str) -> URL:
-        return self.deployments(namespace) / name
+class Metadata:
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self._payload = payload
+
+    @property
+    def annotations(self) -> dict[str, Any]:
+        if "annotations" not in self._payload:
+            self._payload["annotations"] = {}
+        return self._payload["annotations"]
 
 
 class Node(dict[str, Any]):
@@ -130,18 +128,7 @@ class Service(dict[str, Any]):
         return self["status"]["loadBalancer"]["ingress"][0]["hostname"]
 
 
-class Metadata:
-    def __init__(self, payload: dict[str, Any]) -> None:
-        self._payload = payload
-
-    @property
-    def annotations(self) -> dict[str, Any]:
-        if "annotations" not in self._payload:
-            self._payload["annotations"] = {}
-        return self._payload["annotations"]
-
-
-class Deployment(dict[str, Any]):
+class Secret(dict[str, Any]):
     @property
     def metadata(self) -> Metadata:
         return Metadata(self["metadata"])
@@ -262,21 +249,54 @@ class KubeClient:
         ) as response:
             response.raise_for_status()
 
-    async def get_secret(self, namespace: str, name: str) -> dict[str, Any]:
+    async def create_secret(self, namespace: str, payload: dict[str, Any]) -> None:
+        assert self._session
+        async with self._session.post(
+            self._endpoints.secrets(namespace), json=payload
+        ) as response:
+            response.raise_for_status()
+
+    async def update_secret(
+        self, namespace: str, name: str, payload: dict[str, Any]
+    ) -> None:
+        assert self._session
+        async with self._session.put(
+            self._endpoints.secret(namespace, name), json=payload
+        ) as response:
+            response.raise_for_status()
+
+    async def delete_secret(self, namespace: str, name: str) -> None:
+        assert self._session
+        async with self._session.delete(
+            self._endpoints.secret(namespace, name)
+        ) as response:
+            response.raise_for_status()
+
+    async def get_secret(self, namespace: str, name: str) -> Secret:
         assert self._session
         async with self._session.get(
             self._endpoints.secret(namespace, name)
         ) as response:
             response.raise_for_status()
             payload = await response.json()
-            return self._decode_secret_data(payload)
+            return Secret(self._decode_secret_data(payload))
+
+    def _encode_secret_data(self, secret: dict[str, Any]) -> dict[str, Any]:
+        secret = dict(**secret)
+        encoded_data: dict[str, str] = {}
+        for key, value in secret.get("data", {}).items():
+            encoded_data[key] = b64encode(value.encode("utf-8")).decode("utf-8")
+        if encoded_data:
+            secret["data"] = encoded_data
+        return secret
 
     def _decode_secret_data(self, secret: dict[str, Any]) -> dict[str, Any]:
         secret = dict(**secret)
         decoded_data: dict[str, str] = {}
-        for key, value in secret["data"].items():
-            decoded_data[key] = b64decode(value.encode("utf-8")).decode("utf-8")
-        secret["data"] = decoded_data
+        for key, value in secret.get("data", {}).items():
+            decoded_data[key] = b64decode(value).decode("utf-8")
+        if decoded_data:
+            secret["data"] = decoded_data
         return secret
 
     async def get_pods(
@@ -350,24 +370,6 @@ class KubeClient:
         ) as response:
             response.raise_for_status()
 
-    async def get_deployment(self, namespace: str, name: str) -> Deployment:
-        assert self._session
-        async with self._session.get(
-            self._endpoints.deployment(namespace, name)
-        ) as response:
-            response.raise_for_status()
-            payload = await response.json()
-            return Deployment(payload)
-
-    async def update_deployment(
-        self, namespace: str, name: str, payload: dict[str, Any]
-    ) -> None:
-        assert self._session
-        async with self._session.put(
-            self._endpoints.deployment(namespace, name), json=payload
-        ) as response:
-            response.raise_for_status()
-
     async def acquire_lock(
         self,
         namespace: str,
@@ -379,7 +381,7 @@ class KubeClient:
     ) -> None:
         while True:
             try:
-                resource = await self.get_deployment(namespace, name)
+                resource = await self.get_secret(namespace, name)
                 expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_s)
                 annotations = resource.metadata.annotations
                 old_lock_key = annotations.get(LOCK_KEY)
@@ -391,7 +393,7 @@ class KubeClient:
                 ):
                     annotations[LOCK_KEY] = lock_key
                     annotations[LOCK_EXPIRES_AT] = expires_at.isoformat()
-                    await self.update_deployment(namespace, name, resource)
+                    await self.update_secret(namespace, name, resource)
                     logger.debug(
                         "Lock %r acquired, expires at %r",
                         lock_key,
@@ -414,13 +416,13 @@ class KubeClient:
     async def release_lock(self, namespace: str, name: str, lock_key: str) -> None:
         while True:
             try:
-                resource = await self.get_deployment(namespace, name)
+                resource = await self.get_secret(namespace, name)
                 annotations = resource.metadata.annotations
                 old_lock_key = annotations.get(LOCK_KEY)
                 if old_lock_key is None or lock_key == old_lock_key:
                     annotations.pop(LOCK_KEY, None)
                     annotations.pop(LOCK_EXPIRES_AT, None)
-                    await self.update_deployment(namespace, name, resource)
+                    await self.update_secret(namespace, name, resource)
                     logger.debug("Lock %r released", lock_key)
                 return
             except aiohttp.ClientResponseError as ex:
