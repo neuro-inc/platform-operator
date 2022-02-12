@@ -1,0 +1,18 @@
+{{- if .Values.acme.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-acme-certs
+  labels: {{ include "platform.labels.standard" . | nindent 4 }}
+    service: acme-certs
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  {{- if .Values.acme.persistence.storageClassName }}
+  storageClassName: {{ .Values.acme.persistence.storageClassName }}
+  {{- end }}
+  volumeMode: Filesystem
+{{- end }}

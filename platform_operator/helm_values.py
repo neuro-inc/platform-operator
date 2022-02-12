@@ -40,6 +40,7 @@ class HelmValuesFactory:
             "pauseImage": {"repository": platform.get_image("pause")},
             "crictlImage": {"repository": platform.get_image("crictl")},
             "kubectlImage": {"repository": platform.get_image("kubectl")},
+            "bashImage": {"repository": platform.get_image("bash")},
             "serviceToken": platform.token,
             "nodePools": platform.jobs_node_pools,
             "nodeLabels": {
@@ -58,6 +59,11 @@ class HelmValuesFactory:
                 "jobFallbackHost": str(platform.jobs_fallback_host),
                 "registryHost": platform.ingress_registry_url.host,
             },
+            "ssl": {
+                "cert": platform.ingress_ssl_cert_data,
+                "key": platform.ingress_ssl_cert_key_data,
+            },
+            "acme": self._create_acme_values(platform),
             "jobs": {
                 "namespace": {
                     "create": True,
@@ -132,6 +138,39 @@ class HelmValuesFactory:
                 self._chart_names.platform_reports
             ] = self.create_platform_reports_values(platform)
         return result
+
+    def _create_acme_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        if platform.ingress_ssl_cert_data and platform.ingress_ssl_cert_key_data:
+            return {"enabled": False}
+        return {
+            "enabled": True,
+            "dns": "neuro",
+            "notify": "neuro",
+            "server": (
+                "letsencrypt"
+                if platform.ingress_acme_environment == "production"
+                else "letsencrypt_test"
+            ),
+            "domains": [
+                platform.ingress_url.host,
+                f"*.{platform.ingress_url.host}",
+                f"*.jobs.{platform.ingress_url.host}",
+            ],
+            "env": [
+                {"name": "NEURO_URL", "value": platform.auth_url},
+                {"name": "NEURO_CLUSTER", "value": platform.cluster_name},
+                {
+                    "name": "NEURO_TOKEN",
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": f"{platform.release_name}-token",
+                            "key": "token",
+                        }
+                    },
+                },
+            ],
+            "persistence": {"storageClassName": platform.standard_storage_class_name},
+        }
 
     def _create_idle_job(self, job: dict[str, Any]) -> dict[str, Any]:
         resources = job["resources"]

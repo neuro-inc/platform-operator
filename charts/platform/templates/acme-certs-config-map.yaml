@@ -1,0 +1,10 @@
+{{- if .Values.acme.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-acme-certs
+  labels: {{ include "platform.labels.standard" . | nindent 4 }}
+    service: acme-certs
+data:
+{{ (.Files.Glob "files/acme/*").AsConfig | indent 2 }}
+{{- end }}
