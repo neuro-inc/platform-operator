@@ -571,7 +571,7 @@ class TestHelmValuesFactory:
             "acme": {
                 "enabled": True,
                 "onHostRule": False,
-                "staging": True,
+                "staging": False,
                 "persistence": {"enabled": False},
                 "keyType": "RSA4096",
                 "challengeType": "dns-01",
