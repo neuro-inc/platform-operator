@@ -1,4 +1,4 @@
-{{- if and .Values.traefik.acme.enabled .Values.traefik.acme.staging }}
+{{- if and .Values.acme.enabled (eq "letsencrypt_test" .Values.acme.server) }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
