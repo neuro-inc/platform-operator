@@ -80,7 +80,7 @@ spec:
         - name: NP_CONSUL_INSTALLED
           value: "true"
         {{- end }}
-        {{- if .Values.standalone }}
+        {{- if .Values.platform.standalone }}
         - name: NP_STANDALONE
           value: "true"
         {{- end }}

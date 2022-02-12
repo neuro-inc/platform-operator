@@ -19,6 +19,7 @@ controller:
   annotations: {}
 
 platform:
+  standalone: false
   authUrl: https://staging.neu.ro
   ingressAuthUrl: https://staging.neu.ro
   configUrl: https://staging.neu.ro

@@ -1,4 +1,4 @@
-{{- if .Values.standalone }}
+{{- if .Values.platform.standalone }}
 {{- $clusterName := include "platformOperator.cluster.name" . }}
 apiVersion: v1
 kind: ConfigMap
