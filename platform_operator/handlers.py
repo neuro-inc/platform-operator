@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import ssl
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from logging import Logger
@@ -12,7 +13,6 @@ import kopf
 from neuro_logging import make_request_logging_trace_config
 
 from .aws_client import AwsElbClient
-from .certificate_store import CertificateStore
 from .config_client import ConfigClient, NotificationType
 from .consul_client import ConsulClient
 from .helm_client import HelmClient, ReleaseStatus
@@ -45,7 +45,7 @@ class App:
     status_manager: PlatformStatusManager = None  # type: ignore
     consul_client: ConsulClient = None  # type: ignore
     config_client: ConfigClient = None  # type: ignore
-    certificate_store: CertificateStore = None  # type: ignore
+    raw_client: aiohttp.ClientSession = None  # type: ignore
     exit_stack: AsyncExitStack = field(default_factory=AsyncExitStack)
 
     async def close(self) -> None:
@@ -79,7 +79,9 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
     app.consul_client = await app.exit_stack.enter_async_context(
         ConsulClient(config.consul_url, trace_configs)
     )
-    app.certificate_store = CertificateStore(app.consul_client)
+    app.raw_client = await app.exit_stack.enter_async_context(
+        aiohttp.ClientSession(trace_configs=trace_configs)
+    )
 
     settings.posting.level = logging.getLevelName(config.log_level)
     settings.persistence.progress_storage = kopf.AnnotationsProgressStorage()
@@ -191,8 +193,13 @@ async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> Non
     if platform_deploy_required:
         await upgrade_platform_helm_release(platform)
 
+    logger.info("Waiting for certificate")
     await wait_for_certificate_created(platform)
+    logger.info("Certificate is ready")
+
+    logger.info("Configuring cluster")
     await wait_for_cluster_configured(platform)
+    logger.info("Cluster configured")
 
     await complete_deployment(name, body)
 
@@ -348,8 +355,13 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
         if platform_deploy_required:
             await upgrade_platform_helm_release(platform)
 
+        logger.info("Waiting for certificate")
         await wait_for_certificate_created(platform)
+        logger.info("Certificate is ready")
+
+        logger.info("Configuring cluster")
         await wait_for_cluster_configured(platform)
+        logger.info("Cluster configured")
 
         await complete_deployment(name, body)
 
@@ -501,19 +513,37 @@ async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
         )
 
 
-async def wait_for_certificate_created(platform: PlatformConfig) -> None:
+async def wait_for_certificate_created(
+    platform: PlatformConfig, timeout_s: float = 5 * 60
+) -> None:
     if not platform.ingress_controller_install:
         return
 
     if platform.ingress_ssl_cert_data and platform.ingress_ssl_cert_key_data:
         return
 
+    if platform.ingress_acme_environment == "staging":
+        ssl_context = ssl.create_default_context(cafile=config.acme_ca_staging_path)
+    else:
+        ssl_context = None
+
+    async def _wait() -> None:
+        while True:
+            try:
+                async with app.raw_client.get(
+                    platform.ingress_url, ssl_context=ssl_context
+                ):
+                    return
+            except ssl.SSLError:
+                pass
+            except aiohttp.ClientError:
+                pass
+            await asyncio.sleep(5)
+
     async with app.status_manager.transition(
         platform.cluster_name, PlatformConditionType.CERTIFICATE_CREATED
     ):
-        await asyncio.wait_for(
-            app.certificate_store.wait_till_certificate_created(), 300
-        )
+        await asyncio.wait_for(_wait(), timeout_s)
 
 
 async def wait_for_cluster_configured(platform: PlatformConfig) -> None:

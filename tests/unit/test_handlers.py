@@ -6,11 +6,11 @@ from dataclasses import replace
 from typing import Any
 from unittest import mock
 
+import aiohttp
 import kopf
 import pytest
 
 from platform_operator.aws_client import AwsElbClient
-from platform_operator.certificate_store import CertificateStore
 from platform_operator.config_client import ConfigClient, NotificationType
 from platform_operator.consul_client import ConsulClient
 from platform_operator.helm_client import HelmClient, Release, ReleaseStatus
@@ -43,7 +43,7 @@ def setup_app(
     config_client: ConfigClient,
     helm_client: HelmClient,
     helm_values_factory: HelmValuesFactory,
-    certificate_store: CertificateStore,
+    raw_client: aiohttp.ClientSession,
 ) -> Iterator[None]:
     with mock.patch.object(Config, "load_from_env") as method:
         method.return_value = config
@@ -56,7 +56,7 @@ def setup_app(
             app.status_manager = status_manager
             app.config_client = config_client
             app.helm_client = helm_client
-            app.certificate_store = certificate_store
+            app.raw_client = raw_client
             app.platform_config_factory = PlatformConfigFactory(config)
             app.helm_values_factory = helm_values_factory
             yield
@@ -93,8 +93,8 @@ def logger() -> logging.Logger:
 
 
 @pytest.fixture
-def certificate_store() -> mock.Mock:
-    return mock.AsyncMock(CertificateStore)
+def raw_client() -> mock.AsyncMock:
+    return mock.AsyncMock(aiohttp.ClientSession)
 
 
 @pytest.fixture
@@ -529,12 +529,11 @@ async def test_deploy(
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    certificate_store: mock.AsyncMock,
+    raw_client: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     is_platform_deploy_failed: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
-    config: Config,
     gcp_cluster: Cluster,
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
@@ -595,7 +594,7 @@ async def test_deploy(
         password=gcp_platform_config.helm_repo.password,
     )
 
-    certificate_store.wait_till_certificate_created.assert_awaited_once()
+    raw_client.get.assert_called()
     configure_cluster.assert_awaited_once_with(gcp_platform_config)
 
     status_manager.start_deployment.assert_awaited_once_with(
@@ -619,7 +618,7 @@ async def test_deploy_with_ingress_controller_disabled(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    certificate_store: mock.AsyncMock,
+    raw_client: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
@@ -659,7 +658,7 @@ async def test_deploy_with_ingress_controller_disabled(
         password=gcp_platform_config.helm_repo.password,
     )
 
-    certificate_store.wait_till_certificate_created.assert_not_awaited()
+    raw_client.get.assert_not_called()
     configure_cluster.assert_awaited_once_with(gcp_platform_config)
 
     status_manager.start_deployment.assert_awaited_once_with(
@@ -727,7 +726,7 @@ async def test_deploy_all_charts_deployed(
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    certificate_store: mock.AsyncMock,
+    raw_client: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
@@ -759,7 +758,7 @@ async def test_deploy_all_charts_deployed(
 
     helm_client.upgrade.assert_not_awaited()
 
-    certificate_store.wait_till_certificate_created.assert_awaited_once()
+    raw_client.get.assert_called()
     configure_cluster.assert_awaited_once_with(gcp_platform_config)
 
     status_manager.start_deployment.assert_awaited_once_with(
@@ -832,12 +831,11 @@ async def test_deploy_no_changes(
     consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    certificate_store: mock.AsyncMock,
+    raw_client: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
-    config: Config,
     gcp_cluster: Cluster,
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
@@ -865,7 +863,7 @@ async def test_deploy_no_changes(
 
     helm_client.upgrade.assert_not_awaited()
 
-    certificate_store.wait_till_certificate_created.assert_not_awaited()
+    raw_client.get.assert_not_called()
     configure_cluster.assert_not_awaited()
 
     status_manager.start_deployment.assert_not_awaited()
@@ -1035,15 +1033,14 @@ async def test_watch_config(
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
+    raw_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
-    certificate_store: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     is_obs_csi_driver_deploy_failed: mock.AsyncMock,
     is_platform_deploy_failed: mock.AsyncMock,
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
-    config: Config,
     gcp_cluster: Cluster,
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
@@ -1121,7 +1118,7 @@ async def test_watch_config(
         ]
     )
 
-    certificate_store.wait_till_certificate_created.assert_awaited_once()
+    raw_client.get.assert_called()
     configure_cluster.assert_awaited_once_with(gcp_platform_config)
 
     status_manager.start_deployment.assert_awaited_once_with(
@@ -1146,13 +1143,12 @@ async def test_watch_config_all_charts_deployed(
     consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
+    raw_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
-    certificate_store: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
     is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
-    config: Config,
     gcp_cluster: Cluster,
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
@@ -1179,7 +1175,7 @@ async def test_watch_config_all_charts_deployed(
 
     helm_client.upgrade.assert_not_awaited()
 
-    certificate_store.wait_till_certificate_created.assert_awaited_once()
+    raw_client.get.assert_called()
     configure_cluster.assert_awaited_once_with(gcp_platform_config)
 
     status_manager.start_deployment.assert_awaited_once_with(
@@ -1366,7 +1362,7 @@ async def test_watch_config_update_failed(
 
 
 async def test_wait_for_certificate_created_without_ingress_controller(
-    certificate_store: mock.AsyncMock,
+    raw_client: mock.AsyncMock,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import wait_for_certificate_created
@@ -1378,11 +1374,11 @@ async def test_wait_for_certificate_created_without_ingress_controller(
         )
     )
 
-    certificate_store.wait_till_certificate_created.assert_not_awaited()
+    raw_client.get.assert_not_called()
 
 
 async def test_wait_for_certificate_created_with_manual_certs(
-    certificate_store: mock.AsyncMock,
+    raw_client: mock.AsyncMock,
     gcp_platform_config: PlatformConfig,
 ) -> None:
     from platform_operator.handlers import wait_for_certificate_created
@@ -1395,4 +1391,4 @@ async def test_wait_for_certificate_created_with_manual_certs(
         )
     )
 
-    certificate_store.wait_till_certificate_created.assert_not_awaited()
+    raw_client.get.assert_not_called()

@@ -111,6 +111,7 @@ class Config:
     platform_config_watch_interval_s: float
     platform_api_url: URL
     platform_namespace: str
+    acme_ca_staging_path: str
     consul_url: URL
     consul_installed: bool
     is_standalone: bool
@@ -159,6 +160,7 @@ class Config:
             ),
             platform_api_url=URL(env["NP_PLATFORM_API_URL"]),
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
+            acme_ca_staging_path=env["NP_ACME_CA_STAGING_PATH"],
             consul_url=URL(env["NP_CONSUL_URL"]),
             consul_installed=env.get("NP_CONSUL_INSTALLED", "false").lower() == "true",
             is_standalone=env.get("NP_STANDALONE", "false").lower() == "true",

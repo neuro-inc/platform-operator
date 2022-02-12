@@ -61,6 +61,7 @@ def config() -> Config:
         platform_admin_url=URL("https://dev.neu.ro"),
         platform_api_url=URL("https://dev.neu.ro"),
         platform_namespace="platform",
+        acme_ca_staging_path="/ca.pem",
         consul_url=URL("http://consul:8500"),
         consul_installed=True,
         is_standalone=False,
@@ -168,7 +169,7 @@ def cluster_factory(
             "dns": {"name": f"{name}.org.neu.ro"},
             "disks": {"storage_limit_per_user_gb": 10240},
             "ingress": {
-                "acme_environment": "staging",
+                "acme_environment": "production",
                 "cors_origins": [
                     "https://release--neuro-web.netlify.app",
                     "https://app.neu.ro",
@@ -471,7 +472,7 @@ def gcp_platform_config(
         ingress_auth_url=URL("https://platformingressauth"),
         ingress_registry_url=URL(f"https://registry.{cluster_name}.org.neu.ro"),
         ingress_metrics_url=URL(f"https://metrics.{cluster_name}.org.neu.ro"),
-        ingress_acme_environment="staging",
+        ingress_acme_environment="production",
         ingress_controller_install=True,
         ingress_controller_replicas=2,
         ingress_public_ips=[],

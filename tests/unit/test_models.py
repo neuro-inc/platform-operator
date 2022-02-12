@@ -60,6 +60,7 @@ class TestConfig:
             "NP_HELM_OBS_CSI_DRIVER_CHART_VERSION": "2.0.0",
             "NP_PLATFORM_NAMESPACE": "platform",
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
+            "NP_ACME_CA_STAGING_PATH": "/ca.pem",
             "NP_CONSUL_URL": "http://consul:8500",
             "NP_CONSUL_INSTALLED": "true",
             "NP_STANDALONE": "true",
@@ -97,6 +98,7 @@ class TestConfig:
             platform_admin_url=URL("http://platformadmin:8080"),
             platform_api_url=URL("http://platformapi:8080"),
             platform_namespace="platform",
+            acme_ca_staging_path="/ca.pem",
             consul_url=URL("http://consul:8500"),
             consul_installed=True,
             is_standalone=True,
@@ -121,6 +123,7 @@ class TestConfig:
             "NP_HELM_OBS_CSI_DRIVER_CHART_VERSION": "2.0.0",
             "NP_PLATFORM_NAMESPACE": "platform",
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
+            "NP_ACME_CA_STAGING_PATH": "/ca.pem",
             "NP_CONSUL_URL": "http://consul:8500",
         }
         assert Config.load_from_env(env) == Config(
@@ -150,6 +153,7 @@ class TestConfig:
             platform_admin_url=URL("http://platformadmin:8080"),
             platform_api_url=URL("http://platformapi:8080"),
             platform_namespace="platform",
+            acme_ca_staging_path="/ca.pem",
             consul_url=URL("http://consul:8500"),
             consul_installed=False,
             is_standalone=False,
