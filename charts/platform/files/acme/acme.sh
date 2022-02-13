@@ -11,7 +11,7 @@ _server="letsencrypt" # letsencrypt_test
 _domains=()
 _domain_options=""
 _debug_option=""
-_notify_option=""
+_notify_hook=""
 _force_option=""
 _secret=()
 _secret_namespace="default"
@@ -35,14 +35,18 @@ _acme_issue() {
 
   local _script="$(realpath -s "$0")"
 
+  if [ ! -z "$_notify_hook" ]; then
+    acme.sh --set-notify --notify-hook "$_notify_hook"
+  fi
+
   acme.sh --issue \
     --dns dns_$_dns \
     --server $_server \
     --renew-hook "$_script install-cert $_debug_option -d ${_domains[0]} --secret $_secret --secret-namespace $_secret_namespace" \
-    $_notify_option \
     $_debug_option \
     $_force_option \
-    $_domain_options
+    $_domain_options \
+    || true
 
   $_script install-cert \
     $_debug_option \
@@ -106,7 +110,7 @@ while [[ $# -gt 0 ]]; do
       shift # past value
       ;;
     --notify)
-      _notify_option="--set-notify --notify-hook $2"
+      _notify_hook="$2"
       shift # past argument
       shift # past value
       ;;
