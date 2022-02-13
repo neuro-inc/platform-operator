@@ -157,7 +157,7 @@ class HelmValuesFactory:
                 f"*.jobs.{platform.ingress_url.host}",
             ],
             "env": [
-                {"name": "NEURO_URL", "value": platform.auth_url},
+                {"name": "NEURO_URL", "value": str(platform.auth_url)},
                 {"name": "NEURO_CLUSTER", "value": platform.cluster_name},
                 {
                     "name": "NEURO_TOKEN",

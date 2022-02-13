@@ -48,7 +48,9 @@ neuro_send() {
     _notification_type="cert_obtain_succeeded"
   fi
 
-  if ! _neuro_rest POST "/api/v1/clusters/$NEURO_CLUSTER/notifications" "{\"notification_type\": \"$_notification_type\"}"; then
+  _message="$_subject\\n$_content"
+
+  if ! _neuro_rest POST "/api/v1/clusters/$NEURO_CLUSTER/notifications" "{\"notification_type\": \"$_notification_type\", \"message\": \"$_message\"}"; then
     _err "Neuro send error."
     _err "$response"
     return 1

@@ -120,7 +120,7 @@ class TestHelmValuesFactory:
                     f"*.jobs.{cluster_name}.org.neu.ro",
                 ],
                 "env": [
-                    {"name": "NEURO_URL", "value": URL("https://dev.neu.ro")},
+                    {"name": "NEURO_URL", "value": "https://dev.neu.ro"},
                     {"name": "NEURO_CLUSTER", "value": cluster_name},
                     {
                         "name": "NEURO_TOKEN",
