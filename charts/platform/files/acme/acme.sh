@@ -80,7 +80,10 @@ _acme_install_cert() {
     -n $_secret_namespace \
     --from-file=cert.crt=$_path/fullchain.pem \
     --from-file=cert.key=$_path/key.pem \
-    --save-config | \
+    --save-config \
+    --dry-run \
+    -o yaml \
+    2>/dev/null | \
   kubectl apply -f -
 }
 
