@@ -43,9 +43,9 @@ neuro_send() {
   _saveaccountconf_mutable NEURO_TOKEN "$NEURO_TOKEN"
 
   if [ "$_statusCode" != 0 ]; then
-    _notification_type="cert_obtain_failed"
+    _notification_type="error"
   else
-    _notification_type="cert_obtain_succeeded"
+    _notification_type="success"
   fi
 
   _message="$_subject\\n$_content"
