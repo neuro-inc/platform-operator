@@ -626,17 +626,8 @@ async def test_deploy(
 
 
 async def test_deploy_multiple_storages_config_patched(
-    status_manager: mock.AsyncMock,
-    consul_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
-    kube_client: mock.AsyncMock,
-    helm_client: mock.AsyncMock,
-    certificate_store: mock.AsyncMock,
-    configure_cluster: mock.AsyncMock,
-    is_platform_deploy_failed: mock.AsyncMock,
-    is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
-    config: Config,
     gcp_cluster: Cluster,
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
