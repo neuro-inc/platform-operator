@@ -186,13 +186,13 @@ async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> Non
     if platform_deploy_required:
         await upgrade_platform_helm_release(platform)
 
-    logger.info("Waiting for certificate")
-    await wait_for_certificate_created(platform)
-    logger.info("Certificate is ready")
-
     logger.info("Configuring cluster")
     await wait_for_cluster_configured(platform)
     logger.info("Cluster configured")
+
+    logger.info("Waiting for certificate")
+    await wait_for_certificate_created(platform)
+    logger.info("Certificate is ready")
 
     await complete_deployment(name, body)
 
@@ -348,13 +348,13 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
         if platform_deploy_required:
             await upgrade_platform_helm_release(platform)
 
-        logger.info("Waiting for certificate")
-        await wait_for_certificate_created(platform)
-        logger.info("Certificate is ready")
-
         logger.info("Configuring cluster")
         await wait_for_cluster_configured(platform)
         logger.info("Cluster configured")
+
+        logger.info("Waiting for certificate")
+        await wait_for_certificate_created(platform)
+        logger.info("Certificate is ready")
 
         await complete_deployment(name, body)
 

@@ -26,6 +26,7 @@ spec:
       annotations:
         checksum: {{ include (print $.Template.BasePath "/acme-certs-config-map.yaml") . | sha256sum }}
     spec:
+      serviceAccountName: {{ .Release.Name }}-acme-certs
       initContainers:
       - name: restore-certs
         {{- with .Values.bashImage }}
