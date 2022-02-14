@@ -66,6 +66,36 @@ class ConfigClient:
         ) as response:
             response.raise_for_status()
 
+    async def patch_cluster_storage(
+        self,
+        cluster_name: str,
+        storage_name: str | None,
+        payload: dict[str, Any],
+        token: str | None = None,
+    ) -> None:
+        assert self._session
+        if storage_name:
+            url = (
+                self._base_url
+                / "api/v1/clusters"
+                / cluster_name
+                / "cloud_provider/storages"
+                / storage_name
+            )
+        else:
+            url = (
+                self._base_url
+                / "api/v1/clusters"
+                / cluster_name
+                / "cloud_provider/storages/default/entry"
+            )
+        async with self._session.patch(
+            url,
+            json=payload,
+            headers=self._create_headers(token=token),
+        ) as response:
+            response.raise_for_status()
+
     async def send_notification(
         self,
         cluster_name: str,
