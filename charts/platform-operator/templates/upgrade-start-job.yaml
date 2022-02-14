@@ -10,6 +10,7 @@ spec:
   backoffLimit: 0
   template:
     spec:
+      serviceAccountName: {{ include "platformOperator.fullname" . }}-upgrade
       restartPolicy: Never
       containers:
       - name: start-upgrade

@@ -10,6 +10,7 @@ spec:
   backoffLimit: 0
   template:
     spec:
+      serviceAccountName: {{ include "platformOperator.fullname" . }}-upgrade
       restartPolicy: Never
       containers:
       - name: end-upgrade
@@ -18,7 +19,7 @@ spec:
         args:
         - -c
         - |
-          from platform_operator.helm_hooks import start_helm_chart_upgrade_hook
+          from platform_operator.helm_hooks import end_helm_chart_upgrade_hook
 
           deployment_namespace = "{{ .Release.Namespace }}"
           deployment_name = "{{ include "platformOperator.fullname" . }}-controller"
