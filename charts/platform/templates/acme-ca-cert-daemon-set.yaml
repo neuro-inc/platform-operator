@@ -1,4 +1,5 @@
-{{- if and .Values.acme.enabled (eq "letsencrypt_test" .Values.acme.server) }}
+{{- if .Values.acmeEnabled }}
+{{- if eq .Values.acme.acme.server "letsencrypt_test" }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -43,4 +44,5 @@ spec:
       - name: certs
         hostPath:
           path: /etc/docker/certs.d
+{{- end }}
 {{- end }}
