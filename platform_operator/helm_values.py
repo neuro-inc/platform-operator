@@ -371,7 +371,10 @@ class HelmValuesFactory:
                 "limits": {"cpu": "1000m", "memory": "1Gi"},
             },
             "service": {"type": platform.ingress_service_type.value},
-            "ports": {"web": {"redirectTo": "websecure"}, "websecure": {}},
+            "ports": {
+                "web": {"redirectTo": "websecure"},
+                "websecure": {"tls": {"enabled": True}},
+            },
             "additionalArguments": [
                 "--entryPoints.websecure.proxyProtocol.insecure=true",
                 "--entryPoints.websecure.forwardedHeaders.insecure=true",

@@ -634,7 +634,10 @@ class TestHelmValuesFactory:
                 "limits": {"cpu": "1000m", "memory": "1Gi"},
             },
             "service": {"type": "LoadBalancer"},
-            "ports": {"web": {"redirectTo": "websecure"}, "websecure": {}},
+            "ports": {
+                "web": {"redirectTo": "websecure"},
+                "websecure": {"tls": {"enabled": True}},
+            },
             "additionalArguments": [
                 "--entryPoints.websecure.proxyProtocol.insecure=true",
                 "--entryPoints.websecure.forwardedHeaders.insecure=true",
