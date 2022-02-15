@@ -476,14 +476,15 @@ class TestHelmValuesFactory:
             "acme": {
                 "email": f"{cluster_name}@neu.ro",
                 "dns": "neuro",
-                "notify": "neuro",
                 "server": "letsencrypt",
                 "domains": [
                     f"{cluster_name}.org.neu.ro",
                     f"*.{cluster_name}.org.neu.ro",
                     f"*.jobs.{cluster_name}.org.neu.ro",
                 ],
+                "notifyHook": "neuro",
                 "sslCertSecretName": "platform-ssl-cert",
+                "rolloutDeploymentName": "traefik",
             },
             "podLabels": {"service": "acme"},
             "env": [

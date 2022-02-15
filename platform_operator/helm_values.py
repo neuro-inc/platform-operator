@@ -149,7 +149,6 @@ class HelmValuesFactory:
             "acme": {
                 "email": f"{platform.cluster_name}@neu.ro",
                 "dns": "neuro",
-                "notify": "neuro",
                 "server": (
                     "letsencrypt"
                     if platform.ingress_acme_environment == "production"
@@ -160,7 +159,9 @@ class HelmValuesFactory:
                     f"*.{platform.ingress_url.host}",
                     f"*.jobs.{platform.ingress_url.host}",
                 ],
+                "notifyHook": "neuro",
                 "sslCertSecretName": f"{platform.release_name}-ssl-cert",
+                "rolloutDeploymentName": "traefik",
             },
             "podLabels": {"service": "acme"},
             "env": [
