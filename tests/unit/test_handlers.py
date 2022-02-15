@@ -1350,6 +1350,7 @@ async def test_wait_for_certificate_created_with_manual_certs(
     await wait_for_certificate_created(
         replace(
             gcp_platform_config,
+            ingress_acme_enabled=False,
             ingress_ssl_cert_data="ssl-cert",
             ingress_ssl_cert_key_data="ssl-cert-key",
         )

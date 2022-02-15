@@ -509,10 +509,7 @@ async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
 async def wait_for_certificate_created(
     platform: PlatformConfig, timeout_s: float = 5 * 60
 ) -> None:
-    if not platform.ingress_controller_install:
-        return
-
-    if platform.ingress_ssl_cert_data and platform.ingress_ssl_cert_key_data:
+    if not platform.ingress_controller_install or not platform.ingress_acme_enabled:
         return
 
     if platform.ingress_acme_environment == "staging":

@@ -36,6 +36,7 @@ class TestHelmValuesFactory:
         assert result == {
             "kubernetesProvider": "gcp",
             "traefikEnabled": True,
+            "acmeEnabled": True,
             "consulEnabled": False,
             "dockerRegistryEnabled": False,
             "minioEnabled": False,
@@ -44,7 +45,6 @@ class TestHelmValuesFactory:
             "pauseImage": {"repository": "neuro.io/pause"},
             "crictlImage": {"repository": "neuro.io/crictl"},
             "kubectlImage": {"repository": "neuro.io/kubectl"},
-            "bashImage": {"repository": "neuro.io/bash"},
             "serviceToken": "token",
             "nodePools": [
                 {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "gpu": 1}
@@ -109,28 +109,7 @@ class TestHelmValuesFactory:
                 }
             ],
             "ssl": {"cert": "", "key": ""},
-            "acme": {
-                "enabled": True,
-                "dns": "neuro",
-                "notify": "neuro",
-                "server": "letsencrypt",
-                "domains": [
-                    f"{cluster_name}.org.neu.ro",
-                    f"*.{cluster_name}.org.neu.ro",
-                    f"*.jobs.{cluster_name}.org.neu.ro",
-                ],
-                "env": [
-                    {"name": "NEURO_URL", "value": "https://dev.neu.ro"},
-                    {"name": "NEURO_CLUSTER", "value": cluster_name},
-                    {
-                        "name": "NEURO_TOKEN",
-                        "valueFrom": {
-                            "secretKeyRef": {"key": "token", "name": "platform-token"}
-                        },
-                    },
-                ],
-                "persistence": {"storageClassName": "platform-standard-topology-aware"},
-            },
+            "acme": mock.ANY,
             "traefik": mock.ANY,
             "platform-storage": mock.ANY,
             "platform-registry": mock.ANY,
@@ -143,19 +122,6 @@ class TestHelmValuesFactory:
             "platform-buckets": mock.ANY,
         }
 
-    def test_create_gcp_platform_with_acme_staging(
-        self,
-        gcp_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
-    ) -> None:
-        gcp_platform_config = replace(
-            gcp_platform_config, ingress_acme_environment="staging"
-        )
-
-        result = factory.create_platform_values(gcp_platform_config)
-
-        assert result["acme"]["server"] == "letsencrypt_test"
-
     def test_create_gcp_platform_with_ssl_cert(
         self,
         gcp_platform_config: PlatformConfig,
@@ -163,6 +129,7 @@ class TestHelmValuesFactory:
     ) -> None:
         gcp_platform_config = replace(
             gcp_platform_config,
+            ingress_acme_enabled=False,
             ingress_ssl_cert_data="cert_data",
             ingress_ssl_cert_key_data="key_data",
         )
@@ -170,7 +137,8 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(gcp_platform_config)
 
         assert result["ssl"] == {"cert": "cert_data", "key": "key_data"}
-        assert result["acme"] == {"enabled": False}
+        assert result["acmeEnabled"] is False
+        assert "acme" not in result
 
     def test_create_gcp_platform_values_idle_jobs(
         self,
@@ -492,6 +460,57 @@ class TestHelmValuesFactory:
 
         assert result["kubernetesProvider"] == "kubeadm"
 
+    def test_create_acme_values(
+        self,
+        gcp_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
+    ) -> None:
+        cluster_name = gcp_platform_config.cluster_name
+        result = factory.create_acme_values(gcp_platform_config)
+
+        assert result == {
+            "nameOverride": "acme",
+            "fullnameOverride": "acme",
+            "bashImage": {"repository": "neuro.io/bash"},
+            "acme": {
+                "email": f"{cluster_name}@neu.ro",
+                "dns": "neuro",
+                "notify": "neuro",
+                "server": "letsencrypt",
+                "domains": [
+                    f"{cluster_name}.org.neu.ro",
+                    f"*.{cluster_name}.org.neu.ro",
+                    f"*.jobs.{cluster_name}.org.neu.ro",
+                ],
+                "sslCertSecretName": "platform-ssl-cert",
+            },
+            "podLabels": {"service": "acme"},
+            "env": [
+                {"name": "NEURO_URL", "value": "https://dev.neu.ro"},
+                {"name": "NEURO_CLUSTER", "value": cluster_name},
+                {
+                    "name": "NEURO_TOKEN",
+                    "valueFrom": {
+                        "secretKeyRef": {"key": "token", "name": "platform-token"}
+                    },
+                },
+            ],
+            "persistence": {"storageClassName": "platform-standard-topology-aware"},
+        }
+
+    def test_create_acme_values_with_acme_staging(
+        self,
+        gcp_platform_config: PlatformConfig,
+        factory: HelmValuesFactory,
+    ) -> None:
+        gcp_platform_config = replace(
+            gcp_platform_config, ingress_acme_environment="staging"
+        )
+
+        result = factory.create_acme_values(gcp_platform_config)
+
+        assert result["acme"]["server"] == "letsencrypt_test"
+
     def test_create_docker_registry_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -721,6 +740,7 @@ class TestHelmValuesFactory:
         result = factory.create_traefik_values(
             replace(
                 gcp_platform_config,
+                ingress_acme_enabled=False,
                 ingress_ssl_cert_data="default-cert",
                 ingress_ssl_cert_key_data="default-key",
             )

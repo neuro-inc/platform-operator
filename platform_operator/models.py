@@ -795,6 +795,7 @@ class PlatformConfig:
     ingress_url: URL
     ingress_registry_url: URL
     ingress_metrics_url: URL
+    ingress_acme_enabled: bool
     ingress_acme_environment: str
     ingress_controller_install: bool
     ingress_controller_replicas: int
@@ -1028,6 +1029,10 @@ class PlatformConfigFactory:
             ingress_url=URL(f"https://{cluster.dns_name}"),
             ingress_registry_url=URL(f"https://registry.{cluster.dns_name}"),
             ingress_metrics_url=URL(f"https://metrics.{cluster.dns_name}"),
+            ingress_acme_enabled=(
+                not spec.ingress_controller.ssl_cert_data
+                or not spec.ingress_controller.ssl_cert_key_data
+            ),
             ingress_acme_environment=cluster.acme_environment,
             ingress_controller_install=spec.ingress_controller.enabled,
             ingress_controller_replicas=spec.ingress_controller.replicas or 2,

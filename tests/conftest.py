@@ -473,6 +473,7 @@ def gcp_platform_config(
         ingress_auth_url=URL("https://platformingressauth"),
         ingress_registry_url=URL(f"https://registry.{cluster_name}.org.neu.ro"),
         ingress_metrics_url=URL(f"https://metrics.{cluster_name}.org.neu.ro"),
+        ingress_acme_enabled=True,
         ingress_acme_environment="production",
         ingress_controller_install=True,
         ingress_controller_replicas=2,
