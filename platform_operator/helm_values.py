@@ -393,11 +393,17 @@ class HelmValuesFactory:
                 },
             ],
             "providers": {
+                "kubernetesCRD": {
+                    "enabled": True,
+                    "allowCrossNamespace": True,
+                    "allowExternalNameServices": True,
+                    "namespaces": platform.ingress_namespaces,
+                },
                 "kubernetesIngress": {
                     "enabled": True,
-                    "namespaces": platform.ingress_namespaces,
                     "allowExternalNameServices": True,
-                }
+                    "namespaces": platform.ingress_namespaces,
+                },
             },
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},

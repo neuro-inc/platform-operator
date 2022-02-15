@@ -656,11 +656,17 @@ class TestHelmValuesFactory:
                 },
             ],
             "providers": {
+                "kubernetesCRD": {
+                    "enabled": True,
+                    "allowCrossNamespace": True,
+                    "allowExternalNameServices": True,
+                    "namespaces": ["platform", "platform-jobs"],
+                },
                 "kubernetesIngress": {
                     "enabled": True,
-                    "namespaces": ["platform", "platform-jobs"],
                     "allowExternalNameServices": True,
-                }
+                    "namespaces": ["platform", "platform-jobs"],
+                },
             },
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
