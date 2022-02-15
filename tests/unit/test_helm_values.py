@@ -84,6 +84,7 @@ class TestHelmValuesFactory:
             "ingress": {
                 "jobFallbackHost": "default.jobs-dev.neu.ro",
                 "registryHost": f"registry.{cluster_name}.org.neu.ro",
+                "ingressAuthHost": "platformingressauth",
             },
             "jobs": {
                 "namespace": {"create": True, "name": "platform-jobs"},
@@ -475,14 +476,15 @@ class TestHelmValuesFactory:
             "acme": {
                 "email": f"{cluster_name}@neu.ro",
                 "dns": "neuro",
-                "notify": "neuro",
                 "server": "letsencrypt",
                 "domains": [
                     f"{cluster_name}.org.neu.ro",
                     f"*.{cluster_name}.org.neu.ro",
                     f"*.jobs.{cluster_name}.org.neu.ro",
                 ],
+                "notifyHook": "neuro",
                 "sslCertSecretName": "platform-ssl-cert",
+                "rolloutDeploymentName": "traefik",
             },
             "podLabels": {"service": "acme"},
             "env": [
@@ -611,107 +613,64 @@ class TestHelmValuesFactory:
         }
 
     def test_create_gcp_traefik_values(
-        self,
-        cluster_name: str,
-        gcp_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_traefik_values(gcp_platform_config)
 
         assert result == {
             "nameOverride": "traefik",
             "fullnameOverride": "traefik",
-            "replicas": 2,
-            "deploymentStrategy": {
-                "type": "RollingUpdate",
-                "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
-            },
+            "image": {"name": "neuro.io/traefik"},
             "deployment": {
+                "replicas": 2,
                 "labels": {"service": "traefik"},
                 "podLabels": {"service": "traefik"},
+                "imagePullSecrets": [
+                    {"name": "platform-docker-config"},
+                    {"name": "platform-docker-hub-config"},
+                ],
             },
-            "image": "neuro.io/traefik",
-            "imageTag": "1.7.20-alpine",
-            "imagePullSecrets": [
-                "platform-docker-config",
-                "platform-docker-hub-config",
-            ],
-            "logLevel": "error",
-            "serviceType": "LoadBalancer",
-            "externalTrafficPolicy": "Cluster",
-            "ssl": {"enabled": True, "enforced": True},
-            "acme": {
-                "enabled": True,
-                "onHostRule": False,
-                "staging": False,
-                "persistence": {"enabled": False},
-                "keyType": "RSA4096",
-                "challengeType": "dns-01",
-                "dnsProvider": {
-                    "name": "exec",
-                    "exec": {
-                        "EXEC_PATH": "/dns-01/challenge/resolve_dns_challenge.sh",
-                    },
-                },
-                "logging": True,
-                "email": f"{cluster_name}@neuromation.io",
-                "domains": {
-                    "enabled": True,
-                    "domainsList": [
-                        {"main": f"{cluster_name}.org.neu.ro"},
-                        {
-                            "sans": [
-                                f"*.{cluster_name}.org.neu.ro",
-                                f"*.jobs.{cluster_name}.org.neu.ro",
-                            ]
-                        },
-                    ],
-                },
-            },
-            "kvprovider": {
-                "consul": {
-                    "watch": True,
-                    "endpoint": "http://consul:8500",
-                    "prefix": "traefik",
-                },
-                "storeAcme": True,
-                "acmeStorageLocation": "traefik/acme/account",
-            },
-            "kubernetes": {
-                "ingressClass": "traefik",
-                "namespaces": ["platform", "platform-jobs"],
-            },
-            "rbac": {"enabled": True},
-            "extraVolumes": [
-                {
-                    "name": "dns-challenge",
-                    "configMap": {
-                        "name": "platform-dns-challenge",
-                        "defaultMode": 0o777,
-                    },
-                },
-                {
-                    "name": "dns-challenge-secret",
-                    "secret": {"secretName": "platform-dns-challenge"},
-                },
-            ],
-            "extraVolumeMounts": [
-                {"name": "dns-challenge", "mountPath": "/dns-01/challenge"},
-                {"name": "dns-challenge-secret", "mountPath": "/dns-01/secret"},
-            ],
-            "env": [
-                {"name": "NP_PLATFORM_CONFIG_URL", "value": "https://dev.neu.ro"},
-                {"name": "NP_CLUSTER_NAME", "value": cluster_name},
-                {
-                    "name": "NP_DNS_CHALLENGE_SCRIPT_NAME",
-                    "value": "resolve_dns_challenge.sh",
-                },
-            ],
             "resources": {
                 "requests": {"cpu": "250m", "memory": "256Mi"},
-                "limits": {"cpu": "1000m", "memory": "4Gi"},
+                "limits": {"cpu": "1000m", "memory": "1Gi"},
             },
-            "timeouts": {"responding": {"idleTimeout": "660s"}},
+            "service": {"type": "LoadBalancer"},
+            "ports": {
+                "web": {"redirectTo": "websecure"},
+                "websecure": {"tls": {"enabled": True}},
+            },
+            "additionalArguments": [
+                "--entryPoints.websecure.proxyProtocol.insecure=true",
+                "--entryPoints.websecure.forwardedHeaders.insecure=true",
+                "--providers.file.filename=/etc/traefik/dynamic/config.yaml",
+            ],
+            "volumes": [
+                {
+                    "name": "platform-traefik-dynamic-config",
+                    "mountPath": "/etc/traefik/dynamic",
+                    "type": "configMap",
+                },
+                {
+                    "name": "platform-ssl-cert",
+                    "mountPath": "/etc/certs",
+                    "type": "secret",
+                },
+            ],
+            "providers": {
+                "kubernetesCRD": {
+                    "enabled": True,
+                    "allowCrossNamespace": True,
+                    "allowExternalNameServices": True,
+                    "namespaces": ["platform", "platform-jobs"],
+                },
+                "kubernetesIngress": {
+                    "enabled": True,
+                    "allowExternalNameServices": True,
+                    "namespaces": ["platform", "platform-jobs"],
+                },
+            },
+            "ingressRoute": {"dashboard": {"enabled": False}},
+            "logs": {"general": {"level": "ERROR"}},
         }
 
     def test_create_gcp_traefik_values_with_ingress_namespaces(
@@ -726,37 +685,17 @@ class TestHelmValuesFactory:
             )
         )
 
-        assert result["kubernetes"]["namespaces"] == [
+        assert result["providers"]["kubernetesIngress"]["namespaces"] == [
             "default",
             "platform",
             "platform-jobs",
         ]
-
-    def test_create_gcp_traefik_values_with_ssl_cert(
-        self,
-        gcp_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
-    ) -> None:
-        result = factory.create_traefik_values(
-            replace(
-                gcp_platform_config,
-                ingress_acme_enabled=False,
-                ingress_ssl_cert_data="default-cert",
-                ingress_ssl_cert_key_data="default-key",
-            )
-        )
-
-        assert "acme" not in result
-        assert result["ssl"]["defaultCert"] == "default-cert"
-        assert result["ssl"]["defaultKey"] == "default-key"
-        assert "storeAcme" not in result["kvprovider"]
 
     def test_create_aws_traefik_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_traefik_values(aws_platform_config)
 
-        assert result["timeouts"] == {"responding": {"idleTimeout": "660s"}}
         assert result["service"] == {
             "annotations": {
                 (
@@ -771,7 +710,6 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_traefik_values(azure_platform_config)
 
-        assert result["timeouts"] == {"responding": {"idleTimeout": "660s"}}
         assert result["service"] == {
             "annotations": {
                 "service.beta.kubernetes.io/azure-load-balancer-tcp-idle-timeout": "10"
@@ -792,14 +730,12 @@ class TestHelmValuesFactory:
             )
         )
 
-        assert result["serviceType"] == "NodePort"
-        assert result["service"] == {"nodePorts": {"http": 30080, "https": 30443}}
-        assert result["deployment"]["hostPort"] == {
-            "httpEnabled": True,
-            "httpsEnabled": True,
-            "httpPort": 80,
-            "httpsPort": 443,
-        }
+        assert result["rollingUpdate"] == {"maxSurge": 0, "maxUnavailable": 1}
+        assert result["service"]["type"] == "NodePort"
+        assert result["ports"]["web"]["nodePort"] == 30080
+        assert result["ports"]["web"]["hostPort"] == 80
+        assert result["ports"]["websecure"]["nodePort"] == 30443
+        assert result["ports"]["websecure"]["hostPort"] == 443
 
     def test_create_platform_storage_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -814,10 +750,6 @@ class TestHelmValuesFactory:
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
-                        "NEURO_STORAGEAPI_SESSION"
-                    ),
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
                         "NEURO_STORAGEAPI_SESSION"
                     ),
                 }
@@ -944,10 +876,6 @@ class TestHelmValuesFactory:
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
                         "NEURO_BUCKETS_API_SESSION"
                     ),
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
-                        "NEURO_BUCKETS_API_SESSION"
-                    ),
                 }
             },
             "ingress": {
@@ -1050,10 +978,6 @@ class TestHelmValuesFactory:
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
                         "NEURO_BUCKETS_API_SESSION"
                     ),
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
-                        "NEURO_BUCKETS_API_SESSION"
-                    ),
                 }
             },
             "ingress": {
@@ -1143,10 +1067,6 @@ class TestHelmValuesFactory:
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
                         "NEURO_BUCKETS_API_SESSION"
                     ),
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
-                        "NEURO_BUCKETS_API_SESSION"
-                    ),
                 }
             },
             "ingress": {
@@ -1209,10 +1129,6 @@ class TestHelmValuesFactory:
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
                         "NEURO_BUCKETS_API_SESSION"
                     ),
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
-                        "NEURO_BUCKETS_API_SESSION"
-                    ),
                 }
             },
             "ingress": {
@@ -1270,10 +1186,6 @@ class TestHelmValuesFactory:
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
-                        "NEURO_BUCKETS_API_SESSION"
-                    ),
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
                         "NEURO_BUCKETS_API_SESSION"
                     ),
                 }
@@ -1338,10 +1250,6 @@ class TestHelmValuesFactory:
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
                         "NEURO_BUCKETS_API_SESSION"
                     ),
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
-                        "NEURO_BUCKETS_API_SESSION"
-                    ),
                 }
             },
             "ingress": {
@@ -1384,10 +1292,6 @@ class TestHelmValuesFactory:
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
-                        "NEURO_REGISTRYAPI_SESSION"
-                    ),
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
                         "NEURO_REGISTRYAPI_SESSION"
                     ),
                 }
@@ -1464,10 +1368,6 @@ class TestHelmValuesFactory:
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
                         "NEURO_REGISTRYAPI_SESSION"
                     ),
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
-                        "NEURO_REGISTRYAPI_SESSION"
-                    ),
                 }
             },
             "ingress": {
@@ -1520,10 +1420,6 @@ class TestHelmValuesFactory:
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
-                        "NEURO_REGISTRYAPI_SESSION"
-                    ),
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
                         "NEURO_REGISTRYAPI_SESSION"
                     ),
                 }
@@ -1594,10 +1490,6 @@ class TestHelmValuesFactory:
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
-                        "NEURO_REGISTRYAPI_SESSION"
-                    ),
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
                         "NEURO_REGISTRYAPI_SESSION"
                     ),
                 }
@@ -1691,10 +1583,6 @@ class TestHelmValuesFactory:
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
-                        "NEURO_MONITORINGAPI_SESSION"
-                    ),
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
                         "NEURO_MONITORINGAPI_SESSION"
                     ),
                 }
@@ -1940,10 +1828,6 @@ class TestHelmValuesFactory:
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
                         "NEURO_SECRETS_SESSION"
                     ),
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
-                        "NEURO_SECRETS_SESSION"
-                    ),
                 }
             },
             "ingress": {
@@ -2031,11 +1915,6 @@ class TestHelmValuesFactory:
                         "traefik.ingress.kubernetes.io/router.middlewares": (
                             "platform-platform-ingress-auth@kubernetescrd"
                         ),
-                        "ingress.kubernetes.io/auth-type": "forward",
-                        "ingress.kubernetes.io/auth-url": (
-                            "https://platformingressauth/oauth/authorize"
-                        ),
-                        "ingress.kubernetes.io/auth-trust-headers": "true",
                     },
                 }
             },
@@ -2463,10 +2342,6 @@ class TestHelmValuesFactory:
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
-                        "NEURO_DISK_API_SESSION"
-                    ),
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
                         "NEURO_DISK_API_SESSION"
                     ),
                 }

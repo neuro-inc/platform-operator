@@ -1,0 +1,10 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-ingress-auth
+  labels: {{ include "platform.labels.standard" . | nindent 4 }}
+    service: traefik
+spec:
+  forwardAuth:
+    address: https://{{ .Values.ingress.ingressAuthHost }}/oauth/authorize
+    trustForwardHeader: true

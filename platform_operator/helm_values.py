@@ -58,6 +58,7 @@ class HelmValuesFactory:
             "ingress": {
                 "jobFallbackHost": str(platform.jobs_fallback_host),
                 "registryHost": platform.ingress_registry_url.host,
+                "ingressAuthHost": platform.ingress_auth_url.host,
             },
             "ssl": {
                 "cert": platform.ingress_ssl_cert_data,
@@ -148,7 +149,6 @@ class HelmValuesFactory:
             "acme": {
                 "email": f"{platform.cluster_name}@neu.ro",
                 "dns": "neuro",
-                "notify": "neuro",
                 "server": (
                     "letsencrypt"
                     if platform.ingress_acme_environment == "production"
@@ -159,7 +159,9 @@ class HelmValuesFactory:
                     f"*.{platform.ingress_url.host}",
                     f"*.jobs.{platform.ingress_url.host}",
                 ],
+                "notifyHook": "neuro",
                 "sslCertSecretName": f"{platform.release_name}-ssl-cert",
+                "rolloutDeploymentName": "traefik",
             },
             "podLabels": {"service": "acme"},
             "env": [
@@ -353,115 +355,69 @@ class HelmValuesFactory:
         }
 
     def create_traefik_values(self, platform: PlatformConfig) -> dict[str, Any]:
-        dns_challenge_script_name = "resolve_dns_challenge.sh"
         result: dict[str, Any] = {
             "nameOverride": "traefik",
             "fullnameOverride": "traefik",
-            "replicas": platform.ingress_controller_replicas,
-            "deploymentStrategy": {
-                "type": "RollingUpdate",
-                "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0},
-            },
+            "image": {"name": platform.get_image("traefik")},
             "deployment": {
+                "replicas": platform.ingress_controller_replicas,
                 "labels": {"service": "traefik"},
                 "podLabels": {"service": "traefik"},
+                "imagePullSecrets": [
+                    {"name": name} for name in platform.image_pull_secret_names
+                ],
             },
-            "image": platform.get_image("traefik"),
-            "imageTag": "1.7.20-alpine",
-            "imagePullSecrets": platform.image_pull_secret_names,
-            "logLevel": "error",
-            "serviceType": platform.ingress_service_type.value,
-            "externalTrafficPolicy": "Cluster",
-            "ssl": {"enabled": True, "enforced": True},
-            "kvprovider": {
-                "consul": {
-                    "watch": True,
-                    "endpoint": str(platform.consul_url),
-                    "prefix": "traefik",
-                },
-            },
-            "kubernetes": {
-                "ingressClass": "traefik",
-                "namespaces": platform.ingress_namespaces,
-            },
-            "rbac": {"enabled": True},
             "resources": {
                 "requests": {"cpu": "250m", "memory": "256Mi"},
-                "limits": {"cpu": "1000m", "memory": "4Gi"},
+                "limits": {"cpu": "1000m", "memory": "1Gi"},
             },
-            "timeouts": {"responding": {"idleTimeout": "600s"}},
-        }
-        if platform.ingress_acme_enabled:
-            result["kvprovider"]["storeAcme"] = True
-            result["kvprovider"]["acmeStorageLocation"] = "traefik/acme/account"
-            result["acme"] = {
-                "enabled": True,
-                "onHostRule": False,
-                "staging": platform.ingress_acme_environment == "staging",
-                "persistence": {"enabled": False},
-                "keyType": "RSA4096",
-                "challengeType": "dns-01",
-                "dnsProvider": {
-                    "name": "exec",
-                    "exec": {
-                        "EXEC_PATH": f"/dns-01/challenge/{dns_challenge_script_name}",
-                    },
+            "service": {"type": platform.ingress_service_type.value},
+            "ports": {
+                "web": {"redirectTo": "websecure"},
+                "websecure": {"tls": {"enabled": True}},
+            },
+            "additionalArguments": [
+                "--entryPoints.websecure.proxyProtocol.insecure=true",
+                "--entryPoints.websecure.forwardedHeaders.insecure=true",
+                "--providers.file.filename=/etc/traefik/dynamic/config.yaml",
+            ],
+            "volumes": [
+                {
+                    "name": f"{platform.release_name}-traefik-dynamic-config",
+                    "mountPath": "/etc/traefik/dynamic",
+                    "type": "configMap",
                 },
-                "logging": True,
-                "email": f"{platform.cluster_name}@neuromation.io",
-                "domains": {
+                {
+                    "name": f"{platform.release_name}-ssl-cert",
+                    "mountPath": "/etc/certs",
+                    "type": "secret",
+                },
+            ],
+            "providers": {
+                "kubernetesCRD": {
                     "enabled": True,
-                    "domainsList": [
-                        {"main": platform.ingress_url.host},
-                        {
-                            "sans": [
-                                f"*.{platform.ingress_url.host}",
-                                f"*.jobs.{platform.ingress_url.host}",
-                            ]
-                        },
-                    ],
+                    "allowCrossNamespace": True,
+                    "allowExternalNameServices": True,
+                    "namespaces": platform.ingress_namespaces,
                 },
-            }
-            result["extraVolumes"] = [
-                # Mounted secret and configmap volumes are updated automatically
-                # by kubelet
-                # https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically
-                # https://kubernetes.io/docs/concepts/configuration/secret/#mounted-secrets-are-updated-automatically
-                {
-                    "name": "dns-challenge",
-                    "configMap": {
-                        "name": f"{platform.release_name}-dns-challenge",
-                        "defaultMode": 0o777,
-                    },
+                "kubernetesIngress": {
+                    "enabled": True,
+                    "allowExternalNameServices": True,
+                    "namespaces": platform.ingress_namespaces,
                 },
-                {
-                    "name": "dns-challenge-secret",
-                    "secret": {"secretName": f"{platform.release_name}-dns-challenge"},
-                },
-            ]
-            result["extraVolumeMounts"] = [
-                {"name": "dns-challenge", "mountPath": "/dns-01/challenge"},
-                {"name": "dns-challenge-secret", "mountPath": "/dns-01/secret"},
-            ]
-            result["env"] = [
-                {"name": "NP_PLATFORM_CONFIG_URL", "value": str(platform.config_url)},
-                {"name": "NP_CLUSTER_NAME", "value": platform.cluster_name},
-                {
-                    "name": "NP_DNS_CHALLENGE_SCRIPT_NAME",
-                    "value": dns_challenge_script_name,
-                },
-            ]
-        else:
-            result["ssl"]["defaultCert"] = platform.ingress_ssl_cert_data
-            result["ssl"]["defaultKey"] = platform.ingress_ssl_cert_key_data
-        if platform.kubernetes_provider == CloudProvider.GCP:
-            result["timeouts"] = {
-                "responding": {
-                    # must be greater than lb timeout
-                    # gcp lb default timeout is 600s and cannot be changed
-                    "idleTimeout": "660s"  # must be greater than lb timeout
-                }
-            }
+            },
+            "ingressRoute": {"dashboard": {"enabled": False}},
+            "logs": {"general": {"level": "ERROR"}},
+        }
+        if platform.ingress_service_type == IngressServiceType.NODE_PORT:
+            result["rollingUpdate"] = {"maxUnavailable": 1, "maxSurge": 0}
+            ports = result["ports"]
+            if platform.ingress_node_port_http and platform.ingress_node_port_https:
+                ports["web"]["nodePort"] = platform.ingress_node_port_http
+                ports["websecure"]["nodePort"] = platform.ingress_node_port_https
+            if platform.ingress_host_port_http and platform.ingress_host_port_https:
+                ports["web"]["hostPort"] = platform.ingress_host_port_http
+                ports["websecure"]["hostPort"] = platform.ingress_host_port_https
         if platform.kubernetes_provider == CloudProvider.AWS:
             # aws lb default idle timeout is 60s
             # aws network lb default idle timeout is 350s and cannot be changed
@@ -471,12 +427,6 @@ class HelmValuesFactory:
                         "service.beta.kubernetes.io/"
                         "aws-load-balancer-connection-idle-timeout"
                     ): "600"
-                }
-            }
-            result["timeouts"] = {
-                "responding": {
-                    # must be greater than lb timeout
-                    "idleTimeout": "660s"  # must be greater than lb timeout
                 }
             }
         if platform.kubernetes_provider == CloudProvider.AZURE:
@@ -489,27 +439,6 @@ class HelmValuesFactory:
                     ): "10"
                 }
             }
-            result["timeouts"] = {
-                "responding": {
-                    # must be greater than lb timeout
-                    "idleTimeout": "660s"  # must be greater than lb timeout
-                }
-            }
-        if platform.ingress_service_type == IngressServiceType.NODE_PORT:
-            if platform.ingress_node_port_http and platform.ingress_node_port_https:
-                result["service"] = {
-                    "nodePorts": {
-                        "http": platform.ingress_node_port_http,
-                        "https": platform.ingress_node_port_https,
-                    }
-                }
-            if platform.ingress_host_port_http and platform.ingress_host_port_https:
-                result["deployment"]["hostPort"] = {
-                    "httpEnabled": True,
-                    "httpsEnabled": True,
-                    "httpPort": platform.ingress_host_port_http,
-                    "httpsPort": platform.ingress_host_port_https,
-                }
         return result
 
     def _create_platform_url_value(
@@ -585,11 +514,6 @@ class HelmValuesFactory:
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
                         "NEURO_STORAGEAPI_SESSION"
                     ),
-                    # TODO: remove traefik v1 annotations
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
-                        "NEURO_STORAGEAPI_SESSION"
-                    ),
                 }
             },
             "ingress": {
@@ -620,11 +544,6 @@ class HelmValuesFactory:
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
-                        "NEURO_REGISTRYAPI_SESSION"
-                    ),
-                    # TODO: remove traefik v1 annotations
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
                         "NEURO_REGISTRYAPI_SESSION"
                     ),
                 }
@@ -793,11 +712,6 @@ class HelmValuesFactory:
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
                         "NEURO_MONITORINGAPI_SESSION"
                     ),
-                    # TODO: remove traefik v1 annotations
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
-                        "NEURO_MONITORINGAPI_SESSION"
-                    ),
                 }
             },
             "ingress": {
@@ -956,11 +870,6 @@ class HelmValuesFactory:
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
                         "NEURO_SECRETS_SESSION"
                     ),
-                    # TODO: remove traefik v1 annotations
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
-                        "NEURO_SECRETS_SESSION"
-                    ),
                 }
             },
             "ingress": {
@@ -1041,12 +950,6 @@ class HelmValuesFactory:
                         "traefik.ingress.kubernetes.io/router.middlewares": (
                             f"{platform.namespace}-{platform.release_name}-ingress-auth"
                             "@kubernetescrd"
-                        ),
-                        # TODO: remove traefik v1 annotations
-                        "ingress.kubernetes.io/auth-trust-headers": "true",
-                        "ingress.kubernetes.io/auth-type": "forward",
-                        "ingress.kubernetes.io/auth-url": str(
-                            platform.ingress_auth_url / "oauth/authorize"
                         ),
                     },
                 }
@@ -1336,11 +1239,6 @@ class HelmValuesFactory:
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
                         "NEURO_DISK_API_SESSION"
                     ),
-                    # TODO: remove traefik v1 annotations
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
-                        "NEURO_DISK_API_SESSION"
-                    ),
                 }
             },
             "ingress": {
@@ -1440,11 +1338,6 @@ class HelmValuesFactory:
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
                     "traefik.ingress.kubernetes.io/service.sticky.cookie.name": (
-                        "NEURO_BUCKETS_API_SESSION"
-                    ),
-                    # TODO: remove traefik v1 annotations
-                    "traefik.ingress.kubernetes.io/affinity": "true",
-                    "traefik.ingress.kubernetes.io/session-cookie-name": (
                         "NEURO_BUCKETS_API_SESSION"
                     ),
                 }
