@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ .Release.Name }}-dns-challenge
-  labels:
-{{ include "platform.labels.standard" . | indent 4 }}
-data:
-{{ (.Files.Glob "files/resolve_dns_challenge.sh").AsConfig | indent 2 }}

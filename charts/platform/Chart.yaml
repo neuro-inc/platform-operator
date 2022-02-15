@@ -5,8 +5,8 @@ version: $CHART_VERSION
 appVersion: $APP_VERSION
 dependencies:
   - name: traefik
-    version: "1.85.1"
-    repository: https://charts.helm.sh/stable
+    version: "10.14.1"
+    repository: https://helm.traefik.io/traefik
     condition: traefikEnabled
   - name: acme
     version: "1.0.2"
@@ -27,7 +27,7 @@ dependencies:
     version: "22.2.37"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-monitoring
-    version: "22.2.0"
+    version: "22.2.1"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-container-runtime
     version: "21.11.3"

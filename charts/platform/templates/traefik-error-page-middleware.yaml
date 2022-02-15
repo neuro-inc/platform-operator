@@ -1,0 +1,14 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-error-page
+  labels: {{ include "platform.labels.standard" . | nindent 4 }}
+    service: traefik
+spec:
+  errors:
+    status:
+    - "500-599"
+    query: /
+    service:
+      name: {{ .Release.Name }}-fallback
+      port: https
