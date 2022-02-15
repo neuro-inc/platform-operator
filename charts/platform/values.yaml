@@ -6,10 +6,6 @@ alpineImage:
   repository: $IMAGE_REPO_BASE/alpine
   tag: latest
 
-bashImage:
-  repository: $IMAGE_REPO_BASE/bash
-  tag: latest
-
 crictlImage:
   repository: $IMAGE_REPO_BASE/crictl
   tag: "1.22.0"
@@ -97,18 +93,8 @@ ssl:
   cert: ""
   key: ""
 
-acme:
-  enabled: false
-  dns: neuro
-  notify: ""
-  server: "letsencrypt" # letsencrypt, letsencrypt_test
-  domains: []
-  env: []
-  persistence:
-    storageClassName:
-    size: 1Gi
-
 traefikEnabled: true
+acmeEnabled: false
 consulEnabled: false
 dockerRegistryEnabled: false
 minioEnabled: false

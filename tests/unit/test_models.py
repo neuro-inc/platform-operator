@@ -537,6 +537,7 @@ class TestPlatformConfigFactory:
 
         assert result == replace(
             gcp_platform_config,
+            ingress_acme_enabled=False,
             ingress_ssl_cert_data="cert-data",
             ingress_ssl_cert_key_data="cert-key-data",
         )

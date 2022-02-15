@@ -32,6 +32,7 @@ class HelmValuesFactory:
         result: dict[str, Any] = {
             "kubernetesProvider": platform.kubernetes_provider,
             "traefikEnabled": platform.ingress_controller_install,
+            "acmeEnabled": platform.ingress_acme_enabled,
             "consulEnabled": platform.consul_install,
             "dockerRegistryEnabled": platform.registry.docker_registry_install,
             "minioEnabled": platform.buckets.minio_install,
@@ -40,7 +41,6 @@ class HelmValuesFactory:
             "pauseImage": {"repository": platform.get_image("pause")},
             "crictlImage": {"repository": platform.get_image("crictl")},
             "kubectlImage": {"repository": platform.get_image("kubectl")},
-            "bashImage": {"repository": platform.get_image("bash")},
             "serviceToken": platform.token,
             "nodePools": platform.jobs_node_pools,
             "nodeLabels": {
@@ -63,7 +63,6 @@ class HelmValuesFactory:
                 "cert": platform.ingress_ssl_cert_data,
                 "key": platform.ingress_ssl_cert_key_data,
             },
-            "acme": self._create_acme_values(platform),
             "jobs": {
                 "namespace": {
                     "create": True,
@@ -99,6 +98,8 @@ class HelmValuesFactory:
                 platform
             ),
         }
+        if platform.ingress_acme_enabled:
+            result["acme"] = self.create_acme_values(platform)
         if platform.docker_config.create_secret:
             result["dockerConfigSecret"] = {
                 "create": True,
@@ -139,23 +140,28 @@ class HelmValuesFactory:
             ] = self.create_platform_reports_values(platform)
         return result
 
-    def _create_acme_values(self, platform: PlatformConfig) -> dict[str, Any]:
-        if platform.ingress_ssl_cert_data and platform.ingress_ssl_cert_key_data:
-            return {"enabled": False}
+    def create_acme_values(self, platform: PlatformConfig) -> dict[str, Any]:
         return {
-            "enabled": True,
-            "dns": "neuro",
-            "notify": "neuro",
-            "server": (
-                "letsencrypt"
-                if platform.ingress_acme_environment == "production"
-                else "letsencrypt_test"
-            ),
-            "domains": [
-                platform.ingress_url.host,
-                f"*.{platform.ingress_url.host}",
-                f"*.jobs.{platform.ingress_url.host}",
-            ],
+            "nameOverride": "acme",
+            "fullnameOverride": "acme",
+            "bashImage": {"repository": platform.get_image("bash")},
+            "acme": {
+                "email": f"{platform.cluster_name}@neu.ro",
+                "dns": "neuro",
+                "notify": "neuro",
+                "server": (
+                    "letsencrypt"
+                    if platform.ingress_acme_environment == "production"
+                    else "letsencrypt_test"
+                ),
+                "domains": [
+                    platform.ingress_url.host,
+                    f"*.{platform.ingress_url.host}",
+                    f"*.jobs.{platform.ingress_url.host}",
+                ],
+                "sslCertSecretName": f"{platform.release_name}-ssl-cert",
+            },
+            "podLabels": {"service": "acme"},
             "env": [
                 {"name": "NEURO_URL", "value": str(platform.auth_url)},
                 {"name": "NEURO_CLUSTER", "value": platform.cluster_name},
@@ -385,10 +391,7 @@ class HelmValuesFactory:
             },
             "timeouts": {"responding": {"idleTimeout": "600s"}},
         }
-        if platform.ingress_ssl_cert_data and platform.ingress_ssl_cert_key_data:
-            result["ssl"]["defaultCert"] = platform.ingress_ssl_cert_data
-            result["ssl"]["defaultKey"] = platform.ingress_ssl_cert_key_data
-        else:
+        if platform.ingress_acme_enabled:
             result["kvprovider"]["storeAcme"] = True
             result["kvprovider"]["acmeStorageLocation"] = "traefik/acme/account"
             result["acme"] = {
@@ -448,6 +451,9 @@ class HelmValuesFactory:
                     "value": dns_challenge_script_name,
                 },
             ]
+        else:
+            result["ssl"]["defaultCert"] = platform.ingress_ssl_cert_data
+            result["ssl"]["defaultKey"] = platform.ingress_ssl_cert_key_data
         if platform.kubernetes_provider == CloudProvider.GCP:
             result["timeouts"] = {
                 "responding": {
