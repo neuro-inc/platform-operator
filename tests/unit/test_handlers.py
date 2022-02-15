@@ -634,8 +634,6 @@ async def test_deploy_multiple_storages_config_patched(
 ) -> None:
     from platform_operator.handlers import deploy
 
-    is_platform_deploy_failed.return_value = False
-    is_platform_deploy_required.return_value = True
     config_client.get_cluster.return_value = gcp_cluster
     gcp_platform_body["spec"]["storages"] = [
         {"nfs": {"server": "192.168.0.3", "path": "/"}, "path": "/storage1"},
