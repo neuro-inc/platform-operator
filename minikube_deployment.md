@@ -159,16 +159,6 @@ cat platform-operator-values.yaml | envsubst | helm install \
 ```
 platform-operator-values.yaml file:
 ```yaml
-consul:
-  server:
-    replicas: 1
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 200m
-        memory: 256Mi
 ingress:
   host: $domain
 platformConfig:

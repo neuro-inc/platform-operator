@@ -78,12 +78,6 @@ spec:
           value: {{ include "platformOperator.fullname" . }}-lock
         - name: NP_ACME_CA_STAGING_PATH
           value: /etc/platform/ca_staging.pem
-        - name: NP_CONSUL_URL
-          value: {{ include "platformOperator.consul.url" . | quote }}
-        {{- if .Values.consulEnabled }}
-        - name: NP_CONSUL_INSTALLED
-          value: "true"
-        {{- end }}
         {{- if .Values.platform.standalone }}
         - name: NP_STANDALONE
           value: "true"

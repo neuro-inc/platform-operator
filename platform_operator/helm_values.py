@@ -33,7 +33,6 @@ class HelmValuesFactory:
             "kubernetesProvider": platform.kubernetes_provider,
             "traefikEnabled": platform.ingress_controller_install,
             "acmeEnabled": platform.ingress_acme_enabled,
-            "consulEnabled": platform.consul_install,
             "dockerRegistryEnabled": platform.registry.docker_registry_install,
             "minioEnabled": platform.buckets.minio_install,
             "platformReportsEnabled": platform.monitoring.metrics_enabled,
@@ -127,8 +126,6 @@ class HelmValuesFactory:
             }
         else:
             result["dockerHubConfigSecret"] = {"create": False}
-        if platform.consul_install:
-            result[self._chart_names.consul] = self.create_consul_values(platform)
         if platform.registry.docker_registry_install:
             result[
                 self._chart_names.docker_registry
@@ -344,14 +341,6 @@ class HelmValuesFactory:
                 "hosts": [platform.buckets.minio_public_url.host],
             },
             "environment": {"MINIO_REGION_NAME": platform.buckets.minio_region},
-        }
-
-    def create_consul_values(self, platform: PlatformConfig) -> dict[str, Any]:
-        return {
-            "Image": platform.get_image("consul"),
-            "StorageClass": platform.standard_storage_class_name,
-            "Storage": "2Gi",
-            "Replicas": 3,
         }
 
     def create_traefik_values(self, platform: PlatformConfig) -> dict[str, Any]:

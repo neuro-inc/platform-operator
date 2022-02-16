@@ -22,14 +22,6 @@ heritage: {{ .Release.Service | quote }}
 release: {{ .Release.Name | quote }}
 {{- end -}}
 
-{{- define "platformOperator.consul.url" -}}
-{{- if .Values.consulEnabled -}}
-http://consul-server:8500
-{{- else -}}
-http://platform-consul:8500
-{{- end -}}
-{{- end -}}
-
 {{- define "platformOperator.postgresqlConfig.fullname" -}}
 {{- if .Values.postgresqlConfig.fullnameOverride -}}
 {{- .Values.postgresqlConfig.fullnameOverride | trunc 63 | trimSuffix "-" -}}

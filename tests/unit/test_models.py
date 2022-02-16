@@ -62,8 +62,6 @@ class TestConfig:
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
             "NP_PLATFORM_LOCK_SECRET_NAME": "platform-operator-lock",
             "NP_ACME_CA_STAGING_PATH": "/ca.pem",
-            "NP_CONSUL_URL": "http://consul:8500",
-            "NP_CONSUL_INSTALLED": "true",
             "NP_STANDALONE": "true",
         }
         assert Config.load_from_env(env) == Config(
@@ -101,8 +99,6 @@ class TestConfig:
             platform_namespace="platform",
             platform_lock_secret_name="platform-operator-lock",
             acme_ca_staging_path="/ca.pem",
-            consul_url=URL("http://consul:8500"),
-            consul_installed=True,
             is_standalone=True,
         )
 
@@ -127,7 +123,6 @@ class TestConfig:
             "NP_PLATFORM_LOCK_SECRET_NAME": "platform-operator-lock",
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
             "NP_ACME_CA_STAGING_PATH": "/ca.pem",
-            "NP_CONSUL_URL": "http://consul:8500",
         }
         assert Config.load_from_env(env) == Config(
             node_name="minikube",
@@ -158,8 +153,6 @@ class TestConfig:
             platform_namespace="platform",
             platform_lock_secret_name="platform-operator-lock",
             acme_ca_staging_path="/ca.pem",
-            consul_url=URL("http://consul:8500"),
-            consul_installed=False,
             is_standalone=False,
         )
 

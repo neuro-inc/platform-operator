@@ -94,7 +94,6 @@ class HelmChartNames:
     obs_csi_driver: str = "obs-csi-driver"
     docker_registry: str = "docker-registry"
     minio: str = "minio"
-    consul: str = "consul"
     traefik: str = "traefik"
     adjust_inotify: str = "adjust-inotify"
     nvidia_gpu_driver: str = "nvidia-gpu-driver"
@@ -136,8 +135,6 @@ class Config:
     platform_namespace: str
     platform_lock_secret_name: str
     acme_ca_staging_path: str
-    consul_url: URL
-    consul_installed: bool
     is_standalone: bool
 
     @classmethod
@@ -169,8 +166,6 @@ class Config:
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
             platform_lock_secret_name=env["NP_PLATFORM_LOCK_SECRET_NAME"],
             acme_ca_staging_path=env["NP_ACME_CA_STAGING_PATH"],
-            consul_url=URL(env["NP_CONSUL_URL"]),
-            consul_installed=env.get("NP_CONSUL_INSTALLED", "false").lower() == "true",
             is_standalone=env.get("NP_STANDALONE", "false").lower() == "true",
         )
 
@@ -832,8 +827,6 @@ class PlatformConfig:
     docker_config: DockerConfig
     grafana_username: str
     grafana_password: str
-    consul_url: URL
-    consul_install: bool
     sentry_dsn: URL = URL("")
     sentry_sample_rate: float | None = None
     docker_hub_config: DockerConfig | None = None
@@ -1089,8 +1082,6 @@ class PlatformConfigFactory:
             docker_hub_config=docker_hub_config,
             grafana_username=cluster.grafana_username,
             grafana_password=cluster.grafana_password,
-            consul_url=self._config.consul_url,
-            consul_install=not self._config.consul_installed,
             sentry_dsn=URL(cluster.sentry_public_dsn),
             sentry_sample_rate=cluster.sentry_sample_rate,
             aws_region=spec.iam.aws_region,

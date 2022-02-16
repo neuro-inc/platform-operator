@@ -25,33 +25,3 @@ platform:
   configUrl: https://staging.neu.ro
   apiUrl: https://staging.neu.ro
   adminUrl: https://staging.neu.ro
-
-# For backward compatibility with old clusters set to `false`
-consulEnabled: true
-
-consul:
-  global:
-    enabled: false
-    image: $IMAGE_REPO_BASE/consul:1.9.2
-
-  nameOverride: consul
-  fullnameOverride: consul
-
-  server:
-    enabled: true
-
-    replicas: 3
-
-    extraLabels:
-      service: consul
-
-    resources:
-      requests:
-        cpu: "1"
-        memory: "1Gi"
-      limits:
-        cpu: "1"
-        memory: "1Gi"
-
-  ui:
-    enabled: true
