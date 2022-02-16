@@ -37,7 +37,6 @@ class TestHelmValuesFactory:
             "kubernetesProvider": "gcp",
             "traefikEnabled": True,
             "acmeEnabled": True,
-            "consulEnabled": False,
             "dockerRegistryEnabled": False,
             "minioEnabled": False,
             "platformReportsEnabled": True,
@@ -178,15 +177,6 @@ class TestHelmValuesFactory:
                 "nodeSelector": {"gpu": "nvidia-tesla-k80"},
             }
         ]
-
-    def test_create_gcp_platform_values_with_consul(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(
-            replace(gcp_platform_config, consul_install=True)
-        )
-
-        assert result["consul"]
 
     def test_create_gcp_platform_values_with_kubernetes_storage(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -598,18 +588,6 @@ class TestHelmValuesFactory:
                     "password": "password",
                 },
             },
-        }
-
-    def test_create_consul_values(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_consul_values(gcp_platform_config)
-
-        assert result == {
-            "Image": "neuro.io/consul",
-            "Replicas": 3,
-            "StorageClass": "platform-standard-topology-aware",
-            "Storage": "2Gi",
         }
 
     def test_create_gcp_traefik_values(

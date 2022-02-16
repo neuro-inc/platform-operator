@@ -63,8 +63,6 @@ def config() -> Config:
         platform_namespace="platform",
         platform_lock_secret_name="platform-operator-lock",
         acme_ca_staging_path="/ca.pem",
-        consul_url=URL("http://consul:8500"),
-        consul_installed=True,
         is_standalone=False,
     )
 
@@ -519,8 +517,6 @@ def gcp_platform_config(
         ),
         grafana_username="admin",
         grafana_password="grafana_password",
-        consul_url=URL("http://consul:8500"),
-        consul_install=False,
         sentry_dsn=URL("https://sentry"),
         sentry_sample_rate=0.1,
         gcp_service_account_key="{}",

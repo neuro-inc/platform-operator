@@ -1,7 +1,3 @@
-consul:
-  server:
-    replicas: 1
-
 platform:
   standalone: true
   configUrl: http://platform-config:8080
