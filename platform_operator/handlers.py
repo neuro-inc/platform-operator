@@ -194,7 +194,7 @@ async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> Non
     await wait_for_certificate_created(platform)
     logger.info("Certificate is ready")
 
-    await complete_deployment(name, body)
+    await complete_deployment(name, body, platform)
 
     logger.info("Platform deployment succeeded")
 
@@ -356,7 +356,7 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
         await wait_for_certificate_created(platform)
         logger.info("Certificate is ready")
 
-        await complete_deployment(name, body)
+        await complete_deployment(name, body, platform)
 
         logger.info("Platform config update succeeded")
     except asyncio.CancelledError:
@@ -449,8 +449,20 @@ async def start_deployment(name: str, body: kopf.Body, retry: int = 0) -> None:
     )
 
 
-async def complete_deployment(name: str, body: kopf.Body) -> None:
+async def complete_deployment(
+    name: str, body: kopf.Body, platform: PlatformConfig
+) -> None:
     await app.status_manager.complete_deployment(name)
+    for storage in platform.storages:
+        storage_name: str | None = None
+        if storage.path:
+            storage_name = storage.path.lstrip("/")
+        await app.config_client.patch_cluster_storage(
+            cluster_name=name,
+            storage_name=storage_name,
+            payload={"ready": True},
+            token=body["spec"].get("token"),
+        )
     await app.config_client.send_notification(
         cluster_name=name,
         token=body["spec"].get("token"),

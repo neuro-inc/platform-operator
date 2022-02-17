@@ -550,6 +550,16 @@ async def test_deploy(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_body["spec"]["token"],
     )
+    config_client.patch_cluster_storage.assert_has_awaits(
+        [
+            mock.call(
+                cluster_name=gcp_platform_config.cluster_name,
+                storage_name=None,
+                payload={"ready": True},
+                token=gcp_platform_config.token,
+            )
+        ]
+    )
     config_client.send_notification.assert_has_awaits(
         [
             mock.call(
@@ -600,6 +610,46 @@ async def test_deploy(
     )
     status_manager.complete_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
+    )
+
+
+async def test_deploy_multiple_storages_config_patched(
+    config_client: mock.AsyncMock,
+    logger: logging.Logger,
+    gcp_cluster: Cluster,
+    gcp_platform_body: kopf.Body,
+    gcp_platform_config: PlatformConfig,
+) -> None:
+    from platform_operator.handlers import deploy
+
+    config_client.get_cluster.return_value = gcp_cluster
+    gcp_platform_body["spec"]["storages"] = [
+        {"nfs": {"server": "192.168.0.3", "path": "/"}, "path": "/storage1"},
+        {"nfs": {"server": "192.168.0.4", "path": "/"}, "path": "/storage2"},
+    ]
+
+    await deploy(  # type: ignore
+        name=gcp_platform_config.cluster_name,
+        body=gcp_platform_body,
+        logger=logger,
+        retry=0,
+    )
+
+    config_client.patch_cluster_storage.assert_has_awaits(
+        [
+            mock.call(
+                cluster_name=gcp_platform_config.cluster_name,
+                storage_name="storage1",
+                payload={"ready": True},
+                token=gcp_platform_config.token,
+            ),
+            mock.call(
+                cluster_name=gcp_platform_config.cluster_name,
+                storage_name="storage2",
+                payload={"ready": True},
+                token=gcp_platform_config.token,
+            ),
+        ]
     )
 
 
@@ -1042,6 +1092,16 @@ async def test_watch_config(
     config_client.get_cluster.assert_awaited_once_with(
         cluster_name=gcp_platform_config.cluster_name,
         token=gcp_platform_config.token,
+    )
+    config_client.patch_cluster_storage.assert_has_awaits(
+        [
+            mock.call(
+                cluster_name=gcp_platform_config.cluster_name,
+                storage_name=None,
+                payload={"ready": True},
+                token=gcp_platform_config.token,
+            )
+        ]
     )
     config_client.send_notification.assert_has_awaits(
         [
