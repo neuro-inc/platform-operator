@@ -249,32 +249,6 @@ class HelmValuesFactory:
             }
         raise ValueError(f"Storage type {storage.type.value!r} is not supported")
 
-    def create_obs_csi_driver_values(self, platform: PlatformConfig) -> dict[str, Any]:
-        result = {
-            "image": platform.get_image("obs-csi-driver"),
-            "driverName": "obs.csi.neu.ro",
-            "credentialsSecret": {
-                "create": True,
-                "gcpServiceAccountKeyBase64": platform.gcp_service_account_key_base64,
-            },
-        }
-        if platform.docker_config.create_secret:
-            result["imagePullSecret"] = {
-                "create": True,
-                "credentials": {
-                    "url": str(platform.docker_config.url),
-                    "email": platform.docker_config.email,
-                    "username": platform.docker_config.username,
-                    "password": platform.docker_config.password,
-                },
-            }
-        else:
-            result["imagePullSecret"] = {
-                "create": False,
-                "name": platform.docker_config.secret_name,
-            }
-        return result
-
     def create_docker_registry_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {
             "image": {"repository": platform.get_image("registry")},

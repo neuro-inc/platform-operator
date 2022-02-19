@@ -86,12 +86,10 @@ class HelmRepo:
 @dataclass
 class HelmReleaseNames:
     platform: str
-    obs_csi_driver: str
 
 
 @dataclass(frozen=True)
 class HelmChartNames:
-    obs_csi_driver: str = "obs-csi-driver"
     docker_registry: str = "docker-registry"
     minio: str = "minio"
     traefik: str = "traefik"
@@ -113,7 +111,6 @@ class HelmChartNames:
 @dataclass(frozen=True)
 class HelmChartVersions:
     platform: str
-    obs_csi_driver: str
 
 
 @dataclass(frozen=True)
@@ -146,14 +143,10 @@ class Config:
             retries=int(env.get("NP_CONTROLLER_RETRIES") or "3"),
             backoff=int(env.get("NP_CONTROLLER_BACKOFF") or "60"),
             kube_config=KubeConfig.load_from_env(env),
-            helm_release_names=HelmReleaseNames(
-                platform="platform",
-                obs_csi_driver="platform-obs-csi-driver",
-            ),
+            helm_release_names=HelmReleaseNames(platform="platform"),
             helm_chart_names=HelmChartNames(),
             helm_chart_versions=HelmChartVersions(
                 platform=env["NP_HELM_PLATFORM_CHART_VERSION"],
-                obs_csi_driver=env["NP_HELM_OBS_CSI_DRIVER_CHART_VERSION"],
             ),
             platform_auth_url=URL(env["NP_PLATFORM_AUTH_URL"]),
             platform_ingress_auth_url=URL(env["NP_PLATFORM_INGRESS_AUTH_URL"]),

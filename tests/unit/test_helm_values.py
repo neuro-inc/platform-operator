@@ -567,29 +567,6 @@ class TestHelmValuesFactory:
             },
         }
 
-    def test_create_obs_csi_driver_values(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_obs_csi_driver_values(gcp_platform_config)
-
-        assert result == {
-            "image": "neuro.io/obs-csi-driver",
-            "driverName": "obs.csi.neu.ro",
-            "credentialsSecret": {
-                "create": True,
-                "gcpServiceAccountKeyBase64": "e30=",
-            },
-            "imagePullSecret": {
-                "create": True,
-                "credentials": {
-                    "url": "https://neuro.io",
-                    "email": f"{gcp_platform_config.cluster_name}@neuromation.io",
-                    "username": gcp_platform_config.cluster_name,
-                    "password": "password",
-                },
-            },
-        }
-
     def test_create_gcp_traefik_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:

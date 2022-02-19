@@ -155,33 +155,22 @@ async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> Non
         await fail_deployment(name, body)
         raise kopf.PermanentError(f"Invalid platform configuration: {ex!s}")
 
-    obs_csi_driver_deploy_failed = await is_obs_csi_driver_deploy_failed()
     platform_deploy_failed = await is_platform_deploy_failed()
 
-    if obs_csi_driver_deploy_failed or platform_deploy_failed:
+    if platform_deploy_failed:
         await fail_deployment(name, body)
-        raise kopf.PermanentError("One of helm releases failed")
+        raise kopf.PermanentError("Platform helm release failed")
 
     phase = await app.status_manager.get_phase(name)
-    obs_csi_driver_deploy_required = await is_obs_csi_driver_deploy_required(
-        platform, install=True
-    )
     platform_deploy_required = await is_platform_deploy_required(platform, install=True)
 
-    if (
-        phase == PlatformPhase.DEPLOYED
-        and not obs_csi_driver_deploy_required
-        and not platform_deploy_required
-    ):
+    if phase == PlatformPhase.DEPLOYED and not platform_deploy_required:
         logger.info("Platform config didn't change, skipping platform deployment")
         return
 
     logger.info("Platform deployment started")
 
     await start_deployment(name, body, retry)
-
-    if obs_csi_driver_deploy_required:
-        await upgrade_obs_csi_driver_helm_release(platform)
 
     if platform_deploy_required:
         await upgrade_platform_helm_release(platform)
@@ -260,11 +249,6 @@ async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
         logger.error(message)
         raise kopf.TemporaryError(message)
 
-    if has_gcs_storage(platform):
-        await app.helm_client.delete(
-            config.helm_release_names.obs_csi_driver, wait=True
-        )
-
 
 @kopf.on.daemon(  # type: ignore
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
@@ -317,23 +301,16 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
         return
 
     platform = await get_platform_config(name, body)
-
-    obs_csi_driver_deploy_failed = await is_obs_csi_driver_deploy_failed()
     platform_deploy_failed = await is_platform_deploy_failed()
 
-    if obs_csi_driver_deploy_failed or platform_deploy_failed:
+    if platform_deploy_failed:
         await app.status_manager.fail_deployment(name)
-        logger.warning("One of helm releases failed, skipping platform config update")
+        logger.warning("Platform helm release failed, skipping platform config update")
         return
 
-    obs_csi_driver_deploy_required = await is_obs_csi_driver_deploy_required(platform)
     platform_deploy_required = await is_platform_deploy_required(platform)
 
-    if (
-        phase == PlatformPhase.DEPLOYED
-        and not obs_csi_driver_deploy_required
-        and not platform_deploy_required
-    ):
+    if phase == PlatformPhase.DEPLOYED and not platform_deploy_required:
         logger.info("Platform config didn't change, skipping platform config update")
         return
 
@@ -342,9 +319,6 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
     await start_deployment(name, body)
 
     try:
-        if obs_csi_driver_deploy_required:
-            await upgrade_obs_csi_driver_helm_release(platform)
-
         if platform_deploy_required:
             await upgrade_platform_helm_release(platform)
 
@@ -371,21 +345,6 @@ async def get_platform_config(name: str, body: kopf.Body) -> PlatformConfig:
     cluster = await app.config_client.get_cluster(cluster_name=name, token=token)
 
     return app.platform_config_factory.create(body, cluster)
-
-
-async def is_obs_csi_driver_deploy_required(
-    platform: PlatformConfig, install: bool = False
-) -> bool:
-    if not has_gcs_storage(platform):
-        return False
-
-    return await is_helm_deploy_required(
-        release_name=config.helm_release_names.obs_csi_driver,
-        chart_name=config.helm_chart_names.obs_csi_driver,
-        chart_version=config.helm_chart_versions.obs_csi_driver,
-        values=app.helm_values_factory.create_obs_csi_driver_values(platform),
-        install=install,
-    )
 
 
 def has_gcs_storage(platform: PlatformConfig) -> bool:
@@ -421,10 +380,6 @@ async def is_helm_deploy_required(
     new_chart = f"{chart_name}-{chart_version}"
 
     return old_chart != new_chart or old_release_values != values
-
-
-async def is_obs_csi_driver_deploy_failed() -> bool:
-    return await is_helm_deploy_failed(config.helm_release_names.obs_csi_driver)
 
 
 async def is_platform_deploy_failed() -> bool:
@@ -477,23 +432,6 @@ async def fail_deployment(name: str, body: kopf.Body) -> None:
         token=body["spec"].get("token"),
         notification_type=NotificationType.CLUSTER_UPDATE_FAILED,
     )
-
-
-async def upgrade_obs_csi_driver_helm_release(platform: PlatformConfig) -> None:
-    async with app.status_manager.transition(
-        platform.cluster_name, PlatformConditionType.OBS_CSI_DRIVER_DEPLOYED
-    ):
-        await app.helm_client.upgrade(
-            config.helm_release_names.obs_csi_driver,
-            str(platform.helm_repo.url / config.helm_chart_names.obs_csi_driver),
-            values=app.helm_values_factory.create_obs_csi_driver_values(platform),
-            version=config.helm_chart_versions.obs_csi_driver,
-            install=True,
-            wait=True,
-            timeout_s=600,
-            username=platform.helm_repo.username,
-            password=platform.helm_repo.password,
-        )
 
 
 async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
