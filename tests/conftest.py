@@ -49,11 +49,9 @@ def config() -> Config:
             url=URL("https://kubernetes.default"),
             auth_type=KubeClientAuthType.NONE,
         ),
-        helm_release_names=HelmReleaseNames(
-            platform="platform", obs_csi_driver="platform-obs-csi-driver"
-        ),
+        helm_release_names=HelmReleaseNames(platform="platform"),
         helm_chart_names=HelmChartNames(),
-        helm_chart_versions=HelmChartVersions(platform="1.0.0", obs_csi_driver="2.0.0"),
+        helm_chart_versions=HelmChartVersions(platform="1.0.0"),
         platform_auth_url=URL("https://dev.neu.ro"),
         platform_ingress_auth_url=URL("https://platformingressauth"),
         platform_config_url=URL("https://dev.neu.ro"),

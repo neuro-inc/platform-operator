@@ -26,8 +26,6 @@ from platform_operator.models import (
     Config,
     PlatformConfig,
     PlatformConfigFactory,
-    StorageConfig,
-    StorageType,
 )
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.usefixtures("setup_app")]
@@ -95,29 +93,12 @@ def helm_values_factory() -> mock.Mock:
 
 
 @pytest.fixture
-def is_obs_csi_driver_deploy_failed() -> Iterator[mock.Mock]:
-    with mock.patch(
-        "platform_operator.handlers.is_obs_csi_driver_deploy_failed"
-    ) as is_obs_csi_driver_deploy_failed:
-        is_obs_csi_driver_deploy_failed.return_value = False
-        yield is_obs_csi_driver_deploy_failed
-
-
-@pytest.fixture
 def is_platform_deploy_failed() -> Iterator[mock.Mock]:
     with mock.patch(
         "platform_operator.handlers.is_platform_deploy_failed"
     ) as is_platform_deploy_failed:
         is_platform_deploy_failed.return_value = False
         yield is_platform_deploy_failed
-
-
-@pytest.fixture
-def is_obs_csi_driver_deploy_required() -> Iterator[mock.Mock]:
-    with mock.patch(
-        "platform_operator.handlers.is_obs_csi_driver_deploy_required"
-    ) as is_obs_csi_driver_deploy_required:
-        yield is_obs_csi_driver_deploy_required
 
 
 @pytest.fixture
@@ -179,155 +160,6 @@ def stopped() -> kopf.DaemonStopped:
     stopped = mock.MagicMock()
     stopped.__bool__.side_effect = [False, True]
     return stopped
-
-
-async def test_is_obs_csi_driver_deploy_required_on_install_true(
-    config: Config,
-    gcp_platform_config: PlatformConfig,
-    helm_client: mock.AsyncMock,
-) -> None:
-    from platform_operator.handlers import (
-        is_obs_csi_driver_deploy_required as _is_obs_csi_driver_deploy_required,
-    )
-
-    gcp_platform_config = replace(
-        gcp_platform_config,
-        storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="bucket")],
-    )
-    helm_client.get_release.return_value = None
-
-    result = await _is_obs_csi_driver_deploy_required(gcp_platform_config, install=True)
-
-    helm_client.get_release.assert_awaited_with(
-        config.helm_release_names.obs_csi_driver
-    )
-    assert result is True
-
-
-async def test_is_obs_csi_driver_deploy_required_on_install_false(
-    gcp_platform_config: PlatformConfig,
-    helm_client: mock.AsyncMock,
-) -> None:
-    from platform_operator.handlers import (
-        is_obs_csi_driver_deploy_required as _is_obs_csi_driver_deploy_required,
-    )
-
-    gcp_platform_config = replace(
-        gcp_platform_config,
-        storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="bucket")],
-    )
-    helm_client.get_release.return_value = None
-
-    result = await _is_obs_csi_driver_deploy_required(
-        gcp_platform_config, install=False
-    )
-
-    assert result is False
-
-
-async def test_is_obs_csi_driver_deploy_required_on_version_update_true(
-    config: Config,
-    gcp_platform_config: PlatformConfig,
-    helm_client: mock.AsyncMock,
-    helm_values_factory: mock.AsyncMock,
-) -> None:
-    from platform_operator.handlers import (
-        is_obs_csi_driver_deploy_required as _is_obs_csi_driver_deploy_required,
-    )
-
-    gcp_platform_config = replace(
-        gcp_platform_config,
-        storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="bucket")],
-    )
-    helm_client.get_release.return_value = Release(
-        name=config.helm_release_names.obs_csi_driver,
-        namespace=config.platform_namespace,
-        chart=(
-            f"{config.helm_chart_names.obs_csi_driver}"
-            f"-{config.helm_chart_versions.obs_csi_driver}-0"
-        ),
-        status=ReleaseStatus.DEPLOYED,
-    )
-    helm_client.get_release_values.return_value = {}
-    helm_values_factory.create_obs_csi_driver_values.return_value = {}
-
-    result = await _is_obs_csi_driver_deploy_required(gcp_platform_config)
-
-    assert result is True
-
-
-async def test_is_obs_csi_driver_deploy_required_on_values_update_true(
-    config: Config,
-    gcp_platform_config: PlatformConfig,
-    helm_client: mock.AsyncMock,
-    helm_values_factory: mock.AsyncMock,
-) -> None:
-    from platform_operator.handlers import (
-        is_obs_csi_driver_deploy_required as _is_obs_csi_driver_deploy_required,
-    )
-
-    gcp_platform_config = replace(
-        gcp_platform_config,
-        storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="bucket")],
-    )
-    helm_client.get_release.return_value = Release(
-        name=config.helm_release_names.obs_csi_driver,
-        namespace=config.platform_namespace,
-        chart=(
-            f"{config.helm_chart_names.obs_csi_driver}"
-            f"-{config.helm_chart_versions.obs_csi_driver}"
-        ),
-        status=ReleaseStatus.DEPLOYED,
-    )
-    helm_client.get_release_values.return_value = {}
-    helm_values_factory.create_obs_csi_driver_values.return_value = {"new": "value"}
-
-    result = await _is_obs_csi_driver_deploy_required(gcp_platform_config)
-
-    assert result is True
-
-
-async def test_is_obs_csi_driver_deploy_required_no_update_false(
-    config: Config,
-    gcp_platform_config: PlatformConfig,
-    helm_client: mock.AsyncMock,
-    helm_values_factory: mock.AsyncMock,
-) -> None:
-    from platform_operator.handlers import (
-        is_obs_csi_driver_deploy_required as _is_obs_csi_driver_deploy_required,
-    )
-
-    gcp_platform_config = replace(
-        gcp_platform_config,
-        storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="bucket")],
-    )
-    helm_client.get_release.return_value = Release(
-        name=config.helm_release_names.obs_csi_driver,
-        namespace=config.platform_namespace,
-        chart=(
-            f"{config.helm_chart_names.obs_csi_driver}"
-            f"-{config.helm_chart_versions.obs_csi_driver}"
-        ),
-        status=ReleaseStatus.DEPLOYED,
-    )
-    helm_client.get_release_values.return_value = {}
-    helm_values_factory.create_obs_csi_driver_values.return_value = {}
-
-    result = await _is_obs_csi_driver_deploy_required(gcp_platform_config)
-
-    assert result is False
-
-
-async def test_is_obs_csi_driver_deploy_required_for_nfs_false(
-    gcp_platform_config: PlatformConfig,
-) -> None:
-    from platform_operator.handlers import (
-        is_obs_csi_driver_deploy_required as _is_obs_csi_driver_deploy_required,
-    )
-
-    result = await _is_obs_csi_driver_deploy_required(gcp_platform_config)
-
-    assert result is False
 
 
 async def test_is_platform_deploy_required_on_install_true(
@@ -715,51 +547,6 @@ async def test_deploy_with_ingress_controller_disabled(
     )
 
 
-async def test_deploy_gcp_with_gcs_storage(
-    config_client: mock.AsyncMock,
-    helm_client: mock.AsyncMock,
-    is_obs_csi_driver_deploy_failed: mock.AsyncMock,
-    is_obs_csi_driver_deploy_required: mock.AsyncMock,
-    logger: logging.Logger,
-    gcp_cluster: Cluster,
-    gcp_platform_body: kopf.Body,
-    gcp_platform_config: PlatformConfig,
-) -> None:
-    from platform_operator.handlers import deploy
-
-    is_obs_csi_driver_deploy_failed.return_value = False
-    is_obs_csi_driver_deploy_required.return_value = True
-    config_client.get_cluster.return_value = gcp_cluster
-    gcp_platform_body["spec"]["storages"] = [{"gcs": {"bucket": "storage"}}]
-    gcp_platform_config = replace(
-        gcp_platform_config,
-        storages=[StorageConfig(type=StorageType.GCS, gcs_bucket_name="storage")],
-    )
-
-    await deploy(  # type: ignore
-        name=gcp_platform_config.cluster_name,
-        body=gcp_platform_body,
-        logger=logger,
-        retry=0,
-    )
-
-    is_obs_csi_driver_deploy_required.assert_awaited_once_with(
-        gcp_platform_config, install=True
-    )
-
-    helm_client.upgrade.assert_any_await(
-        "platform-obs-csi-driver",
-        "https://ghcr.io/neuro-inc/helm-charts/obs-csi-driver",
-        values=mock.ANY,
-        version="2.0.0",
-        install=True,
-        wait=True,
-        timeout_s=600,
-        username=gcp_platform_config.helm_repo.username,
-        password=gcp_platform_config.helm_repo.password,
-    )
-
-
 async def test_deploy_all_charts_deployed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -767,7 +554,6 @@ async def test_deploy_all_charts_deployed(
     helm_client: mock.AsyncMock,
     raw_client: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
-    is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
@@ -776,7 +562,6 @@ async def test_deploy_all_charts_deployed(
 ) -> None:
     from platform_operator.handlers import deploy
 
-    is_obs_csi_driver_deploy_required.return_value = False
     is_platform_deploy_required.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
 
@@ -870,7 +655,6 @@ async def test_deploy_no_changes(
     helm_client: mock.AsyncMock,
     raw_client: mock.AsyncMock,
     configure_cluster: mock.AsyncMock,
-    is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
@@ -880,7 +664,6 @@ async def test_deploy_no_changes(
     from platform_operator.handlers import deploy
 
     status_manager.get_phase.return_value = PlatformPhase.DEPLOYED
-    is_obs_csi_driver_deploy_required.return_value = False
     is_platform_deploy_required.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
 
@@ -905,30 +688,22 @@ async def test_deploy_no_changes(
     status_manager.complete_deployment.assert_not_awaited()
 
 
-@pytest.mark.parametrize(
-    "obs_csi_driver_deploy_failed,platform_deploy_failed",
-    [(True, True), (False, True), (True, False)],
-)
-async def test_deploy_helm_release_failed(
+async def test_deploy_platform_helm_release_failed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
-    is_obs_csi_driver_deploy_failed: mock.AsyncMock,
     is_platform_deploy_failed: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
-    obs_csi_driver_deploy_failed: bool,
-    platform_deploy_failed: bool,
 ) -> None:
     from platform_operator.handlers import deploy
 
     status_manager.get_phase.return_value = PlatformPhase.DEPLOYED
-    is_obs_csi_driver_deploy_failed.return_value = obs_csi_driver_deploy_failed
-    is_platform_deploy_failed.return_value = platform_deploy_failed
+    is_platform_deploy_failed.return_value = True
     config_client.get_cluster.return_value = gcp_cluster
 
-    with pytest.raises(kopf.PermanentError, match="One of helm releases failed"):
+    with pytest.raises(kopf.PermanentError, match="Platform helm release failed"):
         await deploy(  # type: ignore
             name=gcp_platform_config.cluster_name,
             body=gcp_platform_body,
@@ -1001,12 +776,7 @@ async def test_delete_gcp_with_gcs_storage(
         retry=0,
     )
 
-    helm_client.delete.assert_has_awaits(
-        [
-            mock.call("platform", wait=True),
-            mock.call("platform-obs-csi-driver", wait=True),
-        ]
-    )
+    helm_client.delete.assert_awaited_once_with("platform", wait=True)
 
 
 async def test_delete_on_prem(
@@ -1028,11 +798,7 @@ async def test_delete_on_prem(
         retry=0,
     )
 
-    helm_client.delete.assert_has_awaits(
-        [
-            mock.call("platform", wait=True),
-        ]
-    )
+    helm_client.delete.assert_awaited_once_with("platform", wait=True)
 
 
 async def test_delete_with_invalid_configuration(
@@ -1067,9 +833,7 @@ async def test_watch_config(
     raw_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
     configure_cluster: mock.AsyncMock,
-    is_obs_csi_driver_deploy_failed: mock.AsyncMock,
     is_platform_deploy_failed: mock.AsyncMock,
-    is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
@@ -1078,7 +842,6 @@ async def test_watch_config(
 ) -> None:
     from platform_operator.handlers import watch_config
 
-    is_obs_csi_driver_deploy_required.return_value = True
     is_platform_deploy_required.return_value = True
     config_client.get_cluster.return_value = gcp_cluster
 
@@ -1118,10 +881,8 @@ async def test_watch_config(
         ]
     )
 
-    is_obs_csi_driver_deploy_failed.assert_awaited_once_with()
     is_platform_deploy_failed.assert_awaited_once_with()
 
-    is_obs_csi_driver_deploy_required.assert_awaited_once_with(gcp_platform_config)
     is_platform_deploy_required.assert_awaited_once_with(gcp_platform_config)
 
     kube_client.update_service_account_image_pull_secrets.assert_awaited_once_with(
@@ -1132,17 +893,6 @@ async def test_watch_config(
 
     helm_client.upgrade.assert_has_awaits(
         [
-            mock.call(
-                "platform-obs-csi-driver",
-                "https://ghcr.io/neuro-inc/helm-charts/obs-csi-driver",
-                values=mock.ANY,
-                version="2.0.0",
-                install=True,
-                wait=True,
-                timeout_s=600,
-                username=gcp_platform_config.helm_repo.username,
-                password=gcp_platform_config.helm_repo.password,
-            ),
             mock.call(
                 "platform",
                 "https://ghcr.io/neuro-inc/helm-charts/platform",
@@ -1184,7 +934,6 @@ async def test_watch_config_all_charts_deployed(
     raw_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
     configure_cluster: mock.AsyncMock,
-    is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
@@ -1193,7 +942,6 @@ async def test_watch_config_all_charts_deployed(
 ) -> None:
     from platform_operator.handlers import watch_config
 
-    is_obs_csi_driver_deploy_required.return_value = False
     is_platform_deploy_required.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
 
@@ -1232,7 +980,6 @@ async def test_watch_config_no_changes(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
-    is_obs_csi_driver_deploy_required: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
@@ -1242,7 +989,6 @@ async def test_watch_config_no_changes(
     from platform_operator.handlers import watch_config
 
     status_manager.get_phase.return_value = PlatformPhase.DEPLOYED
-    is_obs_csi_driver_deploy_required.return_value = False
     is_platform_deploy_required.return_value = False
     config_client.get_cluster.return_value = gcp_cluster
 
@@ -1292,28 +1038,20 @@ async def test_watch_config_platform_deploying_deleting(
     status_manager.start_deployment.assert_not_awaited()
 
 
-@pytest.mark.parametrize(
-    "obs_csi_driver_deploy_failed,platform_deploy_failed",
-    [(True, True), (False, True), (True, False)],
-)
-async def test_watch_config_helm_release_failed(
+async def test_watch_config_platform_helm_release_failed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
-    is_obs_csi_driver_deploy_failed: mock.AsyncMock,
     is_platform_deploy_failed: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
-    obs_csi_driver_deploy_failed: bool,
-    platform_deploy_failed: bool,
 ) -> None:
     from platform_operator.handlers import watch_config
 
     status_manager.get_phase.return_value = PlatformPhase.DEPLOYED
-    is_obs_csi_driver_deploy_failed.return_value = obs_csi_driver_deploy_failed
-    is_platform_deploy_failed.return_value = platform_deploy_failed
+    is_platform_deploy_failed.return_value = True
     config_client.get_cluster.return_value = gcp_cluster
 
     await watch_config(  # type: ignore

@@ -57,7 +57,6 @@ class TestConfig:
             "NP_LABEL_ACCELERATOR": "platform.neuromation.io/accelerator",
             "NP_LABEL_PREEMPTIBLE": "platform.neuromation.io/preemptible",
             "NP_HELM_PLATFORM_CHART_VERSION": "1.0.0",
-            "NP_HELM_OBS_CSI_DRIVER_CHART_VERSION": "2.0.0",
             "NP_PLATFORM_NAMESPACE": "platform",
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
             "NP_PLATFORM_LOCK_SECRET_NAME": "platform-operator-lock",
@@ -83,13 +82,9 @@ class TestConfig:
                 read_timeout_s=100,
                 conn_pool_size=100,
             ),
-            helm_release_names=HelmReleaseNames(
-                platform="platform", obs_csi_driver="platform-obs-csi-driver"
-            ),
+            helm_release_names=HelmReleaseNames(platform="platform"),
             helm_chart_names=HelmChartNames(),
-            helm_chart_versions=HelmChartVersions(
-                platform="1.0.0", obs_csi_driver="2.0.0"
-            ),
+            helm_chart_versions=HelmChartVersions(platform="1.0.0"),
             platform_auth_url=URL("http://platformauthapi:8080"),
             platform_ingress_auth_url=URL("http://platformingressauth:8080"),
             platform_config_url=URL("http://platformconfig:8080"),
@@ -118,7 +113,6 @@ class TestConfig:
             "NP_LABEL_ACCELERATOR": "platform.neuromation.io/accelerator",
             "NP_LABEL_PREEMPTIBLE": "platform.neuromation.io/preemptible",
             "NP_HELM_PLATFORM_CHART_VERSION": "1.0.0",
-            "NP_HELM_OBS_CSI_DRIVER_CHART_VERSION": "2.0.0",
             "NP_PLATFORM_NAMESPACE": "platform",
             "NP_PLATFORM_LOCK_SECRET_NAME": "platform-operator-lock",
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
@@ -137,13 +131,9 @@ class TestConfig:
                 read_timeout_s=100,
                 conn_pool_size=100,
             ),
-            helm_release_names=HelmReleaseNames(
-                platform="platform", obs_csi_driver="platform-obs-csi-driver"
-            ),
+            helm_release_names=HelmReleaseNames(platform="platform"),
             helm_chart_names=HelmChartNames(),
-            helm_chart_versions=HelmChartVersions(
-                platform="1.0.0", obs_csi_driver="2.0.0"
-            ),
+            helm_chart_versions=HelmChartVersions(platform="1.0.0"),
             platform_auth_url=URL("http://platformauthapi:8080"),
             platform_ingress_auth_url=URL("http://platformingressauth:8080"),
             platform_config_url=URL("http://platformconfig:8080"),

@@ -35,7 +35,6 @@ class PlatformPhase(str, Enum):
 
 
 class PlatformConditionType(str, Enum):
-    OBS_CSI_DRIVER_DEPLOYED = "ObsCsiDriverDeployed"
     PLATFORM_DEPLOYED = "PlatformDeployed"
     CERTIFICATE_CREATED = "CertificateCreated"
     CLUSTER_CONFIGURED = "ClusterConfigured"
