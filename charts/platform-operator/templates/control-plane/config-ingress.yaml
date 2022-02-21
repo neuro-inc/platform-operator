@@ -1,5 +1,6 @@
 {{- if .Values.platform.standalone }}
-apiVersion: networking.k8s.io/v1beta1
+{{- $ingressApiIsStable := eq (include "k8s.ingress.isStable" .) "true" -}}
+apiVersion: {{ include "k8s.ingress.apiVersion" . }}
 kind: Ingress
 metadata:
   name: {{ include "platformOperator.platformConfig.fullname" . }}
