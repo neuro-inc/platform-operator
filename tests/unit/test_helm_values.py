@@ -559,10 +559,7 @@ class TestHelmValuesFactory:
             "environment": {"MINIO_REGION_NAME": "minio"},
             "ingress": {
                 "enabled": True,
-                "annotations": {
-                    "kubernetes.io/ingress.class": "traefik",
-                    "traefik.frontend.rule.type": "PathPrefix",
-                },
+                "ingressClassName": "traefik",
                 "hosts": [f"blob.{on_prem_platform_config.cluster_name}.org.neu.ro"],
             },
         }
@@ -711,8 +708,8 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
@@ -835,8 +832,8 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [f"{aws_platform_config.cluster_name}.org.neu.ro"],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": aws_platform_config.cluster_name,
@@ -937,8 +934,8 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [f"{on_prem_platform_config.cluster_name}.org.neu.ro"],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": on_prem_platform_config.cluster_name,
@@ -1026,8 +1023,8 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [f"{on_prem_platform_config.cluster_name}.org.neu.ro"],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": on_prem_platform_config.cluster_name,
@@ -1088,8 +1085,8 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [f"{cluster_name}.org.neu.ro"],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": cluster_name,
@@ -1147,8 +1144,8 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
@@ -1209,8 +1206,8 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [f"{azure_platform_config.cluster_name}.org.neu.ro"],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": azure_platform_config.cluster_name,
@@ -1253,8 +1250,8 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [f"registry.{gcp_platform_config.cluster_name}.org.neu.ro"],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
@@ -1327,8 +1324,8 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [f"registry.{aws_platform_config.cluster_name}.org.neu.ro"],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": aws_platform_config.cluster_name,
@@ -1381,8 +1378,8 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [f"registry.{azure_platform_config.cluster_name}.org.neu.ro"],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": azure_platform_config.cluster_name,
@@ -1451,10 +1448,10 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [
                     f"registry.{on_prem_platform_config.cluster_name}.org.neu.ro"
                 ],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "platform": {
                 "clusterName": on_prem_platform_config.cluster_name,
@@ -1544,8 +1541,8 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "cors": {
                 "origins": [
@@ -1787,8 +1784,8 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "secretsNamespace": "platform-jobs",
             "platform": {
@@ -1864,9 +1861,9 @@ class TestHelmValuesFactory:
             "grafanaProxy": {
                 "ingress": {
                     "enabled": True,
+                    "ingressClassName": "traefik",
                     "hosts": [f"metrics.{gcp_platform_config.cluster_name}.org.neu.ro"],
                     "annotations": {
-                        "kubernetes.io/ingress.class": "traefik",
                         "traefik.ingress.kubernetes.io/router.middlewares": (
                             "platform-platform-ingress-auth@kubernetescrd"
                         ),
@@ -2303,8 +2300,8 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "sentry": {
                 "dsn": "https://sentry",
@@ -2381,8 +2378,8 @@ class TestHelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "sentry": {
                 "dsn": "https://sentry",

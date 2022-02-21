@@ -12,3 +12,6 @@ dependencies:
   - name: postgres-db-init-script
     version: "1.0.8"
     repository: https://neuro-inc.github.io/helm-charts
+  - name: k8s-resources
+    version: "1.0.1"
+    repository: https://neuro-inc.github.io/helm-charts
