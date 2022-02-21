@@ -97,10 +97,6 @@ release: {{ .Release.Name | quote }}
 {{- end -}}
 {{- end -}}
 
-{{- define "platformOperator.ingress.fallbackHost" -}}
-{{- printf "fallback.%s" .Values.ingress.host -}}
-{{- end -}}
-
 {{- define "platformOperator.cluster.name" -}}
 {{- print "default" -}}
 {{- end -}}

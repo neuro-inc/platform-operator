@@ -22,7 +22,7 @@
     "is_http_ingress_secure": true,
     "job_hostname_template": "{job_id}.jobs.{{ .Values.ingress.host }}",
     "job_internal_hostname_template": "{job_id}.{{ .Values.platformConfig.jobsNamespace | default (print "%s-jobs" .Release.Namespace) }}",
-    "job_fallback_hostname": "{{ include "platformOperator.ingress.fallbackHost" . }}",
+    "job_fallback_hostname": "default.jobs-staging.neu.ro",
     "job_schedule_timeout_s": 180,
     "job_schedule_scale_up_timeout_s": 900,
     "allow_privileged_mode": false,
