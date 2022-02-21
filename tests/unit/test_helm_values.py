@@ -621,6 +621,7 @@ class TestHelmValuesFactory:
                     "namespaces": ["platform", "platform-jobs"],
                 },
             },
+            "ingressClass": {"enabled": True},
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
         }

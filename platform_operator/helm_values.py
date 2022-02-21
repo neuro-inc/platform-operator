@@ -364,6 +364,7 @@ class HelmValuesFactory:
                     "namespaces": platform.ingress_namespaces,
                 },
             },
+            "ingressClass": {"enabled": True},
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
         }
