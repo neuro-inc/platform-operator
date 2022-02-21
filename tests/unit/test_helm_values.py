@@ -366,6 +366,10 @@ class TestHelmValuesFactory:
         assert result["dockerRegistryEnabled"] is True
         assert "docker-registry" in result
         assert result["minioEnabled"] is True
+        assert (
+            result["ingress"]["minioHost"]
+            == f"blob.{on_prem_platform_config.cluster_name}.org.neu.ro"
+        )
         assert "minio" in result
         assert "platform-object-storage" not in result
 
@@ -557,11 +561,7 @@ class TestHelmValuesFactory:
             "accessKey": "username",
             "secretKey": "password",
             "environment": {"MINIO_REGION_NAME": "minio"},
-            "ingress": {
-                "enabled": True,
-                "ingressClassName": "traefik",
-                "hosts": [f"blob.{on_prem_platform_config.cluster_name}.org.neu.ro"],
-            },
+            "ingress": {"enabled": False},
         }
 
     def test_create_gcp_traefik_values(

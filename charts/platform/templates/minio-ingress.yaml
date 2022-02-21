@@ -1,0 +1,34 @@
+{{- if .Values.minioEnabled -}}
+{{- $ingressApiIsStable := eq (include "k8s.ingress.isStable" .) "true" -}}
+apiVersion: {{ include "k8s.ingress.apiVersion" . }}
+kind: Ingress
+metadata:
+  name: minio
+  labels: {{ include "platform.labels.standard" . | nindent 4 }}
+  annotations:
+    {{- if not $ingressApiIsStable }}
+    kubernetes.io/ingress.class: traefik
+    {{- end }}
+spec:
+  {{- if $ingressApiIsStable }}
+  ingressClassName: traefik
+  {{- end }}
+  rules:
+  - host: {{ .Values.ingress.minioHost }}
+    http:
+      paths:
+      - path: /
+        {{- if $ingressApiIsStable }}
+        pathType: Prefix
+        {{- end }}
+        backend:
+          {{- if $ingressApiIsStable }}
+          service:
+            name: minio
+            port:
+              name: http
+          {{- else }}
+          serviceName: minio
+          servicePort: http
+          {{- end }}
+{{- end }}

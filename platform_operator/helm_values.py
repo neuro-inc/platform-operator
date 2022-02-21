@@ -131,6 +131,8 @@ class HelmValuesFactory:
                 self._chart_names.docker_registry
             ] = self.create_docker_registry_values(platform)
         if platform.buckets.minio_install:
+            assert platform.buckets.minio_public_url
+            result["ingress"]["minioHost"] = platform.buckets.minio_public_url.host
             result[self._chart_names.minio] = self.create_minio_values(platform)
         if platform.monitoring.metrics_enabled:
             result[
@@ -306,11 +308,7 @@ class HelmValuesFactory:
             },
             "accessKey": platform.buckets.minio_access_key,
             "secretKey": platform.buckets.minio_secret_key,
-            "ingress": {
-                "enabled": True,
-                "ingressClassName": "traefik",
-                "hosts": [platform.buckets.minio_public_url.host],
-            },
+            "ingress": {"enabled": False},
             "environment": {"MINIO_REGION_NAME": platform.buckets.minio_region},
         }
 
