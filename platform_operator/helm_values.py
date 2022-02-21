@@ -131,6 +131,8 @@ class HelmValuesFactory:
                 self._chart_names.docker_registry
             ] = self.create_docker_registry_values(platform)
         if platform.buckets.minio_install:
+            assert platform.buckets.minio_public_url
+            result["ingress"]["minioHost"] = platform.buckets.minio_public_url.host
             result[self._chart_names.minio] = self.create_minio_values(platform)
         if platform.monitoring.metrics_enabled:
             result[
@@ -306,14 +308,7 @@ class HelmValuesFactory:
             },
             "accessKey": platform.buckets.minio_access_key,
             "secretKey": platform.buckets.minio_secret_key,
-            "ingress": {
-                "enabled": True,
-                "annotations": {
-                    "kubernetes.io/ingress.class": "traefik",
-                    "traefik.frontend.rule.type": "PathPrefix",
-                },
-                "hosts": [platform.buckets.minio_public_url.host],
-            },
+            "ingress": {"enabled": False},
             "environment": {"MINIO_REGION_NAME": platform.buckets.minio_region},
         }
 
@@ -369,6 +364,7 @@ class HelmValuesFactory:
                     "namespaces": platform.ingress_namespaces,
                 },
             },
+            "ingressClass": {"enabled": True},
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
         }
@@ -481,8 +477,8 @@ class HelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [platform.ingress_url.host],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
         }
         result.update(
@@ -513,8 +509,8 @@ class HelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [platform.ingress_registry_url.host],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "secrets": [],
         }
@@ -679,8 +675,8 @@ class HelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [platform.ingress_url.host],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "containerRuntime": {"name": self._container_runtime},
             "fluentbit": {"image": {"repository": platform.get_image("fluent-bit")}},
@@ -837,8 +833,8 @@ class HelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [platform.ingress_url.host],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
         }
         result.update(
@@ -907,9 +903,9 @@ class HelmValuesFactory:
             "grafanaProxy": {
                 "ingress": {
                     "enabled": True,
+                    "ingressClassName": "traefik",
                     "hosts": [platform.ingress_metrics_url.host],
                     "annotations": {
-                        "kubernetes.io/ingress.class": "traefik",
                         "traefik.ingress.kubernetes.io/router.middlewares": (
                             f"{platform.namespace}-{platform.release_name}-ingress-auth"
                             "@kubernetescrd"
@@ -1206,8 +1202,8 @@ class HelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [platform.ingress_url.host],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
         }
         if platform.disks_storage_class_name:
@@ -1271,8 +1267,8 @@ class HelmValuesFactory:
             ],
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [platform.ingress_url.host],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
         }
         result.update(**self._create_tracing_values(platform))
@@ -1307,8 +1303,8 @@ class HelmValuesFactory:
             },
             "ingress": {
                 "enabled": True,
+                "ingressClassName": "traefik",
                 "hosts": [platform.ingress_url.host],
-                "annotations": {"kubernetes.io/ingress.class": "traefik"},
             },
             "secrets": [],
             "disableCreation": platform.buckets.disable_creation,

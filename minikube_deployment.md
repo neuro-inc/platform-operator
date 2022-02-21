@@ -168,7 +168,6 @@ platformConfig:
     available_cpu: 1
     memory_mb: 8192
     available_memory_mb: 1024
-
   resourcePresets:
   - name: cpu-small
     cpu: 0.1

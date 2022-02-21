@@ -62,6 +62,7 @@ ingress: {}
   # jobFallbackHost: default.jobs-dev.neu.ro
   # registryHost: registry.default.org.neu.ro
   # ingressAuthHost: staging.neu.ro
+  # minioHost: staging.neu.ro
 
 jobs:
   namespace:
