@@ -27,7 +27,7 @@ dependencies:
     version: "22.2.38"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-monitoring
-    version: "22.2.3"
+    version: "22.2.4"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-container-runtime
     version: "21.11.3"
@@ -36,7 +36,7 @@ dependencies:
     version: "22.2.3"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-reports
-    version: "22.2.5"
+    version: "22.2.6"
     repository: oci://ghcr.io/neuro-inc/helm-charts
     condition: platformReportsEnabled
   - name: platform-disks
