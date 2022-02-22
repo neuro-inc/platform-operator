@@ -621,7 +621,6 @@ class TestHelmValuesFactory:
                     "namespaces": ["platform", "platform-jobs"],
                 },
             },
-            "ingressClass": {"enabled": True},
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
         }
@@ -643,6 +642,15 @@ class TestHelmValuesFactory:
             "platform",
             "platform-jobs",
         ]
+
+    def test_create_gcp_traefik_values_with_ingress_class(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_traefik_values(
+            replace(gcp_platform_config, kubernetes_version="1.19.0")
+        )
+
+        assert result["ingressClass"]["enabled"] is True
 
     def test_create_aws_traefik_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory

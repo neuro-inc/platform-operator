@@ -364,10 +364,11 @@ class HelmValuesFactory:
                     "namespaces": platform.ingress_namespaces,
                 },
             },
-            "ingressClass": {"enabled": True},
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
         }
+        if platform.kubernetes_version > "1.18":
+            result["ingressClass"] = {"enabled": True}
         if platform.ingress_service_type == IngressServiceType.NODE_PORT:
             result["rollingUpdate"] = {"maxUnavailable": 1, "maxSurge": 0}
             ports = result["ports"]
