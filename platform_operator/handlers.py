@@ -10,10 +10,16 @@ from typing import Any
 
 import aiohttp
 import kopf
+from neuro_config_client import (
+    ACMEEnvironment,
+    CloudProviderType,
+    Cluster,
+    ConfigClient,
+    NotificationType,
+)
 from neuro_logging import make_request_logging_trace_config
 
 from .aws_client import AwsElbClient
-from .config_client import ConfigClient, NotificationType
 from .helm_client import HelmClient, ReleaseStatus
 from .helm_values import HelmValuesFactory
 from .kube_client import (
@@ -25,13 +31,7 @@ from .kube_client import (
     PlatformPhase,
     PlatformStatusManager,
 )
-from .models import (
-    CloudProvider,
-    Config,
-    PlatformConfig,
-    PlatformConfigFactory,
-    StorageType,
-)
+from .models import Config, PlatformConfig, PlatformConfigFactory
 
 
 @dataclass
@@ -71,7 +71,7 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
         app.kube_client, namespace=config.platform_namespace
     )
     app.config_client = await app.exit_stack.enter_async_context(
-        ConfigClient(config.platform_config_url, trace_configs)
+        ConfigClient(config.platform_config_url, trace_configs=trace_configs)
     )
     app.raw_client = await app.exit_stack.enter_async_context(
         aiohttp.ClientSession(trace_configs=trace_configs)
@@ -146,7 +146,8 @@ async def deploy(
 
 async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> None:
     try:
-        platform = await get_platform_config(name, body)
+        cluster = await get_cluster(name, body)
+        platform = app.platform_config_factory.create(body, cluster)
     except asyncio.CancelledError:
         raise
     except aiohttp.ClientError:
@@ -176,7 +177,7 @@ async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> Non
         await upgrade_platform_helm_release(platform)
 
     logger.info("Configuring cluster")
-    await wait_for_cluster_configured(platform)
+    await configure_cluster(cluster, platform)
     logger.info("Cluster configured")
 
     logger.info("Waiting for certificate")
@@ -209,7 +210,8 @@ async def delete(
 
 async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
     try:
-        platform = await get_platform_config(name, body)
+        cluster = await get_cluster(name, body)
+        platform = app.platform_config_factory.create(body, cluster)
     except aiohttp.ClientError:
         raise
     except asyncio.CancelledError:
@@ -300,7 +302,8 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
         logger.info("Cannot update platform while it is in %s phase", phase.value)
         return
 
-    platform = await get_platform_config(name, body)
+    cluster = await get_cluster(name, body)
+    platform = app.platform_config_factory.create(body, cluster)
     platform_deploy_failed = await is_platform_deploy_failed()
 
     if platform_deploy_failed:
@@ -323,7 +326,7 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
             await upgrade_platform_helm_release(platform)
 
         logger.info("Configuring cluster")
-        await wait_for_cluster_configured(platform)
+        await configure_cluster(cluster, platform)
         logger.info("Cluster configured")
 
         logger.info("Waiting for certificate")
@@ -340,15 +343,9 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
         await fail_deployment(name, body)
 
 
-async def get_platform_config(name: str, body: kopf.Body) -> PlatformConfig:
+async def get_cluster(name: str, body: kopf.Body) -> Cluster:
     token = body["spec"].get("token")
-    cluster = await app.config_client.get_cluster(cluster_name=name, token=token)
-
-    return app.platform_config_factory.create(body, cluster)
-
-
-def has_gcs_storage(platform: PlatformConfig) -> bool:
-    return any(s.type == StorageType.GCS for s in platform.storages)
+    return await app.config_client.get_cluster(name, token=token)
 
 
 async def is_platform_deploy_required(
@@ -397,10 +394,10 @@ async def is_helm_deploy_failed(release_name: str) -> bool:
 
 async def start_deployment(name: str, body: kopf.Body, retry: int = 0) -> None:
     await app.status_manager.start_deployment(name, retry)
-    await app.config_client.send_notification(
-        cluster_name=name,
+    await app.config_client.notify(
+        name,
+        NotificationType.CLUSTER_UPDATING,
         token=body["spec"].get("token"),
-        notification_type=NotificationType.CLUSTER_UPDATING,
     )
 
 
@@ -412,25 +409,25 @@ async def complete_deployment(
         storage_name: str | None = None
         if storage.path:
             storage_name = storage.path.lstrip("/")
-        await app.config_client.patch_cluster_storage(
+        await app.config_client.patch_storage(
             cluster_name=name,
             storage_name=storage_name,
-            payload={"ready": True},
+            ready=True,
             token=body["spec"].get("token"),
         )
-    await app.config_client.send_notification(
-        cluster_name=name,
+    await app.config_client.notify(
+        name,
+        NotificationType.CLUSTER_UPDATE_SUCCEEDED,
         token=body["spec"].get("token"),
-        notification_type=NotificationType.CLUSTER_UPDATE_SUCCEEDED,
     )
 
 
 async def fail_deployment(name: str, body: kopf.Body) -> None:
     await app.status_manager.fail_deployment(name)
-    await app.config_client.send_notification(
-        cluster_name=name,
+    await app.config_client.notify(
+        name,
+        NotificationType.CLUSTER_UPDATE_FAILED,
         token=body["spec"].get("token"),
-        notification_type=NotificationType.CLUSTER_UPDATE_FAILED,
     )
 
 
@@ -462,7 +459,7 @@ async def wait_for_certificate_created(
     if not platform.ingress_controller_install or not platform.ingress_acme_enabled:
         return
 
-    if platform.ingress_acme_environment == "staging":
+    if platform.ingress_acme_environment == ACMEEnvironment.STAGING:
         ssl_context = ssl.create_default_context(cafile=config.acme_ca_staging_path)
     else:
         ssl_context = None
@@ -486,14 +483,14 @@ async def wait_for_certificate_created(
         await asyncio.wait_for(_wait(), timeout_s)
 
 
-async def wait_for_cluster_configured(platform: PlatformConfig) -> None:
+async def configure_cluster(cluster: Cluster, platform: PlatformConfig) -> None:
     async with app.status_manager.transition(
         platform.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
     ):
-        await configure_cluster(platform)
+        await _configure_cluster(cluster, platform)
 
 
-async def configure_cluster(platform: PlatformConfig) -> None:
+async def _configure_cluster(cluster: Cluster, platform: PlatformConfig) -> None:
     ingress_service: dict[str, Any] | None = None
     aws_ingress_lb: dict[str, Any] | None = None
 
@@ -501,16 +498,19 @@ async def configure_cluster(platform: PlatformConfig) -> None:
         ingress_service = await app.kube_client.get_service(
             namespace=platform.namespace, name=platform.ingress_service_name
         )
-        if platform.kubernetes_provider == CloudProvider.AWS:
+        if platform.kubernetes_provider == CloudProviderType.AWS:
             async with AwsElbClient(region=platform.aws_region) as client:
                 aws_ingress_lb = await client.get_load_balancer_by_dns_name(
                     ingress_service.load_balancer_host
                 )
 
-    cluster_config = platform.create_cluster_config(
-        ingress_service=ingress_service,
-        aws_ingress_lb=aws_ingress_lb,
+    orchestrator = platform.create_orchestrator_config(cluster)
+    dns = platform.create_dns_config(
+        ingress_service=ingress_service, aws_ingress_lb=aws_ingress_lb
     )
     await app.config_client.patch_cluster(
-        cluster_name=platform.cluster_name, token=platform.token, payload=cluster_config
+        platform.cluster_name,
+        token=platform.token,
+        orchestrator=orchestrator,
+        dns=dns,
     )

@@ -5,11 +5,11 @@ from hashlib import sha256
 from typing import Any
 
 import bcrypt
+from neuro_config_client import ACMEEnvironment, CloudProviderType, IdleJobConfig
 from yarl import URL
 
 from .models import (
     BucketsProvider,
-    CloudProvider,
     HelmChartNames,
     IngressServiceType,
     LabelsConfig,
@@ -41,7 +41,15 @@ class HelmValuesFactory:
             "crictlImage": {"repository": platform.get_image("crictl")},
             "kubectlImage": {"repository": platform.get_image("kubectl")},
             "serviceToken": platform.token,
-            "nodePools": platform.jobs_node_pools,
+            "nodePools": [
+                {
+                    "name": rpt.name,
+                    "idleSize": rpt.idle_size,
+                    "cpu": rpt.available_cpu,
+                    "gpu": rpt.gpu or 0,
+                }
+                for rpt in platform.jobs_resource_pool_types
+            ],
             "nodeLabels": {
                 "nodePool": platform.node_labels.node_pool,
                 "job": platform.node_labels.job,
@@ -150,7 +158,7 @@ class HelmValuesFactory:
                 "dns": "neuro",
                 "server": (
                     "letsencrypt"
-                    if platform.ingress_acme_environment == "production"
+                    if platform.ingress_acme_environment == ACMEEnvironment.PRODUCTION
                     else "letsencrypt_test"
                 ),
                 "domains": [
@@ -179,24 +187,23 @@ class HelmValuesFactory:
             "persistence": {"storageClassName": platform.standard_storage_class_name},
         }
 
-    def _create_idle_job(self, job: dict[str, Any]) -> dict[str, Any]:
-        resources = job["resources"]
-        result = {
-            "name": job["name"],
-            "count": job["count"],
-            "image": job["image"],
+    def _create_idle_job(self, job: IdleJobConfig) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "name": job.name,
+            "count": job.count,
+            "image": job.image,
             "imagePullSecrets": [],
             "resources": {
-                "cpu": f"{resources['cpu_m']}m",
-                "memory": f"{resources['memory_mb']}Mi",
+                "cpu": f"{job.resources.cpu_m}m",
+                "memory": f"{job.resources.memory_mb}Mi",
             },
-            "env": job.get("env") or {},
-            "nodeSelector": job.get("node_selector") or {},
+            "env": job.env,
+            "nodeSelector": job.node_selector,
         }
-        if "image_pull_secret" in job:
-            result["imagePullSecrets"].append({"name": job["image_pull_secret"]})
-        if "gpu" in resources:
-            result["resources"]["nvidia.com/gpu"] = resources["gpu"]
+        if job.image_pull_secret:
+            result["imagePullSecrets"].append({"name": job.image_pull_secret})
+        if job.resources.gpu:
+            result["resources"]["nvidia.com/gpu"] = job.resources.gpu
         return result
 
     def _create_storage_values(self, storage: StorageConfig) -> dict[str, Any]:
@@ -378,7 +385,7 @@ class HelmValuesFactory:
             if platform.ingress_host_port_http and platform.ingress_host_port_https:
                 ports["web"]["hostPort"] = platform.ingress_host_port_http
                 ports["websecure"]["hostPort"] = platform.ingress_host_port_https
-        if platform.kubernetes_provider == CloudProvider.AWS:
+        if platform.kubernetes_provider == CloudProviderType.AWS:
             # aws lb default idle timeout is 60s
             # aws network lb default idle timeout is 350s and cannot be changed
             result["service"] = {
@@ -389,7 +396,7 @@ class HelmValuesFactory:
                     ): "600"
                 }
             }
-        if platform.kubernetes_provider == CloudProvider.AZURE:
+        if platform.kubernetes_provider == CloudProviderType.AZURE:
             # azure lb default and minimum idle timeout is 4m, maximum is 30m
             result["service"] = {
                 "annotations": {
@@ -435,17 +442,13 @@ class HelmValuesFactory:
     def _create_tracing_values(self, platform: PlatformConfig) -> dict[str, Any]:
         if not platform.sentry_dsn:
             return {}
-
-        result: dict[str, Any] = {
+        result = {
             "sentry": {
                 "dsn": str(platform.sentry_dsn),
                 "clusterName": platform.cluster_name,
+                "sampleRate": platform.sentry_sample_rate,
             }
         }
-
-        if platform.sentry_sample_rate is not None:
-            result["sentry"]["sampleRate"] = platform.sentry_sample_rate
-
         return result
 
     def create_platform_storage_values(
@@ -1138,7 +1141,7 @@ class HelmValuesFactory:
             }
         else:
             raise AssertionError("was unable to construct thanos object store config")
-        if platform.kubernetes_provider == CloudProvider.GCP:
+        if platform.kubernetes_provider == CloudProviderType.GCP:
             result["cloudProvider"] = {
                 "type": "gcp",
                 "region": platform.monitoring.metrics_region,
@@ -1147,12 +1150,12 @@ class HelmValuesFactory:
                     "key": "key.json",
                 },
             }
-        if platform.kubernetes_provider == CloudProvider.AWS:
+        if platform.kubernetes_provider == CloudProviderType.AWS:
             result["cloudProvider"] = {
                 "type": "aws",
                 "region": platform.monitoring.metrics_region,
             }
-        if platform.kubernetes_provider == CloudProvider.AZURE:
+        if platform.kubernetes_provider == CloudProviderType.AZURE:
             result["cloudProvider"] = {
                 "type": "azure",
                 "region": platform.monitoring.metrics_region,
@@ -1251,6 +1254,7 @@ class HelmValuesFactory:
                 "ingressOAuthAuthorizeUrl": str(
                     platform.ingress_auth_url / "oauth/authorize"
                 ),
+                "priorityClassName": platform.jobs_priority_class_name,
             },
             "nodeLabels": {
                 "job": platform.node_labels.job,
@@ -1273,7 +1277,7 @@ class HelmValuesFactory:
             },
         }
         result.update(**self._create_tracing_values(platform))
-        if platform.kubernetes_provider == CloudProvider.AZURE:
+        if platform.kubernetes_provider == CloudProviderType.AZURE:
             result["jobs"][
                 "preemptibleTolerationKey"
             ] = "kubernetes.azure.com/scalesetpriority"

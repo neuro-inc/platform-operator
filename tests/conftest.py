@@ -3,18 +3,44 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from dataclasses import replace
-from ipaddress import IPv4Address
+from datetime import datetime
+from decimal import Decimal
+from ipaddress import IPv4Address, IPv4Network
 from typing import Any
 
 import kopf
 import pytest
+from neuro_config_client import (
+    ACMEEnvironment,
+    BucketsConfig as ClusterBucketsConfig,
+    CloudProviderType,
+    Cluster,
+    ClusterStatus,
+    CredentialsConfig,
+    DisksConfig,
+    DNSConfig,
+    DockerRegistryConfig,
+    GrafanaCredentials,
+    HelmRegistryConfig,
+    IdleJobConfig,
+    IngressConfig,
+    MinioCredentials,
+    MonitoringConfig as ClusterMonitoringConfig,
+    NeuroAuthConfig,
+    OrchestratorConfig,
+    RegistryConfig as ClusterRegistryConfig,
+    ResourcePoolType,
+    ResourcePreset,
+    Resources,
+    SentryCredentials,
+    StorageConfig as ClusterStorageConfig,
+    TPUResource,
+)
 from yarl import URL
 
 from platform_operator.models import (
     BucketsConfig,
     BucketsProvider,
-    CloudProvider,
-    Cluster,
     Config,
     DockerConfig,
     HelmChartNames,
@@ -71,118 +97,140 @@ def cluster_name() -> str:
 
 
 @pytest.fixture
-def resource_pool_type_factory() -> Callable[..., dict[str, Any]]:
-    def _factory(name: str, tpu_ipv4_cidr_block: str = "") -> dict[str, Any]:
-        result = {
-            "name": name,
-            "is_preemptible": False,
-            "min_size": 0,
-            "max_size": 1,
-            "cpu": 1,
-            "available_cpu": 1,
-            "memory_mb": 1024,
-            "available_memory_mb": 1024,
-            "gpu": 1,
-            "gpu_model": "nvidia-tesla-k80",
-            "presets": [{"name": "gpu-small", "cpu": 1, "memory_mb": 1024, "gpu": 1}],
-        }
-        if tpu_ipv4_cidr_block:
-            result["tpu"] = {"ipv4_cidr_block": tpu_ipv4_cidr_block}
-        return result
-
-    return _factory
-
-
-@pytest.fixture
-def resource_preset_factory() -> Callable[[], dict[str, Any]]:
-    def _factory() -> dict[str, Any]:
-        return {
-            "name": "gpu-small",
-            "cpu": 1,
-            "memory_mb": 1024,
-            "gpu": 1,
-            "gpu_model": "nvidia-tesla-k80",
-            "resource_affinity": ["gpu"],
-        }
+def resource_pool_type_factory() -> Callable[..., ResourcePoolType]:
+    def _factory(name: str, tpu_ipv4_cidr_block: str = "") -> ResourcePoolType:
+        return ResourcePoolType(
+            name=name,
+            is_preemptible=False,
+            min_size=0,
+            max_size=1,
+            cpu=1,
+            available_cpu=1,
+            memory_mb=1024,
+            available_memory_mb=1024,
+            gpu=1,
+            gpu_model="nvidia-tesla-k80",
+            tpu=TPUResource(ipv4_cidr_block=tpu_ipv4_cidr_block)
+            if tpu_ipv4_cidr_block
+            else None,
+        )
 
     return _factory
 
 
 @pytest.fixture
 def cluster_factory(
-    resource_pool_type_factory: Callable[..., dict[str, Any]],
-    resource_preset_factory: Callable[[], dict[str, Any]],
+    resource_pool_type_factory: Callable[..., ResourcePoolType],
 ) -> Callable[..., Cluster]:
     def _factory(name: str, resource_pool_name: str) -> Cluster:
-        payload = {
-            "name": name,
-            "storage": {"url": f"https://{name}.org.neu.ro/api/v1/storage"},
-            "registry": {"url": f"https://registry.{name}.org.neu.ro"},
-            "orchestrator": {
-                "job_hostname_template": f"{{job_id}}.jobs.{name}.org.neu.ro",
-                "is_http_ingress_secure": True,
-                "resource_pool_types": [resource_pool_type_factory(resource_pool_name)],
-                "resource_presets": [resource_preset_factory()],
-                "job_fallback_hostname": "default.jobs-dev.neu.ro",
-                "job_schedule_timeout_s": 60,
-                "job_schedule_scale_up_timeout_s": 30,
-                "pre_pull_images": ["neuromation/base"],
-                "allow_privileged_mode": True,
-                "idle_jobs": [
-                    {
-                        "name": "miner",
-                        "count": 1,
-                        "image": "miner",
-                        "resources": {"cpu_m": 1000, "memory_mb": 1024},
-                    }
+        return Cluster(
+            name=name,
+            status=ClusterStatus.DEPLOYED,
+            credentials=CredentialsConfig(
+                neuro=NeuroAuthConfig(url=URL("https://neu.ro"), token="token"),
+                neuro_registry=DockerRegistryConfig(
+                    url=URL("https://ghcr.io/neuro-inc"),
+                    username=name,
+                    password="password",
+                    email=f"{name}@neu.ro",
+                ),
+                neuro_helm=HelmRegistryConfig(
+                    url=URL("https://ghcr.io/neuro-inc/helm-charts"),
+                    username=name,
+                    password="password",
+                ),
+                grafana=GrafanaCredentials(
+                    username="admin", password="grafana_password"
+                ),
+                sentry=SentryCredentials(
+                    client_key_id="sentry",
+                    public_dsn=URL("https://sentry"),
+                    sample_rate=0.1,
+                ),
+                docker_hub=DockerRegistryConfig(
+                    url=URL("https://index.docker.io/v1/"),
+                    username=name,
+                    password="password",
+                    email=f"{name}@neu.ro",
+                ),
+            ),
+            orchestrator=OrchestratorConfig(
+                job_hostname_template=f"{{job_id}}.jobs.{name}.org.neu.ro",
+                job_internal_hostname_template=f"{{job_id}}.platform-jobs",
+                is_http_ingress_secure=True,
+                resource_pool_types=[resource_pool_type_factory(resource_pool_name)],
+                resource_presets=[
+                    ResourcePreset(
+                        name="gpu-small",
+                        credits_per_hour=Decimal(10),
+                        cpu=1,
+                        memory_mb=1024,
+                        gpu=1,
+                        gpu_model="nvidia-tesla-k80",
+                        resource_affinity=[resource_pool_name],
+                    )
                 ],
-            },
-            "monitoring": {"url": f"https://{name}.org.neu.ro/api/v1/jobs"},
-            "credentials": {
-                "neuro_registry": {
-                    "username": name,
-                    "password": "password",
-                    "url": "https://neuro.io",
-                    "email": f"{name}@neuromation.io",
-                },
-                "neuro_helm": {
-                    "url": "https://ghcr.io/neuro-inc/helm-charts",
-                    "username": name,
-                    "password": "password",
-                },
-                "neuro": {
-                    "token": "token",
-                    "url": "https://dev.neu.ro",
-                },
-                "grafana": {"username": "admin", "password": "grafana_password"},
-                "sentry": {"public_dsn": "https://sentry", "sample_rate": 0.1},
-                "docker_hub": {
-                    "username": name,
-                    "password": "password",
-                    "url": "https://index.docker.io/v1/",
-                    "email": f"{name}@neuromation.io",
-                },
-            },
-            "dns": {"name": f"{name}.org.neu.ro"},
-            "disks": {"storage_limit_per_user_gb": 10240},
-            "ingress": {
-                "acme_environment": "production",
-                "cors_origins": [
+                job_fallback_hostname="default.jobs-dev.neu.ro",
+                job_schedule_timeout_s=60,
+                job_schedule_scale_up_timeout_s=30,
+                pre_pull_images=["neuromation/base"],
+                allow_privileged_mode=True,
+                idle_jobs=[
+                    IdleJobConfig(
+                        name="miner",
+                        count=1,
+                        image="miner",
+                        resources=Resources(cpu_m=1000, memory_mb=1024),
+                    )
+                ],
+            ),
+            storage=ClusterStorageConfig(
+                url=URL(f"https://{name}.org.neu.ro/api/v1/storage"),
+            ),
+            registry=ClusterRegistryConfig(
+                url=URL(f"https://registry.{name}.org.neu.ro")
+            ),
+            buckets=ClusterBucketsConfig(
+                url=URL(f"https://{name}.org.neu.ro/api/v1/bucket"),
+                disable_creation=False,
+            ),
+            disks=DisksConfig(
+                url=URL(f"https://{name}.org.neu.ro/api/v1/disk"),
+                storage_limit_per_user_gb=10240,
+            ),
+            monitoring=ClusterMonitoringConfig(
+                url=URL(f"https://{name}.org.neu.ro/api/v1/jobs")
+            ),
+            dns=DNSConfig(name=f"{name}.org.neu.ro"),
+            ingress=IngressConfig(
+                acme_environment=ACMEEnvironment.PRODUCTION,
+                cors_origins=[
                     "https://release--neuro-web.netlify.app",
                     "https://app.neu.ro",
                 ],
-            },
-            "buckets": {"disable_creation": False},
-        }
-        return Cluster(payload)
+            ),
+            created_at=datetime.now(),
+        )
 
     return _factory
 
 
 @pytest.fixture
-def gcp_cluster(cluster_name: str, cluster_factory: Callable[..., Cluster]) -> Cluster:
+def gcp_cluster(
+    cluster_name: str,
+    cluster_factory: Callable[..., Cluster],
+    resource_pool_type_factory: Callable[..., ResourcePoolType],
+) -> Cluster:
     cluster = cluster_factory(cluster_name, "n1-highmem-8")
-    cluster["orchestrator"]["resource_pool_types"][0]["tpu"] = {}
+    cluster = replace(
+        cluster,
+        orchestrator=replace(
+            cluster.orchestrator,
+            resource_pool_types=[
+                resource_pool_type_factory("n1-highmem-8", "192.168.0.0/16")
+            ],
+        ),
+    )
     return cluster
 
 
@@ -203,20 +251,26 @@ def on_prem_cluster(
     cluster_name: str, cluster_factory: Callable[..., Cluster]
 ) -> Cluster:
     cluster = cluster_factory(cluster_name, "gpu")
-    cluster["credentials"]["minio"] = {
-        "username": "username",
-        "password": "password",
-    }
+    cluster = replace(
+        cluster,
+        credentials=replace(
+            cluster.credentials,
+            minio=MinioCredentials(username="username", password="password"),
+        ),
+    )
     return cluster
 
 
 @pytest.fixture
 def vcd_cluster(cluster_name: str, cluster_factory: Callable[..., Cluster]) -> Cluster:
     cluster = cluster_factory(cluster_name, "gpu")
-    cluster["credentials"]["minio"] = {
-        "username": "username",
-        "password": "password",
-    }
+    cluster = replace(
+        cluster,
+        credentials=replace(
+            cluster.credentials,
+            minio=MinioCredentials(username="username", password="password"),
+        ),
+    )
     return cluster
 
 
@@ -415,8 +469,7 @@ def vcd_platform_body(on_prem_platform_body: kopf.Body) -> kopf.Body:
 @pytest.fixture
 def gcp_platform_config(
     cluster_name: str,
-    resource_pool_type_factory: Callable[..., dict[str, Any]],
-    resource_preset_factory: Callable[[], dict[str, Any]],
+    resource_pool_type_factory: Callable[..., ResourcePoolType],
 ) -> PlatformConfig:
     return PlatformConfig(
         release_name="platform",
@@ -434,8 +487,9 @@ def gcp_platform_config(
         ],
         pre_pull_images=["neuromation/base"],
         standard_storage_class_name="platform-standard-topology-aware",
-        kubernetes_provider=CloudProvider.GCP,
+        kubernetes_provider=CloudProviderType.GCP,
         kubernetes_version="1.16.10",
+        kubernetes_tpu_network=IPv4Network("192.168.0.0/16"),
         kubelet_port=10250,
         node_labels=LabelsConfig(
             job="platform.neuromation.io/job",
@@ -444,25 +498,19 @@ def gcp_platform_config(
             preemptible="platform.neuromation.io/preemptible",
         ),
         jobs_namespace="platform-jobs",
-        jobs_node_pools=[{"name": "n1-highmem-8", "idleSize": 0, "cpu": 1, "gpu": 1}],
         jobs_resource_pool_types=[
             resource_pool_type_factory("n1-highmem-8", "192.168.0.0/16")
         ],
-        jobs_resource_presets=[resource_preset_factory()],
         jobs_fallback_host="default.jobs-dev.neu.ro",
-        jobs_host_template=f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
         jobs_internal_host_template="{job_id}.platform-jobs",
         jobs_priority_class_name="platform-job",
-        jobs_schedule_timeout_s=60,
-        jobs_schedule_scale_up_timeout_s=30,
-        jobs_allow_privileged_mode=True,
         idle_jobs=[
-            {
-                "name": "miner",
-                "count": 1,
-                "image": "miner",
-                "resources": {"cpu_m": 1000, "memory_mb": 1024},
-            }
+            IdleJobConfig(
+                name="miner",
+                count=1,
+                image="miner",
+                resources=Resources(cpu_m=1000, memory_mb=1024),
+            )
         ],
         ingress_dns_name=f"{cluster_name}.org.neu.ro",
         ingress_url=URL(f"https://{cluster_name}.org.neu.ro"),
@@ -470,7 +518,7 @@ def gcp_platform_config(
         ingress_registry_url=URL(f"https://registry.{cluster_name}.org.neu.ro"),
         ingress_metrics_url=URL(f"https://metrics.{cluster_name}.org.neu.ro"),
         ingress_acme_enabled=True,
-        ingress_acme_environment="production",
+        ingress_acme_environment=ACMEEnvironment.PRODUCTION,
         ingress_controller_install=True,
         ingress_controller_replicas=2,
         ingress_public_ips=[],
@@ -520,8 +568,8 @@ def gcp_platform_config(
         gcp_service_account_key="{}",
         gcp_service_account_key_base64="e30=",
         docker_config=DockerConfig(
-            url=URL("https://neuro.io"),
-            email=f"{cluster_name}@neuromation.io",
+            url=URL("https://ghcr.io/neuro-inc"),
+            email=f"{cluster_name}@neu.ro",
             username=cluster_name,
             password="password",
             create_secret=True,
@@ -529,7 +577,7 @@ def gcp_platform_config(
         ),
         docker_hub_config=DockerConfig(
             url=URL("https://index.docker.io/v1/"),
-            email=f"{cluster_name}@neuromation.io",
+            email=f"{cluster_name}@neu.ro",
             username=cluster_name,
             password="password",
             secret_name="platform-docker-hub-config",
@@ -547,8 +595,8 @@ def aws_platform_config(
         gcp_platform_config,
         gcp_service_account_key="",
         gcp_service_account_key_base64="",
-        kubernetes_provider=CloudProvider.AWS,
-        jobs_node_pools=[{"name": "p2.xlarge", "idleSize": 0, "cpu": 1.0, "gpu": 1}],
+        kubernetes_provider=CloudProviderType.AWS,
+        kubernetes_tpu_network=None,
         jobs_resource_pool_types=[resource_pool_type_factory("p2.xlarge")],
         registry=RegistryConfig(
             provider=RegistryProvider.AWS,
@@ -577,8 +625,8 @@ def azure_platform_config(
         gcp_platform_config,
         gcp_service_account_key="",
         gcp_service_account_key_base64="",
-        kubernetes_provider=CloudProvider.AZURE,
-        jobs_node_pools=[{"name": "Standard_NC6", "idleSize": 0, "cpu": 1.0, "gpu": 1}],
+        kubernetes_provider=CloudProviderType.AZURE,
+        kubernetes_tpu_network=None,
         jobs_resource_pool_types=[resource_pool_type_factory("Standard_NC6")],
         storages=[
             StorageConfig(
@@ -621,7 +669,7 @@ def on_prem_platform_config(
         ingress_public_ips=[IPv4Address("192.168.0.3")],
         standard_storage_class_name="standard",
         kubernetes_provider="kubeadm",
-        jobs_node_pools=[{"name": "gpu", "idleSize": 0, "cpu": 1.0, "gpu": 1}],
+        kubernetes_tpu_network=None,
         jobs_resource_pool_types=[resource_pool_type_factory("gpu")],
         disks_storage_class_name="openebs-cstor",
         storages=[
@@ -662,4 +710,8 @@ def on_prem_platform_config(
 
 @pytest.fixture
 def vcd_platform_config(on_prem_platform_config: PlatformConfig) -> PlatformConfig:
-    return replace(on_prem_platform_config, kubernetes_provider="kubeadm")
+    return replace(
+        on_prem_platform_config,
+        kubernetes_provider="kubeadm",
+        kubernetes_tpu_network=None,
+    )
