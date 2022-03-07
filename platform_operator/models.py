@@ -1,18 +1,26 @@
 from __future__ import annotations
 
-import copy
 import os
-from base64 import b64decode, b64encode
+from base64 import b64decode
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
 from typing import Any
 
 import kopf
+from neuro_config_client import (
+    ACMEEnvironment,
+    ARecord,
+    Cluster,
+    DNSConfig,
+    DockerRegistryConfig,
+    IdleJobConfig,
+    OrchestratorConfig,
+    ResourcePoolType,
+)
 from yarl import URL
 
 
@@ -161,36 +169,6 @@ class Config:
             acme_ca_staging_path=env["NP_ACME_CA_STAGING_PATH"],
             is_standalone=env.get("NP_STANDALONE", "false").lower() == "true",
         )
-
-
-class Cluster(dict[str, Any]):
-    @property
-    def name(self) -> str:
-        return self["name"]
-
-    @property
-    def acme_environment(self) -> str:
-        return self["ingress"]["acme_environment"]
-
-    @property
-    def dns_name(self) -> str:
-        return self["dns"]["name"]
-
-    @property
-    def grafana_username(self) -> str:
-        return self["credentials"].get("grafana", {}).get("username", "")
-
-    @property
-    def grafana_password(self) -> str:
-        return self["credentials"].get("grafana", {}).get("password", "")
-
-    @property
-    def sentry_public_dsn(self) -> str:
-        return self["credentials"].get("sentry", {}).get("public_dsn", "")
-
-    @property
-    def sentry_sample_rate(self) -> float:
-        return self["credentials"].get("sentry", {}).get("sample_rate")
 
 
 def _spec_default_factory() -> dict[str, Any]:
@@ -618,16 +596,6 @@ class Metadata(dict[str, Any]):
         return self["name"]
 
 
-class CloudProvider(str, Enum):
-    AWS = "aws"
-    GCP = "gcp"
-    AZURE = "azure"
-
-    @classmethod
-    def has_value(cls, value: str) -> bool:
-        return value in CloudProvider._value2member_map_
-
-
 @dataclass(frozen=True)
 class DockerConfig:
     url: URL
@@ -776,6 +744,7 @@ class PlatformConfig:
     standard_storage_class_name: str | None
     kubernetes_provider: str
     kubernetes_version: str
+    kubernetes_tpu_network: IPv4Network | None
     node_labels: LabelsConfig
     kubelet_port: int
     namespace: str
@@ -784,7 +753,7 @@ class PlatformConfig:
     ingress_registry_url: URL
     ingress_metrics_url: URL
     ingress_acme_enabled: bool
-    ingress_acme_environment: str
+    ingress_acme_environment: ACMEEnvironment
     ingress_controller_install: bool
     ingress_controller_replicas: int
     ingress_public_ips: Sequence[IPv4Address]
@@ -801,26 +770,20 @@ class PlatformConfig:
     disks_storage_limit_per_user_gb: int
     disks_storage_class_name: str | None
     jobs_namespace: str
-    jobs_node_pools: Sequence[dict[str, Any]]
-    jobs_schedule_timeout_s: float
-    jobs_schedule_scale_up_timeout_s: float
-    jobs_resource_pool_types: Sequence[dict[str, Any]]
-    jobs_resource_presets: Sequence[dict[str, Any]]
+    jobs_resource_pool_types: Sequence[ResourcePoolType]
     jobs_priority_class_name: str
-    jobs_host_template: str
     jobs_internal_host_template: str
     jobs_fallback_host: str
-    jobs_allow_privileged_mode: bool
-    idle_jobs: Sequence[dict[str, Any]]
+    idle_jobs: Sequence[IdleJobConfig]
     storages: Sequence[StorageConfig]
     buckets: BucketsConfig
     registry: RegistryConfig
     monitoring: MonitoringConfig
     helm_repo: HelmRepo
     docker_config: DockerConfig
-    grafana_username: str
-    grafana_password: str
-    sentry_dsn: URL = URL("")
+    grafana_username: str | None = None
+    grafana_password: str | None = None
+    sentry_dsn: URL | None = None
     sentry_sample_rate: float | None = None
     docker_hub_config: DockerConfig | None = None
     aws_region: str = ""
@@ -843,118 +806,108 @@ class PlatformConfig:
         self,
         ingress_service: dict[str, Any] | None = None,
         aws_ingress_lb: dict[str, Any] | None = None,
-    ) -> dict[str, Any] | None:
+    ) -> DNSConfig | None:
         if not ingress_service and not self.ingress_public_ips:
             return None
-        result: dict[str, Any] = {"name": self.ingress_dns_name, "a_records": []}
+        a_records: list[ARecord] = []
         if self.ingress_public_ips:
             ips = [str(ip) for ip in self.ingress_public_ips]
-            result["a_records"].extend(
+            a_records.extend(
                 (
-                    {"name": f"{self.ingress_dns_name}.", "ips": ips},
-                    {"name": f"*.jobs.{self.ingress_dns_name}.", "ips": ips},
-                    {"name": f"registry.{self.ingress_dns_name}.", "ips": ips},
-                    {"name": f"metrics.{self.ingress_dns_name}.", "ips": ips},
+                    ARecord(name=f"{self.ingress_dns_name}.", ips=ips),
+                    ARecord(name=f"*.jobs.{self.ingress_dns_name}.", ips=ips),
+                    ARecord(name=f"registry.{self.ingress_dns_name}.", ips=ips),
+                    ARecord(name=f"metrics.{self.ingress_dns_name}.", ips=ips),
                 )
             )
             if self.buckets.provider == BucketsProvider.MINIO:
-                result["a_records"].extend(
-                    ({"name": f"blob.{self.ingress_dns_name}.", "ips": ips},)
+                a_records.append(
+                    ARecord(name=f"blob.{self.ingress_dns_name}.", ips=ips)
                 )
         elif aws_ingress_lb and ingress_service:
             ingress_host = ingress_service["status"]["loadBalancer"]["ingress"][0][
                 "hostname"
             ]
             ingress_zone_id = aws_ingress_lb["CanonicalHostedZoneNameID"]
-            result["a_records"].extend(
+            a_records.extend(
                 (
-                    {
-                        "name": f"{self.ingress_dns_name}.",
-                        "dns_name": ingress_host,
-                        "zone_id": ingress_zone_id,
-                    },
-                    {
-                        "name": f"*.jobs.{self.ingress_dns_name}.",
-                        "dns_name": ingress_host,
-                        "zone_id": ingress_zone_id,
-                    },
-                    {
-                        "name": f"registry.{self.ingress_dns_name}.",
-                        "dns_name": ingress_host,
-                        "zone_id": ingress_zone_id,
-                    },
-                    {
-                        "name": f"metrics.{self.ingress_dns_name}.",
-                        "dns_name": ingress_host,
-                        "zone_id": ingress_zone_id,
-                    },
+                    ARecord(
+                        name=f"{self.ingress_dns_name}.",
+                        dns_name=ingress_host,
+                        zone_id=ingress_zone_id,
+                    ),
+                    ARecord(
+                        name=f"*.jobs.{self.ingress_dns_name}.",
+                        dns_name=ingress_host,
+                        zone_id=ingress_zone_id,
+                    ),
+                    ARecord(
+                        name=f"registry.{self.ingress_dns_name}.",
+                        dns_name=ingress_host,
+                        zone_id=ingress_zone_id,
+                    ),
+                    ARecord(
+                        name=f"metrics.{self.ingress_dns_name}.",
+                        dns_name=ingress_host,
+                        zone_id=ingress_zone_id,
+                    ),
                 )
             )
         elif ingress_service and ingress_service["spec"]["type"] == "LoadBalancer":
             ingress_host = ingress_service["status"]["loadBalancer"]["ingress"][0]["ip"]
-            result["a_records"].extend(
+            a_records.extend(
                 (
-                    {
-                        "name": f"{self.ingress_dns_name}.",
-                        "ips": [ingress_host],
-                    },
-                    {
-                        "name": f"*.jobs.{self.ingress_dns_name}.",
-                        "ips": [ingress_host],
-                    },
-                    {
-                        "name": f"registry.{self.ingress_dns_name}.",
-                        "ips": [ingress_host],
-                    },
-                    {
-                        "name": f"metrics.{self.ingress_dns_name}.",
-                        "ips": [ingress_host],
-                    },
+                    ARecord(
+                        name=f"{self.ingress_dns_name}.",
+                        ips=[ingress_host],
+                    ),
+                    ARecord(
+                        name=f"*.jobs.{self.ingress_dns_name}.",
+                        ips=[ingress_host],
+                    ),
+                    ARecord(
+                        name=f"registry.{self.ingress_dns_name}.",
+                        ips=[ingress_host],
+                    ),
+                    ARecord(
+                        name=f"metrics.{self.ingress_dns_name}.",
+                        ips=[ingress_host],
+                    ),
                 )
             )
             if self.buckets.provider == BucketsProvider.MINIO:
-                result["a_records"].extend(
-                    ({"name": f"blob.{self.ingress_dns_name}.", "ips": [ingress_host]},)
+                a_records.append(
+                    ARecord(name=f"blob.{self.ingress_dns_name}.", ips=[ingress_host])
                 )
         else:
             return None
-        return result
+        return DNSConfig(name=self.ingress_dns_name, a_records=a_records)
 
-    def create_cluster_config(
-        self,
-        ingress_service: dict[str, Any] | None = None,
-        aws_ingress_lb: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        result: dict[str, Any] = {
-            "orchestrator": {
-                "is_http_ingress_secure": True,
-                "job_hostname_template": self.jobs_host_template,
-                "job_internal_hostname_template": self.jobs_internal_host_template,
-                "job_fallback_hostname": str(self.jobs_fallback_host),
-                "job_schedule_timeout_s": self.jobs_schedule_timeout_s,
-                "job_schedule_scale_up_timeout_s": (
-                    self.jobs_schedule_scale_up_timeout_s
-                ),
-                "resource_pool_types": self.jobs_resource_pool_types,
-                "resource_presets": self._create_resource_presets(),
-                "pre_pull_images": self.pre_pull_images,
-                "allow_privileged_mode": self.jobs_allow_privileged_mode,
-                "idle_jobs": self.idle_jobs,
-            },
-        }
-        dns = self.create_dns_config(
-            ingress_service=ingress_service, aws_ingress_lb=aws_ingress_lb
+    def create_orchestrator_config(self, cluster: Cluster) -> OrchestratorConfig | None:
+        assert cluster.orchestrator
+        if not self.kubernetes_tpu_network:
+            return None
+        return replace(
+            cluster.orchestrator,
+            resource_pool_types=self._update_tpu_network(
+                cluster.orchestrator.resource_pool_types, self.kubernetes_tpu_network
+            ),
         )
-        if dns:
-            result["dns"] = dns
-        return result
 
-    def _create_resource_presets(self) -> Sequence[dict[str, Any]]:
+    @classmethod
+    def _update_tpu_network(
+        cls,
+        resource_pools_types: Sequence[ResourcePoolType],
+        tpu_network: IPv4Network,
+    ) -> Sequence[ResourcePoolType]:
         result = []
-        for preset in self.jobs_resource_presets:
-            new_preset = deepcopy(preset)
-            new_preset.pop("resource_affinity", None)
-            result.append(new_preset)
+        for rpt in resource_pools_types:
+            if rpt.tpu:
+                result.append(
+                    replace(rpt, tpu=replace(rpt.tpu, ipv4_cidr_block=str(tpu_network)))
+                )
+            else:
+                result.append(rpt)
         return result
 
 
@@ -963,6 +916,11 @@ class PlatformConfigFactory:
         self._config = config
 
     def create(self, platform_body: kopf.Body, cluster: Cluster) -> PlatformConfig:
+        assert cluster.credentials
+        assert cluster.orchestrator
+        assert cluster.disks
+        assert cluster.dns
+        assert cluster.ingress
         metadata = Metadata(platform_body["metadata"])
         spec = Spec(platform_body["spec"])
         release_name = self._config.helm_release_names.platform
@@ -992,12 +950,13 @@ class PlatformConfigFactory:
             image_pull_secret_names=self._create_image_pull_secret_names(
                 docker_config, docker_hub_config
             ),
-            pre_pull_images=cluster["orchestrator"].get("pre_pull_images", ()),
+            pre_pull_images=cluster.orchestrator.pre_pull_images,
             standard_storage_class_name=(
                 spec.kubernetes.standard_storage_class_name or None
             ),
             kubernetes_provider=spec.kubernetes.provider,
             kubernetes_version=self._config.kube_config.version,
+            kubernetes_tpu_network=spec.kubernetes.tpu_network,
             kubelet_port=int(spec.kubernetes.kubelet_port or 10250),
             node_labels=LabelsConfig(
                 job=spec.kubernetes.node_label_job or LabelsConfig.job,
@@ -1011,19 +970,19 @@ class PlatformConfigFactory:
                     spec.kubernetes.node_label_preemptible or LabelsConfig.preemptible
                 ),
             ),
-            ingress_dns_name=cluster.dns_name,
-            ingress_url=URL(f"https://{cluster.dns_name}"),
-            ingress_registry_url=URL(f"https://registry.{cluster.dns_name}"),
-            ingress_metrics_url=URL(f"https://metrics.{cluster.dns_name}"),
+            ingress_dns_name=cluster.dns.name,
+            ingress_url=URL(f"https://{cluster.dns.name}"),
+            ingress_registry_url=URL(f"https://registry.{cluster.dns.name}"),
+            ingress_metrics_url=URL(f"https://metrics.{cluster.dns.name}"),
             ingress_acme_enabled=(
                 not spec.ingress_controller.ssl_cert_data
                 or not spec.ingress_controller.ssl_cert_key_data
             ),
-            ingress_acme_environment=cluster.acme_environment,
+            ingress_acme_environment=cluster.ingress.acme_environment,
             ingress_controller_install=spec.ingress_controller.enabled,
             ingress_controller_replicas=spec.ingress_controller.replicas or 2,
             ingress_public_ips=spec.ingress_controller.public_ips,
-            ingress_cors_origins=cluster["ingress"].get("cors_origins", ()),
+            ingress_cors_origins=cluster.ingress.cors_origins,
             ingress_service_type=IngressServiceType(
                 spec.ingress_controller.service_type or IngressServiceType.LOAD_BALANCER
             ),
@@ -1042,41 +1001,32 @@ class PlatformConfigFactory:
             ingress_ssl_cert_data=spec.ingress_controller.ssl_cert_data,
             ingress_ssl_cert_key_data=spec.ingress_controller.ssl_cert_key_data,
             jobs_namespace=jobs_namespace,
-            jobs_node_pools=self._create_node_pools(
-                cluster["orchestrator"].get("resource_pool_types", ())
-            ),
-            jobs_resource_pool_types=self._update_tpu_network(
-                cluster["orchestrator"].get("resource_pool_types", ()),
-                spec.kubernetes.tpu_network,
-            ),
-            jobs_resource_presets=cluster["orchestrator"].get("resource_presets", ()),
-            jobs_schedule_timeout_s=cluster["orchestrator"]["job_schedule_timeout_s"],
-            jobs_schedule_scale_up_timeout_s=cluster["orchestrator"][
-                "job_schedule_scale_up_timeout_s"
-            ],
+            jobs_resource_pool_types=cluster.orchestrator.resource_pool_types,
             jobs_priority_class_name=f"{self._config.helm_release_names.platform}-job",
-            jobs_host_template=f"{{job_id}}.jobs.{cluster.dns_name}",
             jobs_internal_host_template=f"{{job_id}}.{jobs_namespace}",
-            jobs_fallback_host=cluster["orchestrator"]["job_fallback_hostname"],
-            jobs_allow_privileged_mode=cluster["orchestrator"].get(
-                "allow_privileged_mode", False
-            ),
-            idle_jobs=cluster["orchestrator"].get("idle_jobs", ()),
+            jobs_fallback_host=cluster.orchestrator.job_fallback_hostname,
+            idle_jobs=cluster.orchestrator.idle_jobs,
             storages=[self._create_storage(s) for s in spec.storages],
             buckets=self._create_buckets(spec.blob_storage, cluster),
             registry=self._create_registry(spec.registry),
             monitoring=self._create_monitoring(spec.monitoring),
-            disks_storage_limit_per_user_gb=cluster["disks"][
-                "storage_limit_per_user_gb"
-            ],
+            disks_storage_limit_per_user_gb=cluster.disks.storage_limit_per_user_gb,
             disks_storage_class_name=spec.disks.storage_class_name or None,
             helm_repo=self._create_helm_repo(cluster),
             docker_config=docker_config,
             docker_hub_config=docker_hub_config,
-            grafana_username=cluster.grafana_username,
-            grafana_password=cluster.grafana_password,
-            sentry_dsn=URL(cluster.sentry_public_dsn),
-            sentry_sample_rate=cluster.sentry_sample_rate,
+            grafana_username=cluster.credentials.grafana.username
+            if cluster.credentials.grafana
+            else None,
+            grafana_password=cluster.credentials.grafana.password
+            if cluster.credentials.grafana
+            else None,
+            sentry_dsn=cluster.credentials.sentry.public_dsn
+            if cluster.credentials.sentry
+            else None,
+            sentry_sample_rate=cluster.credentials.sentry.sample_rate
+            if cluster.credentials.sentry
+            else None,
             aws_region=spec.iam.aws_region,
             aws_role_arn=spec.iam.aws_role_arn,
             aws_s3_role_arn=spec.iam.aws_s3_role_arn,
@@ -1087,41 +1037,44 @@ class PlatformConfigFactory:
         )
 
     def _create_helm_repo(self, cluster: Cluster) -> HelmRepo:
-        neuro_helm = cluster["credentials"]["neuro_helm"]
+        assert cluster.credentials
+        assert cluster.credentials.neuro_helm
         return HelmRepo(
-            url=URL(neuro_helm["url"]),
-            username=neuro_helm.get("username", ""),
-            password=neuro_helm.get("password", ""),
+            url=cluster.credentials.neuro_helm.url,
+            username=cluster.credentials.neuro_helm.username or "",
+            password=cluster.credentials.neuro_helm.password or "",
         )
 
     def _create_neuro_docker_config(
         self, cluster: Cluster, secret_name: str, create_secret: bool
     ) -> DockerConfig:
+        assert cluster.credentials
+        assert cluster.credentials.neuro_registry
         return self._create_docker_config(
-            cluster["credentials"]["neuro_registry"], secret_name, create_secret
+            cluster.credentials.neuro_registry, secret_name, create_secret
         )
 
     def _create_docker_hub_config(
         self, cluster: Cluster, secret_name: str
     ) -> DockerConfig | None:
-        docker_hub_data = cluster["credentials"].get("docker_hub")
-        if docker_hub_data is None:
+        assert cluster.credentials
+        if cluster.credentials.docker_hub is None:
             return None
-        return self._create_docker_config(docker_hub_data, secret_name, True)
+        return self._create_docker_config(
+            cluster.credentials.docker_hub, secret_name, True
+        )
 
     def _create_docker_config(
-        self, data: Mapping[str, Any], secret_name: str, create_secret: bool
+        self, registry: DockerRegistryConfig, secret_name: str, create_secret: bool
     ) -> DockerConfig:
-        username = data.get("username", "")
-        password = data.get("password", "")
-        if not username or not password:
+        if not registry.username or not registry.password:
             secret_name = ""
             create_secret = False
         return DockerConfig(
-            url=URL(data["url"]),
-            email=data.get("email", ""),
-            username=username,
-            password=password,
+            url=registry.url,
+            email=registry.email or "",
+            username=registry.username or "",
+            password=registry.password or "",
             secret_name=secret_name,
             create_secret=create_secret,
         )
@@ -1181,31 +1134,33 @@ class PlatformConfigFactory:
         if not spec:
             raise ValueError("Blob storage spec is empty")
 
-        disable_creation = cluster["buckets"].get("disable_creation", False)
+        assert cluster.credentials
+        assert cluster.buckets
+        assert cluster.dns
 
         if BucketsProvider.AWS in spec:
             return BucketsConfig(
                 provider=BucketsProvider.AWS,
-                disable_creation=disable_creation,
+                disable_creation=cluster.buckets.disable_creation,
                 aws_region=spec.aws_region,
             )
         elif BucketsProvider.GCP in spec:
             return BucketsConfig(
                 provider=BucketsProvider.GCP,
                 gcp_project=spec.gcp_project,
-                disable_creation=disable_creation,
+                disable_creation=cluster.buckets.disable_creation,
             )
         elif BucketsProvider.AZURE in spec:
             return BucketsConfig(
                 provider=BucketsProvider.AZURE,
-                disable_creation=disable_creation,
+                disable_creation=cluster.buckets.disable_creation,
                 azure_storage_account_name=spec.azure_storrage_account_name,
                 azure_storage_account_key=spec.azure_storrage_account_key,
             )
         elif BucketsProvider.EMC_ECS in spec:
             return BucketsConfig(
                 provider=BucketsProvider.EMC_ECS,
-                disable_creation=disable_creation,
+                disable_creation=cluster.buckets.disable_creation,
                 emc_ecs_access_key_id=spec.emc_ecs_access_key_id,
                 emc_ecs_secret_access_key=spec.emc_ecs_secret_access_key,
                 emc_ecs_s3_assumable_role=spec.emc_ecs_s3_role,
@@ -1215,7 +1170,7 @@ class PlatformConfigFactory:
         elif BucketsProvider.OPEN_STACK in spec:
             return BucketsConfig(
                 provider=BucketsProvider.OPEN_STACK,
-                disable_creation=disable_creation,
+                disable_creation=cluster.buckets.disable_creation,
                 open_stack_region_name=spec.open_stack_region,
                 open_stack_username=spec.open_stack_username,
                 open_stack_password=spec.open_stack_password,
@@ -1225,18 +1180,19 @@ class PlatformConfigFactory:
         elif BucketsProvider.MINIO in spec:
             return BucketsConfig(
                 provider=BucketsProvider.MINIO,
-                disable_creation=disable_creation,
+                disable_creation=cluster.buckets.disable_creation,
                 minio_url=URL(spec.minio_url),
                 # Ingress should be configured manually in this case
-                minio_public_url=URL(f"https://blob.{cluster.dns_name}"),
+                minio_public_url=URL(f"https://blob.{cluster.dns.name}"),
                 minio_region=spec.minio_region,
                 minio_access_key=spec.minio_access_key,
                 minio_secret_key=spec.minio_secret_key,
             )
         elif "kubernetes" in spec:
+            assert cluster.credentials.minio
             return BucketsConfig(
                 provider=BucketsProvider.MINIO,
-                disable_creation=disable_creation,
+                disable_creation=cluster.buckets.disable_creation,
                 minio_install=True,
                 minio_url=URL.build(
                     scheme="http",
@@ -1244,10 +1200,10 @@ class PlatformConfigFactory:
                     port=9000,
                 ),
                 # Ingress should be configured manually in this case
-                minio_public_url=URL(f"https://blob.{cluster.dns_name}"),
+                minio_public_url=URL(f"https://blob.{cluster.dns.name}"),
                 minio_region="minio",
-                minio_access_key=cluster["credentials"]["minio"]["username"],
-                minio_secret_key=cluster["credentials"]["minio"]["password"],
+                minio_access_key=cluster.credentials.minio.username,
+                minio_secret_key=cluster.credentials.minio.password,
                 minio_storage_class_name=spec.kubernetes_storage_class_name,
                 minio_storage_size=spec.kubernetes_storage_size or "10Gi",
             )
@@ -1343,38 +1299,7 @@ class PlatformConfigFactory:
             raise ValueError("Metrics storage type is not supported")
 
     @classmethod
-    def _base64_encode(cls, value: str) -> str:
-        return b64encode(value.encode("utf-8")).decode("utf-8")
-
-    @classmethod
     def _base64_decode(cls, value: str | None) -> str:
         if not value:
             return ""
         return b64decode(value.encode("utf-8")).decode("utf-8")
-
-    @classmethod
-    def _update_tpu_network(
-        cls,
-        resource_pools_types: Sequence[dict[str, Any]],
-        tpu_network: IPv4Network | None,
-    ) -> Sequence[dict[str, Any]]:
-        resource_pools_types = copy.deepcopy(resource_pools_types)
-        for rpt in resource_pools_types:
-            if "tpu" in rpt and tpu_network:
-                rpt["tpu"]["ipv4_cidr_block"] = str(tpu_network)
-        return resource_pools_types
-
-    @classmethod
-    def _create_node_pools(
-        cls, node_pools: Sequence[Mapping[str, Any]]
-    ) -> Sequence[dict[str, Any]]:
-        return [cls._create_node_pool(np) for np in node_pools]
-
-    @classmethod
-    def _create_node_pool(cls, resource_pool: Mapping[str, Any]) -> dict[str, Any]:
-        return {
-            "name": resource_pool["name"],
-            "idleSize": resource_pool.get("idle_size", 0),
-            "cpu": resource_pool["available_cpu"],
-            "gpu": resource_pool.get("gpu", 0),
-        }

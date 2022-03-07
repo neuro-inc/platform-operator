@@ -7,12 +7,18 @@ from typing import Any
 
 import kopf
 import pytest
+from neuro_config_client import (
+    ARecord,
+    Cluster,
+    DNSConfig,
+    DockerRegistryConfig,
+    ResourcePoolType,
+)
 from yarl import URL
 
 from platform_operator.models import (
     BucketsConfig,
     BucketsProvider,
-    Cluster,
     Config,
     HelmChartNames,
     HelmChartVersions,
@@ -147,23 +153,6 @@ class TestConfig:
         )
 
 
-class TestCluster:
-    def test_name(self) -> None:
-        cluster = Cluster({"name": "test"})
-
-        assert cluster.name == "test"
-
-    def test_acme_environment(self) -> None:
-        cluster = Cluster({"ingress": {"acme_environment": "staging"}})
-
-        assert cluster.acme_environment == "staging"
-
-    def test_dns_name(self) -> None:
-        cluster = Cluster({"dns": {"name": "test.org.neu.ro"}})
-
-        assert cluster.dns_name == "test.org.neu.ro"
-
-
 class TestPlatformConfig:
     @pytest.fixture
     def traefik_service(self) -> dict[str, Any]:
@@ -200,15 +189,15 @@ class TestPlatformConfig:
         result = gcp_platform_config.create_dns_config(ingress_service=traefik_service)
         dns_name = gcp_platform_config.ingress_dns_name
 
-        assert result == {
-            "name": gcp_platform_config.ingress_dns_name,
-            "a_records": [
-                {"name": f"{dns_name}.", "ips": ["192.168.0.1"]},
-                {"name": f"*.jobs.{dns_name}.", "ips": ["192.168.0.1"]},
-                {"name": f"registry.{dns_name}.", "ips": ["192.168.0.1"]},
-                {"name": f"metrics.{dns_name}.", "ips": ["192.168.0.1"]},
+        assert result == DNSConfig(
+            name=gcp_platform_config.ingress_dns_name,
+            a_records=[
+                ARecord(name=f"{dns_name}.", ips=["192.168.0.1"]),
+                ARecord(name=f"*.jobs.{dns_name}.", ips=["192.168.0.1"]),
+                ARecord(name=f"registry.{dns_name}.", ips=["192.168.0.1"]),
+                ARecord(name=f"metrics.{dns_name}.", ips=["192.168.0.1"]),
             ],
-        }
+        )
 
     def test_create_dns_config_from_traefik_node_port_service(
         self,
@@ -227,16 +216,16 @@ class TestPlatformConfig:
         result = on_prem_platform_config.create_dns_config()
         dns_name = on_prem_platform_config.ingress_dns_name
 
-        assert result == {
-            "name": on_prem_platform_config.ingress_dns_name,
-            "a_records": [
-                {"name": f"{dns_name}.", "ips": ["192.168.0.3"]},
-                {"name": f"*.jobs.{dns_name}.", "ips": ["192.168.0.3"]},
-                {"name": f"registry.{dns_name}.", "ips": ["192.168.0.3"]},
-                {"name": f"metrics.{dns_name}.", "ips": ["192.168.0.3"]},
-                {"name": f"blob.{dns_name}.", "ips": ["192.168.0.3"]},
+        assert result == DNSConfig(
+            name=on_prem_platform_config.ingress_dns_name,
+            a_records=[
+                ARecord(name=f"{dns_name}.", ips=["192.168.0.3"]),
+                ARecord(name=f"*.jobs.{dns_name}.", ips=["192.168.0.3"]),
+                ARecord(name=f"registry.{dns_name}.", ips=["192.168.0.3"]),
+                ARecord(name=f"metrics.{dns_name}.", ips=["192.168.0.3"]),
+                ARecord(name=f"blob.{dns_name}.", ips=["192.168.0.3"]),
             ],
-        }
+        )
 
     def test_create_aws_dns_config(
         self,
@@ -249,89 +238,64 @@ class TestPlatformConfig:
         )
         dns_name = aws_platform_config.ingress_dns_name
 
-        assert result == {
-            "name": aws_platform_config.ingress_dns_name,
-            "a_records": [
-                {
-                    "name": f"{dns_name}.",
-                    "dns_name": "traefik",
-                    "zone_id": "/hostedzone/traefik",
-                },
-                {
-                    "name": f"*.jobs.{dns_name}.",
-                    "dns_name": "traefik",
-                    "zone_id": "/hostedzone/traefik",
-                },
-                {
-                    "name": f"registry.{dns_name}.",
-                    "dns_name": "traefik",
-                    "zone_id": "/hostedzone/traefik",
-                },
-                {
-                    "name": f"metrics.{dns_name}.",
-                    "dns_name": "traefik",
-                    "zone_id": "/hostedzone/traefik",
-                },
+        assert result == DNSConfig(
+            name=aws_platform_config.ingress_dns_name,
+            a_records=[
+                ARecord(
+                    name=f"{dns_name}.",
+                    dns_name="traefik",
+                    zone_id="/hostedzone/traefik",
+                ),
+                ARecord(
+                    name=f"*.jobs.{dns_name}.",
+                    dns_name="traefik",
+                    zone_id="/hostedzone/traefik",
+                ),
+                ARecord(
+                    name=f"registry.{dns_name}.",
+                    dns_name="traefik",
+                    zone_id="/hostedzone/traefik",
+                ),
+                ARecord(
+                    name=f"metrics.{dns_name}.",
+                    dns_name="traefik",
+                    zone_id="/hostedzone/traefik",
+                ),
             ],
-        }
-
-    def test_create_cluster_config(
-        self,
-        cluster_name: str,
-        gcp_platform_config: PlatformConfig,
-        traefik_service: dict[str, Any],
-        resource_pool_type_factory: Callable[..., dict[str, Any]],
-        resource_preset_factory: Callable[[], dict[str, Any]],
-    ) -> None:
-        resource_preset = resource_preset_factory()
-        resource_preset.pop("resource_affinity", None)
-
-        result = gcp_platform_config.create_cluster_config(
-            ingress_service=traefik_service,
         )
-        dns_name = gcp_platform_config.ingress_dns_name
 
-        assert result == {
-            "orchestrator": {
-                "is_http_ingress_secure": True,
-                "job_hostname_template": f"{{job_id}}.jobs.{cluster_name}.org.neu.ro",
-                "job_internal_hostname_template": "{job_id}.platform-jobs",
-                "job_fallback_hostname": "default.jobs-dev.neu.ro",
-                "job_schedule_timeout_s": 60,
-                "job_schedule_scale_up_timeout_s": 30,
-                "resource_pool_types": [
-                    resource_pool_type_factory("n1-highmem-8", "192.168.0.0/16")
-                ],
-                "resource_presets": [resource_preset],
-                "pre_pull_images": ["neuromation/base"],
-                "allow_privileged_mode": True,
-                "idle_jobs": [
-                    {
-                        "name": "miner",
-                        "count": 1,
-                        "image": "miner",
-                        "resources": {"cpu_m": 1000, "memory_mb": 1024},
-                    }
-                ],
-            },
-            "dns": {
-                "name": gcp_platform_config.ingress_dns_name,
-                "a_records": [
-                    {"name": f"{dns_name}.", "ips": ["192.168.0.1"]},
-                    {"name": f"*.jobs.{dns_name}.", "ips": ["192.168.0.1"]},
-                    {"name": f"registry.{dns_name}.", "ips": ["192.168.0.1"]},
-                    {"name": f"metrics.{dns_name}.", "ips": ["192.168.0.1"]},
-                ],
-            },
-        }
-
-    def test_create_cluster_config_without_dns(
+    def test_create_dns_config_none(
         self,
         gcp_platform_config: PlatformConfig,
     ) -> None:
-        result = gcp_platform_config.create_cluster_config()
+        result = gcp_platform_config.create_dns_config()
 
-        assert "dns" not in result
+        assert result is None
+
+    def test_create_orchestrator_config(
+        self,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+        resource_pool_type_factory: Callable[..., ResourcePoolType],
+    ) -> None:
+        result = gcp_platform_config.create_orchestrator_config(gcp_cluster)
+
+        assert result == replace(
+            gcp_cluster.orchestrator,
+            resource_pool_types=[
+                resource_pool_type_factory("n1-highmem-8", "192.168.0.0/16")
+            ],
+        )
+
+    def test_create_orchestrator_config_none(
+        self,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        gcp_platform_config = replace(gcp_platform_config, kubernetes_tpu_network=None)
+        result = gcp_platform_config.create_orchestrator_config(gcp_cluster)
+
+        assert result is None
 
 
 class TestPlatformConfigFactory:
@@ -407,25 +371,6 @@ class TestPlatformConfigFactory:
         result = factory.create(gcp_platform_body, gcp_cluster)
 
         assert result == replace(gcp_platform_config, standard_storage_class_name=None)
-
-    def test_gcp_platform_config_without_tpu(
-        self,
-        factory: PlatformConfigFactory,
-        gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
-        gcp_platform_config: PlatformConfig,
-        resource_pool_type_factory: Callable[..., dict[str, Any]],
-    ) -> None:
-        del gcp_platform_body["spec"]["kubernetes"]["tpuIPv4CIDR"]
-        gcp_cluster["orchestrator"]["resource_pool_types"] = [
-            resource_pool_type_factory("n1-highmem-8")
-        ]
-        result = factory.create(gcp_platform_body, gcp_cluster)
-
-        assert result == replace(
-            gcp_platform_config,
-            jobs_resource_pool_types=[resource_pool_type_factory("n1-highmem-8")],
-        )
 
     def test_gcp_platform_config_with_kubernetes_storage(
         self,
@@ -574,8 +519,16 @@ class TestPlatformConfigFactory:
         gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
-        gcp_cluster["credentials"]["neuro_registry"] = {"url": "https://neuro.io"}
-        del gcp_cluster["credentials"]["docker_hub"]
+        gcp_cluster = replace(
+            gcp_cluster,
+            credentials=replace(
+                gcp_cluster.credentials,
+                neuro_registry=DockerRegistryConfig(
+                    url=URL("https://ghcr.io/neuro-inc")
+                ),
+                docker_hub=None,
+            ),
+        )
         result = factory.create(gcp_platform_body, gcp_cluster)
 
         assert result.docker_config.create_secret is False
@@ -616,11 +569,14 @@ class TestPlatformConfigFactory:
         gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
-        del gcp_cluster["credentials"]["grafana"]
+        gcp_cluster = replace(
+            gcp_cluster,
+            credentials=replace(gcp_cluster.credentials, grafana=None),
+        )
         result = factory.create(gcp_platform_body, gcp_cluster)
 
-        assert result.grafana_username == ""
-        assert result.grafana_password == ""
+        assert result.grafana_username is None
+        assert result.grafana_password is None
 
     def test_gcp_platform_config_without_tracing(
         self,
@@ -628,22 +584,13 @@ class TestPlatformConfigFactory:
         gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
-        del gcp_cluster["credentials"]["sentry"]
+        gcp_cluster = replace(
+            gcp_cluster,
+            credentials=replace(gcp_cluster.credentials, sentry=None),
+        )
         result = factory.create(gcp_platform_body, gcp_cluster)
 
-        assert result.sentry_dsn == URL("")
-        assert result.sentry_sample_rate is None
-
-    def test_gcp_platform_config_without_tracing_sample_rate(
-        self,
-        factory: PlatformConfigFactory,
-        gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
-    ) -> None:
-        del gcp_cluster["credentials"]["sentry"]["sample_rate"]
-        result = factory.create(gcp_platform_body, gcp_cluster)
-
-        assert result.sentry_dsn
+        assert result.sentry_dsn is None
         assert result.sentry_sample_rate is None
 
     def test_gcp_platform_config_without_docker_hub(
@@ -652,7 +599,10 @@ class TestPlatformConfigFactory:
         gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
-        del gcp_cluster["credentials"]["docker_hub"]
+        gcp_cluster = replace(
+            gcp_cluster,
+            credentials=replace(gcp_cluster.credentials, docker_hub=None),
+        )
         result = factory.create(gcp_platform_body, gcp_cluster)
 
         assert result.image_pull_secret_names == ["platform-docker-config"]

@@ -2,6 +2,7 @@ from dataclasses import replace
 from unittest import mock
 
 import pytest
+from neuro_config_client import ACMEEnvironment, IdleJobConfig, Resources
 from yarl import URL
 
 from platform_operator.helm_values import HelmValuesFactory
@@ -40,10 +41,10 @@ class TestHelmValuesFactory:
             "dockerRegistryEnabled": False,
             "minioEnabled": False,
             "platformReportsEnabled": True,
-            "alpineImage": {"repository": "neuro.io/alpine"},
-            "pauseImage": {"repository": "neuro.io/pause"},
-            "crictlImage": {"repository": "neuro.io/crictl"},
-            "kubectlImage": {"repository": "neuro.io/kubectl"},
+            "alpineImage": {"repository": "ghcr.io/neuro-inc/alpine"},
+            "pauseImage": {"repository": "ghcr.io/neuro-inc/pause"},
+            "crictlImage": {"repository": "ghcr.io/neuro-inc/crictl"},
+            "kubectlImage": {"repository": "ghcr.io/neuro-inc/kubectl"},
             "serviceToken": "token",
             "nodePools": [
                 {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "gpu": 1}
@@ -54,7 +55,7 @@ class TestHelmValuesFactory:
                 "gpu": "platform.neuromation.io/accelerator",
             },
             "nvidiaGpuDriver": {
-                "image": {"repository": "neuro.io/k8s-device-plugin"},
+                "image": {"repository": "ghcr.io/neuro-inc/k8s-device-plugin"},
             },
             "imagesPrepull": {
                 "refreshInterval": "1h",
@@ -64,8 +65,8 @@ class TestHelmValuesFactory:
                 "create": True,
                 "name": "platform-docker-config",
                 "credentials": {
-                    "url": "https://neuro.io",
-                    "email": f"{cluster_name}@neuromation.io",
+                    "url": "https://ghcr.io/neuro-inc",
+                    "email": f"{cluster_name}@neu.ro",
                     "username": cluster_name,
                     "password": "password",
                 },
@@ -75,7 +76,7 @@ class TestHelmValuesFactory:
                 "name": "platform-docker-hub-config",
                 "credentials": {
                     "url": "https://index.docker.io/v1/",
-                    "email": f"{cluster_name}@neuromation.io",
+                    "email": f"{cluster_name}@neu.ro",
                     "username": cluster_name,
                     "password": "password",
                 },
@@ -148,19 +149,15 @@ class TestHelmValuesFactory:
         gcp_platform_config = replace(
             gcp_platform_config,
             idle_jobs=[
-                {
-                    "name": "miner",
-                    "count": 1,
-                    "image": "miner",
-                    "image_pull_secret": "secret",
-                    "resources": {
-                        "cpu_m": 1000,
-                        "memory_mb": 1024,
-                        "gpu": 1,
-                    },
-                    "env": {"NAME": "VALUE"},
-                    "node_selector": {"gpu": "nvidia-tesla-k80"},
-                }
+                IdleJobConfig(
+                    name="miner",
+                    count=1,
+                    image="miner",
+                    image_pull_secret="secret",
+                    resources=Resources(cpu_m=1000, memory_mb=1024, gpu=1),
+                    env={"NAME": "VALUE"},
+                    node_selector={"gpu": "nvidia-tesla-k80"},
+                )
             ],
         )
 
@@ -234,7 +231,7 @@ class TestHelmValuesFactory:
             replace(
                 gcp_platform_config,
                 docker_config=DockerConfig(
-                    url=URL("https://neuro.io"),
+                    url=URL("https://ghcr.io/neuro-inc"),
                     secret_name="secret",
                     create_secret=False,
                 ),
@@ -466,7 +463,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "acme",
             "fullnameOverride": "acme",
-            "bashImage": {"repository": "neuro.io/bash"},
+            "bashImage": {"repository": "ghcr.io/neuro-inc/bash"},
             "acme": {
                 "email": f"{cluster_name}@neu.ro",
                 "dns": "neuro",
@@ -500,7 +497,7 @@ class TestHelmValuesFactory:
         factory: HelmValuesFactory,
     ) -> None:
         gcp_platform_config = replace(
-            gcp_platform_config, ingress_acme_environment="staging"
+            gcp_platform_config, ingress_acme_environment=ACMEEnvironment.STAGING
         )
 
         result = factory.create_acme_values(gcp_platform_config)
@@ -513,7 +510,7 @@ class TestHelmValuesFactory:
         result = factory.create_docker_registry_values(on_prem_platform_config)
 
         assert result == {
-            "image": {"repository": "neuro.io/registry"},
+            "image": {"repository": "ghcr.io/neuro-inc/registry"},
             "ingress": {"enabled": False},
             "persistence": {
                 "enabled": True,
@@ -533,7 +530,7 @@ class TestHelmValuesFactory:
 
         assert result == {
             "image": {
-                "repository": "neuro.io/minio",
+                "repository": "ghcr.io/neuro-inc/minio",
                 "tag": "RELEASE.2021-08-25T00-41-18Z",
             },
             "imagePullSecrets": [
@@ -572,7 +569,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "traefik",
             "fullnameOverride": "traefik",
-            "image": {"name": "neuro.io/traefik"},
+            "image": {"name": "ghcr.io/neuro-inc/traefik"},
             "deployment": {
                 "replicas": 2,
                 "labels": {"service": "traefik"},
@@ -706,7 +703,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "platform-storage",
             "fullnameOverride": "platform-storage",
-            "image": {"repository": "neuro.io/platformstorageapi"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformstorageapi"},
             "service": {
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
@@ -793,23 +790,11 @@ class TestHelmValuesFactory:
     def test_create_platform_storage_without_tracing_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        gcp_platform_config = replace(gcp_platform_config, sentry_dsn=URL(""))
+        gcp_platform_config = replace(gcp_platform_config, sentry_dsn=None)
 
         result = factory.create_platform_storage_values(gcp_platform_config)
 
         assert "sentry" not in result
-
-    def test_create_platform_storage_without_tracing_sample_rate_values(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        gcp_platform_config = replace(gcp_platform_config, sentry_sample_rate=None)
-
-        result = factory.create_platform_storage_values(gcp_platform_config)
-
-        assert result["sentry"] == {
-            "dsn": "https://sentry",
-            "clusterName": gcp_platform_config.cluster_name,
-        }
 
     def test_create_aws_buckets_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -830,7 +815,7 @@ class TestHelmValuesFactory:
                     "https://app.neu.ro",
                 ]
             },
-            "image": {"repository": "neuro.io/platformbucketsapi"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
@@ -932,7 +917,7 @@ class TestHelmValuesFactory:
                     "https://app.neu.ro",
                 ]
             },
-            "image": {"repository": "neuro.io/platformbucketsapi"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
@@ -1021,7 +1006,7 @@ class TestHelmValuesFactory:
                     "https://app.neu.ro",
                 ]
             },
-            "image": {"repository": "neuro.io/platformbucketsapi"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
@@ -1083,7 +1068,7 @@ class TestHelmValuesFactory:
                     "https://app.neu.ro",
                 ]
             },
-            "image": {"repository": "neuro.io/platformbucketsapi"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
@@ -1142,7 +1127,7 @@ class TestHelmValuesFactory:
                     "https://app.neu.ro",
                 ]
             },
-            "image": {"repository": "neuro.io/platformbucketsapi"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
@@ -1204,7 +1189,7 @@ class TestHelmValuesFactory:
                     "https://app.neu.ro",
                 ]
             },
-            "image": {"repository": "neuro.io/platformbucketsapi"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
@@ -1248,7 +1233,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "platform-registry",
             "fullnameOverride": "platform-registry",
-            "image": {"repository": "neuro.io/platformregistryapi"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformregistryapi"},
             "service": {
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
@@ -1322,7 +1307,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "platform-registry",
             "fullnameOverride": "platform-registry",
-            "image": {"repository": "neuro.io/platformregistryapi"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformregistryapi"},
             "service": {
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
@@ -1376,7 +1361,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "platform-registry",
             "fullnameOverride": "platform-registry",
-            "image": {"repository": "neuro.io/platformregistryapi"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformregistryapi"},
             "service": {
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
@@ -1446,7 +1431,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "platform-registry",
             "fullnameOverride": "platform-registry",
-            "image": {"repository": "neuro.io/platformregistryapi"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformregistryapi"},
             "service": {
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
@@ -1516,7 +1501,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "platform-monitoring",
             "fullnameOverride": "platform-monitoring",
-            "image": {"repository": "neuro.io/platformmonitoringapi"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformmonitoringapi"},
             "kubeletPort": 10250,
             "jobsNamespace": "platform-jobs",
             "nodeLabels": {
@@ -1561,16 +1546,16 @@ class TestHelmValuesFactory:
             },
             "containerRuntime": {"name": "docker"},
             "fluentbit": {
-                "image": {"repository": "neuro.io/fluent-bit"},
+                "image": {"repository": "ghcr.io/neuro-inc/fluent-bit"},
             },
             "fluentd": {
-                "image": {"repository": "neuro.io/fluentd"},
+                "image": {"repository": "ghcr.io/neuro-inc/fluentd"},
                 "persistence": {
                     "enabled": True,
                     "storageClassName": "platform-standard-topology-aware",
                 },
             },
-            "minio": {"image": {"repository": "neuro.io/minio"}},
+            "minio": {"image": {"repository": "ghcr.io/neuro-inc/minio"}},
             "logs": {
                 "persistence": {
                     "type": "gcp",
@@ -1750,7 +1735,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "platform-container-runtime",
             "fullnameOverride": "platform-container-runtime",
-            "image": {"repository": "neuro.io/platformcontainerruntime"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformcontainerruntime"},
             "affinity": {
                 "nodeAffinity": {
                     "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -1782,7 +1767,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "platform-secrets",
             "fullnameOverride": "platform-secrets",
-            "image": {"repository": "neuro.io/platformsecrets"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformsecrets"},
             "service": {
                 "annotations": {
                     "traefik.ingress.kubernetes.io/service.sticky.cookie": "true",
@@ -1838,8 +1823,10 @@ class TestHelmValuesFactory:
                 "supported": True,
                 "configMapName": "thanos-object-storage-config",
             },
-            "image": {"repository": "neuro.io/platform-reports"},
-            "nvidiaDCGMExporter": {"image": {"repository": "neuro.io/dcgm-exporter"}},
+            "image": {"repository": "ghcr.io/neuro-inc/platform-reports"},
+            "nvidiaDCGMExporter": {
+                "image": {"repository": "ghcr.io/neuro-inc/dcgm-exporter"}
+            },
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
@@ -1888,10 +1875,10 @@ class TestHelmValuesFactory:
                 },
                 "prometheus": {
                     "prometheusSpec": {
-                        "image": {"repository": "neuro.io/prometheus"},
+                        "image": {"repository": "ghcr.io/neuro-inc/prometheus"},
                         "retention": "15d",
                         "thanos": {
-                            "image": "neuro.io/thanos:v0.24.0",
+                            "image": "ghcr.io/neuro-inc/thanos:v0.24.0",
                             "version": "v0.14.0",
                             "objectStorageConfig": {
                                 "name": "thanos-object-storage-config",
@@ -1910,16 +1897,22 @@ class TestHelmValuesFactory:
                     }
                 },
                 "prometheusOperator": {
-                    "image": {"repository": "neuro.io/prometheus-operator"},
+                    "image": {"repository": "ghcr.io/neuro-inc/prometheus-operator"},
                     "prometheusConfigReloaderImage": {
-                        "repository": ("neuro.io/prometheus-config-reloader")
+                        "repository": ("ghcr.io/neuro-inc/prometheus-config-reloader")
                     },
-                    "configmapReloadImage": {"repository": "neuro.io/configmap-reload"},
-                    "kubectlImage": {"repository": "neuro.io/kubectl"},
-                    "tlsProxy": {"image": {"repository": "neuro.io/ghostunnel"}},
+                    "configmapReloadImage": {
+                        "repository": "ghcr.io/neuro-inc/configmap-reload"
+                    },
+                    "kubectlImage": {"repository": "ghcr.io/neuro-inc/kubectl"},
+                    "tlsProxy": {
+                        "image": {"repository": "ghcr.io/neuro-inc/ghostunnel"}
+                    },
                     "admissionWebhooks": {
                         "patch": {
-                            "image": {"repository": "neuro.io/kube-webhook-certgen"}
+                            "image": {
+                                "repository": "ghcr.io/neuro-inc/kube-webhook-certgen"
+                            }
                         }
                     },
                     "kubeletService": {"namespace": "platform"},
@@ -1938,7 +1931,7 @@ class TestHelmValuesFactory:
                     }
                 },
                 "kube-state-metrics": {
-                    "image": {"repository": "neuro.io/kube-state-metrics"},
+                    "image": {"repository": "ghcr.io/neuro-inc/kube-state-metrics"},
                     "serviceAccount": {
                         "imagePullSecrets": [
                             {"name": "platform-docker-config"},
@@ -1947,7 +1940,7 @@ class TestHelmValuesFactory:
                     },
                 },
                 "prometheus-node-exporter": {
-                    "image": {"repository": "neuro.io/node-exporter"},
+                    "image": {"repository": "ghcr.io/neuro-inc/node-exporter"},
                     "serviceAccount": {
                         "imagePullSecrets": [
                             {"name": "platform-docker-config"},
@@ -1957,7 +1950,7 @@ class TestHelmValuesFactory:
                 },
             },
             "thanos": {
-                "image": {"repository": "neuro.io/thanos"},
+                "image": {"repository": "ghcr.io/neuro-inc/thanos"},
                 "store": {
                     "persistentVolumeClaim": {
                         "spec": {"storageClassName": "platform-standard-topology-aware"}
@@ -1983,7 +1976,7 @@ class TestHelmValuesFactory:
             },
             "grafana": {
                 "image": {
-                    "repository": "neuro.io/grafana",
+                    "repository": "ghcr.io/neuro-inc/grafana",
                     "pullSecrets": [
                         "platform-docker-config",
                         "platform-docker-hub-config",
@@ -1991,7 +1984,7 @@ class TestHelmValuesFactory:
                 },
                 "initChownData": {
                     "image": {
-                        "repository": "neuro.io/busybox",
+                        "repository": "ghcr.io/neuro-inc/busybox",
                         "pullSecrets": [
                             "platform-docker-config",
                             "platform-docker-hub-config",
@@ -2000,7 +1993,7 @@ class TestHelmValuesFactory:
                 },
                 "sidecar": {
                     "image": {
-                        "repository": "neuro.io/k8s-sidecar",
+                        "repository": "ghcr.io/neuro-inc/k8s-sidecar",
                         "pullSecrets": [
                             "platform-docker-config",
                             "platform-docker-hub-config",
@@ -2278,7 +2271,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "platform-disks",
             "fullnameOverride": "platform-disks",
-            "image": {"repository": "neuro.io/platformdiskapi"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformdiskapi"},
             "disks": {
                 "namespace": "platform-jobs",
                 "limitPerUser": "10995116277760",
@@ -2345,7 +2338,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "platform-api-poller",
             "fullnameOverride": "platform-api-poller",
-            "image": {"repository": "neuro.io/platformapi"},
+            "image": {"repository": "ghcr.io/neuro-inc/platformapi"},
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
@@ -2377,6 +2370,7 @@ class TestHelmValuesFactory:
                     "https://platformingressauth/oauth/authorize"
                 ),
                 "imagePullSecret": "platform-docker-hub-config",
+                "priorityClassName": "platform-job",
             },
             "storages": [{"path": "", "type": "pvc", "claimName": "platform-storage"}],
             "nodeLabels": {
