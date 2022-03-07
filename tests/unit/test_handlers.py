@@ -110,14 +110,6 @@ def is_platform_deploy_required() -> Iterator[mock.Mock]:
 
 
 @pytest.fixture
-def configure_cluster() -> Iterator[mock.Mock]:
-    with mock.patch(
-        "platform_operator.handlers._configure_cluster"
-    ) as configure_cluster:
-        yield configure_cluster
-
-
-@pytest.fixture
 def aws_elb_client() -> Iterator[mock.Mock]:
     with mock.patch(
         "platform_operator.handlers.AwsElbClient", spec=AwsElbClient
@@ -284,12 +276,12 @@ async def test_configure_aws_cluster(
     aws_traefik_service: dict[str, Any],
     aws_traefik_lb: dict[str, Any],
 ) -> None:
-    from platform_operator.handlers import configure_cluster as _configure_cluster
+    from platform_operator.handlers import configure_cluster
 
     kube_client.get_service.side_effect = [aws_traefik_service]
     aws_elb_client.get_load_balancer_by_dns_name.side_effect = [aws_traefik_lb]
 
-    await _configure_cluster(aws_cluster, aws_platform_config)
+    await configure_cluster(aws_cluster, aws_platform_config)
 
     kube_client.get_service.assert_has_awaits(
         [mock.call(namespace="platform", name="traefik")]
@@ -315,11 +307,11 @@ async def test_configure_cluster(
     gcp_platform_config: PlatformConfig,
     traefik_service: dict[str, Any],
 ) -> None:
-    from platform_operator.handlers import configure_cluster as _configure_cluster
+    from platform_operator.handlers import configure_cluster
 
     kube_client.get_service.side_effect = [traefik_service]
 
-    await _configure_cluster(gcp_cluster, gcp_platform_config)
+    await configure_cluster(gcp_cluster, gcp_platform_config)
 
     kube_client.get_service.assert_has_awaits(
         [mock.call(namespace="platform", name="traefik")]
@@ -337,11 +329,11 @@ async def test_configure_cluster_with_ingress_controller_disabled(
     gcp_cluster: Cluster,
     gcp_platform_config: PlatformConfig,
 ) -> None:
-    from platform_operator.handlers import configure_cluster as _configure_cluster
+    from platform_operator.handlers import configure_cluster
 
     gcp_platform_config = replace(gcp_platform_config, ingress_controller_install=False)
 
-    await _configure_cluster(gcp_cluster, gcp_platform_config)
+    await configure_cluster(gcp_cluster, gcp_platform_config)
 
     config_client.patch_cluster.assert_awaited_with(
         gcp_platform_config.cluster_name,
@@ -357,7 +349,6 @@ async def test_deploy(
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
     raw_client: mock.AsyncMock,
-    configure_cluster: mock.AsyncMock,
     is_platform_deploy_failed: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
@@ -430,7 +421,8 @@ async def test_deploy(
     )
 
     raw_client.get.assert_called()
-    configure_cluster.assert_awaited_once_with(gcp_cluster, gcp_platform_config)
+
+    config_client.patch_cluster.assert_awaited_once()
 
     status_manager.start_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name, 0
@@ -494,7 +486,6 @@ async def test_deploy_with_ingress_controller_disabled(
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
     raw_client: mock.AsyncMock,
-    configure_cluster: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
@@ -534,7 +525,8 @@ async def test_deploy_with_ingress_controller_disabled(
     )
 
     raw_client.get.assert_not_called()
-    configure_cluster.assert_awaited_once_with(gcp_cluster, gcp_platform_config)
+
+    config_client.patch_cluster.assert_awaited_once()
 
     status_manager.start_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name, 0
@@ -557,7 +549,6 @@ async def test_deploy_all_charts_deployed(
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
     raw_client: mock.AsyncMock,
-    configure_cluster: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
@@ -586,7 +577,8 @@ async def test_deploy_all_charts_deployed(
     helm_client.upgrade.assert_not_awaited()
 
     raw_client.get.assert_called()
-    configure_cluster.assert_awaited_once_with(gcp_cluster, gcp_platform_config)
+
+    config_client.patch_cluster.assert_awaited_once()
 
     status_manager.start_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name, 0
@@ -662,7 +654,6 @@ async def test_deploy_no_changes(
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
     raw_client: mock.AsyncMock,
-    configure_cluster: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
@@ -690,7 +681,8 @@ async def test_deploy_no_changes(
     helm_client.upgrade.assert_not_awaited()
 
     raw_client.get.assert_not_called()
-    configure_cluster.assert_not_awaited()
+
+    config_client.patch_cluster.assert_not_awaited()
 
     status_manager.start_deployment.assert_not_awaited()
     status_manager.complete_deployment.assert_not_awaited()
@@ -840,7 +832,6 @@ async def test_watch_config(
     helm_client: mock.AsyncMock,
     raw_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
-    configure_cluster: mock.AsyncMock,
     is_platform_deploy_failed: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
@@ -916,7 +907,8 @@ async def test_watch_config(
     )
 
     raw_client.get.assert_called()
-    configure_cluster.assert_awaited_once_with(gcp_cluster, gcp_platform_config)
+
+    config_client.patch_cluster.assert_awaited_once()
 
     status_manager.start_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name, 0
@@ -941,7 +933,6 @@ async def test_watch_config_all_charts_deployed(
     helm_client: mock.AsyncMock,
     raw_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
-    configure_cluster: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
@@ -968,7 +959,8 @@ async def test_watch_config_all_charts_deployed(
     helm_client.upgrade.assert_not_awaited()
 
     raw_client.get.assert_called()
-    configure_cluster.assert_awaited_once_with(gcp_cluster, gcp_platform_config)
+
+    config_client.patch_cluster.assert_awaited_once()
 
     status_manager.start_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name, 0

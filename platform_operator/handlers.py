@@ -459,28 +459,29 @@ async def wait_for_certificate_created(
     if not platform.ingress_controller_install or not platform.ingress_acme_enabled:
         return
 
+    async with app.status_manager.transition(
+        platform.cluster_name, PlatformConditionType.CERTIFICATE_CREATED
+    ):
+        await asyncio.wait_for(_wait_for_certificate_created(platform), timeout_s)
+
+
+async def _wait_for_certificate_created(platform: PlatformConfig) -> None:
     if platform.ingress_acme_environment == ACMEEnvironment.STAGING:
         ssl_context = ssl.create_default_context(cafile=config.acme_ca_staging_path)
     else:
         ssl_context = None
 
-    async def _wait() -> None:
-        while True:
-            try:
-                async with app.raw_client.get(
-                    platform.ingress_url, ssl_context=ssl_context
-                ):
-                    return
-            except ssl.SSLError:
-                pass
-            except aiohttp.ClientError:
-                pass
-            await asyncio.sleep(5)
-
-    async with app.status_manager.transition(
-        platform.cluster_name, PlatformConditionType.CERTIFICATE_CREATED
-    ):
-        await asyncio.wait_for(_wait(), timeout_s)
+    while True:
+        try:
+            async with app.raw_client.get(
+                platform.ingress_url, ssl_context=ssl_context
+            ):
+                return
+        except ssl.SSLError:
+            pass
+        except aiohttp.ClientError:
+            pass
+        await asyncio.sleep(5)
 
 
 async def configure_cluster(cluster: Cluster, platform: PlatformConfig) -> None:
