@@ -531,7 +531,7 @@ class TestHelmValuesFactory:
         assert result == {
             "image": {
                 "repository": "ghcr.io/neuro-inc/minio",
-                "tag": "RELEASE.2021-08-25T00-41-18Z",
+                "tag": "RELEASE.2022-03-08T22-28-51Z",
             },
             "imagePullSecrets": [
                 {"name": "platform-docker-config"},
@@ -557,7 +557,6 @@ class TestHelmValuesFactory:
             },
             "accessKey": "username",
             "secretKey": "password",
-            "environment": {"MINIO_REGION_NAME": "minio"},
             "ingress": {"enabled": False},
         }
 

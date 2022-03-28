@@ -290,7 +290,7 @@ class HelmValuesFactory:
         return {
             "image": {
                 "repository": platform.get_image("minio"),
-                "tag": "RELEASE.2021-08-25T00-41-18Z",
+                "tag": "RELEASE.2022-03-08T22-28-51Z",
             },
             "imagePullSecrets": [
                 {"name": name} for name in platform.image_pull_secret_names
@@ -316,7 +316,6 @@ class HelmValuesFactory:
             "accessKey": platform.buckets.minio_access_key,
             "secretKey": platform.buckets.minio_secret_key,
             "ingress": {"enabled": False},
-            "environment": {"MINIO_REGION_NAME": platform.buckets.minio_region},
         }
 
     def create_traefik_values(self, platform: PlatformConfig) -> dict[str, Any]:
