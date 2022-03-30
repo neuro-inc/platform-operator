@@ -32,6 +32,12 @@ spec:
       containers:
       - name: job
         image: {{ .image | quote }}
+        {{- if .command }}
+        command: {{ toYaml .command | nindent 8 }}
+        {{- end }}
+        {{- if .args }}
+        args: {{ toYaml .args | nindent 8 }}
+        {{- end }}
         resources:
           requests: {{ toYaml .resources | nindent 12 }}
           limits: {{ toYaml .resources | nindent 12 }}
