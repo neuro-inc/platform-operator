@@ -96,10 +96,7 @@ class TestHelmValuesFactory:
                     "name": "miner",
                     "count": 1,
                     "image": "miner",
-                    "imagePullSecrets": [],
                     "resources": {"cpu": "1000m", "memory": "1024Mi"},
-                    "env": {},
-                    "nodeSelector": {},
                 }
             ],
             "storages": [
@@ -154,11 +151,19 @@ class TestHelmValuesFactory:
                     name="miner",
                     count=1,
                     image="miner",
+                    resources=Resources(cpu_m=1000, memory_mb=1024, gpu=1),
+                ),
+                IdleJobConfig(
+                    name="miner",
+                    count=1,
+                    image="miner",
+                    command=["bash"],
+                    args=["-c", "sleep infinity"],
                     image_pull_secret="secret",
                     resources=Resources(cpu_m=1000, memory_mb=1024, gpu=1),
                     env={"NAME": "VALUE"},
                     node_selector={"gpu": "nvidia-tesla-k80"},
-                )
+                ),
             ],
         )
 
@@ -169,11 +174,19 @@ class TestHelmValuesFactory:
                 "name": "miner",
                 "count": 1,
                 "image": "miner",
+                "resources": {"cpu": "1000m", "memory": "1024Mi", "nvidia.com/gpu": 1},
+            },
+            {
+                "name": "miner",
+                "count": 1,
+                "image": "miner",
+                "command": ["bash"],
+                "args": ["-c", "sleep infinity"],
                 "imagePullSecrets": [{"name": "secret"}],
                 "resources": {"cpu": "1000m", "memory": "1024Mi", "nvidia.com/gpu": 1},
                 "env": {"NAME": "VALUE"},
                 "nodeSelector": {"gpu": "nvidia-tesla-k80"},
-            }
+            },
         ]
 
     def test_create_gcp_platform_values_with_kubernetes_storage(

@@ -193,18 +193,23 @@ class HelmValuesFactory:
             "name": job.name,
             "count": job.count,
             "image": job.image,
-            "imagePullSecrets": [],
             "resources": {
                 "cpu": f"{job.resources.cpu_m}m",
                 "memory": f"{job.resources.memory_mb}Mi",
             },
-            "env": job.env,
-            "nodeSelector": job.node_selector,
         }
+        if job.command:
+            result["command"] = job.command
+        if job.args:
+            result["args"] = job.args
         if job.image_pull_secret:
-            result["imagePullSecrets"].append({"name": job.image_pull_secret})
+            result["imagePullSecrets"] = [{"name": job.image_pull_secret}]
         if job.resources.gpu:
             result["resources"]["nvidia.com/gpu"] = job.resources.gpu
+        if job.env:
+            result["env"] = job.env
+        if job.node_selector:
+            result["nodeSelector"] = job.node_selector
         return result
 
     def _create_storage_values(self, storage: StorageConfig) -> dict[str, Any]:
