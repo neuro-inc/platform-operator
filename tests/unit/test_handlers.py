@@ -9,7 +9,14 @@ from unittest import mock
 import aiohttp
 import kopf
 import pytest
-from neuro_config_client import ConfigClient, NotificationType
+from neuro_config_client import (
+    ConfigClient,
+    GoogleCloudProvider,
+    GoogleFilestoreTier,
+    GoogleStorage,
+    NotificationType,
+    StorageInstance,
+)
 
 from platform_operator.aws_client import AwsElbClient
 from platform_operator.helm_client import HelmClient, Release, ReleaseStatus
@@ -377,16 +384,7 @@ async def test_deploy(
         gcp_platform_config.cluster_name,
         token=gcp_platform_body["spec"]["token"],
     )
-    config_client.patch_storage.assert_has_awaits(
-        [
-            mock.call(
-                cluster_name=gcp_platform_config.cluster_name,
-                storage_name=None,
-                ready=True,
-                token=gcp_platform_config.token,
-            )
-        ]
-    )
+    config_client.patch_storage.assert_not_awaited()
     config_client.notify.assert_has_awaits(
         [
             mock.call(
@@ -441,7 +439,7 @@ async def test_deploy(
     )
 
 
-async def test_deploy_multiple_storages_config_patched(
+async def test_deploy_storage_configs_patched(
     config_client: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
@@ -450,10 +448,29 @@ async def test_deploy_multiple_storages_config_patched(
 ) -> None:
     from platform_operator.handlers import deploy
 
-    config_client.get_cluster.return_value = gcp_cluster
+    config_client.get_cluster.return_value = replace(
+        gcp_cluster,
+        cloud_provider=GoogleCloudProvider(
+            region="us-central1",
+            zones=["us-central1-a"],
+            project="neuro",
+            credentials={},
+            node_pools=[],
+            storage=GoogleStorage(
+                id="standard",
+                tier=GoogleFilestoreTier.STANDARD,
+                instances=[
+                    StorageInstance(size_mb=1024 * 1024),
+                    StorageInstance(name="org1", size_mb=2 * 1024 * 1024),
+                ],
+                description="Standard Filestore",
+            ),
+        ),
+    )
     gcp_platform_body["spec"]["storages"] = [
-        {"nfs": {"server": "192.168.0.3", "path": "/"}, "path": "/storage1"},
-        {"nfs": {"server": "192.168.0.4", "path": "/"}, "path": "/storage2"},
+        {"nfs": {"server": "192.168.0.3", "path": "/"}},
+        {"nfs": {"server": "192.168.0.4", "path": "/"}, "path": "/org1"},
+        {"nfs": {"server": "192.168.0.5", "path": "/"}, "path": "/org2"},
     ]
 
     await deploy(  # type: ignore
@@ -467,13 +484,13 @@ async def test_deploy_multiple_storages_config_patched(
         [
             mock.call(
                 cluster_name=gcp_platform_config.cluster_name,
-                storage_name="storage1",
+                storage_name=None,
                 ready=True,
                 token=gcp_platform_config.token,
             ),
             mock.call(
                 cluster_name=gcp_platform_config.cluster_name,
-                storage_name="storage2",
+                storage_name="org1",
                 ready=True,
                 token=gcp_platform_config.token,
             ),
@@ -855,16 +872,7 @@ async def test_watch_config(
         gcp_platform_config.cluster_name,
         token=gcp_platform_config.token,
     )
-    config_client.patch_storage.assert_has_awaits(
-        [
-            mock.call(
-                cluster_name=gcp_platform_config.cluster_name,
-                storage_name=None,
-                ready=True,
-                token=gcp_platform_config.token,
-            )
-        ]
-    )
+    config_client.patch_storage.assert_not_awaited()
     config_client.notify.assert_has_awaits(
         [
             mock.call(

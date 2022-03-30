@@ -171,7 +171,7 @@ async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> Non
 
     logger.info("Platform deployment started")
 
-    await start_deployment(name, body, retry)
+    await start_deployment(platform, retry)
 
     if platform_deploy_required:
         await upgrade_platform_helm_release(platform)
@@ -184,7 +184,7 @@ async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> Non
     await wait_for_certificate_created(platform)
     logger.info("Certificate is ready")
 
-    await complete_deployment(name, body, platform)
+    await complete_deployment(cluster, platform)
 
     logger.info("Platform deployment succeeded")
 
@@ -319,7 +319,7 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
 
     logger.info("Platform config update started")
 
-    await start_deployment(name, body)
+    await start_deployment(platform)
 
     try:
         if platform_deploy_required:
@@ -333,7 +333,7 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
         await wait_for_certificate_created(platform)
         logger.info("Certificate is ready")
 
-        await complete_deployment(name, body, platform)
+        await complete_deployment(cluster, platform)
 
         logger.info("Platform config update succeeded")
     except asyncio.CancelledError:
@@ -392,33 +392,33 @@ async def is_helm_deploy_failed(release_name: str) -> bool:
     return release.status == ReleaseStatus.FAILED
 
 
-async def start_deployment(name: str, body: kopf.Body, retry: int = 0) -> None:
-    await app.status_manager.start_deployment(name, retry)
+async def start_deployment(platform: PlatformConfig, retry: int = 0) -> None:
+    await app.status_manager.start_deployment(platform.cluster_name, retry)
     await app.config_client.notify(
-        name,
-        NotificationType.CLUSTER_UPDATING,
-        token=body["spec"].get("token"),
+        platform.cluster_name, NotificationType.CLUSTER_UPDATING, token=platform.token
     )
 
 
-async def complete_deployment(
-    name: str, body: kopf.Body, platform: PlatformConfig
-) -> None:
-    await app.status_manager.complete_deployment(name)
+async def complete_deployment(cluster: Cluster, platform: PlatformConfig) -> None:
+    await app.status_manager.complete_deployment(cluster.name)
+    if cluster.cloud_provider and cluster.cloud_provider.storage:
+        storage_names = [s.name for s in cluster.cloud_provider.storage.instances]
+    else:
+        storage_names = []
     for storage in platform.storages:
         storage_name: str | None = None
         if storage.path:
             storage_name = storage.path.lstrip("/")
+        if storage_name not in storage_names:
+            continue
         await app.config_client.patch_storage(
-            cluster_name=name,
+            cluster_name=cluster.name,
             storage_name=storage_name,
             ready=True,
-            token=body["spec"].get("token"),
+            token=platform.token,
         )
     await app.config_client.notify(
-        name,
-        NotificationType.CLUSTER_UPDATE_SUCCEEDED,
-        token=body["spec"].get("token"),
+        cluster.name, NotificationType.CLUSTER_UPDATE_SUCCEEDED, token=platform.token
     )
 
 
