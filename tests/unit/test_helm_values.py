@@ -45,6 +45,7 @@ class TestHelmValuesFactory:
             "pauseImage": {"repository": "ghcr.io/neuro-inc/pause"},
             "crictlImage": {"repository": "ghcr.io/neuro-inc/crictl"},
             "kubectlImage": {"repository": "ghcr.io/neuro-inc/kubectl"},
+            "clusterName": cluster_name,
             "serviceToken": "token",
             "nodePools": [
                 {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "gpu": 1}
