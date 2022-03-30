@@ -3,7 +3,7 @@
 apiVersion: {{ include "k8s.ingress.apiVersion" . }}
 kind: Ingress
 metadata:
-  name: minio
+  name: {{ $.Release.Name }}-minio
   labels: {{ include "platform.labels.standard" . | nindent 4 }}
   annotations:
     {{- if not $ingressApiIsStable }}
@@ -24,11 +24,11 @@ spec:
         backend:
           {{- if $ingressApiIsStable }}
           service:
-            name: minio
+            name: {{ $.Release.Name }}-minio
             port:
               name: http
           {{- else }}
-          serviceName: minio
+          serviceName: {{ $.Release.Name }}-minio
           servicePort: http
           {{- end }}
 {{- end }}
