@@ -40,6 +40,7 @@ class HelmValuesFactory:
             "pauseImage": {"repository": platform.get_image("pause")},
             "crictlImage": {"repository": platform.get_image("crictl")},
             "kubectlImage": {"repository": platform.get_image("kubectl")},
+            "clusterName": platform.cluster_name,
             "serviceToken": platform.token,
             "nodePools": [
                 {

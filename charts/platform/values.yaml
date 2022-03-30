@@ -18,6 +18,8 @@ nginxImage:
   repository: $IMAGE_REPO_BASE/nginx
   tag: latest
 
+clusterName: ""
+
 serviceToken: ""
 
 nodePools: []

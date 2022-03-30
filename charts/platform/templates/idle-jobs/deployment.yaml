@@ -35,6 +35,13 @@ spec:
         resources:
           requests: {{ toYaml .resources | nindent 12 }}
           limits: {{ toYaml .resources | nindent 12 }}
+        env:
+        - name: NEURO_CLUSTER
+          value: {{ $.Values.clusterName }}
+        - name: NEURO_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         {{- if .env }}
         envFrom:
         - secretRef:
