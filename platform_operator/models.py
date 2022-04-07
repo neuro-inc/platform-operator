@@ -747,6 +747,7 @@ class PlatformConfig:
     kubernetes_tpu_network: IPv4Network | None
     node_labels: LabelsConfig
     kubelet_port: int
+    nvidia_dcgm_port: int
     namespace: str
     ingress_dns_name: str
     ingress_url: URL
@@ -958,6 +959,7 @@ class PlatformConfigFactory:
             kubernetes_version=self._config.kube_config.version,
             kubernetes_tpu_network=spec.kubernetes.tpu_network,
             kubelet_port=int(spec.kubernetes.kubelet_port or 10250),
+            nvidia_dcgm_port=9400,
             node_labels=LabelsConfig(
                 job=spec.kubernetes.node_label_job or LabelsConfig.job,
                 node_pool=(
