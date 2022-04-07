@@ -491,6 +491,7 @@ def gcp_platform_config(
         kubernetes_version="1.16.10",
         kubernetes_tpu_network=IPv4Network("192.168.0.0/16"),
         kubelet_port=10250,
+        nvidia_dcgm_port=9400,
         node_labels=LabelsConfig(
             job="platform.neuromation.io/job",
             node_pool="platform.neuromation.io/nodepool",

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nvidia-dcgm-exporter
+  labels: {{ include "platform.labels.standard" . | nindent 4 }}
+    service: nvidia-dcgm-exporter
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "platform.name" . }}
+      release: {{ .Release.Name | quote }}
+      service: nvidia-dcgm-exporter
+  ports:
+  - name: metrics
+    port: 9400
+    protocol: TCP
+    targetPort: metrics

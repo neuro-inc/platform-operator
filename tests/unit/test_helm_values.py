@@ -58,6 +58,10 @@ class TestHelmValuesFactory:
             "nvidiaGpuDriver": {
                 "image": {"repository": "ghcr.io/neuro-inc/k8s-device-plugin"},
             },
+            "nvidiaDCGMExporter": {
+                "image": {"repository": "ghcr.io/neuro-inc/dcgm-exporter"},
+                "serviceMonitor": {"enabled": True},
+            },
             "imagesPrepull": {
                 "refreshInterval": "1h",
                 "images": [{"image": "neuromation/base"}],
@@ -139,7 +143,7 @@ class TestHelmValuesFactory:
         assert result["acmeEnabled"] is False
         assert "acme" not in result
 
-    def test_create_gcp_platform_values_idle_jobs(
+    def test_create_gcp_platform_values_with_idle_jobs(
         self,
         gcp_platform_config: PlatformConfig,
         factory: HelmValuesFactory,
@@ -456,6 +460,7 @@ class TestHelmValuesFactory:
             )
         )
 
+        assert result["nvidiaDCGMExporter"]["serviceMonitor"]["enabled"] is False
         assert result["platformReportsEnabled"] is False
         assert "platform-reports" not in result
 
@@ -1516,6 +1521,7 @@ class TestHelmValuesFactory:
             "fullnameOverride": "platform-monitoring",
             "image": {"repository": "ghcr.io/neuro-inc/platformmonitoringapi"},
             "kubeletPort": 10250,
+            "nvidiaDCGMPort": 9400,
             "jobsNamespace": "platform-jobs",
             "nodeLabels": {
                 "job": "platform.neuromation.io/job",
@@ -1837,9 +1843,6 @@ class TestHelmValuesFactory:
                 "configMapName": "thanos-object-storage-config",
             },
             "image": {"repository": "ghcr.io/neuro-inc/platform-reports"},
-            "nvidiaDCGMExporter": {
-                "image": {"repository": "ghcr.io/neuro-inc/dcgm-exporter"}
-            },
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",

@@ -36,6 +36,11 @@ nvidiaGpuDriver:
     repository: $IMAGE_REPO_BASE/k8s-device-plugin
     tag: 1.0.0-beta6
 
+nvidiaDCGMExporter:
+  image:
+    repository: $IMAGE_REPO_BASE/dcgm-exporter
+    tag: 1.7.2
+
 imagesPrepull:
   refreshInterval: 1h
   images: []

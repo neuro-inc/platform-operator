@@ -59,6 +59,10 @@ class HelmValuesFactory:
             "nvidiaGpuDriver": {
                 "image": {"repository": platform.get_image("k8s-device-plugin")},
             },
+            "nvidiaDCGMExporter": {
+                "image": {"repository": platform.get_image("dcgm-exporter")},
+                "serviceMonitor": {"enabled": platform.monitoring.metrics_enabled},
+            },
             "imagesPrepull": {
                 "refreshInterval": "1h",
                 "images": [{"image": image} for image in platform.pre_pull_images],
@@ -660,6 +664,7 @@ class HelmValuesFactory:
             "image": {"repository": platform.get_image("platformmonitoringapi")},
             "jobsNamespace": platform.jobs_namespace,
             "kubeletPort": platform.kubelet_port,
+            "nvidiaDCGMPort": platform.nvidia_dcgm_port,
             "nodeLabels": {
                 "job": platform.node_labels.job,
                 "nodePool": platform.node_labels.node_pool,
@@ -884,9 +889,6 @@ class HelmValuesFactory:
             )
         result: dict[str, Any] = {
             "image": {"repository": platform.get_image("platform-reports")},
-            "nvidiaDCGMExporter": {
-                "image": {"repository": platform.get_image("dcgm-exporter")}
-            },
             "nodePoolLabels": {
                 "job": platform.node_labels.job,
                 "gpu": platform.node_labels.accelerator,
