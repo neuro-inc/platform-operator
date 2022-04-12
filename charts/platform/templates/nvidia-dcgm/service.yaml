@@ -6,10 +6,9 @@ metadata:
     service: nvidia-dcgm-exporter
 spec:
   selector:
-    matchLabels:
-      app: {{ include "platform.name" . }}
-      release: {{ .Release.Name | quote }}
-      service: nvidia-dcgm-exporter
+    app: {{ include "platform.name" . }}
+    release: {{ .Release.Name | quote }}
+    service: nvidia-dcgm-exporter
   ports:
   - name: metrics
     port: 9400
