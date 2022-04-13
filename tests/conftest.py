@@ -156,7 +156,7 @@ def cluster_factory(
             ),
             orchestrator=OrchestratorConfig(
                 job_hostname_template=f"{{job_id}}.jobs.{name}.org.neu.ro",
-                job_internal_hostname_template=f"{{job_id}}.platform-jobs",
+                job_internal_hostname_template=None,
                 is_http_ingress_secure=True,
                 resource_pool_types=[resource_pool_type_factory(resource_pool_name)],
                 resource_presets=[

@@ -282,6 +282,7 @@ class TestPlatformConfig:
 
         assert result == replace(
             gcp_cluster.orchestrator,
+            job_internal_hostname_template=f"{{job_id}}.platform-jobs",
             resource_pool_types=[
                 resource_pool_type_factory("n1-highmem-8", "192.168.0.0/16")
             ],
@@ -292,6 +293,13 @@ class TestPlatformConfig:
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
+        gcp_cluster = replace(
+            gcp_cluster,
+            orchestrator=replace(
+                gcp_cluster.orchestrator,
+                job_internal_hostname_template=f"{{job_id}}.platform-jobs",
+            ),
+        )
         gcp_platform_config = replace(gcp_platform_config, kubernetes_tpu_network=None)
         result = gcp_platform_config.create_orchestrator_config(gcp_cluster)
 
