@@ -886,14 +886,21 @@ class PlatformConfig:
 
     def create_orchestrator_config(self, cluster: Cluster) -> OrchestratorConfig | None:
         assert cluster.orchestrator
-        if not self.kubernetes_tpu_network:
-            return None
-        return replace(
+        orchestrator = replace(
             cluster.orchestrator,
-            resource_pool_types=self._update_tpu_network(
-                cluster.orchestrator.resource_pool_types, self.kubernetes_tpu_network
-            ),
+            job_internal_hostname_template=self.jobs_internal_host_template,
         )
+        if self.kubernetes_tpu_network:
+            orchestrator = replace(
+                orchestrator,
+                resource_pool_types=self._update_tpu_network(
+                    orchestrator.resource_pool_types,
+                    self.kubernetes_tpu_network,
+                ),
+            )
+        if cluster.orchestrator == orchestrator:
+            return None
+        return orchestrator
 
     @classmethod
     def _update_tpu_network(
