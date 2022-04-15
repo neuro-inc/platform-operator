@@ -6,6 +6,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $.Release.Name }}-idle-nodes-{{ $name }}
+  namespace: {{ include "platform.jobs.namespace.name" $ }}
   labels: {{ include "platform.labels.standard" $ | nindent 4 }}
     service: idle-nodes-$name
 spec:
