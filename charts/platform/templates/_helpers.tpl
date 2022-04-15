@@ -30,10 +30,6 @@ release: {{ .Release.Name | quote }}
 {{- end -}}
 {{- end -}}
 
-{{- define "platform.idleJobs.priorityClass.name" -}}
-{{ .Release.Name }}-idle-job
-{{- end -}}
-
 {{- define "platform.smb.volumeHandle" -}}
 {{- if .path -}}
 {{- printf "smb-%s%s" .smb.server .path | replace "." "-" -}}

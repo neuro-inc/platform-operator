@@ -2386,7 +2386,6 @@ class TestHelmValuesFactory:
                     "https://platformingressauth/oauth/authorize"
                 ),
                 "imagePullSecret": "platform-docker-hub-config",
-                "priorityClassName": "platform-job",
             },
             "storages": [{"path": "", "type": "pvc", "claimName": "platform-storage"}],
             "nodeLabels": {

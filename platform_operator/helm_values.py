@@ -1261,7 +1261,6 @@ class HelmValuesFactory:
                 "ingressOAuthAuthorizeUrl": str(
                     platform.ingress_auth_url / "oauth/authorize"
                 ),
-                "priorityClassName": platform.jobs_priority_class_name,
             },
             "nodeLabels": {
                 "job": platform.node_labels.job,

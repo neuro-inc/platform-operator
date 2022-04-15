@@ -29,6 +29,7 @@ spec:
         release: {{ $.Release.Name }}
         service: idle-nodes
         node-pool: {{ $name | quote }}
+        platform.neuromation.io/idle: "true"
     spec:
       containers:
       {{- if $.Values.imagesPrepull.images }}
@@ -96,7 +97,7 @@ spec:
       - name: host-run
         hostPath:
           path: /run
-      priorityClassName: {{ include "platform.idleJobs.priorityClass.name" $ }}
+      priorityClassName: {{ $.Release.Name }}-idle-node
       tolerations:
       - operator: Exists
         effect: NoSchedule
@@ -128,7 +129,7 @@ spec:
                 operator: In
                 values:
                 - {{ $.Release.Name }}
-              - key: component
+              - key: service
                 operator: In
                 values:
                 - idle-nodes
