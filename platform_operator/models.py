@@ -723,8 +723,7 @@ class MonitoringConfig:
     metrics_bucket_name: str = ""
     metrics_storage_class_name: str = ""
     metrics_storage_size: str = ""
-    # 15d is default prometheus retention time
-    metrics_retention_time: str = "15d"
+    metrics_retention_time: str = "3d"
     metrics_region: str = ""
 
 

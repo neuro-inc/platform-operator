@@ -1892,7 +1892,7 @@ class TestHelmValuesFactory:
                 "prometheus": {
                     "prometheusSpec": {
                         "image": {"repository": "ghcr.io/neuro-inc/prometheus"},
-                        "retention": "15d",
+                        "retention": "3d",
                         "thanos": {
                             "image": "ghcr.io/neuro-inc/thanos:v0.24.0",
                             "version": "v0.14.0",
@@ -2146,7 +2146,7 @@ class TestHelmValuesFactory:
         }
         assert (
             result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]["retention"]
-            == "15d"
+            == "3d"
         )
         assert (
             result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]["thanos"]
