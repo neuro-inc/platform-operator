@@ -5,17 +5,16 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $.Release.Name }}-idle-jobs-{{ .name | lower }}
+  namespace: {{ include "platform.jobs.namespace.name" $ }}
   labels: {{ include "platform.labels.standard" $ | nindent 4 }}
-    service: idle-jobs
-    idle-job: {{ .name | lower | quote }}
+    service: idle-jobs-{{ .name | lower | quote }}
 spec:
   replicas: {{ .count }}
   selector:
     matchLabels:
       app: {{ include "platform.name" $ }}
       release: {{ $.Release.Name }}
-      service: idle-jobs
-      idle-job: {{ .name | lower | quote }}
+      service: idle-jobs-{{ .name | lower | quote }}
   strategy:
     rollingUpdate:
       maxSurge: 0
@@ -26,8 +25,8 @@ spec:
       labels:
         app: {{ include "platform.name" $ }}
         release: {{ $.Release.Name }}
-        service: idle-jobs
-        idle-job: {{ .name | lower | quote }}
+        service: idle-jobs-{{ .name | lower | quote }}
+        platform.neuromation.io/idle: "true"
     spec:
       containers:
       - name: job
@@ -53,7 +52,7 @@ spec:
         - secretRef:
             name: {{ $.Release.Name }}-idle-jobs-secret-{{ .name | lower }}
         {{- end }}
-      priorityClassName: {{ include "platform.idleJobs.priorityClass.name" $ }}
+      priorityClassName: {{ $.Release.Name }}-idle-job
       tolerations:
       - key: ""
         operator: Exists
