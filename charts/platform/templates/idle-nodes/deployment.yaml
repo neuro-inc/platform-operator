@@ -7,16 +7,14 @@ kind: Deployment
 metadata:
   name: {{ $.Release.Name }}-idle-nodes-{{ $name }}
   labels: {{ include "platform.labels.standard" $ | nindent 4 }}
-    service: idle-nodes
-    node-pool: {{ $name | quote }}
+    service: idle-nodes-$name
 spec:
   replicas: {{ .idleSize }}
   selector:
     matchLabels:
       app: {{ include "platform.name" $ }}
       release: {{ $.Release.Name }}
-      service: idle-nodes
-      node-pool: {{ $name | quote }}
+      service: idle-nodes-$name
   strategy:
     rollingUpdate:
       maxSurge: 0
@@ -27,8 +25,7 @@ spec:
       labels:
         app: {{ include "platform.name" $ }}
         release: {{ $.Release.Name }}
-        service: idle-nodes
-        node-pool: {{ $name | quote }}
+        service: idle-nodes-$name
         platform.neuromation.io/idle: "true"
     spec:
       containers:
