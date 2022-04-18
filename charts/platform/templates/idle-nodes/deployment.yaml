@@ -29,6 +29,7 @@ spec:
         service: idle-nodes-$name
         platform.neuromation.io/idle: "true"
     spec:
+      automountServiceAccountToken: false
       containers:
       {{- if $.Values.imagesPrepull.images }}
       - name: images-prepull

@@ -28,6 +28,7 @@ spec:
         service: idle-jobs-{{ .name | lower }}
         platform.neuromation.io/idle: "true"
     spec:
+      automountServiceAccountToken: false
       containers:
       - name: job
         image: {{ .image | quote }}
