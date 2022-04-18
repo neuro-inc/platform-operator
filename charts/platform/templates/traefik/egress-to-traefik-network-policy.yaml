@@ -3,8 +3,7 @@ kind: NetworkPolicy
 metadata:
   name: {{ .Release.Name }}-egress-to-ingress
   namespace: {{ include "platform.jobs.namespace.name" . }}
-  labels:
-{{ include "platform.labels.standard" . | indent 4 }}
+  labels: {{ include "platform.labels.standard" . | nindent 4 }}
 spec:
   podSelector: {}
   policyTypes:
@@ -13,5 +12,4 @@ spec:
   - to:
     - namespaceSelector: {}
       podSelector:
-        matchLabels:
-{{ toYaml .Values.traefik.deployment.podLabels | indent 10 }}
+        matchLabels: {{ toYaml .Values.traefik.deployment.podLabels | nindent 10 }}
