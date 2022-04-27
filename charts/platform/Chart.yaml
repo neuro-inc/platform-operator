@@ -25,7 +25,7 @@ dependencies:
     version: "22.4.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-registry
-    version: "22.4.2"
+    version: "22.4.3"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-monitoring
     version: "22.4.2"
@@ -44,7 +44,7 @@ dependencies:
     version: "22.2.3"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-api-poller
-    version: "22.4.1"
+    version: "22.4.2"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-buckets
     version: "22.2.2"
