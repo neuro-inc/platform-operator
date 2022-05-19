@@ -5,11 +5,11 @@ image:
 imagePullSecrets: []
 
 kubectlImage:
-  repository: $IMAGE_REPO_BASE/kubectl
+  repository: ghcr.io/neuro-inc/kubectl
   tag: 1.16
 
 nginxImage:
-  repository: $IMAGE_REPO_BASE/nginx
+  repository: ghcr.io/neuro-inc/nginx
   tag: latest
 
 controller:

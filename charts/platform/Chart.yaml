@@ -2,8 +2,8 @@ apiVersion: v2
 name: platform
 description: Neu.ro platform services
 kubeVersion: ">= 1.16-0"
-version: $CHART_VERSION
-appVersion: $APP_VERSION
+version: 1.0.0
+appVersion: 1.0.0
 dependencies:
   - name: traefik
     version: "10.14.1"
