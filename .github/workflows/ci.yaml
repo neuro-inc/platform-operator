@@ -52,4 +52,4 @@ jobs:
     uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v0.0.28
     with:
       image: platform-operator-controller
-      helm_charts: platform,platform-operator
+      helm_charts: platform platform-operator
