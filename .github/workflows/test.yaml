@@ -44,13 +44,6 @@ jobs:
       run: make setup
     - name: Run unit tests
       run: make test_unit
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        file: .coverage-unit.xml
-        flags: unit
-        name: unit
 
   integration:
     name: Integration tests
