@@ -1,21 +1,21 @@
 pauseImage:
-  repository: $IMAGE_REPO_BASE/pause
+  repository: ghcr.io/neuro-inc/pause
   tag: "3.0"
 
 alpineImage:
-  repository: $IMAGE_REPO_BASE/alpine
+  repository: ghcr.io/neuro-inc/alpine
   tag: latest
 
 crictlImage:
-  repository: $IMAGE_REPO_BASE/crictl
+  repository: ghcr.io/neuro-inc/crictl
   tag: "1.22.0"
 
 kubectlImage:
-  repository: $IMAGE_REPO_BASE/kubectl
+  repository: ghcr.io/neuro-inc/kubectl
   tag: "1.16"
 
 nginxImage:
-  repository: $IMAGE_REPO_BASE/nginx
+  repository: ghcr.io/neuro-inc/nginx
   tag: latest
 
 clusterName: ""
@@ -33,12 +33,12 @@ inotify:
 
 nvidiaGpuDriver:
   image:
-    repository: $IMAGE_REPO_BASE/k8s-device-plugin
+    repository: ghcr.io/neuro-inc/k8s-device-plugin
     tag: 1.0.0-beta6
 
 nvidiaDCGMExporter:
   image:
-    repository: $IMAGE_REPO_BASE/dcgm-exporter
+    repository: ghcr.io/neuro-inc/dcgm-exporter
     tag: 1.7.2
 
 imagesPrepull:

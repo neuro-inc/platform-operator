@@ -1,7 +1,4 @@
-ARG PYTHON_VERSION=3.9.7
-ARG PYTHON_BASE=buster
-
-FROM python:${PYTHON_VERSION} AS installer
+FROM python:3.9.9-slim-bullseye AS packages
 
 ENV PATH=/root/.local/bin:$PATH
 
@@ -12,7 +9,8 @@ COPY dist /tmp/dist
 RUN ls /tmp/dist
 RUN pip install --user --find-links /tmp/dist platform-operator
 
-FROM python:${PYTHON_VERSION}-${PYTHON_BASE} AS service
+
+FROM python:3.9.9-slim-bullseye AS service
 
 LABEL org.opencontainers.image.source = "https://github.com/neuro-inc/platform-operator"
 
@@ -25,7 +23,7 @@ RUN mkdir /etc/platform \
 
 WORKDIR /app
 
-COPY --from=installer /root/.local/ /root/.local/
+COPY --from=packages /root/.local/ /root/.local/
 
 ENV PATH=/root/.local/bin:$PATH
 
