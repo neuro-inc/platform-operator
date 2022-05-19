@@ -1,0 +1,45 @@
+dependencies:
+- name: traefik
+  repository: https://helm.traefik.io/traefik
+  version: 10.14.1
+- name: acme
+  repository: https://neuro-inc.github.io/helm-charts
+  version: 1.0.6
+- name: docker-registry
+  repository: https://charts.helm.sh/stable
+  version: 1.9.2
+- name: minio
+  repository: https://charts.helm.sh/stable
+  version: 5.0.33
+- name: platform-storage
+  repository: oci://ghcr.io/neuro-inc/helm-charts
+  version: 22.4.0
+- name: platform-registry
+  repository: oci://ghcr.io/neuro-inc/helm-charts
+  version: 22.5.0
+- name: platform-monitoring
+  repository: oci://ghcr.io/neuro-inc/helm-charts
+  version: 22.4.2
+- name: platform-container-runtime
+  repository: oci://ghcr.io/neuro-inc/helm-charts
+  version: 22.2.1
+- name: platform-secrets
+  repository: oci://ghcr.io/neuro-inc/helm-charts
+  version: 22.2.3
+- name: platform-reports
+  repository: oci://ghcr.io/neuro-inc/helm-charts
+  version: 22.3.0
+- name: platform-disks
+  repository: oci://ghcr.io/neuro-inc/helm-charts
+  version: 22.5.0
+- name: platform-api-poller
+  repository: oci://ghcr.io/neuro-inc/helm-charts
+  version: 22.4.2
+- name: platform-buckets
+  repository: oci://ghcr.io/neuro-inc/helm-charts
+  version: 22.5.0
+- name: k8s-resources
+  repository: https://neuro-inc.github.io/helm-charts
+  version: 1.0.1
+digest: sha256:56ea44f5eae0973078fef4128a621462d4f83800924ea57e82c64ee78e14300f
+generated: "2022-05-19T10:47:29.892807+03:00"
