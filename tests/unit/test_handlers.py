@@ -400,9 +400,10 @@ async def test_deploy(
         ]
     )
 
-    kube_client.update_service_account_image_pull_secrets.assert_awaited_once_with(
+    kube_client.update_service_account.assert_awaited_once_with(
         namespace=gcp_platform_config.namespace,
         name=gcp_platform_config.service_account_name,
+        annotations=gcp_platform_config.service_account_annotations,
         image_pull_secrets=gcp_platform_config.image_pull_secret_names,
     )
 
@@ -589,7 +590,7 @@ async def test_deploy_all_charts_deployed(
         token=gcp_platform_body["spec"]["token"],
     )
 
-    kube_client.update_service_account_image_pull_secrets.assert_not_awaited()
+    kube_client.update_service_account.assert_not_awaited()
 
     helm_client.upgrade.assert_not_awaited()
 
@@ -892,9 +893,10 @@ async def test_watch_config(
 
     is_platform_deploy_required.assert_awaited_once_with(gcp_platform_config)
 
-    kube_client.update_service_account_image_pull_secrets.assert_awaited_once_with(
+    kube_client.update_service_account.assert_awaited_once_with(
         namespace=gcp_platform_config.namespace,
         name=gcp_platform_config.service_account_name,
+        annotations=gcp_platform_config.service_account_annotations,
         image_pull_secrets=gcp_platform_config.image_pull_secret_names,
     )
 

@@ -50,15 +50,19 @@ class TestKubeClient:
         assert secret["metadata"]["name"] == secret_name
         assert secret["data"]["namespace"] == "default"
 
-    async def test_update_service_account_image_pull_secrets(
-        self, kube_client: KubeClient
-    ) -> None:
-        await kube_client.update_service_account_image_pull_secrets(
-            "default", "default", ["secret"]
-        )
+    async def test_update_service_account(self, kube_client: KubeClient) -> None:
+        for _ in range(2):
+            # Should be idempotent
+            await kube_client.update_service_account(
+                "default",
+                "default",
+                annotations={"role-arn": "neuro"},
+                image_pull_secrets=["secret"],
+            )
 
         service_account = await kube_client.get_service_account("default", "default")
 
+        assert service_account["metadata"]["annotations"] == {"role-arn": "neuro"}
         assert service_account["imagePullSecrets"] == [{"name": "secret"}]
 
     async def test_get_unknown_secret__raises_error(

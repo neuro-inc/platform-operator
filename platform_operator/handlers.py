@@ -435,9 +435,10 @@ async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
     async with app.status_manager.transition(
         platform.cluster_name, PlatformConditionType.PLATFORM_DEPLOYED
     ):
-        await app.kube_client.update_service_account_image_pull_secrets(
+        await app.kube_client.update_service_account(
             namespace=platform.namespace,
             name=platform.service_account_name,
+            annotations=platform.service_account_annotations,
             image_pull_secrets=platform.image_pull_secret_names,
         )
         await app.helm_client.upgrade(
