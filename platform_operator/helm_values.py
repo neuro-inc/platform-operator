@@ -937,7 +937,9 @@ class HelmValuesFactory:
                     "admissionWebhooks": {
                         "patch": {
                             "image": {
-                                "repository": platform.get_image("kube-webhook-certgen")
+                                "repository": platform.get_image(
+                                    "nginx-kube-webhook-certgen"
+                                )
                             }
                         }
                     },

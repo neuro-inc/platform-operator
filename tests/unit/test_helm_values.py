@@ -1886,7 +1886,9 @@ class TestHelmValuesFactory:
                     "admissionWebhooks": {
                         "patch": {
                             "image": {
-                                "repository": "ghcr.io/neuro-inc/kube-webhook-certgen"
+                                "repository": (
+                                    "ghcr.io/neuro-inc/nginx-kube-webhook-certgen"
+                                )
                             }
                         }
                     },
