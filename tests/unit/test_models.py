@@ -641,6 +641,7 @@ class TestPlatformConfigFactory:
 
         assert result == replace(
             aws_platform_config,
+            service_account_annotations={"eks.amazonaws.com/role-arn": "role-arn"},
             aws_role_arn="role-arn",
             aws_s3_role_arn="s3-role-arn",
         )

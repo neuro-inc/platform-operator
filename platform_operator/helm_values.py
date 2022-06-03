@@ -67,6 +67,7 @@ class HelmValuesFactory:
                 "refreshInterval": "1h",
                 "images": [{"image": image} for image in platform.pre_pull_images],
             },
+            "serviceAccount": {"annotations": platform.service_account_annotations},
             "ingress": {
                 "jobFallbackHost": str(platform.jobs_fallback_host),
                 "registryHost": platform.ingress_registry_url.host,
@@ -394,27 +395,6 @@ class HelmValuesFactory:
             if platform.ingress_host_port_http and platform.ingress_host_port_https:
                 ports["web"]["hostPort"] = platform.ingress_host_port_http
                 ports["websecure"]["hostPort"] = platform.ingress_host_port_https
-        if platform.kubernetes_provider == CloudProviderType.AWS:
-            # aws lb default idle timeout is 60s
-            # aws network lb default idle timeout is 350s and cannot be changed
-            result["service"] = {
-                "annotations": {
-                    (
-                        "service.beta.kubernetes.io/"
-                        "aws-load-balancer-connection-idle-timeout"
-                    ): "600"
-                }
-            }
-        if platform.kubernetes_provider == CloudProviderType.AZURE:
-            # azure lb default and minimum idle timeout is 4m, maximum is 30m
-            result["service"] = {
-                "annotations": {
-                    (
-                        "service.beta.kubernetes.io/"
-                        "azure-load-balancer-tcp-idle-timeout"
-                    ): "10"
-                }
-            }
         return result
 
     def _create_platform_url_value(
@@ -574,10 +554,6 @@ class HelmValuesFactory:
                 "project": "neuro",
                 "maxCatalogEntries": 1000,
             }
-            if platform.aws_role_arn:
-                result["annotations"] = {
-                    "iam.amazonaws.com/role": platform.aws_role_arn
-                }
         elif platform.registry.provider == RegistryProvider.AZURE:
             assert platform.registry.azure_url
             azure_credentials_secret_name = (
@@ -725,13 +701,6 @@ class HelmValuesFactory:
                 }
             }
         elif platform.buckets.provider == BucketsProvider.AWS:
-            if platform.aws_role_arn:
-                result["podAnnotations"] = {
-                    "iam.amazonaws.com/role": platform.aws_role_arn
-                }
-                result["fluentd"]["podAnnotations"] = {
-                    "iam.amazonaws.com/role": platform.aws_role_arn
-                }
             result["logs"] = {
                 "persistence": {
                     "type": "aws",
@@ -1073,24 +1042,6 @@ class HelmValuesFactory:
                 }
             )
         elif platform.buckets.provider == BucketsProvider.AWS:
-            if platform.aws_role_arn:
-                result["metricsExporter"] = {
-                    "podMetadata": {
-                        "annotations": {"iam.amazonaws.com/role": platform.aws_role_arn}
-                    }
-                }
-                prometheus_spec["podMetadata"] = {
-                    "annotations": {"iam.amazonaws.com/role": platform.aws_role_arn}
-                }
-                result["thanos"]["store"]["annotations"] = {
-                    "iam.amazonaws.com/role": platform.aws_role_arn
-                }
-                result["thanos"]["bucket"] = {
-                    "annotations": {"iam.amazonaws.com/role": platform.aws_role_arn}
-                }
-                result["thanos"]["compact"]["annotations"] = {
-                    "iam.amazonaws.com/role": platform.aws_role_arn
-                }
             result["thanos"]["objstore"] = {
                 "type": "S3",
                 "config": {
@@ -1332,10 +1283,6 @@ class HelmValuesFactory:
                     "s3RoleArn": platform.aws_s3_role_arn,
                 },
             }
-            if platform.aws_role_arn:
-                result["annotations"] = {
-                    "iam.amazonaws.com/role": platform.aws_role_arn
-                }
         elif platform.buckets.provider == BucketsProvider.EMC_ECS:
             secret_name = f"{platform.release_name}-buckets-emc-ecs-key"
             result["secrets"].append(

@@ -738,6 +738,7 @@ class PlatformConfig:
     token: str
     cluster_name: str
     service_account_name: str
+    service_account_annotations: dict[str, str]
     image_pull_secret_names: Sequence[str]
     pre_pull_images: Sequence[str]
     standard_storage_class_name: str | None
@@ -943,6 +944,11 @@ class PlatformConfigFactory:
             cluster, f"{release_name}-docker-hub-config"
         )
         jobs_namespace = self._config.platform_namespace + "-jobs"
+        service_account_annotations: dict[str, str] = {}
+        if spec.iam.aws_role_arn:
+            service_account_annotations[
+                "eks.amazonaws.com/role-arn"
+            ] = spec.iam.aws_role_arn
         return PlatformConfig(
             release_name=release_name,
             auth_url=self._config.platform_auth_url,
@@ -954,6 +960,7 @@ class PlatformConfigFactory:
             cluster_name=metadata.name,
             namespace=self._config.platform_namespace,
             service_account_name="default",
+            service_account_annotations=service_account_annotations,
             image_pull_secret_names=self._create_image_pull_secret_names(
                 docker_config, docker_hub_config
             ),

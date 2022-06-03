@@ -86,6 +86,7 @@ class TestHelmValuesFactory:
                     "password": "password",
                 },
             },
+            "serviceAccount": {"annotations": {}},
             "ingress": {
                 "jobFallbackHost": "default.jobs-dev.neu.ro",
                 "registryHost": f"registry.{cluster_name}.org.neu.ro",
@@ -271,6 +272,19 @@ class TestHelmValuesFactory:
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         assert factory.create_platform_values(aws_platform_config)
+
+    def test_create_aws_platform_values_with_role(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(
+                aws_platform_config, service_account_annotations={"role-arn": "role"}
+            )
+        )
+
+        assert factory.create_platform_values(aws_platform_config)
+
+        assert result["serviceAccount"] == {"annotations": {"role-arn": "role"}}
 
     def test_create_aws_platform_values_with_kubernetes_storage(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -667,31 +681,6 @@ class TestHelmValuesFactory:
 
         assert result["ingressClass"]["enabled"] is True
 
-    def test_create_aws_traefik_values(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_traefik_values(aws_platform_config)
-
-        assert result["service"] == {
-            "annotations": {
-                (
-                    "service.beta.kubernetes.io/"
-                    "aws-load-balancer-connection-idle-timeout"
-                ): "600"
-            }
-        }
-
-    def test_create_azure_traefik_values(
-        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_traefik_values(azure_platform_config)
-
-        assert result["service"] == {
-            "annotations": {
-                "service.beta.kubernetes.io/azure-load-balancer-tcp-idle-timeout": "10"
-            }
-        }
-
     def test_create_on_prem_traefik_values_with_custom_ports(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -872,15 +861,6 @@ class TestHelmValuesFactory:
         )
 
         assert "cors" not in result
-
-    def test_create_aws_platform_buckets_values_with_role(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_buckets_values(
-            replace(aws_platform_config, aws_role_arn="s3_role")
-        )
-
-        assert result["annotations"] == {"iam.amazonaws.com/role": "s3_role"}
 
     def test_create_emc_ecs_buckets_values(
         self,
@@ -1362,15 +1342,6 @@ class TestHelmValuesFactory:
             "sentry": mock.ANY,
         }
 
-    def test_create_aws_platform_registry_values_with_role(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_registry_values(
-            replace(aws_platform_config, aws_role_arn="ecr_role")
-        )
-
-        assert result["annotations"] == {"iam.amazonaws.com/role": "ecr_role"}
-
     def test_create_azure_platform_registry_values(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -1637,18 +1608,6 @@ class TestHelmValuesFactory:
                 "type": "aws",
                 "aws": {"bucket": "job-logs", "region": "us-east-1"},
             },
-        }
-
-    def test_create_aws_platform_monitoring_values_with_roles(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_monitoring_values(
-            replace(aws_platform_config, aws_role_arn="s3_role")
-        )
-
-        assert result["podAnnotations"] == {"iam.amazonaws.com/role": "s3_role"}
-        assert result["fluentd"]["podAnnotations"] == {
-            "iam.amazonaws.com/role": "s3_role"
         }
 
     def test_create_azure_platform_monitoring_values(
@@ -2080,37 +2039,6 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_reports_values(aws_platform_config)
 
-        assert result["thanos"]["objstore"] == {
-            "type": "S3",
-            "config": {
-                "bucket": "job-metrics",
-                "endpoint": "s3.us-east-1.amazonaws.com",
-            },
-        }
-        assert result["cloudProvider"] == {"type": "aws", "region": "us-east-1"}
-
-    def test_create_aws_platform_reports_values_with_roles(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_reports_values(
-            replace(aws_platform_config, aws_role_arn="role_arn")
-        )
-
-        assert result["metricsExporter"]["podMetadata"]["annotations"] == {
-            "iam.amazonaws.com/role": "role_arn"
-        }
-        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
-            "podMetadata"
-        ] == {"annotations": {"iam.amazonaws.com/role": "role_arn"}}
-        assert result["thanos"]["store"]["annotations"] == {
-            "iam.amazonaws.com/role": "role_arn"
-        }
-        assert result["thanos"]["bucket"]["annotations"] == {
-            "iam.amazonaws.com/role": "role_arn"
-        }
-        assert result["thanos"]["compact"]["annotations"] == {
-            "iam.amazonaws.com/role": "role_arn"
-        }
         assert result["thanos"]["objstore"] == {
             "type": "S3",
             "config": {

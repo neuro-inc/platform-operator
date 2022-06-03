@@ -481,6 +481,7 @@ def gcp_platform_config(
         cluster_name=cluster_name,
         namespace="platform",
         service_account_name="default",
+        service_account_annotations={},
         image_pull_secret_names=[
             "platform-docker-config",
             "platform-docker-hub-config",

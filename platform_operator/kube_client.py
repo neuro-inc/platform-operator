@@ -5,7 +5,7 @@ import json
 import logging
 import ssl
 from base64 import b64decode, b64encode
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Iterable, Sequence
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -235,16 +235,26 @@ class KubeClient:
             payload = await response.json()
             return payload
 
-    async def update_service_account_image_pull_secrets(
-        self, namespace: str, name: str, image_pull_secrets: Sequence[str]
+    async def update_service_account(
+        self,
+        namespace: str,
+        name: str,
+        *,
+        annotations: dict[str, str] | None = None,
+        image_pull_secrets: Iterable[str] = (),
     ) -> None:
+        data: dict[str, Any] = {}
+        if annotations:
+            data["metadata"] = {"annotations": annotations}
+        if image_pull_secrets:
+            data["imagePullSecrets"] = [{"name": name} for name in image_pull_secrets]
+        if not data:
+            return
         assert self._session
         async with self._session.patch(
             self._endpoints.service_account(namespace, name),
             headers={"Content-Type": "application/merge-patch+json"},
-            data=json.dumps(
-                {"imagePullSecrets": [{"name": name} for name in image_pull_secrets]}
-            ),
+            data=json.dumps(data),
         ) as response:
             response.raise_for_status()
 
