@@ -6,7 +6,7 @@ name: platform-operator
 description: Neu.ro platform operator
 dependencies:
   - name: postgresql
-    version: "10.13.11"
+    version: "10.16.2"
     repository: https://charts.bitnami.com/bitnami
     condition: platform.standalone
   - name: postgres-db-init-script
