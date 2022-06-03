@@ -4,6 +4,9 @@ image:
 
 imagePullSecrets: []
 
+serviceAccount:
+  annotations: {}
+
 kubectlImage:
   repository: ghcr.io/neuro-inc/kubectl
   tag: 1.16
