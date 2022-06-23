@@ -200,7 +200,7 @@ class HelmValuesFactory:
             "image": job.image,
             "resources": {
                 "cpu": f"{job.resources.cpu_m}m",
-                "memory": f"{job.resources.memory_mb}Mi",
+                "memory": f"{job.resources.memory}",
             },
         }
         if job.command:
@@ -1147,9 +1147,7 @@ class HelmValuesFactory:
             "image": {"repository": platform.get_image("platformdiskapi")},
             "disks": {
                 "namespace": platform.jobs_namespace,
-                "limitPerUser": str(
-                    platform.disks_storage_limit_per_user_gb * 1024**3
-                ),
+                "limitPerUser": str(platform.disks_storage_limit_per_user),
             },
             "platform": {
                 "clusterName": platform.cluster_name,

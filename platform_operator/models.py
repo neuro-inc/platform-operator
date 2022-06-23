@@ -768,7 +768,7 @@ class PlatformConfig:
     ingress_namespaces: Sequence[str]
     ingress_ssl_cert_data: str
     ingress_ssl_cert_key_data: str
-    disks_storage_limit_per_user_gb: int
+    disks_storage_limit_per_user: int
     disks_storage_class_name: str | None
     jobs_namespace: str
     jobs_resource_pool_types: Sequence[ResourcePoolType]
@@ -1025,7 +1025,7 @@ class PlatformConfigFactory:
             buckets=self._create_buckets(spec.blob_storage, cluster),
             registry=self._create_registry(spec.registry),
             monitoring=self._create_monitoring(spec.monitoring),
-            disks_storage_limit_per_user_gb=cluster.disks.storage_limit_per_user_gb,
+            disks_storage_limit_per_user=cluster.disks.storage_limit_per_user,
             disks_storage_class_name=spec.disks.storage_class_name or None,
             helm_repo=self._create_helm_repo(cluster),
             docker_config=docker_config,

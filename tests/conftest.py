@@ -106,8 +106,8 @@ def resource_pool_type_factory() -> Callable[..., ResourcePoolType]:
             max_size=1,
             cpu=1,
             available_cpu=1,
-            memory_mb=1024,
-            available_memory_mb=1024,
+            memory=2**30,
+            available_memory=2**30,
             gpu=1,
             gpu_model="nvidia-tesla-k80",
             tpu=TPUResource(ipv4_cidr_block=tpu_ipv4_cidr_block)
@@ -164,7 +164,7 @@ def cluster_factory(
                         name="gpu-small",
                         credits_per_hour=Decimal(10),
                         cpu=1,
-                        memory_mb=1024,
+                        memory=2**30,
                         gpu=1,
                         gpu_model="nvidia-tesla-k80",
                         resource_affinity=[resource_pool_name],
@@ -180,7 +180,7 @@ def cluster_factory(
                         name="miner",
                         count=1,
                         image="miner",
-                        resources=Resources(cpu_m=1000, memory_mb=1024),
+                        resources=Resources(cpu_m=1000, memory=2**30),
                     )
                 ],
             ),
@@ -196,7 +196,7 @@ def cluster_factory(
             ),
             disks=DisksConfig(
                 url=URL(f"https://{name}.org.neu.ro/api/v1/disk"),
-                storage_limit_per_user_gb=10240,
+                storage_limit_per_user=10240 * 2**30,
             ),
             monitoring=ClusterMonitoringConfig(
                 url=URL(f"https://{name}.org.neu.ro/api/v1/jobs")
@@ -511,7 +511,7 @@ def gcp_platform_config(
                 name="miner",
                 count=1,
                 image="miner",
-                resources=Resources(cpu_m=1000, memory_mb=1024),
+                resources=Resources(cpu_m=1000, memory=2**30),
             )
         ],
         ingress_dns_name=f"{cluster_name}.org.neu.ro",
@@ -556,7 +556,7 @@ def gcp_platform_config(
             metrics_region="us-central1",
             metrics_bucket_name="job-metrics",
         ),
-        disks_storage_limit_per_user_gb=10240,
+        disks_storage_limit_per_user=10240 * 2**30,
         disks_storage_class_name="platform-disk",
         helm_repo=HelmRepo(
             url=URL("https://ghcr.io/neuro-inc/helm-charts"),

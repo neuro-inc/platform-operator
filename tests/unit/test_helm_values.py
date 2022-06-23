@@ -156,7 +156,7 @@ class TestHelmValuesFactory:
                     name="miner",
                     count=1,
                     image="miner",
-                    resources=Resources(cpu_m=1000, memory_mb=1024, gpu=1),
+                    resources=Resources(cpu_m=1000, memory=2**30, gpu=1),
                 ),
                 IdleJobConfig(
                     name="miner",
@@ -165,7 +165,7 @@ class TestHelmValuesFactory:
                     command=["bash"],
                     args=["-c", "sleep infinity"],
                     image_pull_secret="secret",
-                    resources=Resources(cpu_m=1000, memory_mb=1024, gpu=1),
+                    resources=Resources(cpu_m=1000, memory=2**30, gpu=1),
                     env={"NAME": "VALUE"},
                     node_selector={"gpu": "nvidia-tesla-k80"},
                 ),
