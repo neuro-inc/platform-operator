@@ -101,7 +101,7 @@ class TestHelmValuesFactory:
                     "name": "miner",
                     "count": 1,
                     "image": "miner",
-                    "resources": {"cpu": "1000m", "memory": "1024Mi"},
+                    "resources": {"cpu": "1000m", "memory": str(2**30)},
                 }
             ],
             "storages": [
@@ -179,7 +179,11 @@ class TestHelmValuesFactory:
                 "name": "miner",
                 "count": 1,
                 "image": "miner",
-                "resources": {"cpu": "1000m", "memory": "1024Mi", "nvidia.com/gpu": 1},
+                "resources": {
+                    "cpu": "1000m",
+                    "memory": str(2**30),
+                    "nvidia.com/gpu": 1,
+                },
             },
             {
                 "name": "miner",
@@ -188,7 +192,11 @@ class TestHelmValuesFactory:
                 "command": ["bash"],
                 "args": ["-c", "sleep infinity"],
                 "imagePullSecrets": [{"name": "secret"}],
-                "resources": {"cpu": "1000m", "memory": "1024Mi", "nvidia.com/gpu": 1},
+                "resources": {
+                    "cpu": "1000m",
+                    "memory": str(2**30),
+                    "nvidia.com/gpu": 1,
+                },
                 "env": {"NAME": "VALUE"},
                 "nodeSelector": {"gpu": "nvidia-tesla-k80"},
             },
