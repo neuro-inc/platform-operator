@@ -467,6 +467,7 @@ async def wait_for_certificate_created(
 
 
 async def _wait_for_certificate_created(platform: PlatformConfig) -> None:
+    ssl_context: ssl.SSLContext | None
     if platform.ingress_acme_environment == ACMEEnvironment.STAGING:
         ssl_context = ssl.create_default_context(cafile=config.acme_ca_staging_path)
     else:

@@ -461,8 +461,8 @@ async def test_deploy_storage_configs_patched(
                 id="standard",
                 tier=GoogleFilestoreTier.STANDARD,
                 instances=[
-                    StorageInstance(size_mb=1024 * 1024),
-                    StorageInstance(name="org1", size_mb=2 * 1024 * 1024),
+                    StorageInstance(size=2**40),
+                    StorageInstance(name="org1", size=2 * 2**40),
                 ],
                 description="Standard Filestore",
             ),
