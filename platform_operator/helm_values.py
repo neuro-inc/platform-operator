@@ -507,7 +507,10 @@ class HelmValuesFactory:
             },
             "secrets": [],
         }
-        result.update(**self._create_tracing_values(platform))
+        result.update(
+            **self._create_cors_values(platform),
+            **self._create_tracing_values(platform),
+        )
         if platform.registry.provider == RegistryProvider.GCP:
             gcp_key_secret_name = f"{platform.release_name}-registry-gcp-key"
             result["upstreamRegistry"] = {

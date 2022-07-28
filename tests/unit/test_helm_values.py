@@ -1303,6 +1303,12 @@ class TestHelmValuesFactory:
                 "clusterName": gcp_platform_config.cluster_name,
                 "sampleRate": 0.1,
             },
+            "cors": {
+                "origins": [
+                    "https://release--neuro-web.netlify.app",
+                    "https://app.neu.ro",
+                ]
+            },
         }
 
     def test_create_aws_platform_registry_values(
@@ -1348,6 +1354,7 @@ class TestHelmValuesFactory:
                 "project": "neuro",
             },
             "sentry": mock.ANY,
+            "cors": mock.ANY,
         }
 
     def test_create_azure_platform_registry_values(
@@ -1418,6 +1425,7 @@ class TestHelmValuesFactory:
                 "url": "https://platform.azurecr.io",
             },
             "sentry": mock.ANY,
+            "cors": mock.ANY,
         }
 
     def test_create_on_prem_platform_registry_values(
@@ -1488,6 +1496,7 @@ class TestHelmValuesFactory:
                 },
             },
             "sentry": mock.ANY,
+            "cors": mock.ANY,
         }
 
     def test_create_gcp_platform_monitoring_values(
