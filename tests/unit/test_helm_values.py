@@ -1886,6 +1886,9 @@ class TestHelmValuesFactory:
                                 }
                             }
                         },
+                        "externalLabels": {
+                            "cluster": gcp_platform_config.cluster_name,
+                        },
                     }
                 },
                 "prometheusOperator": {
@@ -2396,3 +2399,11 @@ class TestHelmValuesFactory:
             result["jobs"]["preemptibleTolerationKey"]
             == "kubernetes.azure.com/scalesetpriority"
         )
+
+    def test_create_prometheus_external_cluster_label(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_reports_values(gcp_platform_config)
+        prom = result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]
+        assert prom["externalLabels"]["cluster"]
+        assert prom["externalLabels"]["cluster"] == gcp_platform_config.cluster_name
