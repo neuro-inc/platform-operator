@@ -923,6 +923,9 @@ class HelmValuesFactory:
                                 },
                             }
                         },
+                        "externalLabels": {
+                            "cluster": platform.cluster_name,
+                        },
                     }
                 },
                 "prometheusOperator": {
