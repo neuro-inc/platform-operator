@@ -89,7 +89,6 @@ def config() -> Config:
         acme_ca_staging_path="/ca.pem",
         is_standalone=False,
         services_priority_class_name="platform-services-test",
-        services_priority_class_value=12345,
     )
 
 
@@ -588,7 +587,6 @@ def gcp_platform_config(
             create_secret=True,
         ),
         services_priority_class_name="platform-services-test",
-        services_priority_class_value=12345,
     )
 
 

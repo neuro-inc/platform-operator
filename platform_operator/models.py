@@ -142,7 +142,6 @@ class Config:
     acme_ca_staging_path: str
     is_standalone: bool
     services_priority_class_name: str
-    services_priority_class_value: int
 
     @classmethod
     def load_from_env(cls, env: Mapping[str, str] | None = None) -> Config:
@@ -172,9 +171,6 @@ class Config:
             is_standalone=env.get("NP_STANDALONE", "false").lower() == "true",
             services_priority_class_name=env.get(
                 "NP_SERVICES_PRIORITY_CLASS_NAME", "platform-services"
-            ),
-            services_priority_class_value=int(
-                env.get("NP_SERVICES_PRIORITY_CLASS_VALUE", "1000")
             ),
         )
 
@@ -801,7 +797,6 @@ class PlatformConfig:
     gcp_service_account_key: str = ""
     gcp_service_account_key_base64: str = ""
     services_priority_class_name: str = ""
-    services_priority_class_value: int = 0
 
     def get_storage_claim_name(self, path: str) -> str:
         name = f"{self.release_name}-storage"
@@ -1060,7 +1055,6 @@ class PlatformConfigFactory:
             ),
             gcp_service_account_key_base64=spec.iam.gcp_service_account_key_base64,
             services_priority_class_name=self._config.services_priority_class_name,
-            services_priority_class_value=self._config.services_priority_class_value,
         )
 
     def _create_helm_repo(self, cluster: Cluster) -> HelmRepo:

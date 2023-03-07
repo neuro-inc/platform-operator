@@ -83,8 +83,6 @@ spec:
         {{- if .Values.platform.servicesPodsPriorityClass.create }}
         - name: NP_SERVICES_PRIORITY_CLASS_NAME
           value: {{ .Values.platform.servicesPodsPriorityClass.className }}
-        - name: NP_SERVICES_PRIORITY_CLASS_VALUE
-          value: {{ .Values.platform.servicesPodsPriorityClass.classValue }}
         {{- end }}
         ports:
         - name: liveness-port
