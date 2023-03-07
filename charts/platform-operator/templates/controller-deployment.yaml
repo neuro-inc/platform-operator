@@ -80,6 +80,12 @@ spec:
         - name: NP_STANDALONE
           value: "true"
         {{- end }}
+        {{- if .Values.platform.servicesPodsPriorityClass.create }}
+        - name: NP_SERVICES_PRIORITY_CLASS_NAME
+          value: {{ .Values.platform.servicesPodsPriorityClass.className }}
+        - name: NP_SERVICES_PRIORITY_CLASS_VALUE
+          value: {{ .Values.platform.servicesPodsPriorityClass.classValue }}
+        {{- end }}
         ports:
         - name: liveness-port
           containerPort: 8080
@@ -92,3 +98,6 @@ spec:
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets: {{ toYaml .Values.imagePullSecrets | nindent 6 }}
       {{- end }}
+      {{- if .Values.platform.servicesPodsPriorityClass.create }}
+      priorityClassName: {{ .Values.platform.servicesPodsPriorityClass.className }}
+      {{- end}}

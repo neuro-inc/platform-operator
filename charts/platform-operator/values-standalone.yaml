@@ -5,6 +5,11 @@ platform:
   authUrl: "-"
   ingressAuthUrl: "-"
   adminUrl: "-"
+  servicesPodsPriorityClass:
+    create: true
+    className: platform-services
+    classValue: 1000
+
 
 ingress:
   host: neu.ro.local

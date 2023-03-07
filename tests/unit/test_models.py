@@ -68,6 +68,8 @@ class TestConfig:
             "NP_PLATFORM_LOCK_SECRET_NAME": "platform-operator-lock",
             "NP_ACME_CA_STAGING_PATH": "/ca.pem",
             "NP_STANDALONE": "true",
+            "NP_SERVICES_PRIORITY_CLASS_NAME": "platform-services",
+            "NP_SERVICES_PRIORITY_CLASS_VALUE": "12343",
         }
         assert Config.load_from_env(env) == Config(
             node_name="minikube",
@@ -101,6 +103,8 @@ class TestConfig:
             platform_lock_secret_name="platform-operator-lock",
             acme_ca_staging_path="/ca.pem",
             is_standalone=True,
+            services_priority_class_name="platform-services",
+            services_priority_class_value=12343,
         )
 
     def test_config_defaults(self) -> None:
@@ -150,6 +154,8 @@ class TestConfig:
             platform_lock_secret_name="platform-operator-lock",
             acme_ca_staging_path="/ca.pem",
             is_standalone=False,
+            services_priority_class_name="platform-services",
+            services_priority_class_value=1000,
         )
 
 

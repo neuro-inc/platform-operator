@@ -141,6 +141,8 @@ class Config:
     platform_lock_secret_name: str
     acme_ca_staging_path: str
     is_standalone: bool
+    services_priority_class_name: str
+    services_priority_class_value: int
 
     @classmethod
     def load_from_env(cls, env: Mapping[str, str] | None = None) -> Config:
@@ -168,6 +170,12 @@ class Config:
             platform_lock_secret_name=env["NP_PLATFORM_LOCK_SECRET_NAME"],
             acme_ca_staging_path=env["NP_ACME_CA_STAGING_PATH"],
             is_standalone=env.get("NP_STANDALONE", "false").lower() == "true",
+            services_priority_class_name=env.get(
+                "NP_SERVICES_PRIORITY_CLASS_NAME", "platform-services"
+            ),
+            services_priority_class_value=int(
+                env.get("NP_SERVICES_PRIORITY_CLASS_VALUE", "1000")
+            ),
         )
 
 
@@ -792,6 +800,8 @@ class PlatformConfig:
     aws_s3_role_arn: str = ""
     gcp_service_account_key: str = ""
     gcp_service_account_key_base64: str = ""
+    services_priority_class_name: str = ""
+    services_priority_class_value: int = 0
 
     def get_storage_claim_name(self, path: str) -> str:
         name = f"{self.release_name}-storage"
@@ -1049,6 +1059,8 @@ class PlatformConfigFactory:
                 spec.iam.gcp_service_account_key_base64
             ),
             gcp_service_account_key_base64=spec.iam.gcp_service_account_key_base64,
+            services_priority_class_name=self._config.services_priority_class_name,
+            services_priority_class_value=self._config.services_priority_class_value,
         )
 
     def _create_helm_repo(self, cluster: Cluster) -> HelmRepo:
