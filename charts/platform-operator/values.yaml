@@ -28,7 +28,3 @@ platform:
   configUrl: https://staging.neu.ro
   apiUrl: https://staging.neu.ro
   adminUrl: https://staging.neu.ro
-  servicesPodsPriorityClass:
-    create: true
-    className: platform-services
-    classValue: 1000

@@ -88,7 +88,6 @@ def config() -> Config:
         platform_lock_secret_name="platform-operator-lock",
         acme_ca_staging_path="/ca.pem",
         is_standalone=False,
-        services_priority_class_name="platform-services-test",
     )
 
 
@@ -590,7 +589,7 @@ def gcp_platform_config(
             secret_name="platform-docker-hub-config",
             create_secret=True,
         ),
-        services_priority_class_name="platform-services-test",
+        services_priority_class_name="platform-services",
     )
 
 
