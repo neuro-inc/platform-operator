@@ -11,6 +11,7 @@ spec:
   template:
     spec:
       serviceAccountName: {{ include "platformOperator.fullname" . }}-upgrade
+      priorityClassName: {{ .Release.Namespace }}-services
       restartPolicy: Never
       containers:
       - name: end-upgrade
