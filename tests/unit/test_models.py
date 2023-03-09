@@ -279,6 +279,7 @@ class TestPlatformConfig:
         resource_pool_type_factory: Callable[..., ResourcePoolType],
     ) -> None:
         result = gcp_platform_config.create_orchestrator_config(gcp_cluster)
+        assert gcp_cluster.orchestrator
 
         assert result == replace(
             gcp_cluster.orchestrator,
@@ -293,6 +294,8 @@ class TestPlatformConfig:
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
+        assert gcp_cluster.orchestrator
+
         gcp_cluster = replace(
             gcp_cluster,
             orchestrator=replace(
@@ -527,6 +530,8 @@ class TestPlatformConfigFactory:
         gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
+        assert gcp_cluster.credentials
+
         gcp_cluster = replace(
             gcp_cluster,
             credentials=replace(
@@ -577,6 +582,8 @@ class TestPlatformConfigFactory:
         gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
+        assert gcp_cluster.credentials
+
         gcp_cluster = replace(
             gcp_cluster,
             credentials=replace(gcp_cluster.credentials, grafana=None),
@@ -592,6 +599,8 @@ class TestPlatformConfigFactory:
         gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
+        assert gcp_cluster.credentials
+
         gcp_cluster = replace(
             gcp_cluster,
             credentials=replace(gcp_cluster.credentials, sentry=None),
@@ -607,6 +616,8 @@ class TestPlatformConfigFactory:
         gcp_platform_body: kopf.Body,
         gcp_cluster: Cluster,
     ) -> None:
+        assert gcp_cluster.credentials
+
         gcp_cluster = replace(
             gcp_cluster,
             credentials=replace(gcp_cluster.credentials, docker_hub=None),

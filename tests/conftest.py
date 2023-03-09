@@ -222,6 +222,7 @@ def gcp_cluster(
     resource_pool_type_factory: Callable[..., ResourcePoolType],
 ) -> Cluster:
     cluster = cluster_factory(cluster_name, "n1-highmem-8")
+    assert cluster.orchestrator
     cluster = replace(
         cluster,
         orchestrator=replace(
@@ -251,6 +252,7 @@ def on_prem_cluster(
     cluster_name: str, cluster_factory: Callable[..., Cluster]
 ) -> Cluster:
     cluster = cluster_factory(cluster_name, "gpu")
+    assert cluster.credentials
     cluster = replace(
         cluster,
         credentials=replace(
@@ -264,6 +266,8 @@ def on_prem_cluster(
 @pytest.fixture
 def vcd_cluster(cluster_name: str, cluster_factory: Callable[..., Cluster]) -> Cluster:
     cluster = cluster_factory(cluster_name, "gpu")
+    assert cluster.credentials
+
     cluster = replace(
         cluster,
         credentials=replace(
@@ -585,6 +589,7 @@ def gcp_platform_config(
             secret_name="platform-docker-hub-config",
             create_secret=True,
         ),
+        services_priority_class_name="platform-services",
     )
 
 

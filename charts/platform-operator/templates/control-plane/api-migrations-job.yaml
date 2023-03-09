@@ -33,4 +33,5 @@ spec:
             secretKeyRef:
               name: {{ include "platformOperator.postgresqlConfig.fullname" . }}-secrets
               key: platform-api-migrations-runner-dsn
+      priorityClassName: {{ .Release.Namespace }}-services
 {{- end }}

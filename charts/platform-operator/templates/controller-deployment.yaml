@@ -92,3 +92,4 @@ spec:
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets: {{ toYaml .Values.imagePullSecrets | nindent 6 }}
       {{- end }}
+      priorityClassName: {{ .Release.Namespace }}-services

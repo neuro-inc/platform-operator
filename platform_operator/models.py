@@ -792,6 +792,7 @@ class PlatformConfig:
     aws_s3_role_arn: str = ""
     gcp_service_account_key: str = ""
     gcp_service_account_key_base64: str = ""
+    services_priority_class_name: str = ""
 
     def get_storage_claim_name(self, path: str) -> str:
         name = f"{self.release_name}-storage"
@@ -1049,6 +1050,7 @@ class PlatformConfigFactory:
                 spec.iam.gcp_service_account_key_base64
             ),
             gcp_service_account_key_base64=spec.iam.gcp_service_account_key_base64,
+            services_priority_class_name=f"{self._config.platform_namespace}-services",
         )
 
     def _create_helm_repo(self, cluster: Cluster) -> HelmRepo:
