@@ -530,6 +530,7 @@ class TestHelmValuesFactory:
                 },
             ],
             "persistence": {"storageClassName": "platform-standard-topology-aware"},
+            "priorityClassName": "platform-services",
         }
 
     def test_create_acme_values_with_acme_staging(
@@ -561,6 +562,7 @@ class TestHelmValuesFactory:
             "secrets": {"haSharedSecret": mock.ANY},
             "configData": {"storage": {"delete": {"enabled": True}}},
             "podLabels": {"service": "docker-registry"},
+            "priorityClassName": "platform-services",
         }
         assert result["secrets"]["haSharedSecret"]
 
@@ -599,6 +601,7 @@ class TestHelmValuesFactory:
             "accessKey": "username",
             "secretKey": "password",
             "ingress": {"enabled": False},
+            "priorityClassName": "platform-services",
         }
 
     def test_create_gcp_traefik_values(
@@ -660,6 +663,7 @@ class TestHelmValuesFactory:
             },
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
+            "priorityClassName": "platform-services",
         }
 
     def test_create_gcp_traefik_values_with_ingress_namespaces(
@@ -756,6 +760,7 @@ class TestHelmValuesFactory:
                 "clusterName": gcp_platform_config.cluster_name,
                 "sampleRate": 0.1,
             },
+            "priorityClassName": "platform-services",
         }
 
     def test_create_platform_storage_values_with_multiple_storages(
@@ -859,6 +864,7 @@ class TestHelmValuesFactory:
             "secrets": [],
             "sentry": mock.ANY,
             "disableCreation": False,
+            "priorityClassName": "platform-services",
         }
 
     def test_create_aws_buckets_values_without_cors(
@@ -957,6 +963,7 @@ class TestHelmValuesFactory:
             ],
             "sentry": mock.ANY,
             "disableCreation": False,
+            "priorityClassName": "platform-services",
         }
 
     def test_create_open_stack_buckets_values(
@@ -1046,6 +1053,7 @@ class TestHelmValuesFactory:
             ],
             "sentry": mock.ANY,
             "disableCreation": False,
+            "priorityClassName": "platform-services",
         }
 
     def test_create_on_prem_buckets_values(
@@ -1103,6 +1111,7 @@ class TestHelmValuesFactory:
             "secrets": [],
             "sentry": mock.ANY,
             "disableCreation": False,
+            "priorityClassName": "platform-services",
         }
 
     def test_create_gcp_buckets_values(
@@ -1164,6 +1173,7 @@ class TestHelmValuesFactory:
             ],
             "sentry": mock.ANY,
             "disableCreation": False,
+            "priorityClassName": "platform-services",
         }
 
     def test_create_azure_buckets_values(
@@ -1229,6 +1239,7 @@ class TestHelmValuesFactory:
             ],
             "sentry": mock.ANY,
             "disableCreation": False,
+            "priorityClassName": "platform-services",
         }
 
     def test_create_gcp_platform_registry_values(
@@ -1309,6 +1320,7 @@ class TestHelmValuesFactory:
                     "https://app.neu.ro",
                 ]
             },
+            "priorityClassName": "platform-services",
         }
 
     def test_create_aws_platform_registry_values(
@@ -1355,6 +1367,7 @@ class TestHelmValuesFactory:
             },
             "sentry": mock.ANY,
             "cors": mock.ANY,
+            "priorityClassName": "platform-services",
         }
 
     def test_create_azure_platform_registry_values(
@@ -1426,6 +1439,7 @@ class TestHelmValuesFactory:
             },
             "sentry": mock.ANY,
             "cors": mock.ANY,
+            "priorityClassName": "platform-services",
         }
 
     def test_create_on_prem_platform_registry_values(
@@ -1497,6 +1511,7 @@ class TestHelmValuesFactory:
             },
             "sentry": mock.ANY,
             "cors": mock.ANY,
+            "priorityClassName": "platform-services",
         }
 
     def test_create_gcp_platform_monitoring_values(
@@ -1579,6 +1594,7 @@ class TestHelmValuesFactory:
                 "clusterName": gcp_platform_config.cluster_name,
                 "sampleRate": 0.1,
             },
+            "priorityClassName": "platform-services",
         }
 
     def test_create_platform_storage_without_api_url(
@@ -1752,6 +1768,7 @@ class TestHelmValuesFactory:
                 "clusterName": gcp_platform_config.cluster_name,
                 "sampleRate": 0.1,
             },
+            "priorityClassName": "platform-services",
         }
 
     def test_create_platform_secrets_values(
@@ -1800,6 +1817,7 @@ class TestHelmValuesFactory:
                 "clusterName": gcp_platform_config.cluster_name,
                 "sampleRate": 0.1,
             },
+            "priorityClassName": "platform-services",
         }
 
     def test_create_gcp_platform_reports_values(
@@ -1889,6 +1907,7 @@ class TestHelmValuesFactory:
                         "externalLabels": {
                             "cluster": gcp_platform_config.cluster_name,
                         },
+                        "priorityClassName": "platform-services",
                     }
                 },
                 "prometheusOperator": {
@@ -1909,10 +1928,12 @@ class TestHelmValuesFactory:
                                 "repository": (
                                     "ghcr.io/neuro-inc/nginx-kube-webhook-certgen"
                                 )
-                            }
+                            },
+                            "priorityClassName": "platform-services",
                         }
                     },
                     "kubeletService": {"namespace": "platform"},
+                    "priorityClassName": "platform-services",
                 },
                 "kubelet": {"namespace": "platform"},
                 "kubeStateMetrics": {
@@ -1962,6 +1983,7 @@ class TestHelmValuesFactory:
                     "type": "GCS",
                     "config": {"bucket": "job-metrics", "service_account": "{}"},
                 },
+                "priorityClassName": "platform-services",
             },
             "cloudProvider": {
                 "type": "gcp",
@@ -1999,7 +2021,9 @@ class TestHelmValuesFactory:
                 },
                 "adminUser": "admin",
                 "adminPassword": "grafana_password",
+                "priorityClassName": "platform-services",
             },
+            "priorityClassName": "platform-services",
         }
 
     def test_create_gcp_platform_reports_values_with_k8s_label_relabelings(
@@ -2276,6 +2300,7 @@ class TestHelmValuesFactory:
                 "clusterName": gcp_platform_config.cluster_name,
                 "sampleRate": 0.1,
             },
+            "priorityClassName": "platform-services",
         }
 
     def test_create_platform_disks_values_without_storage_class(
@@ -2354,6 +2379,7 @@ class TestHelmValuesFactory:
                 "clusterName": gcp_platform_config.cluster_name,
                 "sampleRate": 0.1,
             },
+            "priorityClassName": "platform-services",
         }
 
     def test_create_platform_api_poller_values_with_multiple_storages(
