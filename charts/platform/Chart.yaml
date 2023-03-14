@@ -10,7 +10,7 @@ dependencies:
     repository: https://helm.traefik.io/traefik
     condition: traefikEnabled
   - name: acme
-    version: "1.1.0"
+    version: "1.0.8"
     repository: https://neuro-inc.github.io/helm-charts
     condition: acmeEnabled
   - name: docker-registry
@@ -22,29 +22,29 @@ dependencies:
     repository: https://charts.helm.sh/stable
     condition: minioEnabled
   - name: platform-storage
-    version: "22.6.1"
+    version: "23.3.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-registry
-    version: "22.6.3"
+    version: "23.3.1"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-monitoring
     version: "22.7.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-container-runtime
-    version: "22.2.1"
+    version: "23.3.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-secrets
-    version: "22.6.0"
+    version: "23.3.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-reports
-    version: "23.2.3"
+    version: "23.3.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
     condition: platformReportsEnabled
   - name: platform-disks
-    version: "22.6.0"
+    version: "23.3.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-api-poller
-    version: "23.2.2"
+    version: "23.3.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-buckets
     version: "22.6.2"
