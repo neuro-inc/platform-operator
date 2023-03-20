@@ -191,6 +191,7 @@ class HelmValuesFactory:
                 },
             ],
             "persistence": {"storageClassName": platform.standard_storage_class_name},
+            "priorityClassName": platform.services_priority_class_name,
         }
 
     def _create_idle_job(self, job: IdleJobConfig) -> dict[str, Any]:
@@ -283,6 +284,7 @@ class HelmValuesFactory:
             },
             "configData": {"storage": {"delete": {"enabled": True}}},
             "podLabels": {"service": "docker-registry"},
+            "priorityClassName": platform.services_priority_class_name,
         }
         if (
             platform.registry.docker_registry_username
@@ -327,6 +329,7 @@ class HelmValuesFactory:
             "accessKey": platform.buckets.minio_access_key,
             "secretKey": platform.buckets.minio_secret_key,
             "ingress": {"enabled": False},
+            "priorityClassName": platform.services_priority_class_name,
         }
 
     def create_traefik_values(self, platform: PlatformConfig) -> dict[str, Any]:
@@ -383,6 +386,7 @@ class HelmValuesFactory:
             },
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
+            "priorityClassName": platform.services_priority_class_name,
         }
         if platform.kubernetes_version >= "1.19":
             result["ingressClass"] = {"enabled": True}
@@ -473,6 +477,7 @@ class HelmValuesFactory:
                 "ingressClassName": "traefik",
                 "hosts": [platform.ingress_url.host],
             },
+            "priorityClassName": platform.services_priority_class_name,
         }
         result.update(
             **self._create_cors_values(platform),
@@ -506,6 +511,7 @@ class HelmValuesFactory:
                 "hosts": [platform.ingress_registry_url.host],
             },
             "secrets": [],
+            "priorityClassName": platform.services_priority_class_name,
         }
         result.update(
             **self._create_cors_values(platform),
@@ -681,6 +687,7 @@ class HelmValuesFactory:
                 },
             },
             "minio": {"image": {"repository": platform.get_image("minio")}},
+            "priorityClassName": platform.services_priority_class_name,
         }
         result.update(
             **self._create_cors_values(platform),
@@ -793,6 +800,7 @@ class HelmValuesFactory:
                     }
                 }
             },
+            "priorityClassName": platform.services_priority_class_name,
             **self._create_tracing_values(platform),
         }
 
@@ -822,6 +830,7 @@ class HelmValuesFactory:
                 "ingressClassName": "traefik",
                 "hosts": [platform.ingress_url.host],
             },
+            "priorityClassName": platform.services_priority_class_name,
         }
         result.update(
             **self._create_cors_values(platform),
@@ -926,6 +935,7 @@ class HelmValuesFactory:
                         "externalLabels": {
                             "cluster": platform.cluster_name,
                         },
+                        "priorityClassName": platform.services_priority_class_name,
                     }
                 },
                 "prometheusOperator": {
@@ -946,10 +956,12 @@ class HelmValuesFactory:
                                 "repository": platform.get_image(
                                     "nginx-kube-webhook-certgen"
                                 )
-                            }
+                            },
+                            "priorityClassName": platform.services_priority_class_name,
                         }
                     },
                     "kubeletService": {"namespace": platform.namespace},
+                    "priorityClassName": platform.services_priority_class_name,
                 },
                 "kubelet": {"namespace": platform.namespace},
                 "kubeStateMetrics": {
@@ -988,6 +1000,7 @@ class HelmValuesFactory:
                         },
                     },
                 },
+                "priorityClassName": platform.services_priority_class_name,
             },
             "grafana": {
                 "image": {
@@ -1008,7 +1021,9 @@ class HelmValuesFactory:
                 },
                 "adminUser": platform.grafana_username,
                 "adminPassword": platform.grafana_password,
+                "priorityClassName": platform.services_priority_class_name,
             },
+            "priorityClassName": platform.services_priority_class_name,
         }
         result.update(**self._create_tracing_values(platform))
         prometheus_spec = result["kube-prometheus-stack"]["prometheus"][
@@ -1173,6 +1188,7 @@ class HelmValuesFactory:
                 "ingressClassName": "traefik",
                 "hosts": [platform.ingress_url.host],
             },
+            "priorityClassName": platform.services_priority_class_name,
         }
         if platform.disks_storage_class_name:
             result["disks"]["storageClassName"] = platform.disks_storage_class_name
@@ -1238,6 +1254,7 @@ class HelmValuesFactory:
                 "ingressClassName": "traefik",
                 "hosts": [platform.ingress_url.host],
             },
+            "priorityClassName": platform.services_priority_class_name,
         }
         result.update(**self._create_tracing_values(platform))
         if platform.kubernetes_provider == CloudProviderType.AZURE:
@@ -1276,6 +1293,7 @@ class HelmValuesFactory:
             },
             "secrets": [],
             "disableCreation": platform.buckets.disable_creation,
+            "priorityClassName": platform.services_priority_class_name,
         }
         result.update(
             **self._create_cors_values(platform),
