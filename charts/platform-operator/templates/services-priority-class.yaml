@@ -3,6 +3,10 @@ kind: PriorityClass
 metadata:
   name: {{ .Release.Namespace }}-services
   labels: {{ include "platformOperator.labels.standard" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/resource-policy": keep
+    "helm.sh/hook-weight": "-1"
 value: 1000
 globalDefault: false
 preemptionPolicy: Never
