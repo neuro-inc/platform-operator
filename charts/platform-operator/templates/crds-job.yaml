@@ -13,7 +13,7 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ include "platformOperator.fullname" . }}-crds
-      priorityClassName: {{ .Release.Namespace }}-services
+      priorityClassName: {{ .Release.Namespace }}-operator-hook
       containers:
         - name: update-crds
           image: {{ .Values.kubectlImage.repository }}:{{ .Values.kubectlImage.tag }}
