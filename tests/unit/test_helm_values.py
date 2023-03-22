@@ -1956,6 +1956,7 @@ class TestHelmValuesFactory:
                             {"name": "platform-docker-hub-config"},
                         ]
                     },
+                    "priorityClassName": "platform-services",
                 },
                 "prometheus-node-exporter": {
                     "image": {"repository": "ghcr.io/neuro-inc/node-exporter"},
