@@ -974,6 +974,7 @@ class HelmValuesFactory:
                             {"name": name} for name in platform.image_pull_secret_names
                         ]
                     },
+                    "priorityClassName": platform.services_priority_class_name,
                 },
                 "prometheus-node-exporter": {
                     "image": {"repository": platform.get_image("node-exporter")},
