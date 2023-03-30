@@ -120,3 +120,7 @@ release: {{ .Release.Name | quote }}
 {{- $host := include "platformOperator.cluster.host" . -}}
 {{- printf "https://metrics.%s" $host -}}
 {{- end -}}
+
+{{- define "platformOperator.kubeAuthMountRoot" -}}
+{{- printf "/var/run/secrets/kubernetes.io/serviceaccount" -}}
+{{- end -}}
