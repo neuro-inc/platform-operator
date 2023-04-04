@@ -180,7 +180,7 @@ class TestPlatformConfig:
     @pytest.fixture
     def aws_traefik_lb(self) -> dict[str, Any]:
         return {
-            "CanonicalHostedZoneNameID": "/hostedzone/traefik",
+            "CanonicalHostedZoneId": "/hostedzone/traefik",
         }
 
     def test_create_dns_config_from_traefik_load_balancer_service(

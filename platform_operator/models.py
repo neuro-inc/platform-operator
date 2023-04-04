@@ -840,7 +840,7 @@ class PlatformConfig:
             ingress_host = ingress_service["status"]["loadBalancer"]["ingress"][0][
                 "hostname"
             ]
-            ingress_zone_id = aws_ingress_lb["CanonicalHostedZoneNameID"]
+            ingress_zone_id = aws_ingress_lb["CanonicalHostedZoneId"]
             a_records.extend(
                 (
                     ARecord(
