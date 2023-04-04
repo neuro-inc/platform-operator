@@ -150,7 +150,7 @@ def aws_traefik_service() -> Service:
 @pytest.fixture
 def aws_traefik_lb() -> dict[str, Any]:
     return {
-        "CanonicalHostedZoneNameID": "/hostedzone/traefik",
+        "CanonicalHostedZoneId": "/hostedzone/traefik",
     }
 
 
