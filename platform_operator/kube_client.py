@@ -140,6 +140,7 @@ class KubeClient:
         trace_configs: list[aiohttp.TraceConfig] | None = None,
     ) -> None:
         self._config = config
+        self._token = config.auth_token
         self._trace_configs = trace_configs
         self._session: aiohttp.ClientSession | None = None
         self._endpoints = Endpoints(config.url)
@@ -167,11 +168,15 @@ class KubeClient:
         return ssl_context
 
     async def __aenter__(self) -> "KubeClient":
+        await self._init()
+        return self
+
+    async def _init(self) -> None:
         headers = {}
         if self._config.auth_type == KubeClientAuthType.TOKEN:
-            assert self._config.auth_token or self._config.auth_token_path
-            if self._config.auth_token:
-                headers = {"Authorization": "Bearer " + self._config.auth_token}
+            assert self._token or self._config.auth_token_path
+            if self._token:
+                headers = {"Authorization": "Bearer " + self._token}
             if self._config.auth_token_path:
                 headers = {
                     "Authorization": "Bearer "
@@ -189,51 +194,66 @@ class KubeClient:
             trace_configs=self._trace_configs,
             headers=headers,
         )
-        return self
 
     async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
+        await self._close()
+
+    async def _close(self) -> None:
         assert self._session
         await self._session.close()
         self._session = None
 
+    async def _reload_http_client(self) -> None:
+        await self._close()
+        self._token = None
+        await self._init()
+
+    async def _request(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        assert self._session, "client is not initialized"
+        doing_retry = kwargs.pop("doing_retry", False)
+        async with self._session.request(*args, **kwargs) as response:
+            try:
+                response.raise_for_status()
+                payload = await response.json()
+            except aiohttp.ClientResponseError as e:
+                if e.code != 401 or doing_retry:
+                    raise
+                # K8s SA's token might be stale, need to refresh it and retry
+                await self._reload_http_client()
+                kwargs["doing_retry"] = True
+                payload = await self._request(*args, **kwargs)
+        return payload
+
     async def get_node(self, name: str) -> Node:
-        assert self._session
-        async with self._session.get(self._endpoints.node(name)) as response:
-            response.raise_for_status()
-            payload = await response.json()
-            return Node(payload)
+        payload = await self._request(method="get", url=self._endpoints.node(name))
+        return Node(payload)
 
     async def create_namespace(self, name: str) -> None:
-        assert self._session
-        async with self._session.post(
-            self._endpoints.namespaces, json={"metadata": {"name": name}}
-        ) as response:
-            response.raise_for_status()
+        await self._request(
+            method="post",
+            url=self._endpoints.namespaces,
+            json={"metadata": {"name": name}},
+        )
 
     async def delete_namespace(self, name: str) -> None:
-        assert self._session
-        async with self._session.delete(
-            self._endpoints.namespace(name), json={"propagationPolicy": "Background"}
-        ) as response:
-            response.raise_for_status()
+        await self._request(
+            method="delete",
+            url=self._endpoints.namespace(name),
+            json={"propagationPolicy": "Background"},
+        )
 
     async def get_service(self, namespace: str, name: str) -> Service:
-        assert self._session
-        async with self._session.get(
-            self._endpoints.service(namespace, name)
-        ) as response:
-            response.raise_for_status()
-            payload = await response.json()
-            return Service(payload)
+        payload = await self._request(
+            method="get",
+            url=self._endpoints.service(namespace, name),
+        )
+        return Service(payload)
 
     async def get_service_account(self, namespace: str, name: str) -> dict[str, Any]:
-        assert self._session
-        async with self._session.get(
-            self._endpoints.service_account(namespace, name)
-        ) as response:
-            response.raise_for_status()
-            payload = await response.json()
-            return payload
+        return await self._request(
+            method="get",
+            url=self._endpoints.service_account(namespace, name),
+        )
 
     async def update_service_account(
         self,
@@ -250,45 +270,41 @@ class KubeClient:
             data["imagePullSecrets"] = [{"name": name} for name in image_pull_secrets]
         if not data:
             return
-        assert self._session
-        async with self._session.patch(
-            self._endpoints.service_account(namespace, name),
+        await self._request(
+            method="patch",
+            url=self._endpoints.service_account(namespace, name),
             headers={"Content-Type": "application/merge-patch+json"},
             data=json.dumps(data),
-        ) as response:
-            response.raise_for_status()
+        )
 
     async def create_secret(self, namespace: str, payload: dict[str, Any]) -> None:
-        assert self._session
-        async with self._session.post(
-            self._endpoints.secrets(namespace), json=payload
-        ) as response:
-            response.raise_for_status()
+        await self._request(
+            method="post",
+            url=self._endpoints.secrets(namespace),
+            json=payload,
+        )
 
     async def update_secret(
         self, namespace: str, name: str, payload: dict[str, Any]
     ) -> None:
-        assert self._session
-        async with self._session.put(
-            self._endpoints.secret(namespace, name), json=payload
-        ) as response:
-            response.raise_for_status()
+        await self._request(
+            method="put",
+            url=self._endpoints.secret(namespace, name),
+            json=payload,
+        )
 
     async def delete_secret(self, namespace: str, name: str) -> None:
-        assert self._session
-        async with self._session.delete(
-            self._endpoints.secret(namespace, name)
-        ) as response:
-            response.raise_for_status()
+        await self._request(
+            method="delete",
+            url=self._endpoints.secret(namespace, name),
+        )
 
     async def get_secret(self, namespace: str, name: str) -> Secret:
-        assert self._session
-        async with self._session.get(
-            self._endpoints.secret(namespace, name)
-        ) as response:
-            response.raise_for_status()
-            payload = await response.json()
-            return Secret(self._decode_secret_data(payload))
+        payload = await self._request(
+            method="get",
+            url=self._endpoints.secret(namespace, name),
+        )
+        return Secret(self._decode_secret_data(payload))
 
     def _encode_secret_data(self, secret: dict[str, Any]) -> dict[str, Any]:
         secret = dict(**secret)
@@ -320,13 +336,11 @@ class KubeClient:
             query["labelSelector"] = ",".join(
                 f"{key}={value}" for key, value in label_selector.items()
             )
-        assert self._session
-        async with self._session.get(
-            self._endpoints.pods(namespace).with_query(**query)
-        ) as response:
-            response.raise_for_status()
-            payload = await response.json()
-            return payload["items"]
+        payload = await self._request(
+            method="get",
+            url=self._endpoints.pods(namespace).with_query(**query),
+        )
+        return payload["items"]
 
     async def wait_till_pods_deleted(
         self,
@@ -341,43 +355,38 @@ class KubeClient:
             await asyncio.sleep(interval_secs)
 
     async def create_platform(self, namespace: str, payload: dict[str, Any]) -> None:
-        assert self._session
-        async with self._session.post(
-            self._endpoints.platforms(namespace=namespace), json=payload
-        ) as response:
-            response.raise_for_status()
+        await self._request(
+            method="post",
+            url=self._endpoints.platforms(namespace=namespace),
+            json=payload,
+        )
 
     async def delete_platform(self, namespace: str, name: str) -> None:
-        assert self._session
-        async with self._session.delete(
-            self._endpoints.platform(namespace, name)
-        ) as response:
-            response.raise_for_status()
+        await self._request(
+            method="delete", url=self._endpoints.platform(namespace, name)
+        )
 
     async def get_platform_status(
         self, namespace: str, name: str
     ) -> dict[str, Any] | None:
-        assert self._session
-        async with self._session.get(
-            self._endpoints.platform(namespace, name) / "status"
-        ) as response:
-            response.raise_for_status()
-            payload = await response.json()
-            if "status" not in payload:
-                return None
-            status_payload = payload["status"]
-            return status_payload
+        payload = await self._request(
+            method="get",
+            url=self._endpoints.platform(namespace, name) / "status",
+        )
+        if "status" not in payload:
+            return None
+        status_payload = payload["status"]
+        return status_payload
 
     async def update_platform_status(
         self, namespace: str, name: str, payload: dict[str, Any]
     ) -> None:
-        assert self._session
-        async with self._session.patch(
-            self._endpoints.platform(namespace, name) / "status",
+        await self._request(
+            method="patch",
+            url=self._endpoints.platform(namespace, name) / "status",
             headers={"Content-Type": "application/merge-patch+json"},
             data=json.dumps({"status": payload}),
-        ) as response:
-            response.raise_for_status()
+        )
 
     async def acquire_lock(
         self,
