@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
+import aiobotocore.session
 import moto.server
 import pytest
 from werkzeug.serving import make_server
@@ -49,9 +50,18 @@ def create_app_server(app: Any, port: int = 8080) -> Iterator[AppAddress]:
 @pytest.fixture(scope="session")
 def elb_endpoint_url() -> Iterator[URL]:
     app = moto.server.DomainDispatcherApplication(
-        moto.server.create_backend_app, service="elb"
+        moto.server.create_backend_app, service="elbv2"
     )
     with create_app_server(app, port=5000) as api_address:
+        yield URL(f"http://{api_address.host}:{api_address.port}")
+
+
+@pytest.fixture(scope="session")
+def ec2_endpoint_url() -> Iterator[URL]:
+    app = moto.server.DomainDispatcherApplication(
+        moto.server.create_backend_app, service="ec2"
+    )
+    with create_app_server(app, port=5001) as api_address:
         yield URL(f"http://{api_address.host}:{api_address.port}")
 
 
@@ -79,5 +89,20 @@ async def elb_client(
         access_key_id=aws_config["access_key_id"],
         secret_access_key=aws_config["secret_access_key"],
         endpoint_url=elb_endpoint_url,
+    ) as client:
+        yield client
+
+
+@pytest.fixture
+async def ec2_client(
+    aws_config: dict[str, str], ec2_endpoint_url: URL
+) -> AsyncIterator[aiobotocore.session.AioBaseClient]:
+    session = aiobotocore.session.get_session()
+    async with session.create_client(
+        "ec2",
+        region_name=aws_config["region"],
+        aws_access_key_id=aws_config["access_key_id"],
+        aws_secret_access_key=aws_config["secret_access_key"],
+        endpoint_url=str(ec2_endpoint_url),
     ) as client:
         yield client

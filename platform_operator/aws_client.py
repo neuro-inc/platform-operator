@@ -31,7 +31,9 @@ class AwsElbClient:
             kwargs["aws_secret_access_key"] = self._secret_access_key
         if self._endpoint_url:
             kwargs["endpoint_url"] = str(self._endpoint_url)
-        context = self._session.create_client("elb", region_name=self._region, **kwargs)
+        context = self._session.create_client(
+            "elbv2", region_name=self._region, **kwargs
+        )
         self._client = await context.__aenter__()
         return self
 
@@ -49,7 +51,7 @@ class AwsElbClient:
     ) -> dict[str, Any] | None:
         paginator = self._client.get_paginator("describe_load_balancers")
         async for page in paginator.paginate():
-            for lb in page.get("LoadBalancerDescriptions", []):
+            for lb in page.get("LoadBalancers", []):
                 if lb["DNSName"] == dns_name:
                     return lb
         return None
