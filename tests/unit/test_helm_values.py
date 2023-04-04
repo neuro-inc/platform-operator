@@ -626,7 +626,10 @@ class TestHelmValuesFactory:
                 "requests": {"cpu": "250m", "memory": "256Mi"},
                 "limits": {"cpu": "1000m", "memory": "1Gi"},
             },
-            "service": {"type": "LoadBalancer"},
+            "service": {
+                "type": "LoadBalancer",
+                "annotations": {},
+            },
             "ports": {
                 "web": {"redirectTo": "websecure"},
                 "websecure": {"tls": {"enabled": True}},
@@ -692,6 +695,53 @@ class TestHelmValuesFactory:
         )
 
         assert result["ingressClass"]["enabled"] is True
+
+    def test_create_gcp_traefik_values_with_ingress_load_balancer_source_ranges(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_traefik_values(
+            replace(
+                gcp_platform_config, ingress_load_balancer_source_ranges=["0.0.0.0/0"]
+            )
+        )
+
+        assert result["service"]["loadBalancerSourceRanges"] == ["0.0.0.0/0"]
+
+    def test_create_aws_traefik_values(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_traefik_values(aws_platform_config)
+
+        assert result["service"]["annotations"] == {
+            "service.beta.kubernetes.io/aws-load-balancer-type": "external",
+            "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": (
+                "instance"
+            ),
+            "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
+        }
+
+    def test_create_aws_traefik_values_with_service_annotations(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        aws_platform_config = replace(
+            aws_platform_config,
+            ingress_service_annotations={
+                "service.beta.kubernetes.io/aws-load-balancer-scheme": "internal",
+                "service.beta.kubernetes.io/"
+                "aws-load-balancer-manage-backend-security-group-rules": "false",
+            },
+        )
+        result = factory.create_traefik_values(aws_platform_config)
+
+        assert result["service"]["annotations"] == {
+            "service.beta.kubernetes.io/aws-load-balancer-type": "external",
+            "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": (
+                "instance"
+            ),
+            "service.beta.kubernetes.io/aws-load-balancer-scheme": "internal",
+            "service.beta.kubernetes.io/"
+            "aws-load-balancer-manage-backend-security-group-rules": "false",
+        }
 
     def test_create_on_prem_traefik_values_with_custom_ports(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory

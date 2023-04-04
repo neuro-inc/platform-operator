@@ -349,7 +349,10 @@ class HelmValuesFactory:
                 "requests": {"cpu": "250m", "memory": "256Mi"},
                 "limits": {"cpu": "1000m", "memory": "1Gi"},
             },
-            "service": {"type": platform.ingress_service_type.value},
+            "service": {
+                "type": platform.ingress_service_type.value,
+                "annotations": {},
+            },
             "ports": {
                 "web": {"redirectTo": "websecure"},
                 "websecure": {"tls": {"enabled": True}},
@@ -390,6 +393,20 @@ class HelmValuesFactory:
         }
         if platform.kubernetes_version >= "1.19":
             result["ingressClass"] = {"enabled": True}
+        if platform.kubernetes_provider == CloudProviderType.AWS:
+            result["service"]["annotations"] = {
+                "service.beta.kubernetes.io/aws-load-balancer-type": "external",
+                "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": (
+                    "instance"
+                ),
+                "service.beta.kubernetes.io/aws-load-balancer-scheme": (
+                    "internet-facing"
+                ),
+            }
+        if platform.ingress_load_balancer_source_ranges:
+            result["service"][
+                "loadBalancerSourceRanges"
+            ] = platform.ingress_load_balancer_source_ranges
         if platform.ingress_service_type == IngressServiceType.NODE_PORT:
             result["rollingUpdate"] = {"maxUnavailable": 1, "maxSurge": 0}
             ports = result["ports"]
@@ -399,6 +416,7 @@ class HelmValuesFactory:
             if platform.ingress_host_port_http and platform.ingress_host_port_https:
                 ports["web"]["hostPort"] = platform.ingress_host_port_http
                 ports["websecure"]["hostPort"] = platform.ingress_host_port_https
+        result["service"]["annotations"].update(platform.ingress_service_annotations)
         return result
 
     def _create_platform_url_value(

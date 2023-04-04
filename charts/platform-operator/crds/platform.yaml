@@ -127,6 +127,15 @@ spec:
                   serviceType:
                     type: string
                     enum: [LoadBalancer, NodePort]
+                  serviceAnnotations:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                    additionalProperties:
+                      type: string
+                  loadBalancerSourceRanges:
+                    type: array
+                    items:
+                      type: string
                   nodePorts:
                     type: object
                     required: [http, https]
