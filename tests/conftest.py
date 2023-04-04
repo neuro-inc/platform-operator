@@ -534,6 +534,8 @@ def gcp_platform_config(
         ],
         ingress_service_type=IngressServiceType.LOAD_BALANCER,
         ingress_service_name="traefik",
+        ingress_service_annotations={},
+        ingress_load_balancer_source_ranges=[],
         ingress_node_port_http=None,
         ingress_node_port_https=None,
         ingress_host_port_http=None,

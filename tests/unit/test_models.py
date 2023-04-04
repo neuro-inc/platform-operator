@@ -510,6 +510,38 @@ class TestPlatformConfigFactory:
             ingress_host_port_https=443,
         )
 
+    def test_gcp_platform_config_with_ingress_service_annotations(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: kopf.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        gcp_platform_body["spec"]["ingressController"] = {
+            "serviceAnnotations": {"key": "value"}
+        }
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result == replace(
+            gcp_platform_config, ingress_service_annotations={"key": "value"}
+        )
+
+    def test_gcp_platform_config_with_ingress_load_balancer_source_ranges(
+        self,
+        factory: PlatformConfigFactory,
+        gcp_platform_body: kopf.Body,
+        gcp_cluster: Cluster,
+        gcp_platform_config: PlatformConfig,
+    ) -> None:
+        gcp_platform_body["spec"]["ingressController"] = {
+            "loadBalancerSourceRanges": ["0.0.0.0/0"]
+        }
+        result = factory.create(gcp_platform_body, gcp_cluster)
+
+        assert result == replace(
+            gcp_platform_config, ingress_load_balancer_source_ranges=["0.0.0.0/0"]
+        )
+
     def test_gcp_platform_config_with_ingress_controller_namespaces_unique(
         self,
         factory: PlatformConfigFactory,

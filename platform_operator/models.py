@@ -507,6 +507,14 @@ class IngressControllerSpec(dict[str, Any]):
         return self._spec.get("serviceType", "")
 
     @property
+    def service_annotations(self) -> dict[str, str]:
+        return self._spec.get("serviceAnnotations", {})
+
+    @property
+    def load_balancer_source_ranges(self) -> list[str]:
+        return self._spec.get("loadBalancerSourceRanges", [])
+
+    @property
     def public_ips(self) -> Sequence[IPv4Address]:
         return [IPv4Address(ip) for ip in self._spec.get("publicIPs", [])]
 
@@ -765,6 +773,8 @@ class PlatformConfig:
     ingress_host_port_https: int | None
     ingress_service_type: IngressServiceType
     ingress_service_name: str
+    ingress_service_annotations: dict[str, str]
+    ingress_load_balancer_source_ranges: list[str]
     ingress_namespaces: Sequence[str]
     ingress_ssl_cert_data: str
     ingress_ssl_cert_key_data: str
@@ -1003,6 +1013,10 @@ class PlatformConfigFactory:
                 spec.ingress_controller.service_type or IngressServiceType.LOAD_BALANCER
             ),
             ingress_service_name="traefik",
+            ingress_service_annotations=spec.ingress_controller.service_annotations,
+            ingress_load_balancer_source_ranges=(
+                spec.ingress_controller.load_balancer_source_ranges
+            ),
             ingress_namespaces=sorted(
                 {
                     self._config.platform_namespace,
