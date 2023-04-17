@@ -14,11 +14,11 @@ lint: format
 	mypy platform_operator tests
 
 test_unit:
-	pytest -vv tests/unit
+	pytest -vv --cov=platform_operator --cov-report xml:.coverage-unit.xml tests/unit
 
 test_integration:
 	kubectl --context minikube apply -f charts/platform-operator/crds
-	pytest -vv --log-level=INFO tests/integration
+	pytest -vv --log-level=INFO --cov=platform_operator --cov-report xml:.coverage-integration.xml tests/integration
 docker_build:
 	rm -rf build dist
 	pip install -U build
