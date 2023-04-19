@@ -208,7 +208,12 @@ class KubeClient:
         self._token = None
         await self._init()
 
+    async def init_if_needed(self) -> None:
+        if not self._session or self._session.closed:
+            await self._init()
+
     async def _request(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        await self.init_if_needed()
         assert self._session, "client is not initialized"
         doing_retry = kwargs.pop("doing_retry", False)
         async with self._session.request(*args, **kwargs) as response:
