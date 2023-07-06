@@ -21,7 +21,7 @@ class AwsElbClient:
         self._secret_access_key = secret_access_key
         self._endpoint_url = endpoint_url
 
-    async def __aenter__(self, *args: Any, **kwargs: Any) -> "AwsElbClient":
+    async def __aenter__(self, *args: Any, **kwargs: Any) -> AwsElbClient:
         # On AWS the nodes will be configured to assume the correct role and no
         # credentials need to be passed.
         kwargs = {}
