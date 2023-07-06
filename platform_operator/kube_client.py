@@ -167,7 +167,7 @@ class KubeClient:
             )
         return ssl_context
 
-    async def __aenter__(self) -> "KubeClient":
+    async def __aenter__(self) -> KubeClient:
         await self._init()
         return self
 
