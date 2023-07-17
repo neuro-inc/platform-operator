@@ -45,8 +45,9 @@ class KubeConfig:
     auth_type: KubeClientAuthType = KubeClientAuthType.NONE
     auth_cert_path: Path | None = None
     auth_cert_key_path: Path | None = None
-    auth_token_path: Path | None = None
     auth_token: str | None = None
+    auth_token_path: Path | None = None
+    auth_token_update_interval_s: int = 300
     conn_timeout_s: int = 300
     read_timeout_s: int = 100
     conn_pool_size: int = 100
