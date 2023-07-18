@@ -6,7 +6,7 @@ import logging
 import ssl
 from base64 import b64decode, b64encode
 from collections.abc import AsyncIterator, Iterable, Sequence
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
@@ -143,6 +143,7 @@ class KubeClient:
         self._token = config.auth_token
         self._trace_configs = trace_configs
         self._session: aiohttp.ClientSession | None = None
+        self._token_updater_task: asyncio.Task[None] | None = None
         self._endpoints = Endpoints(config.url)
 
     @property
@@ -172,16 +173,9 @@ class KubeClient:
         return self
 
     async def _init(self) -> None:
-        headers = {}
-        if self._config.auth_type == KubeClientAuthType.TOKEN:
-            assert self._token or self._config.auth_token_path
-            if self._token:
-                headers = {"Authorization": "Bearer " + self._token}
-            if self._config.auth_token_path:
-                headers = {
-                    "Authorization": "Bearer "
-                    + self._config.auth_token_path.read_text()
-                }
+        if self._config.auth_token_path:
+            self._token = self._config.auth_token_path.read_text()
+            self._token_updater_task = asyncio.create_task(self._start_token_updater())
         connector = aiohttp.TCPConnector(
             limit=self._config.conn_pool_size, ssl=self._create_ssl_context()
         )
@@ -192,42 +186,49 @@ class KubeClient:
             connector=connector,
             timeout=timeout,
             trace_configs=self._trace_configs,
-            headers=headers,
         )
 
+    async def _start_token_updater(self) -> None:
+        if not self._config.auth_token_path:
+            return
+        while True:
+            try:
+                token = self._config.auth_token_path.read_text()
+                if token != self._token:
+                    self._token = token
+                    logger.info("Kube token was refreshed")
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.exception("Failed to update kube token: %s", exc)
+            await asyncio.sleep(self._config.auth_token_update_interval_s)
+
     async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
-        await self._close()
+        await self.close()
 
-    async def _close(self) -> None:
-        assert self._session
-        await self._session.close()
-        self._session = None
+    async def close(self) -> None:
+        if self._session:
+            await self._session.close()
+            self._session = None
+        if self._token_updater_task:
+            self._token_updater_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await self._token_updater_task
+            self._token_updater_task = None
 
-    async def _reload_http_client(self) -> None:
-        await self._close()
-        self._token = None
-        await self._init()
-
-    async def init_if_needed(self) -> None:
-        if not self._session or self._session.closed:
-            await self._init()
+    def _create_headers(self, headers: dict[str, Any] | None = None) -> dict[str, Any]:
+        headers = dict(headers) if headers else {}
+        if self._config.auth_type == KubeClientAuthType.TOKEN and self._token:
+            headers["Authorization"] = "Bearer " + self._token
+        return headers
 
     async def _request(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        await self.init_if_needed()
+        headers = self._create_headers(kwargs.pop("headers", None))
         assert self._session, "client is not initialized"
-        doing_retry = kwargs.pop("doing_retry", False)
-        async with self._session.request(*args, **kwargs) as response:
-            try:
-                response.raise_for_status()
-                payload = await response.json()
-            except aiohttp.ClientResponseError as e:
-                if e.code != 401 or doing_retry:
-                    raise
-                # K8s SA's token might be stale, need to refresh it and retry
-                await self._reload_http_client()
-                kwargs["doing_retry"] = True
-                payload = await self._request(*args, **kwargs)
-        return payload
+        async with self._session.request(*args, headers=headers, **kwargs) as response:
+            response.raise_for_status()
+            payload = await response.json()
+            return payload
 
     async def get_node(self, name: str) -> Node:
         payload = await self._request(method="get", url=self._endpoints.node(name))
