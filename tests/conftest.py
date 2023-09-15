@@ -6,7 +6,6 @@ from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv4Network
-from typing import Any
 
 import kopf
 import pytest
@@ -598,7 +597,7 @@ def gcp_platform_config(
 @pytest.fixture
 def aws_platform_config(
     gcp_platform_config: PlatformConfig,
-    resource_pool_type_factory: Callable[..., dict[str, Any]],
+    resource_pool_type_factory: Callable[..., ResourcePoolType],
 ) -> PlatformConfig:
     return replace(
         gcp_platform_config,
@@ -628,7 +627,7 @@ def aws_platform_config(
 @pytest.fixture
 def azure_platform_config(
     gcp_platform_config: PlatformConfig,
-    resource_pool_type_factory: Callable[..., dict[str, Any]],
+    resource_pool_type_factory: Callable[..., ResourcePoolType],
 ) -> PlatformConfig:
     return replace(
         gcp_platform_config,
@@ -668,7 +667,7 @@ def azure_platform_config(
 @pytest.fixture
 def on_prem_platform_config(
     gcp_platform_config: PlatformConfig,
-    resource_pool_type_factory: Callable[..., dict[str, Any]],
+    resource_pool_type_factory: Callable[..., ResourcePoolType],
     cluster_name: str,
 ) -> PlatformConfig:
     return replace(
