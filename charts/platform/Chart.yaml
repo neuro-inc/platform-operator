@@ -44,7 +44,7 @@ dependencies:
     version: "23.7.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-api-poller
-    version: "23.7.2"
+    version: "23.9.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-buckets
     version: "23.7.0"
