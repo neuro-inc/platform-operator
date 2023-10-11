@@ -29,6 +29,7 @@ nodeLabels:
   job: platform.neuromation.io/job
 
 inotify:
+  maxInstances: 65536
   maxWatchers: 65536
 
 nvidiaGpuDriver:
