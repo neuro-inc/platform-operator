@@ -1620,14 +1620,7 @@ class TestHelmValuesFactory:
             "fluentbit": {
                 "image": {"repository": "ghcr.io/neuro-inc/fluent-bit"},
             },
-            "fluentd": {
-                "image": {"repository": "ghcr.io/neuro-inc/fluentd"},
-                "persistence": {
-                    "enabled": True,
-                    "storageClassName": "platform-standard-topology-aware",
-                },
-            },
-            "minio": {"image": {"repository": "ghcr.io/neuro-inc/minio"}},
+            "minioGateway": {"image": {"repository": "ghcr.io/neuro-inc/minio"}},
             "logs": {
                 "persistence": {
                     "type": "gcp",
