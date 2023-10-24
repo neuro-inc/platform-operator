@@ -697,14 +697,7 @@ class HelmValuesFactory:
             },
             "containerRuntime": {"name": self._container_runtime},
             "fluentbit": {"image": {"repository": platform.get_image("fluent-bit")}},
-            "fluentd": {
-                "image": {"repository": platform.get_image("fluentd")},
-                "persistence": {
-                    "enabled": True,
-                    "storageClassName": platform.standard_storage_class_name,
-                },
-            },
-            "minio": {"image": {"repository": platform.get_image("minio")}},
+            "minioGateway": {"image": {"repository": platform.get_image("minio")}},
             "priorityClassName": platform.services_priority_class_name,
         }
         result.update(
