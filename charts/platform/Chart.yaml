@@ -6,7 +6,7 @@ version: 1.0.0
 appVersion: 1.0.0
 dependencies:
   - name: traefik
-    version: "10.14.1"
+    version: "25.0.0"
     repository: https://helm.traefik.io/traefik
     condition: traefikEnabled
   - name: acme
