@@ -19,6 +19,7 @@ test_unit:
 test_integration:
 	kubectl --context minikube apply -f charts/platform-operator/crds
 	pytest -vv --log-level=INFO --cov=platform_operator --cov-report xml:.coverage.integration.xml tests/integration
+
 docker_build:
 	rm -rf build dist
 	pip install -U build

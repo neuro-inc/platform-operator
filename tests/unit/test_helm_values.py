@@ -91,6 +91,12 @@ class TestHelmValuesFactory:
                 "jobFallbackHost": "default.jobs-dev.neu.ro",
                 "registryHost": f"registry.{cluster_name}.org.neu.ro",
                 "ingressAuthHost": "platformingressauth",
+                "cors": {
+                    "originList": [
+                        "https://release--neuro-web.netlify.app",
+                        "https://app.neu.ro",
+                    ]
+                },
             },
             "jobs": {
                 "namespace": {"create": True, "name": "platform-jobs"},
@@ -612,6 +618,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "traefik",
             "fullnameOverride": "traefik",
+            "instanceLabelOverride": "traefik",
             "image": {"name": "ghcr.io/neuro-inc/traefik"},
             "deployment": {
                 "replicas": 2,
@@ -637,6 +644,8 @@ class TestHelmValuesFactory:
             "additionalArguments": [
                 "--entryPoints.websecure.proxyProtocol.insecure=true",
                 "--entryPoints.websecure.forwardedHeaders.insecure=true",
+                "--entryPoints.websecure.http.middlewares="
+                "platform-platform-cors@kubernetescrd",
                 "--providers.file.filename=/etc/traefik/dynamic/config.yaml",
             ],
             "volumes": [
@@ -799,12 +808,6 @@ class TestHelmValuesFactory:
                 },
             },
             "storages": [{"type": "pvc", "path": "", "claimName": "platform-storage"}],
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
-            },
             "sentry": {
                 "dsn": "https://sentry",
                 "clusterName": gcp_platform_config.cluster_name,
@@ -878,12 +881,6 @@ class TestHelmValuesFactory:
             "bucketProvider": {
                 "type": "aws",
                 "aws": {"regionName": "us-east-1", "s3RoleArn": ""},
-            },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
             },
             "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
@@ -973,12 +970,6 @@ class TestHelmValuesFactory:
                     },
                 },
             },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
-            },
             "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
                 "annotations": {
@@ -1063,12 +1054,6 @@ class TestHelmValuesFactory:
                     },
                 },
             },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
-            },
             "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
                 "annotations": {
@@ -1126,12 +1111,6 @@ class TestHelmValuesFactory:
                     "publicUrl": f"https://blob.{cluster_name}.org.neu.ro",
                 },
             },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
-            },
             "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
                 "annotations": {
@@ -1185,12 +1164,6 @@ class TestHelmValuesFactory:
                         }
                     }
                 },
-            },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
             },
             "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
@@ -1248,12 +1221,6 @@ class TestHelmValuesFactory:
                     },
                     "url": "https://accountName2.blob.core.windows.net",
                 },
-            },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
             },
             "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
@@ -1364,12 +1331,6 @@ class TestHelmValuesFactory:
                 "clusterName": gcp_platform_config.cluster_name,
                 "sampleRate": 0.1,
             },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
-            },
             "priorityClassName": "platform-services",
         }
 
@@ -1416,7 +1377,6 @@ class TestHelmValuesFactory:
                 "project": "neuro",
             },
             "sentry": mock.ANY,
-            "cors": mock.ANY,
             "priorityClassName": "platform-services",
         }
 
@@ -1488,7 +1448,6 @@ class TestHelmValuesFactory:
                 "url": "https://platform.azurecr.io",
             },
             "sentry": mock.ANY,
-            "cors": mock.ANY,
             "priorityClassName": "platform-services",
         }
 
@@ -1560,7 +1519,6 @@ class TestHelmValuesFactory:
                 },
             },
             "sentry": mock.ANY,
-            "cors": mock.ANY,
             "priorityClassName": "platform-services",
         }
 
@@ -1609,12 +1567,6 @@ class TestHelmValuesFactory:
                 "enabled": True,
                 "ingressClassName": "traefik",
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
-            },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
             },
             "containerRuntime": {"name": "docker"},
             "fluentbit": {
@@ -1848,12 +1800,6 @@ class TestHelmValuesFactory:
                         }
                     }
                 },
-            },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
             },
             "sentry": {
                 "dsn": "https://sentry",
@@ -2319,12 +2265,6 @@ class TestHelmValuesFactory:
                         "secretKeyRef": {"key": "token", "name": "platform-token"}
                     }
                 },
-            },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
             },
             "service": {
                 "annotations": {

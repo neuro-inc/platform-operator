@@ -114,6 +114,8 @@ class HelmValuesFactory:
         }
         if platform.ingress_acme_enabled:
             result["acme"] = self.create_acme_values(platform)
+        if platform.ingress_cors_origins:
+            result["ingress"]["cors"] = {"originList": platform.ingress_cors_origins}
         if platform.docker_config.create_secret:
             result["dockerConfigSecret"] = {
                 "create": True,
@@ -336,6 +338,7 @@ class HelmValuesFactory:
         result: dict[str, Any] = {
             "nameOverride": "traefik",
             "fullnameOverride": "traefik",
+            "instanceLabelOverride": "traefik",
             "image": {"name": platform.get_image("traefik")},
             "deployment": {
                 "replicas": platform.ingress_controller_replicas,
@@ -360,6 +363,8 @@ class HelmValuesFactory:
             "additionalArguments": [
                 "--entryPoints.websecure.proxyProtocol.insecure=true",
                 "--entryPoints.websecure.forwardedHeaders.insecure=true",
+                "--entryPoints.websecure.http.middlewares="
+                f"{platform.namespace}-{platform.release_name}-cors@kubernetescrd",
                 "--providers.file.filename=/etc/traefik/dynamic/config.yaml",
             ],
             "volumes": [
@@ -444,12 +449,6 @@ class HelmValuesFactory:
             "token": {"value": ""},
         }
 
-    def _create_cors_values(self, platform: PlatformConfig) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        if platform.ingress_cors_origins:
-            result["cors"] = {"origins": platform.ingress_cors_origins}
-        return result
-
     def _create_tracing_values(self, platform: PlatformConfig) -> dict[str, Any]:
         if not platform.sentry_dsn:
             return {}
@@ -497,10 +496,7 @@ class HelmValuesFactory:
             },
             "priorityClassName": platform.services_priority_class_name,
         }
-        result.update(
-            **self._create_cors_values(platform),
-            **self._create_tracing_values(platform),
-        )
+        result.update(**self._create_tracing_values(platform))
         return result
 
     def create_platform_registry_values(
@@ -531,10 +527,7 @@ class HelmValuesFactory:
             "secrets": [],
             "priorityClassName": platform.services_priority_class_name,
         }
-        result.update(
-            **self._create_cors_values(platform),
-            **self._create_tracing_values(platform),
-        )
+        result.update(**self._create_tracing_values(platform))
         if platform.registry.provider == RegistryProvider.GCP:
             gcp_key_secret_name = f"{platform.release_name}-registry-gcp-key"
             result["upstreamRegistry"] = {
@@ -700,10 +693,7 @@ class HelmValuesFactory:
             "minioGateway": {"image": {"repository": platform.get_image("minio")}},
             "priorityClassName": platform.services_priority_class_name,
         }
-        result.update(
-            **self._create_cors_values(platform),
-            **self._create_tracing_values(platform),
-        )
+        result.update(**self._create_tracing_values(platform))
         if platform.buckets.provider == BucketsProvider.GCP:
             result["logs"] = {
                 "persistence": {
@@ -843,10 +833,7 @@ class HelmValuesFactory:
             },
             "priorityClassName": platform.services_priority_class_name,
         }
-        result.update(
-            **self._create_cors_values(platform),
-            **self._create_tracing_values(platform),
-        )
+        result.update(**self._create_tracing_values(platform))
         return result
 
     def create_platform_reports_values(
@@ -1204,10 +1191,7 @@ class HelmValuesFactory:
         }
         if platform.disks_storage_class_name:
             result["disks"]["storageClassName"] = platform.disks_storage_class_name
-        result.update(
-            **self._create_cors_values(platform),
-            **self._create_tracing_values(platform),
-        )
+        result.update(**self._create_tracing_values(platform))
         return result
 
     def create_platform_api_poller_values(
@@ -1307,10 +1291,7 @@ class HelmValuesFactory:
             "disableCreation": platform.buckets.disable_creation,
             "priorityClassName": platform.services_priority_class_name,
         }
-        result.update(
-            **self._create_cors_values(platform),
-            **self._create_tracing_values(platform),
-        )
+        result.update(**self._create_tracing_values(platform))
         if platform.buckets.provider == BucketsProvider.AWS:
             result["bucketProvider"] = {
                 "type": "aws",

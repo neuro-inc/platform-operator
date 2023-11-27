@@ -1,0 +1,36 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-cors
+  labels:
+    {{- include "platform.labels.standard" . | nindent 4 }}
+    service: traefik
+spec:
+  headers:
+    accessControlAllowCredentials: true
+    accessControlAllowMethods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - HEAD
+      - OPTIONS
+    accessControlAllowHeaders:
+      - authorization
+      - accept
+      - accept-language
+      - content-language
+      - last-event-id
+      - content-type
+      - x-requested-with
+    {{- with .Values.ingress.cors.originList }}
+    accessControlAllowOriginList:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.ingress.cors.originListRegex }}
+    accessControlAllowOriginListRegex:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    accessControlMaxAge: 100
+    addVaryHeader: true

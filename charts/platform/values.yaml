@@ -72,6 +72,10 @@ ingress: {}
   # ingressAuthHost: staging.neu.ro
   # minioHost: staging.neu.ro
 
+  cors:
+    originList: []
+    originListRegex: []
+
 jobs:
   namespace:
     create: true
