@@ -520,7 +520,6 @@ class TestHelmValuesFactory:
                     f"*.{cluster_name}.org.neu.ro",
                     f"*.jobs.{cluster_name}.org.neu.ro",
                 ],
-                "notifyHook": "neuro",
                 "sslCertSecretName": "platform-ssl-cert",
                 "rolloutDeploymentName": "traefik",
             },
@@ -1821,10 +1820,6 @@ class TestHelmValuesFactory:
                 "nodePool": "platform.neuromation.io/nodepool",
                 "preemptible": "platform.neuromation.io/preemptible",
             },
-            "objectStore": {
-                "supported": True,
-                "configMapName": "thanos-object-storage-config",
-            },
             "image": {"repository": "ghcr.io/neuro-inc/platform-reports"},
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
@@ -1865,23 +1860,31 @@ class TestHelmValuesFactory:
                     },
                 }
             },
+            "prometheusRemoteStorageEnabled": True,
             "kube-prometheus-stack": {
                 "global": {
+                    "imageRegistry": "ghcr.io",
                     "imagePullSecrets": [
                         {"name": "platform-docker-config"},
                         {"name": "platform-docker-hub-config"},
-                    ]
+                    ],
                 },
                 "prometheus": {
                     "prometheusSpec": {
-                        "image": {"repository": "ghcr.io/neuro-inc/prometheus"},
+                        "image": {
+                            "registry": "ghcr.io",
+                            "repository": "neuro-inc/prometheus",
+                        },
                         "retention": "3d",
                         "thanos": {
-                            "image": "ghcr.io/neuro-inc/thanos:v0.24.0",
-                            "version": "v0.14.0",
                             "objectStorageConfig": {
-                                "name": "thanos-object-storage-config",
-                                "key": "thanos-object-storage.yaml",
+                                "secret": {
+                                    "type": "GCS",
+                                    "config": {
+                                        "bucket": "job-metrics",
+                                        "service_account": "{}",
+                                    },
+                                }
                             },
                         },
                         "storageSpec": {
@@ -1900,23 +1903,25 @@ class TestHelmValuesFactory:
                     }
                 },
                 "prometheusOperator": {
-                    "image": {"repository": "ghcr.io/neuro-inc/prometheus-operator"},
-                    "prometheusConfigReloaderImage": {
-                        "repository": ("ghcr.io/neuro-inc/prometheus-config-reloader")
+                    "image": {
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/prometheus-operator",
                     },
-                    "configmapReloadImage": {
-                        "repository": "ghcr.io/neuro-inc/configmap-reload"
+                    "prometheusConfigReloader": {
+                        "image": {
+                            "registry": "ghcr.io",
+                            "repository": "neuro-inc/prometheus-config-reloader",
+                        }
                     },
-                    "kubectlImage": {"repository": "ghcr.io/neuro-inc/kubectl"},
-                    "tlsProxy": {
-                        "image": {"repository": "ghcr.io/neuro-inc/ghostunnel"}
+                    "thanosImage": {
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/thanos",
                     },
                     "admissionWebhooks": {
                         "patch": {
                             "image": {
-                                "repository": (
-                                    "ghcr.io/neuro-inc/nginx-kube-webhook-certgen"
-                                )
+                                "registry": "ghcr.io",
+                                "repository": "neuro-inc/kube-webhook-certgen",
                             },
                             "priorityClassName": "platform-services",
                         }
@@ -1938,7 +1943,10 @@ class TestHelmValuesFactory:
                     }
                 },
                 "kube-state-metrics": {
-                    "image": {"repository": "ghcr.io/neuro-inc/kube-state-metrics"},
+                    "image": {
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/kube-state-metrics",
+                    },
                     "serviceAccount": {
                         "imagePullSecrets": [
                             {"name": "platform-docker-config"},
@@ -1946,9 +1954,61 @@ class TestHelmValuesFactory:
                         ]
                     },
                     "priorityClassName": "platform-services",
+                    "rbac": {
+                        "extraRules": [
+                            {
+                                "apiGroups": ["neuromation.io"],
+                                "resources": ["platforms"],
+                                "verbs": ["list", "watch"],
+                            }
+                        ]
+                    },
+                    "customResourceState": {
+                        "enabled": True,
+                        "config": {
+                            "spec": {
+                                "resources": [
+                                    {
+                                        "groupVersionKind": {
+                                            "group": "neuromation.io",
+                                            "version": "*",
+                                            "kind": "Platform",
+                                        },
+                                        "labelsFromPath": {
+                                            "name": ["metadata", "name"],
+                                        },
+                                        "metricNamePrefix": "kube_platform",
+                                        "metrics": [
+                                            {
+                                                "name": "status_phase",
+                                                "help": "Platform status phase",
+                                                "each": {
+                                                    "type": "StateSet",
+                                                    "stateSet": {
+                                                        "labelName": "phase",
+                                                        "path": ["status", "phase"],
+                                                        "list": [
+                                                            "Pending",
+                                                            "Deploying",
+                                                            "Deleting",
+                                                            "Deployed",
+                                                            "Failed",
+                                                        ],
+                                                    },
+                                                },
+                                            }
+                                        ],
+                                    }
+                                ]
+                            }
+                        },
+                    },
                 },
                 "prometheus-node-exporter": {
-                    "image": {"repository": "ghcr.io/neuro-inc/node-exporter"},
+                    "image": {
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/node-exporter",
+                    },
                     "serviceAccount": {
                         "imagePullSecrets": [
                             {"name": "platform-docker-config"},
@@ -1985,7 +2045,8 @@ class TestHelmValuesFactory:
             },
             "grafana": {
                 "image": {
-                    "repository": "ghcr.io/neuro-inc/grafana",
+                    "registry": "ghcr.io",
+                    "repository": "neuro-inc/grafana",
                     "pullSecrets": [
                         "platform-docker-config",
                         "platform-docker-hub-config",
@@ -1993,7 +2054,8 @@ class TestHelmValuesFactory:
                 },
                 "initChownData": {
                     "image": {
-                        "repository": "ghcr.io/neuro-inc/busybox",
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/busybox",
                         "pullSecrets": [
                             "platform-docker-config",
                             "platform-docker-hub-config",
@@ -2002,7 +2064,8 @@ class TestHelmValuesFactory:
                 },
                 "sidecar": {
                     "image": {
-                        "repository": "ghcr.io/neuro-inc/k8s-sidecar",
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/k8s-sidecar",
                         "pullSecrets": [
                             "platform-docker-config",
                             "platform-docker-hub-config",
@@ -2082,6 +2145,9 @@ class TestHelmValuesFactory:
                 "endpoint": "s3.us-east-1.amazonaws.com",
             },
         }
+        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
+            "thanos"
+        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
         assert result["cloudProvider"] == {"type": "aws", "region": "us-east-1"}
 
     def test_create_azure_platform_reports_values(
@@ -2097,6 +2163,9 @@ class TestHelmValuesFactory:
                 "storage_account_key": "accountKey2",
             },
         }
+        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
+            "thanos"
+        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
         assert result["cloudProvider"] == {"type": "azure", "region": "westus"}
 
     def test_create_on_prem_platform_reports_values(
@@ -2104,7 +2173,7 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_reports_values(on_prem_platform_config)
 
-        assert result["objectStore"] == {"supported": False}
+        assert result["prometheusRemoteStorageEnabled"] is False
         assert result["prometheusProxy"] == {
             "prometheus": {"host": "prometheus-prometheus", "port": 9090}
         }
@@ -2113,8 +2182,8 @@ class TestHelmValuesFactory:
             == "3d"
         )
         assert (
-            result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]["thanos"]
-            == ""
+            "thanos"
+            not in result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]
         )
         assert "cloudProvider" not in result
 
@@ -2152,6 +2221,9 @@ class TestHelmValuesFactory:
                 "secret_key": "minio_secret_key",
             },
         }
+        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
+            "thanos"
+        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
 
     def test_create_on_prem_platform_reports_values_with_emc_ecs(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -2184,6 +2256,9 @@ class TestHelmValuesFactory:
                 "secret_key": "emc_ecs_secret_key",
             },
         }
+        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
+            "thanos"
+        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
 
     def test_create_on_prem_platform_reports_values_with_open_stack(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -2217,6 +2292,9 @@ class TestHelmValuesFactory:
                 "secret_key": "os_password",
             },
         }
+        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
+            "thanos"
+        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
 
     def test_create_on_prem_platform_reports_values_with_retention(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory

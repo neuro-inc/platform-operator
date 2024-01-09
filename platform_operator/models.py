@@ -811,9 +811,19 @@ class PlatformConfig:
             name += path.replace("/", "-")
         return name
 
+    @property
+    def image_registry(self) -> str:
+        registry = self.docker_config.url.host
+        assert registry
+        return registry
+
     def get_image(self, name: str) -> str:
         url = str(self.docker_config.url / name)
         return url.replace("http://", "").replace("https://", "")
+
+    def get_image_repo(self, name: str) -> str:
+        url = self.docker_config.url / name
+        return url.path.lstrip("/")
 
     def create_dns_config(
         self,

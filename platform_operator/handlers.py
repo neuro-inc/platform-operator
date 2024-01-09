@@ -15,7 +15,6 @@ from neuro_config_client import (
     CloudProviderType,
     Cluster,
     ConfigClient,
-    NotificationType,
 )
 from neuro_logging import make_request_logging_trace_config
 
@@ -129,7 +128,7 @@ async def deploy(
     name: str, body: kopf.Body, logger: Logger, retry: int, **_: Any
 ) -> None:
     if retry > config.retries:
-        await fail_deployment(name, body)
+        await app.status_manager.fail_deployment(name)
         raise kopf.HandlerRetriesError(
             f"Platform deployment has exceeded {config.retries} retries"
         )
@@ -153,13 +152,13 @@ async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> Non
     except aiohttp.ClientError:
         raise
     except Exception as ex:
-        await fail_deployment(name, body)
+        await app.status_manager.fail_deployment(name)
         raise kopf.PermanentError(f"Invalid platform configuration: {ex!s}")
 
     platform_deploy_failed = await is_platform_deploy_failed()
 
     if platform_deploy_failed:
-        await fail_deployment(name, body)
+        await app.status_manager.fail_deployment(name)
         raise kopf.PermanentError("Platform helm release failed")
 
     phase = await app.status_manager.get_phase(name)
@@ -171,7 +170,7 @@ async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> Non
 
     logger.info("Platform deployment started")
 
-    await start_deployment(platform, retry)
+    await app.status_manager.start_deployment(platform.cluster_name, retry)
 
     if platform_deploy_required:
         await upgrade_platform_helm_release(platform)
@@ -319,7 +318,7 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
 
     logger.info("Platform config update started")
 
-    await start_deployment(platform)
+    await app.status_manager.start_deployment(platform.cluster_name)
 
     try:
         if platform_deploy_required:
@@ -340,7 +339,7 @@ async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
         raise
     except Exception as exc:
         logger.error("Platform config update failed", exc_info=exc)
-        await fail_deployment(name, body)
+        await app.status_manager.fail_deployment(name)
 
 
 async def get_cluster(name: str, body: kopf.Body) -> Cluster:
@@ -392,13 +391,6 @@ async def is_helm_deploy_failed(release_name: str) -> bool:
     return release.status == ReleaseStatus.FAILED
 
 
-async def start_deployment(platform: PlatformConfig, retry: int = 0) -> None:
-    await app.status_manager.start_deployment(platform.cluster_name, retry)
-    await app.config_client.notify(
-        platform.cluster_name, NotificationType.CLUSTER_UPDATING, token=platform.token
-    )
-
-
 async def complete_deployment(cluster: Cluster, platform: PlatformConfig) -> None:
     await app.status_manager.complete_deployment(cluster.name)
     if cluster.cloud_provider and cluster.cloud_provider.storage:
@@ -417,18 +409,6 @@ async def complete_deployment(cluster: Cluster, platform: PlatformConfig) -> Non
             ready=True,
             token=platform.token,
         )
-    await app.config_client.notify(
-        cluster.name, NotificationType.CLUSTER_UPDATE_SUCCEEDED, token=platform.token
-    )
-
-
-async def fail_deployment(name: str, body: kopf.Body) -> None:
-    await app.status_manager.fail_deployment(name)
-    await app.config_client.notify(
-        name,
-        NotificationType.CLUSTER_UPDATE_FAILED,
-        token=body["spec"].get("token"),
-    )
 
 
 async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
