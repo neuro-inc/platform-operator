@@ -996,7 +996,7 @@ class HelmValuesFactory:
                                         "labelsFromPath": {
                                             "name": ["metadata", "name"],
                                         },
-                                        "metricNamePrefix": "platform",
+                                        "metricNamePrefix": "kube_platform",
                                         "metrics": [
                                             {
                                                 "name": "status_phase",
