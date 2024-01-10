@@ -14,7 +14,6 @@ from neuro_config_client import (
     GoogleCloudProvider,
     GoogleFilestoreTier,
     GoogleStorage,
-    NotificationType,
     StorageInstance,
 )
 
@@ -385,20 +384,6 @@ async def test_deploy(
         token=gcp_platform_body["spec"]["token"],
     )
     config_client.patch_storage.assert_not_awaited()
-    config_client.notify.assert_has_awaits(
-        [
-            mock.call(
-                gcp_platform_config.cluster_name,
-                NotificationType.CLUSTER_UPDATING,
-                token=gcp_platform_config.token,
-            ),
-            mock.call(
-                gcp_platform_config.cluster_name,
-                NotificationType.CLUSTER_UPDATE_SUCCEEDED,
-                token=gcp_platform_config.token,
-            ),
-        ]
-    )
 
     kube_client.update_service_account.assert_awaited_once_with(
         namespace=gcp_platform_config.namespace,
@@ -632,11 +617,6 @@ async def test_deploy_with_retries_exceeded(
 
     status_manager.fail_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
-    )
-    config_client.notify.assert_any_await(
-        gcp_platform_config.cluster_name,
-        NotificationType.CLUSTER_UPDATE_FAILED,
-        token=gcp_platform_config.token,
     )
 
 
@@ -874,20 +854,6 @@ async def test_watch_config(
         token=gcp_platform_config.token,
     )
     config_client.patch_storage.assert_not_awaited()
-    config_client.notify.assert_has_awaits(
-        [
-            mock.call(
-                gcp_platform_config.cluster_name,
-                NotificationType.CLUSTER_UPDATING,
-                token=gcp_platform_config.token,
-            ),
-            mock.call(
-                gcp_platform_config.cluster_name,
-                NotificationType.CLUSTER_UPDATE_SUCCEEDED,
-                token=gcp_platform_config.token,
-            ),
-        ]
-    )
 
     is_platform_deploy_failed.assert_awaited_once_with()
 
@@ -921,7 +887,7 @@ async def test_watch_config(
     config_client.patch_cluster.assert_awaited_once()
 
     status_manager.start_deployment.assert_awaited_once_with(
-        gcp_platform_config.cluster_name, 0
+        gcp_platform_config.cluster_name
     )
     status_manager.transition.assert_any_call(
         gcp_platform_config.cluster_name, PlatformConditionType.PLATFORM_DEPLOYED
@@ -973,7 +939,7 @@ async def test_watch_config_all_charts_deployed(
     config_client.patch_cluster.assert_awaited_once()
 
     status_manager.start_deployment.assert_awaited_once_with(
-        gcp_platform_config.cluster_name, 0
+        gcp_platform_config.cluster_name
     )
     status_manager.complete_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
@@ -1124,12 +1090,6 @@ async def test_watch_config_update_failed(
 
     status_manager.fail_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
-    )
-
-    config_client.notify.assert_awaited_with(
-        gcp_platform_config.cluster_name,
-        NotificationType.CLUSTER_UPDATE_FAILED,
-        token=gcp_platform_config.token,
     )
 
 

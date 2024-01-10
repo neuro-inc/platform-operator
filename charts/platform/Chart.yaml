@@ -10,7 +10,7 @@ dependencies:
     repository: https://helm.traefik.io/traefik
     condition: traefikEnabled
   - name: acme
-    version: "1.1.1"
+    version: "1.2.0"
     repository: https://neuro-inc.github.io/helm-charts
     condition: acmeEnabled
   - name: docker-registry
@@ -37,7 +37,7 @@ dependencies:
     version: "23.7.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-reports
-    version: "23.7.2"
+    version: "24.1.1"
     repository: oci://ghcr.io/neuro-inc/helm-charts
     condition: platformReportsEnabled
   - name: platform-disks

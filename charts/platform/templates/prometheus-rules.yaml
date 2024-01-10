@@ -1,0 +1,8 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "platform.fullname" . }}-platform-rules
+  labels:
+    {{- include "platform.labels.standard" . | nindent 4 }}
+spec:
+{{ .Files.Get "files/prometheus-rules/platform.yaml" | indent 2 }}
