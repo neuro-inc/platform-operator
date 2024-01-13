@@ -86,6 +86,30 @@ class HelmValuesFactory:
             },
             "idleJobs": [self._create_idle_job(job) for job in platform.idle_jobs],
             "storages": [self._create_storage_values(s) for s in platform.storages],
+            "alertmanager": {
+                "receivers": [
+                    {
+                        "name": "platform-notifications",
+                        "webhook_configs": [
+                            {
+                                "url": str(
+                                    platform.notifications_url
+                                    / "api/v1/notifications/alert-manager-notification"
+                                ),
+                                "http_config": {
+                                    "authorization": {
+                                        "type": "Bearer",
+                                        "credentials_file": (
+                                            "/etc/alertmanager/secrets"
+                                            f"/{platform.release_name}-token/token"
+                                        ),
+                                    }
+                                },
+                            }
+                        ],
+                    }
+                ]
+            },
             self._chart_names.traefik: self.create_traefik_values(platform),
             self._chart_names.platform_storage: self.create_platform_storage_values(
                 platform
@@ -1039,7 +1063,9 @@ class HelmValuesFactory:
                         "image": {
                             "registry": platform.image_registry,
                             "repository": platform.get_image_repo("alertmanager"),
-                        }
+                        },
+                        "configSecret": f"{platform.release_name}-alertmanager-config",
+                        "secrets": [f"{platform.release_name}-token"],
                     }
                 },
             },

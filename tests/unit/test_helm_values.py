@@ -118,6 +118,30 @@ class TestHelmValuesFactory:
                     "nfs": {"server": "192.168.0.3", "path": "/"},
                 }
             ],
+            "alertmanager": {
+                "receivers": [
+                    {
+                        "name": "platform-notifications",
+                        "webhook_configs": [
+                            {
+                                "url": (
+                                    "https://dev.neu.ro/api"
+                                    "/v1/notifications/alert-manager-notification"
+                                ),
+                                "http_config": {
+                                    "authorization": {
+                                        "type": "Bearer",
+                                        "credentials_file": (
+                                            "/etc/alertmanager"
+                                            "/secrets/platform-token/token"
+                                        ),
+                                    }
+                                },
+                            }
+                        ],
+                    }
+                ]
+            },
             "ssl": {"cert": "", "key": ""},
             "acme": mock.ANY,
             "traefik": mock.ANY,
@@ -2021,7 +2045,9 @@ class TestHelmValuesFactory:
                         "image": {
                             "registry": "ghcr.io",
                             "repository": "neuro-inc/alertmanager",
-                        }
+                        },
+                        "configSecret": "platform-alertmanager-config",
+                        "secrets": ["platform-token"],
                     }
                 },
             },
