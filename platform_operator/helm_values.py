@@ -337,7 +337,7 @@ class HelmValuesFactory:
         result: dict[str, Any] = {
             "nameOverride": "traefik",
             "fullnameOverride": "traefik",
-            "instanceLabelOverride": "traefik",
+            "instanceLabelOverride": platform.release_name,
             "image": {"name": platform.get_image("traefik")},
             "deployment": {
                 "replicas": platform.ingress_controller_replicas,

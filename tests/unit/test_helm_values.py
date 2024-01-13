@@ -617,7 +617,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "traefik",
             "fullnameOverride": "traefik",
-            "instanceLabelOverride": "traefik",
+            "instanceLabelOverride": "platform",
             "image": {"name": "ghcr.io/neuro-inc/traefik"},
             "deployment": {
                 "replicas": 2,
