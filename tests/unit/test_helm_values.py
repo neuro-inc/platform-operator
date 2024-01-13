@@ -637,7 +637,7 @@ class TestHelmValuesFactory:
                 "annotations": {},
             },
             "ports": {
-                "web": {"redirectTo": "websecure"},
+                "web": {"redirectTo": {"port": "websecure"}},
                 "websecure": {"tls": {"enabled": True}},
             },
             "additionalArguments": [
