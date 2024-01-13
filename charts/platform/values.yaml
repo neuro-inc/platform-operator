@@ -29,7 +29,7 @@ nodeLabels:
   job: platform.neuromation.io/job
 
 alertmanager:
-  receivers: []
+  config: {}
 
 inotify:
   maxInstances: 65536

@@ -86,30 +86,6 @@ class HelmValuesFactory:
             },
             "idleJobs": [self._create_idle_job(job) for job in platform.idle_jobs],
             "storages": [self._create_storage_values(s) for s in platform.storages],
-            "alertmanager": {
-                "receivers": [
-                    {
-                        "name": "platform-notifications",
-                        "webhook_configs": [
-                            {
-                                "url": str(
-                                    platform.notifications_url
-                                    / "api/v1/notifications/alert-manager-notification"
-                                ),
-                                "http_config": {
-                                    "authorization": {
-                                        "type": "Bearer",
-                                        "credentials_file": (
-                                            "/etc/alertmanager/secrets"
-                                            f"/{platform.release_name}-token/token"
-                                        ),
-                                    }
-                                },
-                            }
-                        ],
-                    }
-                ]
-            },
             self._chart_names.traefik: self.create_traefik_values(platform),
             self._chart_names.platform_storage: self.create_platform_storage_values(
                 platform
@@ -175,6 +151,40 @@ class HelmValuesFactory:
             result["ingress"]["minioHost"] = platform.buckets.minio_public_url.host
             result[self._chart_names.minio] = self.create_minio_values(platform)
         if platform.monitoring.metrics_enabled:
+            result["alertmanager"] = {
+                "config": {
+                    "route": {
+                        "receiver": "platform-notifications",
+                        "group_wait": "30s",
+                        "group_interval": "5m",
+                        "repeat_interval": "4h",
+                        "group_by": ["alertname"],
+                    },
+                    "receivers": [
+                        {
+                            "name": "platform-notifications",
+                            "webhook_configs": [
+                                {
+                                    "url": str(
+                                        platform.notifications_url
+                                        / "api/v1/notifications"
+                                        / "alert-manager-notification"
+                                    ),
+                                    "http_config": {
+                                        "authorization": {
+                                            "type": "Bearer",
+                                            "credentials_file": (
+                                                "/etc/alertmanager/secrets"
+                                                f"/{platform.release_name}-token/token"
+                                            ),
+                                        }
+                                    },
+                                }
+                            ],
+                        }
+                    ],
+                }
+            }
             result[
                 self._chart_names.platform_reports
             ] = self.create_platform_reports_values(platform)

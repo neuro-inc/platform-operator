@@ -119,28 +119,37 @@ class TestHelmValuesFactory:
                 }
             ],
             "alertmanager": {
-                "receivers": [
-                    {
-                        "name": "platform-notifications",
-                        "webhook_configs": [
-                            {
-                                "url": (
-                                    "https://dev.neu.ro/api"
-                                    "/v1/notifications/alert-manager-notification"
-                                ),
-                                "http_config": {
-                                    "authorization": {
-                                        "type": "Bearer",
-                                        "credentials_file": (
-                                            "/etc/alertmanager"
-                                            "/secrets/platform-token/token"
-                                        ),
-                                    }
-                                },
-                            }
-                        ],
-                    }
-                ]
+                "config": {
+                    "route": {
+                        "receiver": "platform-notifications",
+                        "group_wait": "30s",
+                        "group_interval": "5m",
+                        "repeat_interval": "4h",
+                        "group_by": ["alertname"],
+                    },
+                    "receivers": [
+                        {
+                            "name": "platform-notifications",
+                            "webhook_configs": [
+                                {
+                                    "url": (
+                                        "https://dev.neu.ro/api"
+                                        "/v1/notifications/alert-manager-notification"
+                                    ),
+                                    "http_config": {
+                                        "authorization": {
+                                            "type": "Bearer",
+                                            "credentials_file": (
+                                                "/etc/alertmanager"
+                                                "/secrets/platform-token/token"
+                                            ),
+                                        }
+                                    },
+                                }
+                            ],
+                        }
+                    ],
+                }
             },
             "ssl": {"cert": "", "key": ""},
             "acme": mock.ANY,
@@ -514,6 +523,7 @@ class TestHelmValuesFactory:
 
         assert result["nvidiaDCGMExporter"]["serviceMonitor"]["enabled"] is False
         assert result["platformReportsEnabled"] is False
+        assert "alertmanager" not in result
         assert "platform-reports" not in result
 
     def test_create_vcd_platform_values(
