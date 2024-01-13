@@ -2016,6 +2016,14 @@ class TestHelmValuesFactory:
                         ]
                     },
                 },
+                "alertmanager": {
+                    "alertmanagerSpec": {
+                        "image": {
+                            "registry": "ghcr.io",
+                            "repository": "neuro-inc/alertmanager",
+                        }
+                    }
+                },
             },
             "thanos": {
                 "image": {"repository": "ghcr.io/neuro-inc/thanos"},

@@ -1034,6 +1034,14 @@ class HelmValuesFactory:
                         ]
                     },
                 },
+                "alertmanager": {
+                    "alertmanagerSpec": {
+                        "image": {
+                            "registry": platform.image_registry,
+                            "repository": platform.get_image_repo("alertmanager"),
+                        }
+                    }
+                },
             },
             "thanos": {
                 "image": {"repository": platform.get_image("thanos")},
