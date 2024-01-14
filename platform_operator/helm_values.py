@@ -433,6 +433,15 @@ class HelmValuesFactory:
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
             "priorityClassName": platform.services_priority_class_name,
+            "metrics": {
+                "prometheus": {
+                    "service": {"enabled": True},
+                    "serviceMonitor": {
+                        "jobLabel": "app.kubernetes.io/name",
+                        "additionalLabels": {"release": platform.release_name},
+                    },
+                }
+            },
         }
         if platform.kubernetes_version >= "1.19":
             result["ingressClass"] = {"enabled": True}

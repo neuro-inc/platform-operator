@@ -718,6 +718,15 @@ class TestHelmValuesFactory:
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
             "priorityClassName": "platform-services",
+            "metrics": {
+                "prometheus": {
+                    "service": {"enabled": True},
+                    "serviceMonitor": {
+                        "jobLabel": "app.kubernetes.io/name",
+                        "additionalLabels": {"release": "platform"},
+                    },
+                }
+            },
         }
 
     def test_create_gcp_traefik_values_with_ingress_namespaces(
