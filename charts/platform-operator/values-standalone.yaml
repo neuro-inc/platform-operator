@@ -5,6 +5,7 @@ platform:
   authUrl: "-"
   ingressAuthUrl: "-"
   adminUrl: "-"
+  notificationsUrl: "-"
 
 ingress:
   host: neu.ro.local

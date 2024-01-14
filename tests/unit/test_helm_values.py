@@ -533,6 +533,15 @@ class TestHelmValuesFactory:
 
         assert result["kubernetesProvider"] == "kubeadm"
 
+    def test_create_platform_values_without_notifications_url(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        gcp_platform_config = replace(gcp_platform_config, notifications_url=URL("-"))
+
+        result = factory.create_platform_values(gcp_platform_config)
+
+        assert result["alertmanager"] == {}
+
     def test_create_acme_values(
         self,
         gcp_platform_config: PlatformConfig,

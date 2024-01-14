@@ -151,44 +151,49 @@ class HelmValuesFactory:
             result["ingress"]["minioHost"] = platform.buckets.minio_public_url.host
             result[self._chart_names.minio] = self.create_minio_values(platform)
         if platform.monitoring.metrics_enabled:
-            result["alertmanager"] = {
-                "config": {
-                    "route": {
-                        "receiver": "platform-notifications",
-                        "group_wait": "30s",
-                        "group_interval": "5m",
-                        "repeat_interval": "4h",
-                        "group_by": ["alertname"],
-                    },
-                    "receivers": [
-                        {
-                            "name": "platform-notifications",
-                            "webhook_configs": [
-                                {
-                                    "url": str(
-                                        platform.notifications_url
-                                        / "api/v1/notifications"
-                                        / "alert-manager-notification"
-                                    ),
-                                    "http_config": {
-                                        "authorization": {
-                                            "type": "Bearer",
-                                            "credentials_file": (
-                                                "/etc/alertmanager/secrets"
-                                                f"/{platform.release_name}-token/token"
-                                            ),
-                                        }
-                                    },
-                                }
-                            ],
-                        }
-                    ],
-                }
-            }
             result[
                 self._chart_names.platform_reports
             ] = self.create_platform_reports_values(platform)
+            result["alertmanager"] = self._create_alert_manager_values(platform)
         return result
+
+    def _create_alert_manager_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        if platform.notifications_url == URL("-"):
+            return {}
+        return {
+            "config": {
+                "route": {
+                    "receiver": "platform-notifications",
+                    "group_wait": "30s",
+                    "group_interval": "5m",
+                    "repeat_interval": "4h",
+                    "group_by": ["alertname"],
+                },
+                "receivers": [
+                    {
+                        "name": "platform-notifications",
+                        "webhook_configs": [
+                            {
+                                "url": str(
+                                    platform.notifications_url
+                                    / "api/v1/notifications"
+                                    / "alert-manager-notification"
+                                ),
+                                "http_config": {
+                                    "authorization": {
+                                        "type": "Bearer",
+                                        "credentials_file": (
+                                            "/etc/alertmanager/secrets"
+                                            f"/{platform.release_name}-token/token"
+                                        ),
+                                    }
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        }
 
     def create_acme_values(self, platform: PlatformConfig) -> dict[str, Any]:
         return {
