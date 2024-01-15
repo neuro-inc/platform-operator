@@ -154,7 +154,46 @@ class HelmValuesFactory:
             result[
                 self._chart_names.platform_reports
             ] = self.create_platform_reports_values(platform)
+            result["alertmanager"] = self._create_alert_manager_values(platform)
         return result
+
+    def _create_alert_manager_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        if platform.notifications_url == URL("-"):
+            return {}
+        return {
+            "config": {
+                "route": {
+                    "receiver": "platform-notifications",
+                    "group_wait": "30s",
+                    "group_interval": "5m",
+                    "repeat_interval": "4h",
+                    "group_by": ["alertname"],
+                },
+                "receivers": [
+                    {
+                        "name": "platform-notifications",
+                        "webhook_configs": [
+                            {
+                                "url": str(
+                                    platform.notifications_url
+                                    / "api/v1/notifications"
+                                    / "alert-manager-notification"
+                                ),
+                                "http_config": {
+                                    "authorization": {
+                                        "type": "Bearer",
+                                        "credentials_file": (
+                                            "/etc/alertmanager/secrets"
+                                            f"/{platform.release_name}-token/token"
+                                        ),
+                                    }
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        }
 
     def create_acme_values(self, platform: PlatformConfig) -> dict[str, Any]:
         return {
@@ -337,7 +376,7 @@ class HelmValuesFactory:
         result: dict[str, Any] = {
             "nameOverride": "traefik",
             "fullnameOverride": "traefik",
-            "instanceLabelOverride": "traefik",
+            "instanceLabelOverride": platform.release_name,
             "image": {"name": platform.get_image("traefik")},
             "deployment": {
                 "replicas": platform.ingress_controller_replicas,
@@ -356,7 +395,7 @@ class HelmValuesFactory:
                 "annotations": {},
             },
             "ports": {
-                "web": {"redirectTo": "websecure"},
+                "web": {"redirectTo": {"port": "websecure"}},
                 "websecure": {"tls": {"enabled": True}},
             },
             "additionalArguments": [
@@ -394,6 +433,15 @@ class HelmValuesFactory:
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
             "priorityClassName": platform.services_priority_class_name,
+            "metrics": {
+                "prometheus": {
+                    "service": {"enabled": True},
+                    "serviceMonitor": {
+                        "jobLabel": "app.kubernetes.io/name",
+                        "additionalLabels": {"release": platform.release_name},
+                    },
+                }
+            },
         }
         if platform.kubernetes_version >= "1.19":
             result["ingressClass"] = {"enabled": True}
@@ -1033,6 +1081,16 @@ class HelmValuesFactory:
                             {"name": name} for name in platform.image_pull_secret_names
                         ]
                     },
+                },
+                "alertmanager": {
+                    "alertmanagerSpec": {
+                        "image": {
+                            "registry": platform.image_registry,
+                            "repository": platform.get_image_repo("alertmanager"),
+                        },
+                        "configSecret": f"{platform.release_name}-alertmanager-config",
+                        "secrets": [f"{platform.release_name}-token"],
+                    }
                 },
             },
             "thanos": {

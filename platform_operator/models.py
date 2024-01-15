@@ -138,6 +138,7 @@ class Config:
     platform_admin_url: URL
     platform_config_watch_interval_s: float
     platform_api_url: URL
+    platform_notifications_url: URL
     platform_namespace: str
     platform_lock_secret_name: str
     acme_ca_staging_path: str
@@ -165,6 +166,7 @@ class Config:
                 env.get("NP_PLATFORM_CONFIG_WATCH_INTERVAL_S", "15")
             ),
             platform_api_url=URL(env["NP_PLATFORM_API_URL"]),
+            platform_notifications_url=URL(env["NP_PLATFORM_NOTIFICATIONS_URL"]),
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
             platform_lock_secret_name=env["NP_PLATFORM_LOCK_SECRET_NAME"],
             acme_ca_staging_path=env["NP_ACME_CA_STAGING_PATH"],
@@ -744,6 +746,7 @@ class PlatformConfig:
     config_url: URL
     admin_url: URL
     api_url: URL
+    notifications_url: URL
     token: str
     cluster_name: str
     service_account_name: str
@@ -978,6 +981,7 @@ class PlatformConfigFactory:
             config_url=self._config.platform_config_url,
             admin_url=self._config.platform_admin_url,
             api_url=self._config.platform_api_url,
+            notifications_url=self._config.platform_notifications_url,
             token=spec.token,
             cluster_name=metadata.name,
             namespace=self._config.platform_namespace,

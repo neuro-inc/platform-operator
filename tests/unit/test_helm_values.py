@@ -118,6 +118,39 @@ class TestHelmValuesFactory:
                     "nfs": {"server": "192.168.0.3", "path": "/"},
                 }
             ],
+            "alertmanager": {
+                "config": {
+                    "route": {
+                        "receiver": "platform-notifications",
+                        "group_wait": "30s",
+                        "group_interval": "5m",
+                        "repeat_interval": "4h",
+                        "group_by": ["alertname"],
+                    },
+                    "receivers": [
+                        {
+                            "name": "platform-notifications",
+                            "webhook_configs": [
+                                {
+                                    "url": (
+                                        "https://dev.neu.ro/api"
+                                        "/v1/notifications/alert-manager-notification"
+                                    ),
+                                    "http_config": {
+                                        "authorization": {
+                                            "type": "Bearer",
+                                            "credentials_file": (
+                                                "/etc/alertmanager"
+                                                "/secrets/platform-token/token"
+                                            ),
+                                        }
+                                    },
+                                }
+                            ],
+                        }
+                    ],
+                }
+            },
             "ssl": {"cert": "", "key": ""},
             "acme": mock.ANY,
             "traefik": mock.ANY,
@@ -490,6 +523,7 @@ class TestHelmValuesFactory:
 
         assert result["nvidiaDCGMExporter"]["serviceMonitor"]["enabled"] is False
         assert result["platformReportsEnabled"] is False
+        assert "alertmanager" not in result
         assert "platform-reports" not in result
 
     def test_create_vcd_platform_values(
@@ -498,6 +532,15 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(vcd_platform_config)
 
         assert result["kubernetesProvider"] == "kubeadm"
+
+    def test_create_platform_values_without_notifications_url(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        gcp_platform_config = replace(gcp_platform_config, notifications_url=URL("-"))
+
+        result = factory.create_platform_values(gcp_platform_config)
+
+        assert result["alertmanager"] == {}
 
     def test_create_acme_values(
         self,
@@ -617,7 +660,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "traefik",
             "fullnameOverride": "traefik",
-            "instanceLabelOverride": "traefik",
+            "instanceLabelOverride": "platform",
             "image": {"name": "ghcr.io/neuro-inc/traefik"},
             "deployment": {
                 "replicas": 2,
@@ -637,7 +680,7 @@ class TestHelmValuesFactory:
                 "annotations": {},
             },
             "ports": {
-                "web": {"redirectTo": "websecure"},
+                "web": {"redirectTo": {"port": "websecure"}},
                 "websecure": {"tls": {"enabled": True}},
             },
             "additionalArguments": [
@@ -675,6 +718,15 @@ class TestHelmValuesFactory:
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
             "priorityClassName": "platform-services",
+            "metrics": {
+                "prometheus": {
+                    "service": {"enabled": True},
+                    "serviceMonitor": {
+                        "jobLabel": "app.kubernetes.io/name",
+                        "additionalLabels": {"release": "platform"},
+                    },
+                }
+            },
         }
 
     def test_create_gcp_traefik_values_with_ingress_namespaces(
@@ -2015,6 +2067,16 @@ class TestHelmValuesFactory:
                             {"name": "platform-docker-hub-config"},
                         ]
                     },
+                },
+                "alertmanager": {
+                    "alertmanagerSpec": {
+                        "image": {
+                            "registry": "ghcr.io",
+                            "repository": "neuro-inc/alertmanager",
+                        },
+                        "configSecret": "platform-alertmanager-config",
+                        "secrets": ["platform-token"],
+                    }
                 },
             },
             "thanos": {

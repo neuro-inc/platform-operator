@@ -28,6 +28,9 @@ nodeLabels:
   nodePool: platform.neuromation.io/nodepool
   job: platform.neuromation.io/job
 
+alertmanager:
+  config: {}
+
 inotify:
   maxInstances: 65536
   maxWatchers: 65536

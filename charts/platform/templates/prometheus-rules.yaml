@@ -1,3 +1,4 @@
+{{- if .Values.platformReportsEnabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -6,3 +7,4 @@ metadata:
     {{- include "platform.labels.standard" . | nindent 4 }}
 spec:
 {{ .Files.Get "files/prometheus-rules/platform.yaml" | indent 2 }}
+{{- end }}
