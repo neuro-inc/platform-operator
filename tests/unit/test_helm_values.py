@@ -126,8 +126,28 @@ class TestHelmValuesFactory:
                         "group_interval": "5m",
                         "repeat_interval": "4h",
                         "group_by": ["alertname"],
+                        "routes": [
+                            {
+                                "receiver": "ignore",
+                                "matchers": [
+                                    'exported_service="default-backend@kubernetes"'
+                                ],
+                                "continue": False,
+                            },
+                            {
+                                "receiver": "ignore",
+                                "matchers": ['exported_service=~"platform-jobs-.+"'],
+                                "continue": False,
+                            },
+                            {
+                                "receiver": "ignore",
+                                "matchers": ['namespace="platform-jobs"'],
+                                "continue": False,
+                            },
+                        ],
                     },
                     "receivers": [
+                        {"name": "ignore"},
                         {
                             "name": "platform-notifications",
                             "webhook_configs": [
@@ -147,7 +167,7 @@ class TestHelmValuesFactory:
                                     },
                                 }
                             ],
-                        }
+                        },
                     ],
                 }
             },
