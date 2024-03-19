@@ -971,9 +971,9 @@ class PlatformConfigFactory:
         jobs_namespace = self._config.platform_namespace + "-jobs"
         service_account_annotations: dict[str, str] = {}
         if spec.iam.aws_role_arn:
-            service_account_annotations[
-                "eks.amazonaws.com/role-arn"
-            ] = spec.iam.aws_role_arn
+            service_account_annotations["eks.amazonaws.com/role-arn"] = (
+                spec.iam.aws_role_arn
+            )
         return PlatformConfig(
             release_name=release_name,
             auth_url=self._config.platform_auth_url,
@@ -1060,18 +1060,26 @@ class PlatformConfigFactory:
             helm_repo=self._create_helm_repo(cluster),
             docker_config=docker_config,
             docker_hub_config=docker_hub_config,
-            grafana_username=cluster.credentials.grafana.username
-            if cluster.credentials.grafana
-            else None,
-            grafana_password=cluster.credentials.grafana.password
-            if cluster.credentials.grafana
-            else None,
-            sentry_dsn=cluster.credentials.sentry.public_dsn
-            if cluster.credentials.sentry
-            else None,
-            sentry_sample_rate=cluster.credentials.sentry.sample_rate
-            if cluster.credentials.sentry
-            else None,
+            grafana_username=(
+                cluster.credentials.grafana.username
+                if cluster.credentials.grafana
+                else None
+            ),
+            grafana_password=(
+                cluster.credentials.grafana.password
+                if cluster.credentials.grafana
+                else None
+            ),
+            sentry_dsn=(
+                cluster.credentials.sentry.public_dsn
+                if cluster.credentials.sentry
+                else None
+            ),
+            sentry_sample_rate=(
+                cluster.credentials.sentry.sample_rate
+                if cluster.credentials.sentry
+                else None
+            ),
             aws_region=spec.iam.aws_region,
             aws_role_arn=spec.iam.aws_role_arn,
             aws_s3_role_arn=spec.iam.aws_s3_role_arn,
