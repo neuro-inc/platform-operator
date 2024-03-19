@@ -143,17 +143,17 @@ class HelmValuesFactory:
         else:
             result["dockerHubConfigSecret"] = {"create": False}
         if platform.registry.docker_registry_install:
-            result[
-                self._chart_names.docker_registry
-            ] = self.create_docker_registry_values(platform)
+            result[self._chart_names.docker_registry] = (
+                self.create_docker_registry_values(platform)
+            )
         if platform.buckets.minio_install:
             assert platform.buckets.minio_public_url
             result["ingress"]["minioHost"] = platform.buckets.minio_public_url.host
             result[self._chart_names.minio] = self.create_minio_values(platform)
         if platform.monitoring.metrics_enabled:
-            result[
-                self._chart_names.platform_reports
-            ] = self.create_platform_reports_values(platform)
+            result[self._chart_names.platform_reports] = (
+                self.create_platform_reports_values(platform)
+            )
             result["alertmanager"] = self._create_alert_manager_values(platform)
         return result
 

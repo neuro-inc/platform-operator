@@ -110,9 +110,11 @@ def resource_pool_type_factory() -> Callable[..., ResourcePoolType]:
             available_memory=2**30,
             gpu=1,
             gpu_model="nvidia-tesla-k80",
-            tpu=TPUResource(ipv4_cidr_block=tpu_ipv4_cidr_block)
-            if tpu_ipv4_cidr_block
-            else None,
+            tpu=(
+                TPUResource(ipv4_cidr_block=tpu_ipv4_cidr_block)
+                if tpu_ipv4_cidr_block
+                else None
+            ),
         )
 
     return _factory
