@@ -842,6 +842,7 @@ class PlatformConfig:
                 (
                     ARecord(name=f"{self.ingress_dns_name}.", ips=ips),
                     ARecord(name=f"*.jobs.{self.ingress_dns_name}.", ips=ips),
+                    ARecord(name=f"*.apps.{self.ingress_dns_name}.", ips=ips),
                     ARecord(name=f"registry.{self.ingress_dns_name}.", ips=ips),
                     ARecord(name=f"metrics.{self.ingress_dns_name}.", ips=ips),
                 )
@@ -868,6 +869,11 @@ class PlatformConfig:
                         zone_id=ingress_zone_id,
                     ),
                     ARecord(
+                        name=f"*.apps.{self.ingress_dns_name}.",
+                        dns_name=ingress_host,
+                        zone_id=ingress_zone_id,
+                    ),
+                    ARecord(
                         name=f"registry.{self.ingress_dns_name}.",
                         dns_name=ingress_host,
                         zone_id=ingress_zone_id,
@@ -889,6 +895,10 @@ class PlatformConfig:
                     ),
                     ARecord(
                         name=f"*.jobs.{self.ingress_dns_name}.",
+                        ips=[ingress_host],
+                    ),
+                    ARecord(
+                        name=f"*.apps.{self.ingress_dns_name}.",
                         ips=[ingress_host],
                     ),
                     ARecord(

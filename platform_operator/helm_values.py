@@ -234,6 +234,7 @@ class HelmValuesFactory:
                     platform.ingress_url.host,
                     f"*.{platform.ingress_url.host}",
                     f"*.jobs.{platform.ingress_url.host}",
+                    f"*.apps.{platform.ingress_url.host}",
                 ],
                 "sslCertSecretName": f"{platform.release_name}-ssl-cert",
                 "rolloutDeploymentName": "traefik",

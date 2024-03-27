@@ -25,7 +25,7 @@ openssl req \
     -reqexts SAN \
     -extensions SAN \
     -config <(cat /System/Library/OpenSSL/openssl.cnf \
-        <(printf "[SAN]\nsubjectAltName=DNS:$domain,DNS:$cluster.org.$domain,DNS:*.$cluster.org.$domain,DNS:*.jobs.$cluster.org.$domain")) \
+        <(printf "[SAN]\nsubjectAltName=DNS:$domain,DNS:$cluster.org.$domain,DNS:*.$cluster.org.$domain,DNS:*.jobs.$cluster.org.$domain,DNS:*.apps.$cluster.org.$domain")) \
     -sha256 \
     -days 365
 ```
@@ -46,7 +46,7 @@ openssl req \
     -reqexts SAN \
     -extensions SAN \
     -config <(cat /usr/lib/ssl/openssl.cnf \
-        <(printf "[SAN]\nsubjectAltName=DNS:$domain,DNS:$cluster.org.$domain,DNS:*.$cluster.org.$domain,DNS:*.jobs.$cluster.org.$domain")) \
+        <(printf "[SAN]\nsubjectAltName=DNS:$domain,DNS:$cluster.org.$domain,DNS:*.$cluster.org.$domain,DNS:*.jobs.$cluster.org.$domain,DNS:*.apps.$cluster.org.$domain")) \
     -sha256 \
     -days 365
 ```
