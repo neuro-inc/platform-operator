@@ -582,6 +582,7 @@ class TestHelmValuesFactory:
                     f"{cluster_name}.org.neu.ro",
                     f"*.{cluster_name}.org.neu.ro",
                     f"*.jobs.{cluster_name}.org.neu.ro",
+                    f"*.apps.{cluster_name}.org.neu.ro",
                 ],
                 "sslCertSecretName": "platform-ssl-cert",
                 "rolloutDeploymentName": "traefik",
