@@ -779,7 +779,6 @@ class PlatformConfig:
     ingress_service_name: str
     ingress_service_annotations: dict[str, str]
     ingress_load_balancer_source_ranges: list[str]
-    ingress_namespaces: Sequence[str]
     ingress_ssl_cert_data: str
     ingress_ssl_cert_key_data: str
     disks_storage_limit_per_user: int
@@ -1041,13 +1040,6 @@ class PlatformConfigFactory:
             ingress_service_annotations=spec.ingress_controller.service_annotations,
             ingress_load_balancer_source_ranges=(
                 spec.ingress_controller.load_balancer_source_ranges
-            ),
-            ingress_namespaces=sorted(
-                {
-                    self._config.platform_namespace,
-                    jobs_namespace,
-                    *spec.ingress_controller.namespaces,
-                }
             ),
             ingress_node_port_http=spec.ingress_controller.node_port_http,
             ingress_node_port_https=spec.ingress_controller.node_port_https,

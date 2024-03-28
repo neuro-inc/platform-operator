@@ -553,20 +553,6 @@ class TestPlatformConfigFactory:
             gcp_platform_config, ingress_load_balancer_source_ranges=["0.0.0.0/0"]
         )
 
-    def test_gcp_platform_config_with_ingress_controller_namespaces_unique(
-        self,
-        factory: PlatformConfigFactory,
-        gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        gcp_platform_body["spec"]["ingressController"] = {
-            "namespaces": [gcp_platform_config.namespace, "default"]
-        }
-        result = factory.create(gcp_platform_body, gcp_cluster)
-
-        assert result.ingress_namespaces == ["default", "platform", "platform-jobs"]
-
     def test_gcp_platform_config_with_docker_config_secret_without_credentials(
         self,
         factory: PlatformConfigFactory,
