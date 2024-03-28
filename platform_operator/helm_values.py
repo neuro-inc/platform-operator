@@ -444,12 +444,10 @@ class HelmValuesFactory:
                     "enabled": True,
                     "allowCrossNamespace": True,
                     "allowExternalNameServices": True,
-                    "namespaces": platform.ingress_namespaces,
                 },
                 "kubernetesIngress": {
                     "enabled": True,
                     "allowExternalNameServices": True,
-                    "namespaces": platform.ingress_namespaces,
                 },
             },
             "ingressRoute": {"dashboard": {"enabled": False}},

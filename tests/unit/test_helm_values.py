@@ -727,12 +727,10 @@ class TestHelmValuesFactory:
                     "enabled": True,
                     "allowCrossNamespace": True,
                     "allowExternalNameServices": True,
-                    "namespaces": ["platform", "platform-jobs"],
                 },
                 "kubernetesIngress": {
                     "enabled": True,
                     "allowExternalNameServices": True,
-                    "namespaces": ["platform", "platform-jobs"],
                 },
             },
             "ingressRoute": {"dashboard": {"enabled": False}},
@@ -748,24 +746,6 @@ class TestHelmValuesFactory:
                 }
             },
         }
-
-    def test_create_gcp_traefik_values_with_ingress_namespaces(
-        self,
-        gcp_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
-    ) -> None:
-        result = factory.create_traefik_values(
-            replace(
-                gcp_platform_config,
-                ingress_namespaces=["default", "platform", "platform-jobs"],
-            )
-        )
-
-        assert result["providers"]["kubernetesIngress"]["namespaces"] == [
-            "default",
-            "platform",
-            "platform-jobs",
-        ]
 
     def test_create_gcp_traefik_values_with_ingress_class(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory

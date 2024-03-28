@@ -543,7 +543,6 @@ def gcp_platform_config(
         ingress_node_port_https=None,
         ingress_host_port_http=None,
         ingress_host_port_https=None,
-        ingress_namespaces=["platform", "platform-jobs"],
         ingress_ssl_cert_data="",
         ingress_ssl_cert_key_data="",
         storages=[
