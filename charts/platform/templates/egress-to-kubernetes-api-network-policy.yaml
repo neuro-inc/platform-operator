@@ -1,0 +1,21 @@
+{{- $kubernetesEndpoint := lookup "v1" "Endpoints" "default" "kubernetes" -}}
+{{- $kubernetesAddresses := (first $kubernetesEndpoint.subsets).addresses -}}
+{{- $kubernetesIP := (first $kubernetesAddresses).ip -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-egress-to-kubernetes-api
+  namespace: {{ include "platform.jobs.namespace.name" . }}
+  labels:
+    {{- include "platform.labels.standard" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: {{ $kubernetesIP }}/32
+      ports:
+        - protocol: TCP
+          port: 443
