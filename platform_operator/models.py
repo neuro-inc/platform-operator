@@ -115,6 +115,7 @@ class HelmChartNames:
     platform_disks: str = "platform-disks"
     platform_api_poller: str = "platform-api-poller"
     platform_buckets: str = "platform-buckets"
+    platform_apps: str = "platform-apps"
 
 
 @dataclass(frozen=True)

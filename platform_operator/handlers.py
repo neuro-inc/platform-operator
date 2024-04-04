@@ -16,7 +16,6 @@ from neuro_config_client import (
     Cluster,
     ConfigClient,
 )
-from neuro_logging import make_request_logging_trace_config
 
 from .aws_client import AwsElbClient
 from .helm_client import HelmClient, ReleaseStatus
@@ -54,12 +53,10 @@ app = App()
 
 @kopf.on.startup()
 async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
-    trace_configs = [make_request_logging_trace_config()]
-
     app.platform_config_factory = PlatformConfigFactory(config)
     app.helm_client = HelmClient(namespace=config.platform_namespace)
     app.kube_client = await app.exit_stack.enter_async_context(
-        KubeClient(config.kube_config, trace_configs),
+        KubeClient(config.kube_config),
     )
     node = await app.kube_client.get_node(config.node_name)
     app.helm_values_factory = HelmValuesFactory(
@@ -70,11 +67,9 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
         app.kube_client, namespace=config.platform_namespace
     )
     app.config_client = await app.exit_stack.enter_async_context(
-        ConfigClient(config.platform_config_url, trace_configs=trace_configs)
+        ConfigClient(config.platform_config_url)
     )
-    app.raw_client = await app.exit_stack.enter_async_context(
-        aiohttp.ClientSession(trace_configs=trace_configs)
-    )
+    app.raw_client = await app.exit_stack.enter_async_context(aiohttp.ClientSession())
 
     settings.posting.level = logging.getLevelName(config.log_level)
     settings.persistence.progress_storage = kopf.AnnotationsProgressStorage()

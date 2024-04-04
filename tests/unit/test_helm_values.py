@@ -183,6 +183,7 @@ class TestHelmValuesFactory:
             "platform-disks": mock.ANY,
             "platform-api-poller": mock.ANY,
             "platform-buckets": mock.ANY,
+            "platform-apps": mock.ANY,
         }
 
     def test_create_gcp_platform_with_ssl_cert(
@@ -2558,3 +2559,39 @@ class TestHelmValuesFactory:
         prom = result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]
         assert prom["externalLabels"]["cluster"]
         assert prom["externalLabels"]["cluster"] == gcp_platform_config.cluster_name
+
+    def test_create_platform_apps_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_apps_values(gcp_platform_config)
+
+        assert result == {
+            "nameOverride": "platform-apps",
+            "fullnameOverride": "platform-apps",
+            "image": {"repository": "ghcr.io/neuro-inc/platform-apps"},
+            "platform": {
+                "clusterName": gcp_platform_config.cluster_name,
+                "authUrl": "https://dev.neu.ro",
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "key": "token",
+                            "name": "platform-token",
+                        }
+                    }
+                },
+            },
+            "ingress": {
+                "enabled": True,
+                "className": "traefik",
+                "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
+            },
+            "priorityClassName": "platform-services",
+            "rbac": {"create": True},
+            "serviceAccount": {"create": True},
+        }
