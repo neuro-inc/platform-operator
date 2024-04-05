@@ -1,6 +1,4 @@
 {{- $kubernetesEndpoint := lookup "v1" "Endpoints" "default" "kubernetes" -}}
-{{- $kubernetesAddresses := (first $kubernetesEndpoint.subsets).addresses -}}
-{{- $kubernetesIP := (first $kubernetesAddresses).ip -}}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -13,9 +11,15 @@ spec:
   policyTypes:
     - Egress
   egress:
+    {{- range $kubernetesEndpoint.subsets }}
     - to:
+        {{- range .addresses }}
         - ipBlock:
-            cidr: {{ $kubernetesIP }}/32
+            cidr: {{ .ip }}/32
+        {{- end }}
       ports:
+        {{- range .ports }}
         - protocol: TCP
-          port: 443
+          port: {{ .port }}
+        {{- end }}
+    {{- end }}
