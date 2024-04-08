@@ -249,27 +249,27 @@ class TestPlatformConfig:
             a_records=[
                 ARecord(
                     name=f"{dns_name}.",
-                    dns_name="traefik",
+                    dns_name="traefik.",
                     zone_id="/hostedzone/traefik",
                 ),
                 ARecord(
                     name=f"*.jobs.{dns_name}.",
-                    dns_name="traefik",
+                    dns_name="traefik.",
                     zone_id="/hostedzone/traefik",
                 ),
                 ARecord(
                     name=f"*.apps.{dns_name}.",
-                    dns_name="traefik",
+                    dns_name="traefik.",
                     zone_id="/hostedzone/traefik",
                 ),
                 ARecord(
                     name=f"registry.{dns_name}.",
-                    dns_name="traefik",
+                    dns_name="traefik.",
                     zone_id="/hostedzone/traefik",
                 ),
                 ARecord(
                     name=f"metrics.{dns_name}.",
-                    dns_name="traefik",
+                    dns_name="traefik.",
                     zone_id="/hostedzone/traefik",
                 ),
             ],

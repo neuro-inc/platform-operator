@@ -860,27 +860,27 @@ class PlatformConfig:
                 (
                     ARecord(
                         name=f"{self.ingress_dns_name}.",
-                        dns_name=ingress_host,
+                        dns_name=f"{ingress_host}.",
                         zone_id=ingress_zone_id,
                     ),
                     ARecord(
                         name=f"*.jobs.{self.ingress_dns_name}.",
-                        dns_name=ingress_host,
+                        dns_name=f"{ingress_host}.",
                         zone_id=ingress_zone_id,
                     ),
                     ARecord(
                         name=f"*.apps.{self.ingress_dns_name}.",
-                        dns_name=ingress_host,
+                        dns_name=f"{ingress_host}.",
                         zone_id=ingress_zone_id,
                     ),
                     ARecord(
                         name=f"registry.{self.ingress_dns_name}.",
-                        dns_name=ingress_host,
+                        dns_name=f"{ingress_host}.",
                         zone_id=ingress_zone_id,
                     ),
                     ARecord(
                         name=f"metrics.{self.ingress_dns_name}.",
-                        dns_name=ingress_host,
+                        dns_name=f"{ingress_host}.",
                         zone_id=ingress_zone_id,
                     ),
                 )
