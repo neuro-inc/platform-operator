@@ -1233,6 +1233,7 @@ class HelmValuesFactory:
                     "region": platform.buckets.minio_region,
                     "access_key": platform.buckets.minio_access_key,
                     "secret_key": platform.buckets.minio_secret_key,
+                    "insecure": platform.buckets.minio_url.scheme == "http",
                 },
             }
             prometheus_spec["thanos"] = {
