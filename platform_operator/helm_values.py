@@ -482,12 +482,14 @@ class HelmValuesFactory:
                 "loadBalancerSourceRanges"
             ] = platform.ingress_load_balancer_source_ranges
         if platform.ingress_service_type == IngressServiceType.NODE_PORT:
-            result["rollingUpdate"] = {"maxUnavailable": 1, "maxSurge": 0}
             ports = result["ports"]
             if platform.ingress_node_port_http and platform.ingress_node_port_https:
                 ports["web"]["nodePort"] = platform.ingress_node_port_http
                 ports["websecure"]["nodePort"] = platform.ingress_node_port_https
             if platform.ingress_host_port_http and platform.ingress_host_port_https:
+                result["updateStrategy"] = {
+                    "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0}
+                }
                 ports["web"]["hostPort"] = platform.ingress_host_port_http
                 ports["websecure"]["hostPort"] = platform.ingress_host_port_https
         result["service"]["annotations"].update(platform.ingress_service_annotations)
