@@ -819,7 +819,9 @@ class TestHelmValuesFactory:
             )
         )
 
-        assert result["rollingUpdate"] == {"maxSurge": 0, "maxUnavailable": 1}
+        assert result["updateStrategy"] == {
+            "rollingUpdate": {"maxSurge": 0, "maxUnavailable": 1}
+        }
         assert result["service"]["type"] == "NodePort"
         assert result["ports"]["web"]["nodePort"] == 30080
         assert result["ports"]["web"]["hostPort"] == 80
