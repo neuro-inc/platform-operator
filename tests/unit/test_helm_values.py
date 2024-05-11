@@ -673,13 +673,12 @@ class TestHelmValuesFactory:
                 "region": "minio",
                 "regionEndpoint": "platform-minio:9000",
                 "bucket": "job-images",
-                "secure": False,
             },
             "configData": {
                 "storage": {
                     "delete": {"enabled": True},
                     "redirect": {"disable": True},
-                    "s3": {"forcepathstyle": True},
+                    "s3": {"secure": False, "forcepathstyle": True},
                 }
             },
             "podLabels": {"service": "docker-registry"},

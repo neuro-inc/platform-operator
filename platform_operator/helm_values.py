@@ -381,15 +381,15 @@ class HelmValuesFactory:
                     platform.registry.docker_registry_s3_endpoint
                 ),
                 "bucket": str(platform.registry.docker_registry_s3_bucket),
-                "secure": platform.registry.docker_registry_s3_endpoint.scheme
-                == "https",
             }
             result["secrets"]["s3"] = {
                 "accessKey": platform.registry.docker_registry_s3_access_key,
                 "secretKey": platform.registry.docker_registry_s3_secret_key,
             }
             result["configData"]["storage"]["s3"] = {
-                "forcepathstyle": platform.registry.docker_registry_s3_force_path_style
+                "secure": platform.registry.docker_registry_s3_endpoint.scheme
+                == "https",
+                "forcepathstyle": platform.registry.docker_registry_s3_force_path_style,
             }
             result["configData"]["storage"]["redirect"] = {
                 "disable": platform.registry.docker_registry_s3_disable_redirect
