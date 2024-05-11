@@ -20,6 +20,7 @@ from platform_operator.models import (
     BucketsConfig,
     BucketsProvider,
     Config,
+    DockerRegistryStorageDriver,
     HelmChartNames,
     HelmChartVersions,
     HelmReleaseNames,
@@ -905,7 +906,7 @@ class TestPlatformConfigFactory:
 
         assert result.monitoring.metrics_retention_time == "1d"
 
-    def test_on_prem_platform_config_with_docker_registry(
+    def test_on_prem_platform_config_with_docker_registry_filesystem(
         self,
         factory: PlatformConfigFactory,
         on_prem_platform_body: kopf.Body,
@@ -947,6 +948,34 @@ class TestPlatformConfigFactory:
             docker_registry_url=URL("http://docker-registry"),
             docker_registry_username="",
             docker_registry_password="",
+        )
+
+    def test_on_prem_platform_config_with_docker_registry__s3_minio(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: kopf.Body,
+        on_prem_cluster: Cluster,
+    ) -> None:
+        on_prem_platform_body["spec"]["registry"] = {
+            "blobStorage": {
+                "bucket": "job-images",
+            }
+        }
+
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result.registry == RegistryConfig(
+            provider=RegistryProvider.DOCKER,
+            docker_registry_install=True,
+            docker_registry_url=URL("http://platform-docker-registry:5000"),
+            docker_registry_storage_driver=DockerRegistryStorageDriver.S3,
+            docker_registry_s3_endpoint=URL("http://platform-minio:9000"),
+            docker_registry_s3_bucket="job-images",
+            docker_registry_s3_region="minio",
+            docker_registry_s3_access_key="username",
+            docker_registry_s3_secret_key="password",
+            docker_registry_s3_disable_redirect=True,
+            docker_registry_s3_force_path_style=True,
         )
 
     def test_on_prem_platform_config_with_minio_buckets(

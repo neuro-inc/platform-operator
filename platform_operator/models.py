@@ -439,6 +439,10 @@ class RegistrySpec(dict[str, Any]):
     def kubernetes_storage_size(self) -> str:
         return self["kubernetes"]["persistence"].get("size", "")
 
+    @property
+    def blob_storage_bucket(self) -> str:
+        return self["blobStorage"].get("bucket", "")
+
 
 class MonitoringSpec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
@@ -656,6 +660,11 @@ class RegistryProvider(str, Enum):
     DOCKER = "docker"
 
 
+class DockerRegistryStorageDriver(str, Enum):
+    FILE_SYSTEM = "file_system"
+    S3 = "s3"
+
+
 @dataclass(frozen=True)
 class RegistryConfig:
     provider: RegistryProvider
@@ -673,8 +682,21 @@ class RegistryConfig:
     docker_registry_url: URL | None = None
     docker_registry_username: str = ""
     docker_registry_password: str = ""
-    docker_registry_storage_class_name: str = ""
-    docker_registry_storage_size: str = ""
+
+    docker_registry_storage_driver: DockerRegistryStorageDriver = (
+        DockerRegistryStorageDriver.FILE_SYSTEM
+    )
+
+    docker_registry_file_system_storage_class_name: str = ""
+    docker_registry_file_system_storage_size: str = ""
+
+    docker_registry_s3_endpoint: URL | None = None
+    docker_registry_s3_region: str = ""
+    docker_registry_s3_bucket: str = ""
+    docker_registry_s3_access_key: str = ""
+    docker_registry_s3_secret_key: str = ""
+    docker_registry_s3_disable_redirect: bool = False
+    docker_registry_s3_force_path_style: bool = False
 
 
 class BucketsProvider(str, Enum):
@@ -984,6 +1006,7 @@ class PlatformConfigFactory:
             service_account_annotations["eks.amazonaws.com/role-arn"] = (
                 spec.iam.aws_role_arn
             )
+        buckets_config = self._create_buckets(spec.blob_storage, cluster)
         return PlatformConfig(
             release_name=release_name,
             auth_url=self._config.platform_auth_url,
@@ -1055,8 +1078,10 @@ class PlatformConfigFactory:
             jobs_fallback_host=cluster.orchestrator.job_fallback_hostname,
             idle_jobs=cluster.orchestrator.idle_jobs,
             storages=[self._create_storage(s) for s in spec.storages],
-            buckets=self._create_buckets(spec.blob_storage, cluster),
-            registry=self._create_registry(spec.registry),
+            buckets=buckets_config,
+            registry=self._create_registry(
+                spec.registry, buckets_config=buckets_config
+            ),
             monitoring=self._create_monitoring(spec.monitoring),
             disks_storage_limit_per_user=cluster.disks.storage_limit_per_user,
             disks_storage_class_name=spec.disks.storage_class_name or None,
@@ -1267,7 +1292,9 @@ class PlatformConfigFactory:
         else:
             raise ValueError("Bucket provider is not supported")
 
-    def _create_registry(self, spec: RegistrySpec) -> RegistryConfig:
+    def _create_registry(
+        self, spec: RegistrySpec, *, buckets_config: BucketsConfig
+    ) -> RegistryConfig:
         if not spec:
             raise ValueError("Registry spec is empty")
 
@@ -1308,8 +1335,30 @@ class PlatformConfigFactory:
                     host=f"{self._config.helm_release_names.platform}-docker-registry",
                     port=5000,
                 ),
-                docker_registry_storage_class_name=spec.kubernetes_storage_class_name,
-                docker_registry_storage_size=spec.kubernetes_storage_size or "10Gi",
+                docker_registry_storage_driver=DockerRegistryStorageDriver.FILE_SYSTEM,
+                docker_registry_file_system_storage_class_name=(
+                    spec.kubernetes_storage_class_name
+                ),
+                docker_registry_file_system_storage_size=spec.kubernetes_storage_size
+                or "10Gi",
+            )
+        elif "blobStorage" in spec and buckets_config.provider == BucketsProvider.MINIO:
+            return RegistryConfig(
+                provider=RegistryProvider.DOCKER,
+                docker_registry_install=True,
+                docker_registry_url=URL.build(
+                    scheme="http",
+                    host=f"{self._config.helm_release_names.platform}-docker-registry",
+                    port=5000,
+                ),
+                docker_registry_storage_driver=DockerRegistryStorageDriver.S3,
+                docker_registry_s3_endpoint=buckets_config.minio_url,
+                docker_registry_s3_region=buckets_config.minio_region,
+                docker_registry_s3_bucket=spec.blob_storage_bucket,
+                docker_registry_s3_access_key=buckets_config.minio_access_key,
+                docker_registry_s3_secret_key=buckets_config.minio_secret_key,
+                docker_registry_s3_disable_redirect=True,
+                docker_registry_s3_force_path_style=True,
             )
         else:
             raise ValueError("Registry provider is not supported")
