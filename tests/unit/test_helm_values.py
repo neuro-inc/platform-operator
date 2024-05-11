@@ -2283,6 +2283,7 @@ class TestHelmValuesFactory:
                 "endpoint": "platform-minio:9000",
                 "access_key": "minio_access_key",
                 "secret_key": "minio_secret_key",
+                "insecure": True,
             },
         }
         assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
