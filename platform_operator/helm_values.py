@@ -10,6 +10,7 @@ from yarl import URL
 
 from .models import (
     BucketsProvider,
+    DockerRegistryStorageDriver,
     HelmChartNames,
     IngressServiceType,
     LabelsConfig,
@@ -338,11 +339,6 @@ class HelmValuesFactory:
         result: dict[str, Any] = {
             "image": {"repository": platform.get_image("registry")},
             "ingress": {"enabled": False},
-            "persistence": {
-                "enabled": True,
-                "storageClass": platform.registry.docker_registry_storage_class_name,
-                "size": platform.registry.docker_registry_storage_size,
-            },
             "secrets": {
                 "haSharedSecret": sha256(platform.cluster_name.encode()).hexdigest()
             },
@@ -360,6 +356,44 @@ class HelmValuesFactory:
                 bcrypt.gensalt(rounds=10),
             ).decode()
             result["secrets"]["htpasswd"] = f"{username}:{password_hash}"
+        if (
+            platform.registry.docker_registry_storage_driver
+            == DockerRegistryStorageDriver.FILE_SYSTEM
+        ):
+            result["storage"] = "filesystem"
+            result["persistence"] = {
+                "enabled": True,
+                "storageClass": (
+                    platform.registry.docker_registry_file_system_storage_class_name
+                ),
+                "size": platform.registry.docker_registry_file_system_storage_size,
+            }
+        elif (
+            platform.registry.docker_registry_storage_driver
+            == DockerRegistryStorageDriver.S3
+        ):
+            assert platform.registry.docker_registry_s3_endpoint
+            result["replicaCount"] = 2
+            result["storage"] = "s3"
+            result["s3"] = {
+                "region": platform.registry.docker_registry_s3_region,
+                "regionEndpoint": self._get_url_authority(
+                    platform.registry.docker_registry_s3_endpoint
+                ),
+                "bucket": str(platform.registry.docker_registry_s3_bucket),
+                "secure": platform.registry.docker_registry_s3_endpoint.scheme
+                == "https",
+            }
+            result["secrets"]["s3"] = {
+                "accessKey": platform.registry.docker_registry_s3_access_key,
+                "secretKey": platform.registry.docker_registry_s3_secret_key,
+            }
+            result["configData"]["storage"]["s3"] = {
+                "forcepathstyle": platform.registry.docker_registry_s3_force_path_style
+            }
+            result["configData"]["storage"]["redirect"] = {
+                "disable": platform.registry.docker_registry_s3_disable_redirect
+            }
         return result
 
     def create_minio_values(self, platform: PlatformConfig) -> dict[str, Any]:

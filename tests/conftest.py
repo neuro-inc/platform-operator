@@ -696,8 +696,8 @@ def on_prem_platform_config(
             docker_registry_url=URL("http://platform-docker-registry:5000"),
             docker_registry_username="",
             docker_registry_password="",
-            docker_registry_storage_class_name="registry-standard",
-            docker_registry_storage_size="100Gi",
+            docker_registry_file_system_storage_class_name="registry-standard",
+            docker_registry_file_system_storage_size="100Gi",
         ),
         buckets=BucketsConfig(
             provider=BucketsProvider.MINIO,

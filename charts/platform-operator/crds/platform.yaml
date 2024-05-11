@@ -221,12 +221,19 @@ spec:
                             type: string
                           size:
                             type: string
+                  blobStorage:
+                    type: object
+                    required: [bucket]
+                    properties:
+                      bucket:
+                        type: string
                 oneOf:
                 - required: [aws]
                 - required: [gcp]
                 - required: [azure]
                 - required: [kubernetes]
                 - required: [docker]
+                - required: [blobStorage]
               storages:
                 type: array
                 items:

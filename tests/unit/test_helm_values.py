@@ -11,6 +11,7 @@ from platform_operator.models import (
     BucketsProvider,
     Config,
     DockerConfig,
+    DockerRegistryStorageDriver,
     IngressServiceType,
     LabelsConfig,
     MetricsStorageType,
@@ -616,7 +617,7 @@ class TestHelmValuesFactory:
 
         assert result["acme"]["server"] == "letsencrypt_test"
 
-    def test_create_docker_registry_values(
+    def test_create_docker_registry_values_with_filesystem_storage(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_docker_registry_values(on_prem_platform_config)
@@ -630,7 +631,57 @@ class TestHelmValuesFactory:
                 "size": "100Gi",
             },
             "secrets": {"haSharedSecret": mock.ANY},
+            "storage": "filesystem",
             "configData": {"storage": {"delete": {"enabled": True}}},
+            "podLabels": {"service": "docker-registry"},
+            "priorityClassName": "platform-services",
+        }
+        assert result["secrets"]["haSharedSecret"]
+
+    def test_create_docker_registry_values_with_s3_minio_storage(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        on_prem_platform_config = replace(
+            on_prem_platform_config,
+            registry=replace(
+                on_prem_platform_config.registry,
+                docker_registry_storage_driver=DockerRegistryStorageDriver.S3,
+                docker_registry_s3_endpoint=URL("http://platform-minio:9000"),
+                docker_registry_s3_region="minio",
+                docker_registry_s3_bucket="job-images",
+                docker_registry_s3_access_key="minio-access-key",
+                docker_registry_s3_secret_key="minio-secret-key",
+                docker_registry_s3_disable_redirect=True,
+                docker_registry_s3_force_path_style=True,
+            ),
+        )
+        result = factory.create_docker_registry_values(on_prem_platform_config)
+
+        assert result == {
+            "replicaCount": 2,
+            "image": {"repository": "ghcr.io/neuro-inc/registry"},
+            "ingress": {"enabled": False},
+            "secrets": {
+                "haSharedSecret": mock.ANY,
+                "s3": {
+                    "accessKey": "minio-access-key",
+                    "secretKey": "minio-secret-key",
+                },
+            },
+            "storage": "s3",
+            "s3": {
+                "region": "minio",
+                "regionEndpoint": "platform-minio:9000",
+                "bucket": "job-images",
+                "secure": False,
+            },
+            "configData": {
+                "storage": {
+                    "delete": {"enabled": True},
+                    "redirect": {"disable": True},
+                    "s3": {"forcepathstyle": True},
+                }
+            },
             "podLabels": {"service": "docker-registry"},
             "priorityClassName": "platform-services",
         }
