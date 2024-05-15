@@ -16,7 +16,7 @@ LABEL org.opencontainers.image.source = "https://github.com/neuro-inc/platform-o
 
 RUN apt-get update && apt-get install -y curl \
     && rm -rf /var/lib/apt/lists/*
-RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- -v v3.13.3
+RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- -v v3.14.0
 
 RUN mkdir /etc/platform \
     && curl -o /etc/platform/ca_staging.pem https://letsencrypt.org/certs/staging/letsencrypt-stg-root-x1.pem
