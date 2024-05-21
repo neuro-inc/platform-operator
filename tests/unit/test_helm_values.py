@@ -2149,6 +2149,7 @@ class TestHelmValuesFactory:
                     "config": {"bucket": "job-metrics", "service_account": "{}"},
                 },
                 "priorityClassName": "platform-services",
+                "sidecar": {"selector": {"app": None}},
             },
             "cloudProvider": {
                 "type": "gcp",

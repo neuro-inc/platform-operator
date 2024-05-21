@@ -1167,6 +1167,7 @@ class HelmValuesFactory:
                     },
                 },
                 "priorityClassName": platform.services_priority_class_name,
+                "sidecar": {"selector": {"app": None}},
             },
             "grafana": {
                 "image": {
