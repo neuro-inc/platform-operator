@@ -1640,7 +1640,6 @@ class TestHelmValuesFactory:
             "nvidiaDCGMPort": 9400,
             "jobsNamespace": "platform-jobs",
             "nodeLabels": {
-                "job": "platform.neuromation.io/job",
                 "nodePool": "platform.neuromation.io/nodepool",
             },
             "platform": {
@@ -2544,7 +2543,6 @@ class TestHelmValuesFactory:
             "storages": [{"path": "", "type": "pvc", "claimName": "platform-storage"}],
             "nodeLabels": {
                 "job": "platform.neuromation.io/job",
-                "gpu": "platform.neuromation.io/accelerator",
                 "preemptible": "platform.neuromation.io/preemptible",
                 "nodePool": "platform.neuromation.io/nodepool",
             },

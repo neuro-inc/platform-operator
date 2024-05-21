@@ -767,7 +767,6 @@ class HelmValuesFactory:
             "kubeletPort": platform.kubelet_port,
             "nvidiaDCGMPort": platform.nvidia_dcgm_port,
             "nodeLabels": {
-                "job": platform.node_labels.job,
                 "nodePool": platform.node_labels.node_pool,
             },
             "platform": {
@@ -1420,7 +1419,6 @@ class HelmValuesFactory:
             },
             "nodeLabels": {
                 "job": platform.node_labels.job,
-                "gpu": platform.node_labels.accelerator,
                 "preemptible": platform.node_labels.preemptible,
                 "nodePool": platform.node_labels.node_pool,
             },
