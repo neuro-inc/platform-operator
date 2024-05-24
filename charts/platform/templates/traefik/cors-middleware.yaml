@@ -24,6 +24,12 @@ spec:
       - last-event-id
       - content-type
       - x-requested-with
+      - x-amz-content-sha256
+      - x-amz-security-token
+      - x-amz-date
+      - x-amz-user-agent
+      - amz-sdk-invocation-id
+      - amz-sdk-request
     {{- with .Values.ingress.cors.originList }}
     accessControlAllowOriginList:
       {{- toYaml . | nindent 6 }}
