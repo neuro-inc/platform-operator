@@ -525,6 +525,7 @@ def gcp_platform_config(
         ingress_url=URL(f"https://{cluster_name}.org.neu.ro"),
         ingress_auth_url=URL("https://platformingressauth"),
         ingress_registry_url=URL(f"https://registry.{cluster_name}.org.neu.ro"),
+        ingress_grafana_url=URL(f"https://grafana.{cluster_name}.org.neu.ro"),
         ingress_metrics_url=URL(f"https://metrics.{cluster_name}.org.neu.ro"),
         ingress_acme_enabled=True,
         ingress_acme_environment=ACMEEnvironment.PRODUCTION,
