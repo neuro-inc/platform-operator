@@ -21,6 +21,14 @@ spec:
       - accept
       - accept-language
       - content-language
+      - upgrade
+      - connection
+      - sec-websocket-accept
+      - sec-websocket-protocol
+      - sec-websocket-version
+      - sec-websocket-extensions
+      - sec-websocket-key
+      - sec-websocket-key1
       - last-event-id
       - content-type
       - x-requested-with
