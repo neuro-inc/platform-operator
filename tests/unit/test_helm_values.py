@@ -1953,11 +1953,21 @@ class TestHelmValuesFactory:
                 "sampleRate": 0.1,
             },
             "platformJobs": {"namespace": "platform-jobs"},
+            "metricsApi": {
+                "ingress": {
+                    "enabled": True,
+                    "ingressClassName": "traefik",
+                    "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+                }
+            },
             "grafanaProxy": {
                 "ingress": {
                     "enabled": True,
                     "ingressClassName": "traefik",
-                    "hosts": [f"metrics.{gcp_platform_config.cluster_name}.org.neu.ro"],
+                    "hosts": [
+                        f"grafana.{gcp_platform_config.cluster_name}.org.neu.ro",
+                        f"metrics.{gcp_platform_config.cluster_name}.org.neu.ro",
+                    ],
                     "annotations": {
                         "traefik.ingress.kubernetes.io/router.middlewares": (
                             "platform-platform-ingress-auth@kubernetescrd"

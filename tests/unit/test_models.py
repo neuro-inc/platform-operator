@@ -198,10 +198,9 @@ class TestPlatformConfig:
             name=gcp_platform_config.ingress_dns_name,
             a_records=[
                 ARecord(name=f"{dns_name}.", ips=["192.168.0.1"]),
+                ARecord(name=f"*.{dns_name}.", ips=["192.168.0.1"]),
                 ARecord(name=f"*.jobs.{dns_name}.", ips=["192.168.0.1"]),
                 ARecord(name=f"*.apps.{dns_name}.", ips=["192.168.0.1"]),
-                ARecord(name=f"registry.{dns_name}.", ips=["192.168.0.1"]),
-                ARecord(name=f"metrics.{dns_name}.", ips=["192.168.0.1"]),
             ],
         )
 
@@ -226,11 +225,9 @@ class TestPlatformConfig:
             name=on_prem_platform_config.ingress_dns_name,
             a_records=[
                 ARecord(name=f"{dns_name}.", ips=["192.168.0.3"]),
+                ARecord(name=f"*.{dns_name}.", ips=["192.168.0.3"]),
                 ARecord(name=f"*.jobs.{dns_name}.", ips=["192.168.0.3"]),
                 ARecord(name=f"*.apps.{dns_name}.", ips=["192.168.0.3"]),
-                ARecord(name=f"registry.{dns_name}.", ips=["192.168.0.3"]),
-                ARecord(name=f"metrics.{dns_name}.", ips=["192.168.0.3"]),
-                ARecord(name=f"blob.{dns_name}.", ips=["192.168.0.3"]),
             ],
         )
 
@@ -254,22 +251,17 @@ class TestPlatformConfig:
                     zone_id="/hostedzone/traefik",
                 ),
                 ARecord(
+                    name=f"*.{dns_name}.",
+                    dns_name="traefik.",
+                    zone_id="/hostedzone/traefik",
+                ),
+                ARecord(
                     name=f"*.jobs.{dns_name}.",
                     dns_name="traefik.",
                     zone_id="/hostedzone/traefik",
                 ),
                 ARecord(
                     name=f"*.apps.{dns_name}.",
-                    dns_name="traefik.",
-                    zone_id="/hostedzone/traefik",
-                ),
-                ARecord(
-                    name=f"registry.{dns_name}.",
-                    dns_name="traefik.",
-                    zone_id="/hostedzone/traefik",
-                ),
-                ARecord(
-                    name=f"metrics.{dns_name}.",
                     dns_name="traefik.",
                     zone_id="/hostedzone/traefik",
                 ),

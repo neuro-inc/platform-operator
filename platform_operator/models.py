@@ -788,6 +788,7 @@ class PlatformConfig:
     ingress_url: URL
     ingress_registry_url: URL
     ingress_metrics_url: URL
+    ingress_grafana_url: URL
     ingress_acme_enabled: bool
     ingress_acme_environment: ACMEEnvironment
     ingress_controller_install: bool
@@ -863,16 +864,11 @@ class PlatformConfig:
             a_records.extend(
                 (
                     ARecord(name=f"{self.ingress_dns_name}.", ips=ips),
+                    ARecord(name=f"*.{self.ingress_dns_name}.", ips=ips),
                     ARecord(name=f"*.jobs.{self.ingress_dns_name}.", ips=ips),
                     ARecord(name=f"*.apps.{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"registry.{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"metrics.{self.ingress_dns_name}.", ips=ips),
                 )
             )
-            if self.buckets.provider == BucketsProvider.MINIO:
-                a_records.append(
-                    ARecord(name=f"blob.{self.ingress_dns_name}.", ips=ips)
-                )
         elif aws_ingress_lb and ingress_service:
             ingress_host = ingress_service["status"]["loadBalancer"]["ingress"][0][
                 "hostname"
@@ -886,22 +882,17 @@ class PlatformConfig:
                         zone_id=ingress_zone_id,
                     ),
                     ARecord(
+                        name=f"*.{self.ingress_dns_name}.",
+                        dns_name=f"{ingress_host}.",
+                        zone_id=ingress_zone_id,
+                    ),
+                    ARecord(
                         name=f"*.jobs.{self.ingress_dns_name}.",
                         dns_name=f"{ingress_host}.",
                         zone_id=ingress_zone_id,
                     ),
                     ARecord(
                         name=f"*.apps.{self.ingress_dns_name}.",
-                        dns_name=f"{ingress_host}.",
-                        zone_id=ingress_zone_id,
-                    ),
-                    ARecord(
-                        name=f"registry.{self.ingress_dns_name}.",
-                        dns_name=f"{ingress_host}.",
-                        zone_id=ingress_zone_id,
-                    ),
-                    ARecord(
-                        name=f"metrics.{self.ingress_dns_name}.",
                         dns_name=f"{ingress_host}.",
                         zone_id=ingress_zone_id,
                     ),
@@ -909,34 +900,15 @@ class PlatformConfig:
             )
         elif ingress_service and ingress_service["spec"]["type"] == "LoadBalancer":
             ingress_host = ingress_service["status"]["loadBalancer"]["ingress"][0]["ip"]
+            ips = [ingress_host]
             a_records.extend(
                 (
-                    ARecord(
-                        name=f"{self.ingress_dns_name}.",
-                        ips=[ingress_host],
-                    ),
-                    ARecord(
-                        name=f"*.jobs.{self.ingress_dns_name}.",
-                        ips=[ingress_host],
-                    ),
-                    ARecord(
-                        name=f"*.apps.{self.ingress_dns_name}.",
-                        ips=[ingress_host],
-                    ),
-                    ARecord(
-                        name=f"registry.{self.ingress_dns_name}.",
-                        ips=[ingress_host],
-                    ),
-                    ARecord(
-                        name=f"metrics.{self.ingress_dns_name}.",
-                        ips=[ingress_host],
-                    ),
+                    ARecord(name=f"{self.ingress_dns_name}.", ips=ips),
+                    ARecord(name=f"*.{self.ingress_dns_name}.", ips=ips),
+                    ARecord(name=f"*.jobs.{self.ingress_dns_name}.", ips=ips),
+                    ARecord(name=f"*.apps.{self.ingress_dns_name}.", ips=ips),
                 )
             )
-            if self.buckets.provider == BucketsProvider.MINIO:
-                a_records.append(
-                    ARecord(name=f"blob.{self.ingress_dns_name}.", ips=[ingress_host])
-                )
         else:
             return None
         return DNSConfig(name=self.ingress_dns_name, a_records=a_records)
@@ -1047,6 +1019,7 @@ class PlatformConfigFactory:
             ingress_dns_name=cluster.dns.name,
             ingress_url=URL(f"https://{cluster.dns.name}"),
             ingress_registry_url=URL(f"https://registry.{cluster.dns.name}"),
+            ingress_grafana_url=URL(f"https://grafana.{cluster.dns.name}"),
             ingress_metrics_url=URL(f"https://metrics.{cluster.dns.name}"),
             ingress_acme_enabled=(
                 not spec.ingress_controller.ssl_cert_data

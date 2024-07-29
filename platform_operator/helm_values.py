@@ -989,11 +989,21 @@ class HelmValuesFactory:
             },
             "secrets": [],
             "platformJobs": {"namespace": platform.jobs_namespace},
+            "metricsApi": {
+                "ingress": {
+                    "enabled": True,
+                    "ingressClassName": "traefik",
+                    "hosts": [platform.ingress_url.host],
+                }
+            },
             "grafanaProxy": {
                 "ingress": {
                     "enabled": True,
                     "ingressClassName": "traefik",
-                    "hosts": [platform.ingress_metrics_url.host],
+                    "hosts": [
+                        platform.ingress_grafana_url.host,
+                        platform.ingress_metrics_url.host,  # deprecated
+                    ],
                     "annotations": {
                         "traefik.ingress.kubernetes.io/router.middlewares": (
                             f"{platform.namespace}-{platform.release_name}-ingress-auth"
