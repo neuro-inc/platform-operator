@@ -1975,7 +1975,10 @@ class TestHelmValuesFactory:
                     },
                 }
             },
-            "prometheusRemoteStorageEnabled": True,
+            "prometheus": {
+                "url": "http://thanos-query-http:10902",
+                "remoteStorageEnabled": True,
+            },
             "kube-prometheus-stack": {
                 "global": {
                     "imageRegistry": "ghcr.io",
@@ -2299,7 +2302,10 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_reports_values(on_prem_platform_config)
 
-        assert result["prometheusRemoteStorageEnabled"] is False
+        assert result["prometheus"] == {
+            "url": "http://prometheus-prometheus:9090",
+            "remoteStorageEnabled": False,
+        }
         assert result["prometheusProxy"] == {
             "prometheus": {"host": "prometheus-prometheus", "port": 9090}
         }

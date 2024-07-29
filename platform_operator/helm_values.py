@@ -1012,7 +1012,10 @@ class HelmValuesFactory:
                     },
                 }
             },
-            "prometheusRemoteStorageEnabled": True,
+            "prometheus": {
+                "url": "http://thanos-query-http:10902",
+                "remoteStorageEnabled": True,
+            },
             "kube-prometheus-stack": {
                 "global": {
                     "imageRegistry": platform.image_registry,
@@ -1210,7 +1213,8 @@ class HelmValuesFactory:
             "prometheusSpec"
         ]
         if platform.monitoring.metrics_storage_type == MetricsStorageType.KUBERNETES:
-            result["prometheusRemoteStorageEnabled"] = False
+            result["prometheus"]["url"] = "http://prometheus-prometheus:9090"
+            result["prometheus"]["remoteStorageEnabled"] = False
             result["prometheusProxy"] = {
                 "prometheus": {"host": "prometheus-prometheus", "port": 9090}
             }
