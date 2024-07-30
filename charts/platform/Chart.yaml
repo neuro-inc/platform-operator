@@ -37,7 +37,7 @@ dependencies:
     version: "23.7.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-reports
-    version: "24.7.2"
+    version: "24.7.3"
     repository: oci://ghcr.io/neuro-inc/helm-charts
     condition: platformReportsEnabled
   - name: platform-disks
