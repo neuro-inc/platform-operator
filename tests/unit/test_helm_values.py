@@ -41,6 +41,7 @@ class TestHelmValuesFactory:
             "acmeEnabled": True,
             "dockerRegistryEnabled": False,
             "minioEnabled": False,
+            "minioGatewayEnabled": True,
             "platformReportsEnabled": True,
             "alpineImage": {"repository": "ghcr.io/neuro-inc/alpine"},
             "pauseImage": {"repository": "ghcr.io/neuro-inc/pause"},
@@ -175,6 +176,7 @@ class TestHelmValuesFactory:
             "ssl": {"cert": "", "key": ""},
             "acme": mock.ANY,
             "traefik": mock.ANY,
+            "minio-gateway": mock.ANY,
             "platform-storage": mock.ANY,
             "platform-registry": mock.ANY,
             "platform-monitoring": mock.ANY,
@@ -263,55 +265,6 @@ class TestHelmValuesFactory:
             },
         ]
 
-    def test_create_gcp_platform_values_with_kubernetes_storage(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(
-            replace(
-                gcp_platform_config,
-                storages=[
-                    StorageConfig(
-                        type=StorageType.KUBERNETES,
-                        storage_class_name="storage-class",
-                        storage_size="100Gi",
-                    )
-                ],
-            )
-        )
-
-        assert result["storages"] == [
-            {
-                "type": "kubernetes",
-                "path": "",
-                "storageClassName": "storage-class",
-                "size": "100Gi",
-            }
-        ]
-
-    def test_create_gcp_platform_values_with_gcs_storage(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(
-            replace(
-                gcp_platform_config,
-                storages=[
-                    StorageConfig(
-                        type=StorageType.GCS,
-                        gcs_bucket_name="platform-storage",
-                    )
-                ],
-            )
-        )
-
-        assert result["storages"] == [
-            {
-                "type": "gcs",
-                "path": "",
-                "size": "10Gi",
-                "gcs": {"bucketName": "platform-storage"},
-            }
-        ]
-
     def test_create_gcp_platform_values_without_docker_config_secret(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -355,31 +308,6 @@ class TestHelmValuesFactory:
 
         assert result["serviceAccount"] == {"annotations": {"role-arn": "role"}}
 
-    def test_create_aws_platform_values_with_kubernetes_storage(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(
-            replace(
-                aws_platform_config,
-                storages=[
-                    StorageConfig(
-                        type=StorageType.KUBERNETES,
-                        storage_class_name="storage-class",
-                        storage_size="100Gi",
-                    )
-                ],
-            )
-        )
-
-        assert result["storages"] == [
-            {
-                "type": "kubernetes",
-                "path": "",
-                "size": "100Gi",
-                "storageClassName": "storage-class",
-            }
-        ]
-
     def test_create_azure_platform_values(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -395,31 +323,6 @@ class TestHelmValuesFactory:
                     "storageAccountKey": "accountKey1",
                     "shareName": "share",
                 },
-            }
-        ]
-
-    def test_create_azure_platform_values_with_kubernetes_storage(
-        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(
-            replace(
-                azure_platform_config,
-                storages=[
-                    StorageConfig(
-                        type=StorageType.KUBERNETES,
-                        storage_class_name="storage-class",
-                        storage_size="100Gi",
-                    )
-                ],
-            )
-        )
-
-        assert result["storages"] == [
-            {
-                "type": "kubernetes",
-                "path": "",
-                "size": "100Gi",
-                "storageClassName": "storage-class",
             }
         ]
 
@@ -455,10 +358,10 @@ class TestHelmValuesFactory:
 
         assert result["storages"] == [
             {
-                "type": "kubernetes",
+                "type": "nfs",
                 "path": "",
-                "storageClassName": "storage-standard",
-                "size": "1000Gi",
+                "size": "10Gi",
+                "nfs": {"server": "192.168.0.3", "path": "/"},
             }
         ]
         assert result["dockerRegistryEnabled"] is True
@@ -724,6 +627,78 @@ class TestHelmValuesFactory:
             "priorityClassName": "platform-services",
         }
 
+    def test_create_minio_gateway_values__gcp(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_minio_gateway_values(gcp_platform_config)
+
+        assert gcp_platform_config.minio_gateway
+        assert result == {
+            "nameOverride": "minio-gateway",
+            "fullnameOverride": "minio-gateway",
+            "image": {"repository": "ghcr.io/neuro-inc/minio"},
+            "imagePullSecrets": [
+                {"name": "platform-docker-config"},
+                {"name": "platform-docker-hub-config"},
+            ],
+            "replicaCount": 2,
+            "env": [
+                {
+                    "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                    "value": "/etc/config/minio/gcs/key.json",
+                }
+            ],
+            "rootUser": {
+                "user": gcp_platform_config.minio_gateway.root_user,
+                "password": gcp_platform_config.minio_gateway.root_user_password,
+            },
+            "secrets": [
+                {
+                    "data": {"key.json": "{}"},
+                    "name": "minio-gateway-gcs-key",
+                }
+            ],
+            "volumeMounts": [
+                {
+                    "name": "gcp-credentials",
+                    "mountPath": "/etc/config/minio/gcs",
+                    "readOnly": True,
+                }
+            ],
+            "volumes": [
+                {
+                    "name": "gcp-credentials",
+                    "secret": {
+                        "secretName": "minio-gateway-gcs-key",
+                        "optional": False,
+                    },
+                }
+            ],
+            "cloudStorage": {"type": "gcs", "gcs": {"project": "project"}},
+        }
+
+    def test_create_minio_gateway_values__azure(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_minio_gateway_values(azure_platform_config)
+
+        assert azure_platform_config.minio_gateway
+        assert result == {
+            "nameOverride": "minio-gateway",
+            "fullnameOverride": "minio-gateway",
+            "image": {"repository": "ghcr.io/neuro-inc/minio"},
+            "imagePullSecrets": [
+                {"name": "platform-docker-config"},
+                {"name": "platform-docker-hub-config"},
+            ],
+            "replicaCount": 2,
+            "rootUser": {
+                "user": azure_platform_config.minio_gateway.root_user,
+                "password": azure_platform_config.minio_gateway.root_user_password,
+            },
+            "cloudStorage": {"type": "azure"},
+        }
+
     def test_create_gcp_traefik_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -903,6 +878,7 @@ class TestHelmValuesFactory:
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
+                "adminUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -919,6 +895,14 @@ class TestHelmValuesFactory:
                 "sampleRate": 0.1,
             },
             "priorityClassName": "platform-services",
+            "s3": {
+                "endpoint": "http://minio-gateway:9000",
+                "region": "us",
+                "accessKeyId": "admin",
+                "secretAccessKey": mock.ANY,
+                "bucket": "job-metrics",
+                "keyPrefix": "storage/",
+            },
         }
 
     def test_create_platform_storage_values_with_multiple_storages(
@@ -929,14 +913,16 @@ class TestHelmValuesFactory:
                 gcp_platform_config,
                 storages=[
                     StorageConfig(
-                        type=StorageType.KUBERNETES,
+                        type=StorageType.NFS,
                         path="/storage1",
-                        storage_class_name="class",
+                        nfs_server="test-nfs-server-1",
+                        nfs_export_path="/test/export/path/1",
                     ),
                     StorageConfig(
-                        type=StorageType.KUBERNETES,
+                        type=StorageType.NFS,
                         path="/storage2",
-                        storage_class_name="class",
+                        nfs_server="test-nfs-server-2",
+                        nfs_export_path="/test/export/path/2",
                     ),
                 ],
             )
@@ -1644,7 +1630,7 @@ class TestHelmValuesFactory:
             },
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
-                "apiUrl": "https://dev.neu.ro/api/v1",
+                "apiUrl": "https://dev.neu.ro",
                 "authUrl": "https://dev.neu.ro",
                 "configUrl": "https://dev.neu.ro",
                 "registryUrl": (
@@ -1676,15 +1662,15 @@ class TestHelmValuesFactory:
             "fluentbit": {
                 "image": {"repository": "ghcr.io/neuro-inc/fluent-bit"},
             },
-            "minioGateway": {"image": {"repository": "ghcr.io/neuro-inc/minio"}},
             "logs": {
                 "persistence": {
-                    "type": "gcp",
-                    "gcp": {
+                    "type": "s3",
+                    "s3": {
+                        "endpoint": "http://minio-gateway:9000",
+                        "region": "us",
+                        "accessKeyId": "admin",
+                        "secretAccessKey": mock.ANY,
                         "bucket": "job-logs",
-                        "project": "project",
-                        "location": "us",
-                        "serviceAccountKeyBase64": "e30=",
                     },
                 }
             },
@@ -1720,12 +1706,13 @@ class TestHelmValuesFactory:
 
         assert result["logs"] == {
             "persistence": {
-                "type": "gcp",
-                "gcp": {
+                "type": "s3",
+                "s3": {
+                    "endpoint": "http://minio-gateway:9000",
+                    "region": "us-central1",
+                    "accessKeyId": "admin",
+                    "secretAccessKey": mock.ANY,
                     "bucket": "job-logs",
-                    "project": "project",
-                    "location": "us-central1",
-                    "serviceAccountKeyBase64": "e30=",
                 },
             }
         }
@@ -1737,8 +1724,8 @@ class TestHelmValuesFactory:
 
         assert result["logs"] == {
             "persistence": {
-                "type": "aws",
-                "aws": {"bucket": "job-logs", "region": "us-east-1"},
+                "type": "s3",
+                "s3": {"bucket": "job-logs", "region": "us-east-1"},
             },
         }
 
@@ -1749,11 +1736,13 @@ class TestHelmValuesFactory:
 
         assert result["logs"] == {
             "persistence": {
-                "type": "azure",
-                "azure": {
+                "type": "s3",
+                "s3": {
+                    "endpoint": "http://minio-gateway:9000",
+                    "accessKeyId": "accountName2",
+                    "secretAccessKey": "accountKey2",
+                    "region": "minio",
                     "bucket": "job-logs",
-                    "storageAccountKey": "accountKey2",
-                    "storageAccountName": "accountName2",
                 },
             },
         }
@@ -1765,11 +1754,11 @@ class TestHelmValuesFactory:
 
         assert result["logs"] == {
             "persistence": {
-                "type": "minio",
-                "minio": {
-                    "url": "http://platform-minio:9000",
-                    "accessKey": "username",
-                    "secretKey": "password",
+                "type": "s3",
+                "s3": {
+                    "endpoint": "http://platform-minio:9000",
+                    "accessKeyId": "username",
+                    "secretAccessKey": "password",
                     "region": "minio",
                     "bucket": "job-logs",
                 },
@@ -1795,13 +1784,13 @@ class TestHelmValuesFactory:
 
         assert result["logs"] == {
             "persistence": {
-                "type": "aws",
-                "aws": {
+                "type": "s3",
+                "s3": {
                     "endpoint": "https://emc-ecs.s3",
+                    "region": "emc-ecs",
                     "accessKeyId": "emc_ecs_access_key",
                     "secretAccessKey": "emc_ecs_secret_key",
                     "bucket": "job-logs",
-                    "forcePathStyle": True,
                 },
             },
         }
@@ -1825,14 +1814,13 @@ class TestHelmValuesFactory:
 
         assert result["logs"] == {
             "persistence": {
-                "type": "aws",
-                "aws": {
+                "type": "s3",
+                "s3": {
                     "endpoint": "https://os.s3",
                     "accessKeyId": "os_user",
                     "secretAccessKey": "os_password",
                     "region": "os_region",
                     "bucket": "job-logs",
-                    "forcePathStyle": True,
                 },
             },
         }
@@ -2584,14 +2572,16 @@ class TestHelmValuesFactory:
                 gcp_platform_config,
                 storages=[
                     StorageConfig(
-                        type=StorageType.KUBERNETES,
+                        type=StorageType.NFS,
                         path="/storage1",
-                        storage_class_name="class",
+                        nfs_server="test-nfs-server-1",
+                        nfs_export_path="/test/export/path/1",
                     ),
                     StorageConfig(
-                        type=StorageType.KUBERNETES,
+                        type=StorageType.NFS,
                         path="/storage2",
-                        storage_class_name="class",
+                        nfs_server="test-nfs-server-2",
+                        nfs_export_path="/test/export/path/2",
                     ),
                 ],
             )

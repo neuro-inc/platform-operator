@@ -6,6 +6,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import Enum
+from hashlib import sha256
 from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
 from typing import Any
@@ -101,6 +102,7 @@ class HelmReleaseNames:
 class HelmChartNames:
     docker_registry: str = "docker-registry"
     minio: str = "minio"
+    minio_gateway: str = "minio-gateway"
     traefik: str = "traefik"
     adjust_inotify: str = "adjust-inotify"
     nvidia_gpu_driver: str = "nvidia-gpu-driver"
@@ -258,14 +260,6 @@ class StorageSpec(dict[str, Any]):
         return self.get("path", "")
 
     @property
-    def storage_size(self) -> str:
-        return self["kubernetes"]["persistence"].get("size", "")
-
-    @property
-    def storage_class_name(self) -> str:
-        return self["kubernetes"]["persistence"].get("storageClassName", "")
-
-    @property
     def nfs_server(self) -> str:
         return self["nfs"].get("server", "")
 
@@ -288,10 +282,6 @@ class StorageSpec(dict[str, Any]):
     @property
     def smb_password(self) -> str:
         return self["smb"].get("password", "")
-
-    @property
-    def gcs_bucket_name(self) -> str:
-        return self["gcs"].get("bucket", "")
 
     @property
     def azure_storage_account_name(self) -> str:
@@ -628,10 +618,8 @@ class IngressServiceType(str, Enum):
 
 
 class StorageType(str, Enum):
-    KUBERNETES = "kubernetes"
     NFS = "nfs"
     SMB = "smb"
-    GCS = "gcs"
     AZURE_fILE = "azureFile"
 
 
@@ -639,8 +627,7 @@ class StorageType(str, Enum):
 class StorageConfig:
     type: StorageType
     path: str = ""
-    storage_size: str = "10Gi"
-    storage_class_name: str = ""
+    size: str = "10Gi"
     nfs_export_path: str = ""
     nfs_server: str = ""
     smb_server: str = ""
@@ -650,7 +637,6 @@ class StorageConfig:
     azure_storage_account_name: str = ""
     azure_storage_account_key: str = ""
     azure_share_name: str = ""
-    gcs_bucket_name: str = ""
 
 
 class RegistryProvider(str, Enum):
@@ -743,6 +729,12 @@ class BucketsConfig:
     open_stack_region_name: str = ""
 
 
+@dataclass(frozen=True)
+class MinioGatewayConfig:
+    root_user: str
+    root_user_password: str
+
+
 class MetricsStorageType(Enum):
     BUCKETS = 1
     KUBERNETES = 2
@@ -830,6 +822,7 @@ class PlatformConfig:
     gcp_service_account_key: str = ""
     gcp_service_account_key_base64: str = ""
     services_priority_class_name: str = ""
+    minio_gateway: MinioGatewayConfig | None = None
 
     def get_storage_claim_name(self, path: str) -> str:
         name = f"{self.release_name}-storage"
@@ -1089,6 +1082,7 @@ class PlatformConfigFactory:
             ),
             gcp_service_account_key_base64=spec.iam.gcp_service_account_key_base64,
             services_priority_class_name=f"{self._config.platform_namespace}-services",
+            minio_gateway=self._create_minio_gateway(spec),
         )
 
     def _create_helm_repo(self, cluster: Cluster) -> HelmRepo:
@@ -1147,14 +1141,7 @@ class PlatformConfigFactory:
         if not spec:
             raise ValueError("Storage spec is empty")
 
-        if StorageType.KUBERNETES in spec:
-            return StorageConfig(
-                type=StorageType.KUBERNETES,
-                path=spec.path,
-                storage_class_name=spec.storage_class_name,
-                storage_size=spec.storage_size,
-            )
-        elif StorageType.NFS in spec:
+        if StorageType.NFS in spec:
             return StorageConfig(
                 type=StorageType.NFS,
                 path=spec.path,
@@ -1177,10 +1164,6 @@ class PlatformConfigFactory:
                 azure_storage_account_name=spec.azure_storage_account_name,
                 azure_storage_account_key=spec.azure_storage_account_key,
                 azure_share_name=spec.azure_share_name,
-            )
-        elif StorageType.GCS in spec:
-            return StorageConfig(
-                type=StorageType.GCS, gcs_bucket_name=spec.gcs_bucket_name
             )
         else:
             raise ValueError("Storage type is not supported")
@@ -1376,6 +1359,21 @@ class PlatformConfigFactory:
             )
         else:
             raise ValueError("Metrics storage type is not supported")
+
+    def _create_minio_gateway(self, spec: Spec) -> MinioGatewayConfig | None:
+        if BucketsProvider.GCP in spec.blob_storage:
+            return MinioGatewayConfig(
+                root_user="admin",
+                root_user_password=sha256(
+                    spec.iam.gcp_service_account_key_base64.encode()
+                ).hexdigest(),
+            )
+        if BucketsProvider.AZURE in spec.blob_storage:
+            return MinioGatewayConfig(
+                root_user=spec.blob_storage.azure_storrage_account_name,
+                root_user_password=spec.blob_storage.azure_storrage_account_key,
+            )
+        return None
 
     @classmethod
     def _base64_decode(cls, value: str | None) -> str:

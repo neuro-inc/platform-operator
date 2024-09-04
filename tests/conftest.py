@@ -6,6 +6,7 @@ from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv4Network
+from unittest import mock
 
 import kopf
 import pytest
@@ -51,6 +52,7 @@ from platform_operator.models import (
     KubeConfig,
     LabelsConfig,
     MetricsStorageType,
+    MinioGatewayConfig,
     MonitoringConfig,
     PlatformConfig,
     RegistryConfig,
@@ -428,11 +430,9 @@ def on_prem_platform_body(cluster_name: str) -> kopf.Body:
             },
             "storages": [
                 {
-                    "kubernetes": {
-                        "persistence": {
-                            "storageClassName": "storage-standard",
-                            "size": "1000Gi",
-                        }
+                    "nfs": {
+                        "server": "192.168.0.3",
+                        "path": "/",
                     }
                 }
             ],
@@ -559,6 +559,10 @@ def gcp_platform_config(
             gcp_location="us",
             gcp_project="project",
         ),
+        minio_gateway=MinioGatewayConfig(
+            root_user="admin",
+            root_user_password=mock.ANY,
+        ),
         monitoring=MonitoringConfig(
             logs_bucket_name="job-logs",
             metrics_storage_type=MetricsStorageType.BUCKETS,
@@ -619,6 +623,7 @@ def aws_platform_config(
             provider=BucketsProvider.AWS,
             aws_region="us-east-1",
         ),
+        minio_gateway=None,
         monitoring=MonitoringConfig(
             logs_bucket_name="job-logs",
             metrics_storage_type=MetricsStorageType.BUCKETS,
@@ -659,6 +664,10 @@ def azure_platform_config(
             azure_storage_account_name="accountName2",
             azure_storage_account_key="accountKey2",
         ),
+        minio_gateway=MinioGatewayConfig(
+            root_user="accountName2",
+            root_user_password="accountKey2",
+        ),
         monitoring=MonitoringConfig(
             logs_bucket_name="job-logs",
             metrics_storage_type=MetricsStorageType.BUCKETS,
@@ -686,9 +695,9 @@ def on_prem_platform_config(
         disks_storage_class_name="openebs-cstor",
         storages=[
             StorageConfig(
-                type=StorageType.KUBERNETES,
-                storage_size="1000Gi",
-                storage_class_name="storage-standard",
+                type=StorageType.NFS,
+                nfs_server="192.168.0.3",
+                nfs_export_path="/",
             )
         ],
         registry=RegistryConfig(
@@ -711,6 +720,7 @@ def on_prem_platform_config(
             minio_storage_class_name="blob-storage-standard",
             minio_storage_size="10Gi",
         ),
+        minio_gateway=None,
         monitoring=MonitoringConfig(
             logs_bucket_name="job-logs",
             metrics_storage_type=MetricsStorageType.KUBERNETES,

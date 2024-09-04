@@ -36,6 +36,7 @@ class HelmValuesFactory:
             "acmeEnabled": platform.ingress_acme_enabled,
             "dockerRegistryEnabled": platform.registry.docker_registry_install,
             "minioEnabled": platform.buckets.minio_install,
+            "minioGatewayEnabled": platform.minio_gateway is not None,
             "platformReportsEnabled": platform.monitoring.metrics_enabled,
             "alpineImage": {"repository": platform.get_image("alpine")},
             "pauseImage": {"repository": platform.get_image("pause")},
@@ -152,6 +153,10 @@ class HelmValuesFactory:
             assert platform.buckets.minio_public_url
             result["ingress"]["minioHost"] = platform.buckets.minio_public_url.host
             result[self._chart_names.minio] = self.create_minio_values(platform)
+        if platform.minio_gateway is not None:
+            result[self._chart_names.minio_gateway] = self.create_minio_gateway_values(
+                platform
+            )
         if platform.monitoring.metrics_enabled:
             result[self._chart_names.platform_reports] = (
                 self.create_platform_reports_values(platform)
@@ -284,18 +289,11 @@ class HelmValuesFactory:
         return result
 
     def _create_storage_values(self, storage: StorageConfig) -> dict[str, Any]:
-        if storage.type == StorageType.KUBERNETES:
-            return {
-                "type": StorageType.KUBERNETES.value,
-                "path": storage.path,
-                "size": storage.storage_size,
-                "storageClassName": storage.storage_class_name,
-            }
         if storage.type == StorageType.NFS:
             return {
                 "type": StorageType.NFS.value,
                 "path": storage.path,
-                "size": storage.storage_size,
+                "size": storage.size,
                 "nfs": {
                     "server": storage.nfs_server,
                     "path": storage.nfs_export_path,
@@ -305,7 +303,7 @@ class HelmValuesFactory:
             return {
                 "type": StorageType.SMB.value,
                 "path": storage.path,
-                "size": storage.storage_size,
+                "size": storage.size,
                 "smb": {
                     "server": storage.smb_server,
                     "shareName": storage.smb_share_name,
@@ -317,20 +315,11 @@ class HelmValuesFactory:
             return {
                 "type": StorageType.AZURE_fILE.value,
                 "path": storage.path,
-                "size": storage.storage_size,
+                "size": storage.size,
                 "azureFile": {
                     "storageAccountName": storage.azure_storage_account_name,
                     "storageAccountKey": storage.azure_storage_account_key,
                     "shareName": storage.azure_share_name,
-                },
-            }
-        if storage.type == StorageType.GCS:
-            return {
-                "type": StorageType.GCS.value,
-                "path": storage.path,
-                "size": storage.storage_size,
-                "gcs": {
-                    "bucketName": storage.gcs_bucket_name,
                 },
             }
         raise ValueError(f"Storage type {storage.type.value!r} is not supported")
@@ -429,6 +418,62 @@ class HelmValuesFactory:
             "ingress": {"enabled": False},
             "priorityClassName": platform.services_priority_class_name,
         }
+
+    def create_minio_gateway_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        assert platform.minio_gateway
+        result = {
+            "nameOverride": "minio-gateway",
+            "fullnameOverride": "minio-gateway",
+            "replicaCount": 2,
+            "image": {"repository": platform.get_image("minio")},
+            "imagePullSecrets": [
+                {"name": name} for name in platform.image_pull_secret_names
+            ],
+            "rootUser": {
+                "user": platform.minio_gateway.root_user,
+                "password": platform.minio_gateway.root_user_password,
+            },
+        }
+        if platform.buckets.provider == BucketsProvider.GCP:
+            result["cloudStorage"] = {
+                "type": "gcs",
+                "gcs": {"project": platform.buckets.gcp_project},
+            }
+            result["env"] = [
+                {
+                    "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                    "value": "/etc/config/minio/gcs/key.json",
+                }
+            ]
+            result["secrets"] = [
+                {
+                    "name": "minio-gateway-gcs-key",
+                    "data": {"key.json": platform.gcp_service_account_key},
+                }
+            ]
+            result["volumes"] = [
+                {
+                    "name": "gcp-credentials",
+                    "secret": {
+                        "secretName": "minio-gateway-gcs-key",
+                        "optional": False,
+                    },
+                }
+            ]
+            result["volumeMounts"] = [
+                {
+                    "name": "gcp-credentials",
+                    "mountPath": "/etc/config/minio/gcs",
+                    "readOnly": True,
+                }
+            ]
+        elif platform.buckets.provider == BucketsProvider.AZURE:
+            result["cloudStorage"] = {"type": "azure"}
+        else:
+            raise ValueError(
+                f"Buckets provider {platform.buckets.provider} not supported"
+            )
+        return result
 
     def create_traefik_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -569,13 +614,14 @@ class HelmValuesFactory:
     def create_platform_storage_values(
         self, platform: PlatformConfig
     ) -> dict[str, Any]:
-        result = {
+        result: dict[str, Any] = {
             "nameOverride": f"{platform.release_name}-storage",
             "fullnameOverride": f"{platform.release_name}-storage",
             "image": {"repository": platform.get_image("platformstorageapi")},
             "platform": {
                 "clusterName": platform.cluster_name,
                 **self._create_platform_url_value("authUrl", platform.auth_url),
+                **self._create_platform_url_value("adminUrl", platform.admin_url),
                 **self._create_platform_token_value(platform),
             },
             "storages": [
@@ -602,6 +648,53 @@ class HelmValuesFactory:
             "priorityClassName": platform.services_priority_class_name,
         }
         result.update(**self._create_tracing_values(platform))
+        if platform.buckets.provider == BucketsProvider.GCP:
+            assert platform.minio_gateway
+            result["s3"] = {
+                "endpoint": "http://minio-gateway:9000",
+                "region": platform.buckets.gcp_location,
+                "accessKeyId": platform.minio_gateway.root_user,
+                "secretAccessKey": platform.minio_gateway.root_user_password,
+            }
+        elif platform.buckets.provider == BucketsProvider.AZURE:
+            assert platform.minio_gateway
+            result["s3"] = {
+                "endpoint": "http://minio-gateway:9000",
+                "region": "minio",
+                "accessKeyId": platform.minio_gateway.root_user,
+                "secretAccessKey": platform.minio_gateway.root_user_password,
+            }
+        elif platform.buckets.provider == BucketsProvider.AWS:
+            result["s3"] = {
+                "region": platform.buckets.aws_region,
+            }
+        elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+            result["s3"] = {
+                "endpoint": str(platform.buckets.emc_ecs_s3_endpoint),
+                "region": "emc-ecs",
+                "accessKeyId": platform.buckets.emc_ecs_access_key_id,
+                "secretAccessKey": platform.buckets.emc_ecs_secret_access_key,
+            }
+        elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+            result["s3"] = {
+                "endpoint": str(platform.buckets.open_stack_s3_endpoint),
+                "region": platform.buckets.open_stack_region_name,
+                "accessKeyId": platform.buckets.open_stack_username,
+                "secretAccessKey": platform.buckets.open_stack_password,
+            }
+        elif platform.buckets.provider == BucketsProvider.MINIO:
+            result["s3"] = {
+                "endpoint": str(platform.buckets.minio_url),
+                "region": platform.buckets.minio_region,
+                "accessKeyId": platform.buckets.minio_access_key,
+                "secretAccessKey": platform.buckets.minio_secret_key,
+            }
+        else:
+            raise ValueError(
+                f"Bucket provider {platform.buckets.provider} not supported"
+            )
+        result["s3"]["bucket"] = platform.monitoring.metrics_bucket_name
+        result["s3"]["keyPrefix"] = "storage/"
         return result
 
     def create_platform_registry_values(
@@ -773,7 +866,7 @@ class HelmValuesFactory:
                 "clusterName": platform.cluster_name,
                 **self._create_platform_url_value("authUrl", platform.auth_url),
                 **self._create_platform_url_value("configUrl", platform.config_url),
-                **self._create_platform_url_value("apiUrl", platform.api_url, "api/v1"),
+                **self._create_platform_url_value("apiUrl", platform.api_url),
                 **self._create_platform_url_value(
                     "registryUrl", platform.ingress_registry_url
                 ),
@@ -794,20 +887,19 @@ class HelmValuesFactory:
             },
             "containerRuntime": {"name": self._container_runtime},
             "fluentbit": {"image": {"repository": platform.get_image("fluent-bit")}},
-            "minioGateway": {"image": {"repository": platform.get_image("minio")}},
             "priorityClassName": platform.services_priority_class_name,
         }
         result.update(**self._create_tracing_values(platform))
         if platform.buckets.provider == BucketsProvider.GCP:
+            assert platform.minio_gateway
             result["logs"] = {
                 "persistence": {
-                    "type": "gcp",
-                    "gcp": {
-                        "serviceAccountKeyBase64": (
-                            platform.gcp_service_account_key_base64
-                        ),
-                        "project": platform.buckets.gcp_project,
-                        "location": (
+                    "type": "s3",
+                    "s3": {
+                        "endpoint": "http://minio-gateway:9000",
+                        "accessKeyId": platform.minio_gateway.root_user,
+                        "secretAccessKey": platform.minio_gateway.root_user_password,
+                        "region": (
                             platform.monitoring.logs_region
                             or platform.buckets.gcp_location
                         ),
@@ -818,22 +910,23 @@ class HelmValuesFactory:
         elif platform.buckets.provider == BucketsProvider.AWS:
             result["logs"] = {
                 "persistence": {
-                    "type": "aws",
-                    "aws": {
+                    "type": "s3",
+                    "s3": {
                         "region": platform.buckets.aws_region,
                         "bucket": platform.monitoring.logs_bucket_name,
                     },
                 }
             }
         elif platform.buckets.provider == BucketsProvider.AZURE:
+            assert platform.minio_gateway
             result["logs"] = {
                 "persistence": {
-                    "type": "azure",
-                    "azure": {
-                        "storageAccountName": (
-                            platform.buckets.azure_storage_account_name
-                        ),
-                        "storageAccountKey": platform.buckets.azure_storage_account_key,
+                    "type": "s3",
+                    "s3": {
+                        "endpoint": "http://minio-gateway:9000",
+                        "accessKeyId": platform.minio_gateway.root_user,
+                        "secretAccessKey": platform.minio_gateway.root_user_password,
+                        "region": "minio",
                         "bucket": platform.monitoring.logs_bucket_name,
                     },
                 }
@@ -841,45 +934,46 @@ class HelmValuesFactory:
         elif platform.buckets.provider == BucketsProvider.EMC_ECS:
             result["logs"] = {
                 "persistence": {
-                    "type": "aws",
-                    "aws": {
+                    "type": "s3",
+                    "s3": {
                         "endpoint": str(platform.buckets.emc_ecs_s3_endpoint),
                         "accessKeyId": platform.buckets.emc_ecs_access_key_id,
                         "secretAccessKey": platform.buckets.emc_ecs_secret_access_key,
+                        "region": "emc-ecs",
                         "bucket": platform.monitoring.logs_bucket_name,
-                        "forcePathStyle": True,
                     },
                 }
             }
         elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
             result["logs"] = {
                 "persistence": {
-                    "type": "aws",
-                    "aws": {
+                    "type": "s3",
+                    "s3": {
                         "endpoint": str(platform.buckets.open_stack_s3_endpoint),
                         "accessKeyId": platform.buckets.open_stack_username,
                         "secretAccessKey": platform.buckets.open_stack_password,
                         "region": platform.buckets.open_stack_region_name,
                         "bucket": platform.monitoring.logs_bucket_name,
-                        "forcePathStyle": True,
                     },
                 }
             }
         elif platform.buckets.provider == BucketsProvider.MINIO:
             result["logs"] = {
                 "persistence": {
-                    "type": "minio",
-                    "minio": {
-                        "url": str(platform.buckets.minio_url),
-                        "accessKey": platform.buckets.minio_access_key,
-                        "secretKey": platform.buckets.minio_secret_key,
+                    "type": "s3",
+                    "s3": {
+                        "endpoint": str(platform.buckets.minio_url),
+                        "accessKeyId": platform.buckets.minio_access_key,
+                        "secretAccessKey": platform.buckets.minio_secret_key,
                         "region": platform.buckets.minio_region,
                         "bucket": platform.monitoring.logs_bucket_name,
                     },
                 }
             }
         else:
-            raise AssertionError("was unable to construct monitoring config")
+            raise ValueError(
+                f"Bucket provider {platform.buckets.provider} not supported"
+            )
         return result
 
     def create_platform_container_runtime_values(

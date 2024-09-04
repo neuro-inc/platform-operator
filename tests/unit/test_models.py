@@ -387,58 +387,6 @@ class TestPlatformConfigFactory:
 
         assert result == replace(gcp_platform_config, standard_storage_class_name=None)
 
-    def test_gcp_platform_config_with_kubernetes_storage(
-        self,
-        factory: PlatformConfigFactory,
-        gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        gcp_platform_body["spec"]["storages"] = [
-            {
-                "kubernetes": {
-                    "persistence": {
-                        "storageClassName": "storage-class",
-                        "size": "100Gi",
-                    }
-                }
-            }
-        ]
-        result = factory.create(gcp_platform_body, gcp_cluster)
-
-        assert result == replace(
-            gcp_platform_config,
-            storages=[
-                StorageConfig(
-                    type=StorageType.KUBERNETES,
-                    storage_size="100Gi",
-                    storage_class_name="storage-class",
-                )
-            ],
-        )
-
-    def test_gcp_platform_config_with_gcs_storage(
-        self,
-        factory: PlatformConfigFactory,
-        gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        gcp_platform_body["spec"]["storages"] = [
-            {"gcs": {"bucket": "platform-storage"}}
-        ]
-        result = factory.create(gcp_platform_body, gcp_cluster)
-
-        assert result == replace(
-            gcp_platform_config,
-            storages=[
-                StorageConfig(
-                    type=StorageType.GCS,
-                    gcs_bucket_name="platform-storage",
-                )
-            ],
-        )
-
     def test_gcp_platform_config_with_ingress_controller_disabled(
         self,
         factory: PlatformConfigFactory,
@@ -690,36 +638,6 @@ class TestPlatformConfigFactory:
         with pytest.raises(ValueError, match="Registry spec is empty"):
             factory.create(aws_platform_body, aws_cluster)
 
-    def test_aws_platform_config_with_kubernetes_storage(
-        self,
-        factory: PlatformConfigFactory,
-        aws_platform_body: kopf.Body,
-        aws_cluster: Cluster,
-        aws_platform_config: PlatformConfig,
-    ) -> None:
-        aws_platform_body["spec"]["storages"] = [
-            {
-                "kubernetes": {
-                    "persistence": {
-                        "storageClassName": "storage-class",
-                        "size": "100Gi",
-                    }
-                }
-            }
-        ]
-        result = factory.create(aws_platform_body, aws_cluster)
-
-        assert result == replace(
-            aws_platform_config,
-            storages=[
-                StorageConfig(
-                    type=StorageType.KUBERNETES,
-                    storage_size="100Gi",
-                    storage_class_name="storage-class",
-                )
-            ],
-        )
-
     def test_azure_platform_config(
         self,
         factory: PlatformConfigFactory,
@@ -741,36 +659,6 @@ class TestPlatformConfigFactory:
 
         with pytest.raises(ValueError, match="Registry spec is empty"):
             factory.create(azure_platform_body, azure_cluster)
-
-    def test_azure_platform_config_with_kubernetes_storage(
-        self,
-        factory: PlatformConfigFactory,
-        azure_platform_body: kopf.Body,
-        azure_cluster: Cluster,
-        azure_platform_config: PlatformConfig,
-    ) -> None:
-        azure_platform_body["spec"]["storages"] = [
-            {
-                "kubernetes": {
-                    "persistence": {
-                        "storageClassName": "storage-class",
-                        "size": "100Gi",
-                    }
-                }
-            }
-        ]
-        result = factory.create(azure_platform_body, azure_cluster)
-
-        assert result == replace(
-            azure_platform_config,
-            storages=[
-                StorageConfig(
-                    type=StorageType.KUBERNETES,
-                    storage_size="100Gi",
-                    storage_class_name="storage-class",
-                )
-            ],
-        )
 
     def test_azure_platform_config_with_nfs_storage(
         self,

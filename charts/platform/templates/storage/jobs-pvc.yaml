@@ -14,7 +14,5 @@ spec:
     requests:
       storage: {{ .size }}
   storageClassName: {{ .storageClassName | default "" | quote }}
-  {{- if ne .type "kubernetes" }}
   volumeName: {{ $.Release.Name }}-{{ include "platform.storage.jobsVolumeNameSuffix" .path }}
-  {{- end }}
 {{- end }}

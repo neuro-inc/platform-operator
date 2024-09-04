@@ -754,29 +754,6 @@ async def test_delete(
     )
 
 
-async def test_delete_gcp_with_gcs_storage(
-    helm_client: mock.AsyncMock,
-    config_client: mock.AsyncMock,
-    logger: logging.Logger,
-    gcp_cluster: Cluster,
-    gcp_platform_body: kopf.Body,
-    gcp_platform_config: PlatformConfig,
-) -> None:
-    from platform_operator.handlers import delete
-
-    config_client.get_cluster.return_value = gcp_cluster
-    gcp_platform_body["spec"]["storages"] = [{"gcs": {"bucket": "storage"}}]
-
-    await delete(  # type: ignore
-        name=gcp_platform_config.cluster_name,
-        body=gcp_platform_body,
-        logger=logger,
-        retry=0,
-    )
-
-    helm_client.delete.assert_awaited_once_with("platform", wait=True)
-
-
 async def test_delete_on_prem(
     helm_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
