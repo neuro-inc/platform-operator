@@ -11,4 +11,9 @@ data:
       certificates:
       - certFile: /etc/certs/cert.crt
         keyFile: /etc/certs/cert.key
+      stores:
+        default:
+          defaultCertificate:
+            certFile: /etc/certs/cert.crt
+            keyFile: /etc/certs/cert.key
 {{- end }}
