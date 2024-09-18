@@ -768,7 +768,9 @@ class TestHelmValuesFactory:
                     "service": {"enabled": True},
                     "serviceMonitor": {
                         "jobLabel": "app.kubernetes.io/name",
-                        "additionalLabels": {"release": "platform"},
+                        "additionalLabels": {
+                            "platform.apolo.us/scrape-metrics": "true"
+                        },
                     },
                 }
             },
@@ -926,6 +928,12 @@ class TestHelmValuesFactory:
                     },
                 }
             ],
+            "storageUsageCollector": {
+                "resources": {
+                    "requests": {"cpu": "250m", "memory": "500Mi"},
+                    "limits": {"cpu": "1000m", "memory": "1Gi"},
+                }
+            },
         }
 
     def test_create_platform_storage_values__aws(

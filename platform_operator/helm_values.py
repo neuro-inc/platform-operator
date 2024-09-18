@@ -536,7 +536,9 @@ class HelmValuesFactory:
                     "service": {"enabled": True},
                     "serviceMonitor": {
                         "jobLabel": "app.kubernetes.io/name",
-                        "additionalLabels": {"release": platform.release_name},
+                        "additionalLabels": {
+                            "platform.apolo.us/scrape-metrics": "true"
+                        },
                     },
                 }
             },
@@ -644,6 +646,12 @@ class HelmValuesFactory:
                 "hosts": [platform.ingress_url.host],
             },
             "priorityClassName": platform.services_priority_class_name,
+            "storageUsageCollector": {
+                "resources": {
+                    "requests": {"cpu": "250m", "memory": "500Mi"},
+                    "limits": {"cpu": "1000m", "memory": "1Gi"},
+                }
+            },
             "secrets": [],
         }
         result.update(**self._create_tracing_values(platform))
