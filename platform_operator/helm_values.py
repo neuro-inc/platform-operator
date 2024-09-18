@@ -252,12 +252,9 @@ class HelmValuesFactory:
                 {"name": "NEURO_CLUSTER", "value": platform.cluster_name},
                 {
                     "name": "NEURO_TOKEN",
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": f"{platform.release_name}-token",
-                            "key": "token",
-                        }
-                    },
+                    **self._create_value_from_secret(
+                        name=f"{platform.release_name}-token", key="token"
+                    ),
                 },
             ],
             "persistence": {"storageClassName": platform.standard_storage_class_name},
@@ -587,12 +584,9 @@ class HelmValuesFactory:
         if platform.token:
             return {
                 "token": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": f"{platform.release_name}-token",
-                            "key": "token",
-                        }
-                    }
+                    **self._create_value_from_secret(
+                        name=f"{platform.release_name}-token", key="token"
+                    ),
                 }
             }
         return {
@@ -609,6 +603,10 @@ class HelmValuesFactory:
                 "sampleRate": platform.sentry_sample_rate,
             }
         }
+        return result
+
+    def _create_value_from_secret(self, *, name: str, key: str) -> dict[str, Any]:
+        result = {"valueFrom": {"secretKeyRef": {"name": name, "key": key}}}
         return result
 
     def create_platform_storage_values(
@@ -646,55 +644,134 @@ class HelmValuesFactory:
                 "hosts": [platform.ingress_url.host],
             },
             "priorityClassName": platform.services_priority_class_name,
+            "secrets": [],
         }
         result.update(**self._create_tracing_values(platform))
+        s3_secret_name = f"{platform.release_name}-storage-s3"
         if platform.buckets.provider == BucketsProvider.GCP:
             assert platform.minio_gateway
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.minio_gateway.root_user,
+                        "secret_access_key": platform.minio_gateway.root_user_password,
+                    },
+                }
+            )
             result["s3"] = {
                 "endpoint": "http://minio-gateway:9000",
-                "region": platform.buckets.gcp_location,
-                "accessKeyId": platform.minio_gateway.root_user,
-                "secretAccessKey": platform.minio_gateway.root_user_password,
+                "region": (
+                    platform.monitoring.logs_region or platform.buckets.gcp_location
+                ),
+                "accessKeyId": self._create_value_from_secret(
+                    name=s3_secret_name, key="access_key_id"
+                ),
+                "secretAccessKey": self._create_value_from_secret(
+                    name=s3_secret_name, key="secret_access_key"
+                ),
+                "bucket": platform.monitoring.metrics_bucket_name,
+                "keyPrefix": "storage/",
             }
         elif platform.buckets.provider == BucketsProvider.AZURE:
             assert platform.minio_gateway
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.minio_gateway.root_user,
+                        "secret_access_key": platform.minio_gateway.root_user_password,
+                    },
+                }
+            )
             result["s3"] = {
                 "endpoint": "http://minio-gateway:9000",
                 "region": "minio",
-                "accessKeyId": platform.minio_gateway.root_user,
-                "secretAccessKey": platform.minio_gateway.root_user_password,
+                "accessKeyId": self._create_value_from_secret(
+                    name=s3_secret_name, key="access_key_id"
+                ),
+                "secretAccessKey": self._create_value_from_secret(
+                    name=s3_secret_name, key="secret_access_key"
+                ),
+                "bucket": platform.monitoring.metrics_bucket_name,
+                "keyPrefix": "storage/",
             }
         elif platform.buckets.provider == BucketsProvider.AWS:
             result["s3"] = {
                 "region": platform.buckets.aws_region,
+                "bucket": platform.monitoring.metrics_bucket_name,
+                "keyPrefix": "storage/",
             }
         elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.buckets.emc_ecs_access_key_id,
+                        "secret_access_key": platform.buckets.emc_ecs_secret_access_key,
+                    },
+                }
+            )
             result["s3"] = {
                 "endpoint": str(platform.buckets.emc_ecs_s3_endpoint),
                 "region": "emc-ecs",
-                "accessKeyId": platform.buckets.emc_ecs_access_key_id,
-                "secretAccessKey": platform.buckets.emc_ecs_secret_access_key,
+                "accessKeyId": self._create_value_from_secret(
+                    name=s3_secret_name, key="access_key_id"
+                ),
+                "secretAccessKey": self._create_value_from_secret(
+                    name=s3_secret_name, key="secret_access_key"
+                ),
+                "bucket": platform.monitoring.metrics_bucket_name,
+                "keyPrefix": "storage/",
             }
         elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.buckets.open_stack_username,
+                        "secret_access_key": platform.buckets.open_stack_password,
+                    },
+                }
+            )
             result["s3"] = {
                 "endpoint": str(platform.buckets.open_stack_s3_endpoint),
                 "region": platform.buckets.open_stack_region_name,
-                "accessKeyId": platform.buckets.open_stack_username,
-                "secretAccessKey": platform.buckets.open_stack_password,
+                "accessKeyId": self._create_value_from_secret(
+                    name=s3_secret_name, key="access_key_id"
+                ),
+                "secretAccessKey": self._create_value_from_secret(
+                    name=s3_secret_name, key="secret_access_key"
+                ),
+                "bucket": platform.monitoring.metrics_bucket_name,
+                "keyPrefix": "storage/",
             }
         elif platform.buckets.provider == BucketsProvider.MINIO:
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.buckets.minio_access_key,
+                        "secret_access_key": platform.buckets.minio_secret_key,
+                    },
+                }
+            )
             result["s3"] = {
                 "endpoint": str(platform.buckets.minio_url),
                 "region": platform.buckets.minio_region,
-                "accessKeyId": platform.buckets.minio_access_key,
-                "secretAccessKey": platform.buckets.minio_secret_key,
+                "accessKeyId": self._create_value_from_secret(
+                    name=s3_secret_name, key="access_key_id"
+                ),
+                "secretAccessKey": self._create_value_from_secret(
+                    name=s3_secret_name, key="secret_access_key"
+                ),
+                "bucket": platform.monitoring.metrics_bucket_name,
+                "keyPrefix": "storage/",
             }
         else:
             raise ValueError(
                 f"Bucket provider {platform.buckets.provider} not supported"
             )
-        result["s3"]["bucket"] = platform.monitoring.metrics_bucket_name
-        result["s3"]["keyPrefix"] = "storage/"
         return result
 
     def create_platform_registry_values(
@@ -734,20 +811,14 @@ class HelmValuesFactory:
                 "tokenUrl": "https://gcr.io/v2/token",
                 "tokenService": "gcr.io",
                 "tokenUsername": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": gcp_key_secret_name,
-                            "key": "username",
-                        }
-                    }
+                    **self._create_value_from_secret(
+                        name=gcp_key_secret_name, key="username"
+                    ),
                 },
                 "tokenPassword": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": gcp_key_secret_name,
-                            "key": "password",
-                        }
-                    }
+                    **self._create_value_from_secret(
+                        name=gcp_key_secret_name, key="password"
+                    ),
                 },
                 "project": platform.registry.gcp_project,
                 "maxCatalogEntries": 10000,
@@ -783,20 +854,14 @@ class HelmValuesFactory:
                 "tokenUrl": str(platform.registry.azure_url / "oauth2/token"),
                 "tokenService": platform.registry.azure_url.host,
                 "tokenUsername": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": azure_credentials_secret_name,
-                            "key": "username",
-                        }
-                    }
+                    **self._create_value_from_secret(
+                        name=azure_credentials_secret_name, key="username"
+                    ),
                 },
                 "tokenPassword": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": azure_credentials_secret_name,
-                            "key": "password",
-                        }
-                    }
+                    **self._create_value_from_secret(
+                        name=azure_credentials_secret_name, key="password"
+                    ),
                 },
                 "project": "neuro",
                 "maxCatalogEntries": 10000,
@@ -818,20 +883,14 @@ class HelmValuesFactory:
                 "type": "basic",
                 "url": str(platform.registry.docker_registry_url),
                 "basicUsername": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": docker_registry_credentials_secret_name,
-                            "key": "username",
-                        }
-                    }
+                    **self._create_value_from_secret(
+                        name=docker_registry_credentials_secret_name, key="username"
+                    ),
                 },
                 "basicPassword": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": docker_registry_credentials_secret_name,
-                            "key": "password",
-                        }
-                    }
+                    **self._create_value_from_secret(
+                        name=docker_registry_credentials_secret_name, key="password"
+                    ),
                 },
                 "project": "neuro",
                 "maxCatalogEntries": 10000,
@@ -888,17 +947,32 @@ class HelmValuesFactory:
             "containerRuntime": {"name": self._container_runtime},
             "fluentbit": {"image": {"repository": platform.get_image("fluent-bit")}},
             "priorityClassName": platform.services_priority_class_name,
+            "secrets": [],
         }
         result.update(**self._create_tracing_values(platform))
+        s3_secret_name = f"{platform.release_name}-monitoring-s3"
         if platform.buckets.provider == BucketsProvider.GCP:
             assert platform.minio_gateway
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.minio_gateway.root_user,
+                        "secret_access_key": platform.minio_gateway.root_user_password,
+                    },
+                }
+            )
             result["logs"] = {
                 "persistence": {
                     "type": "s3",
                     "s3": {
                         "endpoint": "http://minio-gateway:9000",
-                        "accessKeyId": platform.minio_gateway.root_user,
-                        "secretAccessKey": platform.minio_gateway.root_user_password,
+                        "accessKeyId": self._create_value_from_secret(
+                            name=s3_secret_name, key="access_key_id"
+                        ),
+                        "secretAccessKey": self._create_value_from_secret(
+                            name=s3_secret_name, key="secret_access_key"
+                        ),
                         "region": (
                             platform.monitoring.logs_region
                             or platform.buckets.gcp_location
@@ -919,52 +993,104 @@ class HelmValuesFactory:
             }
         elif platform.buckets.provider == BucketsProvider.AZURE:
             assert platform.minio_gateway
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.minio_gateway.root_user,
+                        "secret_access_key": platform.minio_gateway.root_user_password,
+                    },
+                }
+            )
             result["logs"] = {
                 "persistence": {
                     "type": "s3",
                     "s3": {
                         "endpoint": "http://minio-gateway:9000",
-                        "accessKeyId": platform.minio_gateway.root_user,
-                        "secretAccessKey": platform.minio_gateway.root_user_password,
+                        "accessKeyId": self._create_value_from_secret(
+                            name=s3_secret_name, key="access_key_id"
+                        ),
+                        "secretAccessKey": self._create_value_from_secret(
+                            name=s3_secret_name, key="secret_access_key"
+                        ),
                         "region": "minio",
                         "bucket": platform.monitoring.logs_bucket_name,
                     },
                 }
             }
         elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.buckets.emc_ecs_access_key_id,
+                        "secret_access_key": platform.buckets.emc_ecs_secret_access_key,
+                    },
+                }
+            )
             result["logs"] = {
                 "persistence": {
                     "type": "s3",
                     "s3": {
                         "endpoint": str(platform.buckets.emc_ecs_s3_endpoint),
-                        "accessKeyId": platform.buckets.emc_ecs_access_key_id,
-                        "secretAccessKey": platform.buckets.emc_ecs_secret_access_key,
+                        "accessKeyId": self._create_value_from_secret(
+                            name=s3_secret_name, key="access_key_id"
+                        ),
+                        "secretAccessKey": self._create_value_from_secret(
+                            name=s3_secret_name, key="secret_access_key"
+                        ),
                         "region": "emc-ecs",
                         "bucket": platform.monitoring.logs_bucket_name,
                     },
                 }
             }
         elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.buckets.open_stack_username,
+                        "secret_access_key": platform.buckets.open_stack_password,
+                    },
+                }
+            )
             result["logs"] = {
                 "persistence": {
                     "type": "s3",
                     "s3": {
                         "endpoint": str(platform.buckets.open_stack_s3_endpoint),
-                        "accessKeyId": platform.buckets.open_stack_username,
-                        "secretAccessKey": platform.buckets.open_stack_password,
+                        "accessKeyId": self._create_value_from_secret(
+                            name=s3_secret_name, key="access_key_id"
+                        ),
+                        "secretAccessKey": self._create_value_from_secret(
+                            name=s3_secret_name, key="secret_access_key"
+                        ),
                         "region": platform.buckets.open_stack_region_name,
                         "bucket": platform.monitoring.logs_bucket_name,
                     },
                 }
             }
         elif platform.buckets.provider == BucketsProvider.MINIO:
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.buckets.minio_access_key,
+                        "secret_access_key": platform.buckets.minio_secret_key,
+                    },
+                }
+            )
             result["logs"] = {
                 "persistence": {
                     "type": "s3",
                     "s3": {
                         "endpoint": str(platform.buckets.minio_url),
-                        "accessKeyId": platform.buckets.minio_access_key,
-                        "secretAccessKey": platform.buckets.minio_secret_key,
+                        "accessKeyId": self._create_value_from_secret(
+                            name=s3_secret_name, key="access_key_id"
+                        ),
+                        "secretAccessKey": self._create_value_from_secret(
+                            name=s3_secret_name, key="secret_access_key"
+                        ),
                         "region": platform.buckets.minio_region,
                         "bucket": platform.monitoring.logs_bucket_name,
                     },
@@ -1610,20 +1736,12 @@ class HelmValuesFactory:
                 "emc_ecs": {
                     "s3RoleUrn": platform.buckets.emc_ecs_s3_assumable_role,
                     "accessKeyId": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": secret_name,
-                                "key": "key",
-                            }
-                        }
+                        **self._create_value_from_secret(name=secret_name, key="key"),
                     },
                     "secretAccessKey": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": secret_name,
-                                "key": "secret",
-                            }
-                        }
+                        **self._create_value_from_secret(
+                            name=secret_name, key="secret"
+                        ),
                     },
                     "s3EndpointUrl": str(platform.buckets.emc_ecs_s3_endpoint),
                     "managementEndpointUrl": str(
@@ -1647,20 +1765,14 @@ class HelmValuesFactory:
                 "open_stack": {
                     "regionName": platform.buckets.open_stack_region_name,
                     "accountId": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": secret_name,
-                                "key": "accountId",
-                            }
-                        }
+                        **self._create_value_from_secret(
+                            name=secret_name, key="accountId"
+                        ),
                     },
                     "password": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": secret_name,
-                                "key": "password",
-                            }
-                        }
+                        **self._create_value_from_secret(
+                            name=secret_name, key="password"
+                        ),
                     },
                     "s3EndpointUrl": str(platform.buckets.open_stack_s3_endpoint),
                     "endpointUrl": str(platform.buckets.open_stack_endpoint),
@@ -1693,12 +1805,7 @@ class HelmValuesFactory:
                         f".blob.core.windows.net"
                     ),
                     "credential": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": secret_name,
-                                "key": "key",
-                            }
-                        }
+                        **self._create_value_from_secret(name=secret_name, key="key"),
                     },
                 },
             }
@@ -1714,12 +1821,9 @@ class HelmValuesFactory:
                 "type": "gcp",
                 "gcp": {
                     "SAKeyJsonB64": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": secret_name,
-                                "key": "SAKeyB64",
-                            }
-                        }
+                        **self._create_value_from_secret(
+                            name=secret_name, key="SAKeyB64"
+                        ),
                     }
                 },
             }
