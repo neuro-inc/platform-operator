@@ -31,7 +31,7 @@ dependencies:
   version: 23.7.0
 - name: platform-reports
   repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 24.12.0
+  version: 24.12.1
 - name: platform-disks
   repository: oci://ghcr.io/neuro-inc/helm-charts
   version: 23.7.0
@@ -47,5 +47,5 @@ dependencies:
 - name: k8s-resources
   repository: https://neuro-inc.github.io/helm-charts
   version: 1.0.1
-digest: sha256:5fd0f986d5ff3af86be8274e330c7d1a497bd77728c64785e18dfc238da80906
-generated: "2024-12-23T10:04:00.006349686+01:00"
+digest: sha256:96b8660b767d02341fc26252cfd2b950667dd792aaa26ff9e9725e5def91102f
+generated: "2024-12-23T13:43:15.594357139+01:00"
