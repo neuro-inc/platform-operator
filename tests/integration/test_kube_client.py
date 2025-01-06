@@ -88,12 +88,11 @@ class TestKubeClientTokenUpdater:
         ) as client:
             yield client
 
-    async def test_auth_token_exp_ts_value_error(self) -> None:
+    async def test_auth_token_exp_ts_value_error(self, kube_server: str) -> None:
         kube_config = KubeConfig(
-            version="1.0",
-            url="https://example.com",
-            auth_type="token",
-            auth_token=None,
+            version="1.25",
+            url=URL(kube_server),
+            auth_type=KubeClientAuthType.TOKEN,
             auth_token_path=None,
         )
         with pytest.raises(
