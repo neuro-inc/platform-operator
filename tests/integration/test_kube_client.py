@@ -66,7 +66,6 @@ class TestKubeClientTokenUpdater:
                 url=URL(kube_server),
                 auth_type=KubeClientAuthType.TOKEN,
                 auth_token_path=Path(kube_token_path),
-                auth_token_update_interval_s=1,
             )
         ) as client:
             yield client

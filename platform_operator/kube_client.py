@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator, Iterable, Sequence
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+from time import time
 from typing import Any
 
 import aiohttp
@@ -201,7 +202,7 @@ class KubeClient:
                 raise
             except Exception as exc:
                 logger.exception("Failed to update kube token: %s", exc)
-            await asyncio.sleep(self._config.auth_token_update_interval_s)
+            await asyncio.sleep(self._config.auth_token_exp_ts - time())
 
     async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
         await self.close()

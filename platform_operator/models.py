@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
-from base64 import b64decode
+from base64 import b64decode, urlsafe_b64decode
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -9,7 +10,7 @@ from enum import Enum
 from hashlib import sha256
 from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import kopf
 from neuro_config_client import (
@@ -48,7 +49,6 @@ class KubeConfig:
     auth_cert_key_path: Path | None = None
     auth_token: str | None = None
     auth_token_path: Path | None = None
-    auth_token_update_interval_s: int = 300
     conn_timeout_s: int = 300
     read_timeout_s: int = 100
     conn_pool_size: int = 100
@@ -71,6 +71,23 @@ class KubeConfig:
             auth_token_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_TOKEN_PATH")),
             auth_token=env.get("NP_KUBE_AUTH_TOKEN"),
         )
+
+    @property
+    def auth_token_exp_ts(self) -> int | NoReturn:
+        token = (
+            self.auth_token_path.read_text()
+            if self.auth_token_path
+            else self.auth_token
+        )
+
+        if not token:
+            raise ValueError("Auth Token must be provided when using token expiration")
+
+        payload = token.split(".")[1]
+        decoded_payload = json.loads(
+            urlsafe_b64decode(payload + "=" * (4 - len(payload) % 4))
+        )
+        return decoded_payload["exp"]
 
     @classmethod
     def _convert_to_path(cls, value: str | None) -> Path | None:

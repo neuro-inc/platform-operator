@@ -5,6 +5,7 @@ import logging
 import ssl
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from logging import Logger
 from typing import Any
 
@@ -110,6 +111,9 @@ def login(**_: Any) -> kopf.ConnectionInfo:
         ca_path=ca_path,
         ca_data=ca_data,
         default_namespace=config.platform_namespace,
+        expiration=datetime.fromtimestamp(
+            config.kube_config.auth_token_exp_ts, tz=timezone.utc
+        ),
     )
 
 
