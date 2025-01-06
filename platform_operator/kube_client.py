@@ -202,7 +202,7 @@ class KubeClient:
                 raise
             except Exception as exc:
                 logger.exception("Failed to update kube token: %s", exc)
-            await asyncio.sleep(self._config.auth_token_exp_ts - time())
+            await asyncio.sleep(max(1, self._config.auth_token_exp_ts - time()))
 
     async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
         await self.close()
