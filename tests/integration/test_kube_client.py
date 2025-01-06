@@ -94,6 +94,7 @@ class TestKubeClientTokenUpdater:
         kube_client: KubeClient,
         jwt_kube_token_with_exp_factory: Callable[[int], str],
     ) -> None:
+        assert kube_client._config.auth_token_path
 
         await kube_client.get_pods("default")
         assert (
