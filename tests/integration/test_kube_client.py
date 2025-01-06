@@ -88,6 +88,19 @@ class TestKubeClientTokenUpdater:
         ) as client:
             yield client
 
+    async def test_auth_token_exp_ts_value_error(self) -> None:
+        kube_config = KubeConfig(
+            version="1.0",
+            url="https://example.com",
+            auth_type="token",
+            auth_token=None,
+            auth_token_path=None,
+        )
+        with pytest.raises(
+            ValueError, match="Auth Token must be provided when using token expiration"
+        ):
+            _ = kube_config.auth_token_exp_ts
+
     async def test_token_periodically_updated(
         self,
         kube_app: aiohttp.web.Application,
