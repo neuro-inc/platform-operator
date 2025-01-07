@@ -38,7 +38,7 @@ from platform_operator.models import (
 
 
 class TestConfig:
-    def test_config(self) -> None:
+    def test_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
         env = {
             "NP_NODE_NAME": "minikube",
             "NP_PLATFORM_AUTH_URL": "http://platformauthapi:8080",
@@ -71,6 +71,9 @@ class TestConfig:
             "NP_ACME_CA_STAGING_PATH": "/ca.pem",
             "NP_STANDALONE": "true",
         }
+
+        monkeypatch.setattr(Path, "read_text", lambda x: None)
+
         assert Config.load_from_env(env) == Config(
             node_name="minikube",
             log_level="DEBUG",
@@ -79,13 +82,11 @@ class TestConfig:
             kube_config=KubeConfig(
                 version="1.14.10",
                 url=URL("https://kubernetes.default"),
-                cert_authority_path=Path("/ca.crt"),
-                cert_authority_data_pem="cert-authority-data",
                 auth_type=KubeClientAuthType.CERTIFICATE,
-                auth_cert_path=Path("/client.crt"),
-                auth_cert_key_path=Path("/client.key"),
-                auth_token_path=Path("/token"),
-                auth_token="token",
+                cert_authority=Path("/ca.crt").read_text(),
+                auth_cert=Path("/client.crt").read_text(),
+                auth_cert_key=Path("/client.key").read_text(),
+                auth_token=Path("/token").read_text(),
                 conn_timeout_s=300,
                 read_timeout_s=100,
                 conn_pool_size=100,

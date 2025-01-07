@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import ssl
+from base64 import b64encode
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -31,6 +32,8 @@ from .kube_client import (
     PlatformStatusManager,
 )
 from .models import Config, PlatformConfig, PlatformConfigFactory
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -90,26 +93,16 @@ async def cleanup(**_: Any) -> None:
 
 @kopf.on.login()
 def login(**_: Any) -> kopf.ConnectionInfo:
-    ca_path = None
-    if config.kube_config.cert_authority_path:
-        ca_path = str(config.kube_config.cert_authority_path)
-
-    ca_data = None
-    if config.kube_config.cert_authority_data_pem:
-        ca_data = config.kube_config.cert_authority_data_pem.encode()
-
-    token = None
-    if config.kube_config.auth_token:
-        token = config.kube_config.auth_token
-    if config.kube_config.auth_token_path:
-        token = config.kube_config.auth_token_path.read_text()
-
+    ca_data = (
+        b64encode(config.kube_config.cert_authority.encode())
+        if config.kube_config.cert_authority
+        else None
+    )
     return kopf.ConnectionInfo(
         server=str(config.kube_config.url),
         scheme="Bearer",
-        token=token,
-        ca_path=ca_path,
         ca_data=ca_data,
+        token=config.kube_config.auth_token,
         default_namespace=config.platform_namespace,
         expiration=datetime.fromtimestamp(
             config.kube_config.auth_token_exp_ts, tz=timezone.utc

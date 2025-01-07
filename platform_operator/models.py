@@ -38,17 +38,15 @@ class KubeClientAuthType(str, Enum):
     CERTIFICATE = "certificate"
 
 
-@dataclass(frozen=True)
+@dataclass
 class KubeConfig:
     version: str
     url: URL
-    cert_authority_path: Path | None = None
-    cert_authority_data_pem: str | None = None
     auth_type: KubeClientAuthType = KubeClientAuthType.NONE
-    auth_cert_path: Path | None = None
-    auth_cert_key_path: Path | None = None
+    cert_authority: str | None = None
+    auth_cert: str | None = None
+    auth_cert_key: str | None = None
     auth_token: str | None = None
-    auth_token_path: Path | None = None
     conn_timeout_s: int = 300
     read_timeout_s: int = 100
     conn_pool_size: int = 100
@@ -59,39 +57,35 @@ class KubeConfig:
         return cls(
             version=env["NP_KUBE_VERSION"].lstrip("v"),
             url=URL(env["NP_KUBE_URL"]),
-            cert_authority_path=cls._convert_to_path(
+            auth_type=KubeClientAuthType(env["NP_KUBE_AUTH_TYPE"]),
+            cert_authority=cls._get_file_content(
                 env.get("NP_KUBE_CERT_AUTHORITY_PATH")
             ),
-            cert_authority_data_pem=env.get("NP_KUBE_CERT_AUTHORITY_DATA_PEM"),
-            auth_type=KubeClientAuthType(env["NP_KUBE_AUTH_TYPE"]),
-            auth_cert_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_CERT_PATH")),
-            auth_cert_key_path=cls._convert_to_path(
-                env.get("NP_KUBE_AUTH_CERT_KEY_PATH")
-            ),
-            auth_token_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_TOKEN_PATH")),
-            auth_token=env.get("NP_KUBE_AUTH_TOKEN"),
+            auth_cert=cls._get_file_content(env.get("NP_KUBE_AUTH_CERT_PATH")),
+            auth_cert_key=cls._get_file_content(env.get("NP_KUBE_AUTH_CERT_KEY_PATH")),
+            auth_token=cls._get_file_content(env.get("NP_KUBE_AUTH_TOKEN_PATH")),
         )
+
+    def refresh_auth_token_from_mounted_file(self) -> str | None:
+        self.auth_token = self._get_file_content(
+            os.environ.get("NP_KUBE_AUTH_TOKEN_PATH")
+        )
+        return self.auth_token
 
     @property
     def auth_token_exp_ts(self) -> int | NoReturn:
-        token = (
-            self.auth_token_path.read_text()
-            if self.auth_token_path
-            else self.auth_token
-        )
+        if not self.auth_token:
+            raise ValueError("Auth Token must be set")
 
-        if not token:
-            raise ValueError("Auth Token must be provided when using token expiration")
-
-        payload = token.split(".")[1]
+        payload = self.auth_token.split(".")[1]
         decoded_payload = json.loads(
             urlsafe_b64decode(payload + "=" * (4 - len(payload) % 4))
         )
         return decoded_payload["exp"]
 
     @classmethod
-    def _convert_to_path(cls, value: str | None) -> Path | None:
-        return Path(value) if value else None
+    def _get_file_content(cls, path: str | None) -> str | None:
+        return Path(path).read_text() if path else None
 
 
 @dataclass(frozen=True)

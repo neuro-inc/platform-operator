@@ -2,11 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
-import tempfile
 from base64 import urlsafe_b64encode
-from collections.abc import AsyncIterator, Callable, Iterator
-from pathlib import Path
+from collections.abc import AsyncIterator, Callable
 from time import time
 from typing import Any
 
@@ -66,24 +63,21 @@ class TestKubeClientTokenUpdater:
         return _create_jwt_kube_token_with_exp
 
     @pytest.fixture
-    def kube_token_path(
+    def kube_auth_token(
         self, jwt_kube_token_with_exp_factory: Callable[[int], str]
-    ) -> Iterator[str]:
-        _, path = tempfile.mkstemp()
-        Path(path).write_text(jwt_kube_token_with_exp_factory(int(time()) + 2))
-        yield path
-        os.remove(path)
+    ) -> str:
+        return jwt_kube_token_with_exp_factory(int(time()) + 2)
 
     @pytest.fixture
     async def kube_client(
-        self, kube_server: str, kube_token_path: str
+        self, kube_server: str, kube_auth_token: str
     ) -> AsyncIterator[KubeClient]:
         async with KubeClient(
             config=KubeConfig(
                 version="1.25",
                 url=URL(kube_server),
                 auth_type=KubeClientAuthType.TOKEN,
-                auth_token_path=Path(kube_token_path),
+                auth_token=kube_auth_token,
             )
         ) as client:
             yield client
@@ -93,11 +87,9 @@ class TestKubeClientTokenUpdater:
             version="1.25",
             url=URL(kube_server),
             auth_type=KubeClientAuthType.TOKEN,
-            auth_token_path=None,
+            auth_token=None,
         )
-        with pytest.raises(
-            ValueError, match="Auth Token must be provided when using token expiration"
-        ):
+        with pytest.raises(ValueError, match="Auth Token must be set"):
             _ = kube_config.auth_token_exp_ts
 
     async def test_token_periodically_updated(
@@ -105,17 +97,25 @@ class TestKubeClientTokenUpdater:
         kube_app: aiohttp.web.Application,
         kube_client: KubeClient,
         jwt_kube_token_with_exp_factory: Callable[[int], str],
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        assert kube_client._config.auth_token_path
+        assert kube_client._config.auth_token
 
         await kube_client.get_pods("default")
-        assert (
-            kube_app["token"]["value"]
-            == kube_client._config.auth_token_path.read_text()
-        )
+        assert kube_app["token"]["value"] == kube_client._config.auth_token
 
         new_token = jwt_kube_token_with_exp_factory(int(time()) + 5)
-        kube_client._config.auth_token_path.write_text(new_token)
+        monkeypatch.setattr(
+            kube_client._config,
+            "refresh_auth_token_from_mounted_file",
+            lambda: new_token,
+        )
+        # if we want to test the token file update, we need to use the following code
+        # add fixture tmp_path: Path
+        # tmp_token_file = tmp_path / "token"
+        # tmp_token_file.write_text(new_token)
+        # monkeypatch.setenv("NP_KUBE_AUTH_TOKEN_PATH", str(tmp_token_file))
+
         await asyncio.sleep(3)
 
         await kube_client.get_pods("default")

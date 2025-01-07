@@ -154,18 +154,13 @@ class KubeClient:
     def _create_ssl_context(self) -> ssl.SSLContext | None:
         if not self._is_ssl:
             return None
-        cert_authority_data_pem = ""
-        if self._config.cert_authority_data_pem:
-            cert_authority_data_pem = self._config.cert_authority_data_pem
-        if self._config.cert_authority_path:
-            cert_authority_data_pem = self._config.cert_authority_path.read_text()
-        assert cert_authority_data_pem
-        ssl_context = ssl.create_default_context(cadata=cert_authority_data_pem)
+        assert self._config.cert_authority
+        ssl_context = ssl.create_default_context(cadata=self._config.cert_authority)
         if self._config.auth_type == KubeClientAuthType.CERTIFICATE:
-            assert self._config.auth_cert_path
-            assert self._config.auth_cert_key_path
+            assert self._config.auth_cert
+            assert self._config.auth_cert_key
             ssl_context.load_cert_chain(
-                str(self._config.auth_cert_path), str(self._config.auth_cert_key_path)
+                str(self._config.auth_cert), str(self._config.auth_cert_key)
             )
         return ssl_context
 
@@ -174,8 +169,7 @@ class KubeClient:
         return self
 
     async def _init(self) -> None:
-        if self._config.auth_token_path:
-            self._token = self._config.auth_token_path.read_text()
+        if self._config.auth_token:
             self._token_updater_task = asyncio.create_task(self._start_token_updater())
         connector = aiohttp.TCPConnector(
             limit=self._config.conn_pool_size, ssl=self._create_ssl_context()
@@ -190,11 +184,10 @@ class KubeClient:
         )
 
     async def _start_token_updater(self) -> None:
-        if not self._config.auth_token_path:
-            return
         while True:
+            await asyncio.sleep(max(1, self._config.auth_token_exp_ts - time()))
             try:
-                token = self._config.auth_token_path.read_text()
+                token = self._config.refresh_auth_token_from_mounted_file()
                 if token != self._token:
                     self._token = token
                     logger.info("Kube token was refreshed")
@@ -202,7 +195,6 @@ class KubeClient:
                 raise
             except Exception as exc:
                 logger.exception("Failed to update kube token: %s", exc)
-            await asyncio.sleep(max(1, self._config.auth_token_exp_ts - time()))
 
     async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
         await self.close()

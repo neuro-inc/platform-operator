@@ -61,10 +61,10 @@ def kube_config(
     return KubeConfig(
         version="1.14.10",
         url=URL(_kube_config_cluster_payload["server"]),
-        cert_authority_data_pem=_cert_authority_data_pem,
+        cert_authority=_cert_authority_data_pem,
         auth_type=KubeClientAuthType.CERTIFICATE,
-        auth_cert_path=Path(_kube_config_user_payload["client-certificate"]),
-        auth_cert_key_path=Path(_kube_config_user_payload["client-key"]),
+        auth_cert=Path(_kube_config_user_payload["client-certificate"]).read_text(),
+        auth_cert_key=Path(_kube_config_user_payload["client-key"]).read_text(),
     )
 
 
