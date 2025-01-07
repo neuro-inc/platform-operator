@@ -141,7 +141,7 @@ class KubeClient:
         trace_configs: list[aiohttp.TraceConfig] | None = None,
     ) -> None:
         self._config = config
-        self._token = config.auth_token
+        self._token = config.auth_token if config.auth_token_path else None
         self._trace_configs = trace_configs
         self._session: aiohttp.ClientSession | None = None
         self._token_updater_task: asyncio.Task[None] | None = None
