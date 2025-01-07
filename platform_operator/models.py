@@ -43,9 +43,9 @@ class KubeConfig:
     version: str
     url: URL
     auth_type: KubeClientAuthType = KubeClientAuthType.NONE
-    cert_authority: str | None = None
-    auth_cert: str | None = None
-    auth_cert_key: str | None = None
+    cert_authority_path: Path | None = None
+    auth_cert_path: Path | None = None
+    auth_cert_key_path: Path | None = None
     auth_token: str | None = None
     conn_timeout_s: int = 300
     read_timeout_s: int = 100
@@ -58,11 +58,13 @@ class KubeConfig:
             version=env["NP_KUBE_VERSION"].lstrip("v"),
             url=URL(env["NP_KUBE_URL"]),
             auth_type=KubeClientAuthType(env["NP_KUBE_AUTH_TYPE"]),
-            cert_authority=cls._get_file_content(
+            cert_authority_path=cls._convert_to_path(
                 env.get("NP_KUBE_CERT_AUTHORITY_PATH")
             ),
-            auth_cert=cls._get_file_content(env.get("NP_KUBE_AUTH_CERT_PATH")),
-            auth_cert_key=cls._get_file_content(env.get("NP_KUBE_AUTH_CERT_KEY_PATH")),
+            auth_cert_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_CERT_PATH")),
+            auth_cert_key_path=cls._convert_to_path(
+                env.get("NP_KUBE_AUTH_CERT_KEY_PATH")
+            ),
             auth_token=cls._get_file_content(env.get("NP_KUBE_AUTH_TOKEN_PATH")),
         )
 
@@ -82,6 +84,10 @@ class KubeConfig:
             urlsafe_b64decode(payload + "=" * (4 - len(payload) % 4))
         )
         return decoded_payload["exp"]
+
+    @classmethod
+    def _convert_to_path(cls, value: str | None) -> Path | None:
+        return Path(value) if value else None
 
     @classmethod
     def _get_file_content(cls, path: str | None) -> str | None:

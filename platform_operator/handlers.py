@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import ssl
-from base64 import b64encode
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -93,15 +92,10 @@ async def cleanup(**_: Any) -> None:
 
 @kopf.on.login()
 def login(**_: Any) -> kopf.ConnectionInfo:
-    ca_data = (
-        b64encode(config.kube_config.cert_authority.encode())
-        if config.kube_config.cert_authority
-        else None
-    )
     return kopf.ConnectionInfo(
         server=str(config.kube_config.url),
         scheme="Bearer",
-        ca_data=ca_data,
+        ca_path=str(config.kube_config.cert_authority_path),
         token=config.kube_config.auth_token,
         default_namespace=config.platform_namespace,
         expiration=datetime.fromtimestamp(

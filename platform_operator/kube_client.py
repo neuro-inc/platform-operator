@@ -154,13 +154,15 @@ class KubeClient:
     def _create_ssl_context(self) -> ssl.SSLContext | None:
         if not self._is_ssl:
             return None
-        assert self._config.cert_authority
-        ssl_context = ssl.create_default_context(cadata=self._config.cert_authority)
+        assert self._config.cert_authority_path
+        ssl_context = ssl.create_default_context(
+            cafile=self._config.cert_authority_path
+        )
         if self._config.auth_type == KubeClientAuthType.CERTIFICATE:
-            assert self._config.auth_cert
-            assert self._config.auth_cert_key
+            assert self._config.auth_cert_path
+            assert self._config.auth_cert_key_path
             ssl_context.load_cert_chain(
-                str(self._config.auth_cert), str(self._config.auth_cert_key)
+                str(self._config.auth_cert_path), str(self._config.auth_cert_key_path)
             )
         return ssl_context
 

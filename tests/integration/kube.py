@@ -46,25 +46,29 @@ def _kube_config_user_payload(_kube_config_payload: dict[str, Any]) -> dict[str,
 
 
 @pytest.fixture(scope="session")
-def _cert_authority_data_pem(_kube_config_cluster_payload: dict[str, Any]) -> str:
+def _cert_authority_path(
+    _kube_config_cluster_payload: dict[str, Any], tmp_path: Path
+) -> Path:
     if "certificate-authority" in _kube_config_cluster_payload:
-        return Path(_kube_config_cluster_payload["certificate-authority"]).read_text()
-    return _kube_config_cluster_payload["certificate-authority-data"]
+        return Path(_kube_config_cluster_payload["certificate-authority"])
+    temp_ca_file = tmp_path / "ca.pem"
+    temp_ca_file.write_text(_kube_config_cluster_payload["certificate-authority-data"])
+    return temp_ca_file  # _kube_config_cluster_payload["certificate-authority-data"]
 
 
 @pytest.fixture(scope="session")
 def kube_config(
     _kube_config_cluster_payload: dict[str, Any],
     _kube_config_user_payload: dict[str, Any],
-    _cert_authority_data_pem: str | None,
+    _cert_authority_path: Path | None,
 ) -> KubeConfig:
     return KubeConfig(
         version="1.14.10",
         url=URL(_kube_config_cluster_payload["server"]),
-        cert_authority=_cert_authority_data_pem,
         auth_type=KubeClientAuthType.CERTIFICATE,
-        auth_cert=Path(_kube_config_user_payload["client-certificate"]).read_text(),
-        auth_cert_key=Path(_kube_config_user_payload["client-key"]).read_text(),
+        cert_authority_path=_cert_authority_path,
+        auth_cert_path=Path(_kube_config_user_payload["client-certificate"]),
+        auth_cert_key_path=Path(_kube_config_user_payload["client-key"]),
     )
 
 
