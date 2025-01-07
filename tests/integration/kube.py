@@ -53,9 +53,6 @@ def _cert_authority_path(
     if "certificate-authority" in _kube_config_cluster_payload:
         yield Path(_kube_config_cluster_payload["certificate-authority"])
         return
-    # temp_ca_file = tmp_path / "ca.pem"
-    # temp_ca_file.write_text(_kube_config_cluster_payload["certificate-authority-data"])
-    # return temp_ca_file  # _kube_config_cluster_payload["certificate-authority-data"]
     _, path = tempfile.mkstemp()
     Path(path).write_text(_kube_config_cluster_payload["certificate-authority-data"])
     yield Path(path)

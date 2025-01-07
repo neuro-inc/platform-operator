@@ -4,6 +4,7 @@ import asyncio
 import json
 from base64 import urlsafe_b64encode
 from collections.abc import AsyncIterator, Callable
+from pathlib import Path
 from time import time
 from typing import Any
 
@@ -92,6 +93,25 @@ class TestKubeClientTokenUpdater:
         with pytest.raises(ValueError, match="Auth Token must be set"):
             _ = kube_config.auth_token_exp_ts
 
+    async def test_auth_token_refreshing(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        kube_client: KubeClient,
+        jwt_kube_token_with_exp_factory: Callable[[int], str],
+        tmp_path: Path,
+    ) -> None:
+        old_token = kube_client._config.auth_token
+
+        new_token = jwt_kube_token_with_exp_factory(int(time()) + 5)
+        tmp_token_file = tmp_path / "token"
+        tmp_token_file.write_text(new_token)
+        monkeypatch.setenv("NP_KUBE_AUTH_TOKEN_PATH", str(tmp_token_file))
+
+        kube_client._config.refresh_auth_token_from_mounted_file()
+
+        assert kube_client._config.auth_token == new_token
+        assert kube_client._config.auth_token != old_token
+
     async def test_token_periodically_updated(
         self,
         kube_app: aiohttp.web.Application,
@@ -110,11 +130,6 @@ class TestKubeClientTokenUpdater:
             "refresh_auth_token_from_mounted_file",
             lambda: new_token,
         )
-        # if we want to test the token file update, we need to use the following code
-        # add fixture tmp_path: Path
-        # tmp_token_file = tmp_path / "token"
-        # tmp_token_file.write_text(new_token)
-        # monkeypatch.setenv("NP_KUBE_AUTH_TOKEN_PATH", str(tmp_token_file))
 
         await asyncio.sleep(3)
 
