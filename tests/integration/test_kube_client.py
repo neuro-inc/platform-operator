@@ -102,7 +102,7 @@ class TestKubeClientTokenUpdater:
         with pytest.raises(ValueError, match="auth_token_path must be set"):
             _ = kube_config.auth_token_exp_ts
 
-    async def test_auth_token_property(
+    async def test_read_auth_token_from_path(
         self,
         kube_client: KubeClient,
         jwt_kube_token_with_exp_factory: Callable[[int], str],
