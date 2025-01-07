@@ -71,6 +71,7 @@ class TestConfig:
             "NP_ACME_CA_STAGING_PATH": "/ca.pem",
             "NP_STANDALONE": "true",
         }
+
         assert Config.load_from_env(env) == Config(
             node_name="minikube",
             log_level="DEBUG",
@@ -79,13 +80,11 @@ class TestConfig:
             kube_config=KubeConfig(
                 version="1.14.10",
                 url=URL("https://kubernetes.default"),
-                cert_authority_path=Path("/ca.crt"),
-                cert_authority_data_pem="cert-authority-data",
                 auth_type=KubeClientAuthType.CERTIFICATE,
+                cert_authority_path=Path("/ca.crt"),
                 auth_cert_path=Path("/client.crt"),
                 auth_cert_key_path=Path("/client.key"),
                 auth_token_path=Path("/token"),
-                auth_token="token",
                 conn_timeout_s=300,
                 read_timeout_s=100,
                 conn_pool_size=100,

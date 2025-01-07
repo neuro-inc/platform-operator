@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
-from base64 import b64decode
+from base64 import b64decode, urlsafe_b64decode
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -9,7 +10,7 @@ from enum import Enum
 from hashlib import sha256
 from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import kopf
 from neuro_config_client import (
@@ -41,14 +42,11 @@ class KubeClientAuthType(str, Enum):
 class KubeConfig:
     version: str
     url: URL
-    cert_authority_path: Path | None = None
-    cert_authority_data_pem: str | None = None
     auth_type: KubeClientAuthType = KubeClientAuthType.NONE
+    cert_authority_path: Path | None = None
     auth_cert_path: Path | None = None
     auth_cert_key_path: Path | None = None
-    auth_token: str | None = None
     auth_token_path: Path | None = None
-    auth_token_update_interval_s: int = 300
     conn_timeout_s: int = 300
     read_timeout_s: int = 100
     conn_pool_size: int = 100
@@ -59,21 +57,32 @@ class KubeConfig:
         return cls(
             version=env["NP_KUBE_VERSION"].lstrip("v"),
             url=URL(env["NP_KUBE_URL"]),
+            auth_type=KubeClientAuthType(env["NP_KUBE_AUTH_TYPE"]),
             cert_authority_path=cls._convert_to_path(
                 env.get("NP_KUBE_CERT_AUTHORITY_PATH")
             ),
-            cert_authority_data_pem=env.get("NP_KUBE_CERT_AUTHORITY_DATA_PEM"),
-            auth_type=KubeClientAuthType(env["NP_KUBE_AUTH_TYPE"]),
             auth_cert_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_CERT_PATH")),
             auth_cert_key_path=cls._convert_to_path(
                 env.get("NP_KUBE_AUTH_CERT_KEY_PATH")
             ),
             auth_token_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_TOKEN_PATH")),
-            auth_token=env.get("NP_KUBE_AUTH_TOKEN"),
         )
 
-    @classmethod
-    def _convert_to_path(cls, value: str | None) -> Path | None:
+    def read_auth_token_from_path(self) -> str | NoReturn:
+        if not self.auth_token_path:
+            raise ValueError("auth_token_path must be set")
+        return Path(self.auth_token_path).read_text()
+
+    @property
+    def auth_token_exp_ts(self) -> int | NoReturn:
+        payload = self.read_auth_token_from_path().split(".")[1]
+        decoded_payload = json.loads(
+            urlsafe_b64decode(payload + "=" * (4 - len(payload) % 4))
+        )
+        return decoded_payload["exp"]
+
+    @staticmethod
+    def _convert_to_path(value: str | None) -> Path | None:
         return Path(value) if value else None
 
 
