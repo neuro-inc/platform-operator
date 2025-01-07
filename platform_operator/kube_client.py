@@ -141,7 +141,9 @@ class KubeClient:
         trace_configs: list[aiohttp.TraceConfig] | None = None,
     ) -> None:
         self._config = config
-        self._token = config.auth_token if config.auth_token_path else None
+        self._token = (
+            config.read_auth_token_from_path() if config.auth_token_path else None
+        )
         self._trace_configs = trace_configs
         self._session: aiohttp.ClientSession | None = None
         self._token_updater_task: asyncio.Task[None] | None = None
@@ -189,7 +191,7 @@ class KubeClient:
         while True:
             await asyncio.sleep(max(1, self._config.auth_token_exp_ts - time()))
             try:
-                token = self._config.auth_token
+                token = self._config.read_auth_token_from_path()
                 if token != self._token:
                     self._token = token
                     logger.info("Kube token was refreshed")

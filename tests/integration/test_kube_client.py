@@ -97,7 +97,7 @@ class TestKubeClientTokenUpdater:
             auth_token_path=None,
         )
         with pytest.raises(ValueError, match="auth_token_path must be set"):
-            _ = kube_config.auth_token
+            _ = kube_config.read_auth_token_from_path()
 
         with pytest.raises(ValueError, match="auth_token_path must be set"):
             _ = kube_config.auth_token_exp_ts
@@ -109,13 +109,13 @@ class TestKubeClientTokenUpdater:
     ) -> None:
         assert kube_client._config.auth_token_path
 
-        old_token = kube_client._config.auth_token
+        old_token = kube_client._config.read_auth_token_from_path()
 
         new_token = jwt_kube_token_with_exp_factory(int(time()) + 3)
         kube_client._config.auth_token_path.write_text(new_token)
 
-        assert kube_client._config.auth_token == new_token
-        assert kube_client._config.auth_token != old_token
+        assert kube_client._config.read_auth_token_from_path() == new_token
+        assert kube_client._config.read_auth_token_from_path() != old_token
 
     async def test_token_periodically_updated(
         self,
@@ -126,7 +126,10 @@ class TestKubeClientTokenUpdater:
         assert kube_client._config.auth_token_path
 
         await kube_client.get_pods("default")
-        assert kube_app["token"]["value"] == kube_client._config.auth_token
+        assert (
+            kube_app["token"]["value"]
+            == kube_client._config.read_auth_token_from_path()
+        )
 
         new_token = jwt_kube_token_with_exp_factory(int(time()) + 5)
         kube_client._config.auth_token_path.write_text(new_token)

@@ -96,7 +96,7 @@ def login(**_: Any) -> kopf.ConnectionInfo:
         server=str(config.kube_config.url),
         scheme="Bearer",
         ca_path=str(config.kube_config.cert_authority_path),
-        token=config.kube_config.auth_token,
+        token=config.kube_config.read_auth_token_from_path(),
         default_namespace=config.platform_namespace,
         expiration=datetime.fromtimestamp(
             config.kube_config.auth_token_exp_ts, tz=timezone.utc

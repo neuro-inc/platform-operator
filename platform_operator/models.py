@@ -68,15 +68,14 @@ class KubeConfig:
             auth_token_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_TOKEN_PATH")),
         )
 
-    @property
-    def auth_token(self) -> str | NoReturn:
+    def read_auth_token_from_path(self) -> str | NoReturn:
         if not self.auth_token_path:
             raise ValueError("auth_token_path must be set")
         return Path(self.auth_token_path).read_text()
 
     @property
     def auth_token_exp_ts(self) -> int | NoReturn:
-        payload = self.auth_token.split(".")[1]
+        payload = self.read_auth_token_from_path().split(".")[1]
         decoded_payload = json.loads(
             urlsafe_b64decode(payload + "=" * (4 - len(payload) % 4))
         )
