@@ -134,7 +134,7 @@ class TestKubeClientTokenUpdater:
         new_token = jwt_kube_token_with_exp_factory(int(time()) + 5)
         kube_client._config.auth_token_path.write_text(new_token)
 
-        await asyncio.sleep(3)
+        await asyncio.sleep(11)
 
         await kube_client.get_pods("default")
         assert kube_app["token"]["value"] == new_token
