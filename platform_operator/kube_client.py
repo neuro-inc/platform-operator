@@ -189,7 +189,7 @@ class KubeClient:
 
     async def _start_token_updater(self) -> None:
         while True:
-            await asyncio.sleep(max(1, self._config.auth_token_exp_ts - time()))
+            await asyncio.sleep(max(10, self._config.auth_token_exp_ts - 60 - time()))
             try:
                 token = self._config.read_auth_token_from_path()
                 if token != self._token:
