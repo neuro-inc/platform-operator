@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncIterator
+import tempfile
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -48,12 +49,17 @@ def _kube_config_user_payload(_kube_config_payload: dict[str, Any]) -> dict[str,
 @pytest.fixture(scope="session")
 def _cert_authority_path(
     _kube_config_cluster_payload: dict[str, Any], tmp_path: Path
-) -> Path:
+) -> Iterator[Path]:
     if "certificate-authority" in _kube_config_cluster_payload:
-        return Path(_kube_config_cluster_payload["certificate-authority"])
-    temp_ca_file = tmp_path / "ca.pem"
-    temp_ca_file.write_text(_kube_config_cluster_payload["certificate-authority-data"])
-    return temp_ca_file  # _kube_config_cluster_payload["certificate-authority-data"]
+        yield Path(_kube_config_cluster_payload["certificate-authority"])
+        return
+    # temp_ca_file = tmp_path / "ca.pem"
+    # temp_ca_file.write_text(_kube_config_cluster_payload["certificate-authority-data"])
+    # return temp_ca_file  # _kube_config_cluster_payload["certificate-authority-data"]
+    _, path = tempfile.mkstemp()
+    Path(path).write_text(_kube_config_cluster_payload["certificate-authority-data"])
+    yield Path(path)
+    os.remove(path)
 
 
 @pytest.fixture(scope="session")
