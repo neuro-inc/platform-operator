@@ -189,7 +189,7 @@ class KubeClient:
         while True:
             await asyncio.sleep(max(1, self._config.auth_token_exp_ts - time()))
             try:
-                token = self._config.refresh_auth_token_from_mounted_file()
+                token = self._config.auth_token
                 if token != self._token:
                     self._token = token
                     logger.info("Kube token was refreshed")

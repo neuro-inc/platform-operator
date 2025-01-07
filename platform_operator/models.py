@@ -38,7 +38,7 @@ class KubeClientAuthType(str, Enum):
     CERTIFICATE = "certificate"
 
 
-@dataclass
+@dataclass(frozen=True)
 class KubeConfig:
     version: str
     url: URL
@@ -46,7 +46,7 @@ class KubeConfig:
     cert_authority_path: Path | None = None
     auth_cert_path: Path | None = None
     auth_cert_key_path: Path | None = None
-    auth_token: str | None = None
+    auth_token_path: Path | None = None
     conn_timeout_s: int = 300
     read_timeout_s: int = 100
     conn_pool_size: int = 100
@@ -65,20 +65,17 @@ class KubeConfig:
             auth_cert_key_path=cls._convert_to_path(
                 env.get("NP_KUBE_AUTH_CERT_KEY_PATH")
             ),
-            auth_token=cls._get_file_content(env.get("NP_KUBE_AUTH_TOKEN_PATH")),
+            auth_token_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_TOKEN_PATH")),
         )
 
-    def refresh_auth_token_from_mounted_file(self) -> str | None:
-        self.auth_token = self._get_file_content(
-            os.environ.get("NP_KUBE_AUTH_TOKEN_PATH")
-        )
-        return self.auth_token
+    @property
+    def auth_token(self) -> str | NoReturn:
+        if not self.auth_token_path:
+            raise ValueError("auth_token_path must be set")
+        return Path(self.auth_token_path).read_text()
 
     @property
     def auth_token_exp_ts(self) -> int | NoReturn:
-        if not self.auth_token:
-            raise ValueError("Auth Token must be set")
-
         payload = self.auth_token.split(".")[1]
         decoded_payload = json.loads(
             urlsafe_b64decode(payload + "=" * (4 - len(payload) % 4))
@@ -88,10 +85,6 @@ class KubeConfig:
     @staticmethod
     def _convert_to_path(value: str | None) -> Path | None:
         return Path(value) if value else None
-
-    @staticmethod
-    def _get_file_content(path: str | None) -> str | None:
-        return Path(path).read_text() if path else None
 
 
 @dataclass(frozen=True)

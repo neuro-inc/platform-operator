@@ -86,7 +86,7 @@ class TestConfig:
                 cert_authority_path=Path("/ca.crt"),
                 auth_cert_path=Path("/client.crt"),
                 auth_cert_key_path=Path("/client.key"),
-                auth_token=Path("/token").read_text(),
+                auth_token_path=Path("/token"),
                 conn_timeout_s=300,
                 read_timeout_s=100,
                 conn_pool_size=100,
