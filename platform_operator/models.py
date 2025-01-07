@@ -85,12 +85,12 @@ class KubeConfig:
         )
         return decoded_payload["exp"]
 
-    @classmethod
-    def _convert_to_path(cls, value: str | None) -> Path | None:
+    @staticmethod
+    def _convert_to_path(value: str | None) -> Path | None:
         return Path(value) if value else None
 
-    @classmethod
-    def _get_file_content(cls, path: str | None) -> str | None:
+    @staticmethod
+    def _get_file_content(path: str | None) -> str | None:
         return Path(path).read_text() if path else None
 
 
