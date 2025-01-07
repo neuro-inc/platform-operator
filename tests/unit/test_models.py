@@ -38,7 +38,7 @@ from platform_operator.models import (
 
 
 class TestConfig:
-    def test_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_config(self) -> None:
         env = {
             "NP_NODE_NAME": "minikube",
             "NP_PLATFORM_AUTH_URL": "http://platformauthapi:8080",
@@ -71,8 +71,6 @@ class TestConfig:
             "NP_ACME_CA_STAGING_PATH": "/ca.pem",
             "NP_STANDALONE": "true",
         }
-
-        monkeypatch.setattr(Path, "read_text", lambda x: None)
 
         assert Config.load_from_env(env) == Config(
             node_name="minikube",
