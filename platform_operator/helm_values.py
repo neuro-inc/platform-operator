@@ -1212,7 +1212,7 @@ class HelmValuesFactory:
                     "ingressAuthUrl", platform.ingress_auth_url
                 ),
                 **self._create_platform_url_value("configUrl", platform.config_url),
-                **self._create_platform_url_value("apiUrl", platform.api_url, "api/v1"),
+                **self._create_platform_url_value("apiUrl", platform.api_url),
                 **self._create_platform_token_value(platform),
             },
             "secrets": [],

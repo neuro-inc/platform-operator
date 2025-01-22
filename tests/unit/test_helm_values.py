@@ -2290,7 +2290,7 @@ class TestHelmValuesFactory:
                 "authUrl": "https://dev.neu.ro",
                 "ingressAuthUrl": "https://platformingressauth",
                 "configUrl": "https://dev.neu.ro",
-                "apiUrl": "https://dev.neu.ro/api/v1",
+                "apiUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
