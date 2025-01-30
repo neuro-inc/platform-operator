@@ -29,7 +29,7 @@ def _kube_config_payload() -> dict[str, Any]:
 
 @pytest.fixture(scope="session")
 def _kube_config_cluster_payload(
-    _kube_config_payload: dict[str, Any]
+    _kube_config_payload: dict[str, Any],
 ) -> dict[str, Any]:
     cluster_name = "minikube"
     clusters = {
@@ -48,7 +48,7 @@ def _kube_config_user_payload(_kube_config_payload: dict[str, Any]) -> dict[str,
 
 @pytest.fixture(scope="session")
 def _cert_authority_path(
-    _kube_config_cluster_payload: dict[str, Any]
+    _kube_config_cluster_payload: dict[str, Any],
 ) -> Iterator[Path]:
     if "certificate-authority" in _kube_config_cluster_payload:
         yield Path(_kube_config_cluster_payload["certificate-authority"])
