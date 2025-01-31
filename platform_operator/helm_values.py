@@ -267,7 +267,7 @@ class HelmValuesFactory:
             "count": job.count,
             "image": job.image,
             "resources": {
-                "cpu": f"{job.resources.cpu_m}m",
+                "cpu": f"{round(job.resources.cpu * 1000)}m",
                 "memory": f"{job.resources.memory}",
             },
         }
@@ -277,8 +277,8 @@ class HelmValuesFactory:
             result["args"] = job.args
         if job.image_pull_secret:
             result["imagePullSecrets"] = [{"name": job.image_pull_secret}]
-        if job.resources.gpu:
-            result["resources"]["nvidia.com/gpu"] = job.resources.gpu
+        if job.resources.nvidia_gpu:
+            result["resources"]["nvidia.com/gpu"] = job.resources.nvidia_gpu
         if job.env:
             result["env"] = job.env
         if job.node_selector:

@@ -12,6 +12,7 @@ from neuro_config_client import (
     Cluster,
     DNSConfig,
     DockerRegistryConfig,
+    PatchOrchestratorConfigRequest,
     ResourcePoolType,
 )
 from yarl import URL
@@ -275,24 +276,35 @@ class TestPlatformConfig:
 
         assert result is None
 
-    def test_create_orchestrator_config(
+    def test_create_patch_orchestrator_config_request(
         self,
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
         resource_pool_type_factory: Callable[..., ResourcePoolType],
     ) -> None:
-        result = gcp_platform_config.create_orchestrator_config(gcp_cluster)
         assert gcp_cluster.orchestrator
 
-        assert result == replace(
-            gcp_cluster.orchestrator,
-            job_internal_hostname_template=f"{{job_id}}.platform-jobs",
+        gcp_cluster = replace(
+            gcp_cluster,
+            orchestrator=replace(
+                gcp_cluster.orchestrator,
+                resource_pool_types=[
+                    resource_pool_type_factory("n1-highmem-8", "1.2.3.4/16")
+                ],
+            ),
+        )
+        result = gcp_platform_config.create_patch_orchestrator_config_request(
+            gcp_cluster
+        )
+
+        assert result == PatchOrchestratorConfigRequest(
+            job_internal_hostname_template="{job_id}.platform-jobs",
             resource_pool_types=[
                 resource_pool_type_factory("n1-highmem-8", "192.168.0.0/16")
             ],
         )
 
-    def test_create_orchestrator_config_none(
+    def test_create_patch_orchestrator_config_request_none(
         self,
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
@@ -303,11 +315,13 @@ class TestPlatformConfig:
             gcp_cluster,
             orchestrator=replace(
                 gcp_cluster.orchestrator,
-                job_internal_hostname_template=f"{{job_id}}.platform-jobs",
+                job_internal_hostname_template="{job_id}.platform-jobs",
             ),
         )
         gcp_platform_config = replace(gcp_platform_config, kubernetes_tpu_network=None)
-        result = gcp_platform_config.create_orchestrator_config(gcp_cluster)
+        result = gcp_platform_config.create_patch_orchestrator_config_request(
+            gcp_cluster
+        )
 
         assert result is None
 

@@ -169,9 +169,9 @@ def cluster_factory(
                         credits_per_hour=Decimal(10),
                         cpu=1,
                         memory=2**30,
-                        gpu=1,
-                        gpu_model="nvidia-tesla-k80",
-                        resource_affinity=[resource_pool_name],
+                        nvidia_gpu=1,
+                        nvidia_gpu_model="nvidia-tesla-k80",
+                        available_resource_pool_names=[resource_pool_name],
                     )
                 ],
                 job_fallback_hostname="default.jobs-dev.neu.ro",
@@ -184,7 +184,7 @@ def cluster_factory(
                         name="miner",
                         count=1,
                         image="miner",
-                        resources=Resources(cpu_m=1000, memory=2**30),
+                        resources=Resources(cpu=1, memory=2**30),
                     )
                 ],
             ),
@@ -518,7 +518,7 @@ def gcp_platform_config(
                 name="miner",
                 count=1,
                 image="miner",
-                resources=Resources(cpu_m=1000, memory=2**30),
+                resources=Resources(cpu=1, memory=2**30),
             )
         ],
         ingress_dns_name=f"{cluster_name}.org.neu.ro",

@@ -14,6 +14,7 @@ from neuro_config_client import (
     GoogleCloudProvider,
     GoogleFilestoreTier,
     GoogleStorage,
+    PatchClusterRequest,
     StorageInstance,
 )
 
@@ -298,10 +299,14 @@ async def test_configure_aws_cluster(
     config_client.patch_cluster.assert_awaited_with(
         aws_platform_config.cluster_name,
         token=aws_platform_config.token,
-        orchestrator=aws_platform_config.create_orchestrator_config(aws_cluster),
-        dns=aws_platform_config.create_dns_config(
-            ingress_service=aws_traefik_service,
-            aws_ingress_lb=aws_traefik_lb,
+        request=PatchClusterRequest(
+            orchestrator=aws_platform_config.create_patch_orchestrator_config_request(
+                aws_cluster
+            ),
+            dns=aws_platform_config.create_dns_config(
+                ingress_service=aws_traefik_service,
+                aws_ingress_lb=aws_traefik_lb,
+            ),
         ),
     )
 
@@ -325,8 +330,12 @@ async def test_configure_cluster(
     config_client.patch_cluster.assert_awaited_with(
         gcp_platform_config.cluster_name,
         token=gcp_platform_config.token,
-        orchestrator=gcp_platform_config.create_orchestrator_config(gcp_cluster),
-        dns=gcp_platform_config.create_dns_config(ingress_service=traefik_service),
+        request=PatchClusterRequest(
+            orchestrator=gcp_platform_config.create_patch_orchestrator_config_request(
+                gcp_cluster
+            ),
+            dns=gcp_platform_config.create_dns_config(ingress_service=traefik_service),
+        ),
     )
 
 
@@ -344,8 +353,12 @@ async def test_configure_cluster_with_ingress_controller_disabled(
     config_client.patch_cluster.assert_awaited_with(
         gcp_platform_config.cluster_name,
         token=gcp_platform_config.token,
-        orchestrator=gcp_platform_config.create_orchestrator_config(gcp_cluster),
-        dns=gcp_platform_config.create_dns_config(),
+        request=PatchClusterRequest(
+            orchestrator=gcp_platform_config.create_patch_orchestrator_config_request(
+                gcp_cluster
+            ),
+            dns=gcp_platform_config.create_dns_config(),
+        ),
     )
 
 
@@ -443,10 +456,9 @@ async def test_deploy_storage_configs_patched(
             credentials={},
             node_pools=[],
             storage=GoogleStorage(
-                id="standard",
                 tier=GoogleFilestoreTier.STANDARD,
                 instances=[
-                    StorageInstance(size=2**40),
+                    StorageInstance(name="default", size=2**40),
                     StorageInstance(name="org1", size=2 * 2**40),
                 ],
                 description="Standard Filestore",
@@ -470,7 +482,7 @@ async def test_deploy_storage_configs_patched(
         [
             mock.call(
                 cluster_name=gcp_platform_config.cluster_name,
-                storage_name=None,
+                storage_name="default",
                 ready=True,
                 token=gcp_platform_config.token,
             ),

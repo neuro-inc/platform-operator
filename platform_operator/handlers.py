@@ -16,6 +16,7 @@ from neuro_config_client import (
     CloudProviderType,
     Cluster,
     ConfigClient,
+    PatchClusterRequest,
 )
 
 from .aws_client import AwsElbClient
@@ -384,9 +385,7 @@ async def complete_deployment(cluster: Cluster, platform: PlatformConfig) -> Non
     else:
         storage_names = []
     for storage in platform.storages:
-        storage_name: str | None = None
-        if storage.path:
-            storage_name = storage.path.lstrip("/")
+        storage_name = storage.path.lstrip("/") if storage.path else "default"
         if storage_name not in storage_names:
             continue
         await app.config_client.patch_storage(
@@ -473,13 +472,12 @@ async def _configure_cluster(cluster: Cluster, platform: PlatformConfig) -> None
                     ingress_service.load_balancer_host
                 )
 
-    orchestrator = platform.create_orchestrator_config(cluster)
+    orchestrator = platform.create_patch_orchestrator_config_request(cluster)
     dns = platform.create_dns_config(
         ingress_service=ingress_service, aws_ingress_lb=aws_ingress_lb
     )
     await app.config_client.patch_cluster(
         platform.cluster_name,
         token=platform.token,
-        orchestrator=orchestrator,
-        dns=dns,
+        request=PatchClusterRequest(orchestrator=orchestrator, dns=dns),
     )

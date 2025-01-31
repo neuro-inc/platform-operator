@@ -5,7 +5,7 @@ import os
 from base64 import b64decode, urlsafe_b64decode
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from enum import Enum
 from hashlib import sha256
 from ipaddress import IPv4Address, IPv4Network
@@ -20,7 +20,7 @@ from neuro_config_client import (
     DNSConfig,
     DockerRegistryConfig,
     IdleJobConfig,
-    OrchestratorConfig,
+    PatchOrchestratorConfigRequest,
     ResourcePoolType,
 )
 from yarl import URL
@@ -915,23 +915,27 @@ class PlatformConfig:
             return None
         return DNSConfig(name=self.ingress_dns_name, a_records=a_records)
 
-    def create_orchestrator_config(self, cluster: Cluster) -> OrchestratorConfig | None:
+    def create_patch_orchestrator_config_request(
+        self, cluster: Cluster
+    ) -> PatchOrchestratorConfigRequest | None:
         assert cluster.orchestrator
-        orchestrator = replace(
-            cluster.orchestrator,
-            job_internal_hostname_template=self.jobs_internal_host_template,
-        )
-        if self.kubernetes_tpu_network:
-            orchestrator = replace(
-                orchestrator,
-                resource_pool_types=self._update_tpu_network(
-                    orchestrator.resource_pool_types,
-                    self.kubernetes_tpu_network,
-                ),
+        request = PatchOrchestratorConfigRequest()
+        if (
+            cluster.orchestrator.job_internal_hostname_template
+            != self.jobs_internal_host_template
+        ):
+            request = replace(
+                request, job_internal_hostname_template=self.jobs_internal_host_template
             )
-        if cluster.orchestrator == orchestrator:
+        if self.kubernetes_tpu_network:
+            resource_pool_types = self._update_tpu_network(
+                cluster.orchestrator.resource_pool_types, self.kubernetes_tpu_network
+            )
+            if cluster.orchestrator.resource_pool_types != resource_pool_types:
+                request = replace(request, resource_pool_types=resource_pool_types)
+        if all(value is None for value in asdict(request).values()):
             return None
-        return orchestrator
+        return request
 
     @classmethod
     def _update_tpu_network(
