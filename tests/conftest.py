@@ -208,10 +208,8 @@ def cluster_factory(
             dns=DNSConfig(name=f"{name}.org.neu.ro"),
             ingress=IngressConfig(
                 acme_environment=ACMEEnvironment.PRODUCTION,
-                cors_origins=[
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ],
+                default_cors_origins=["https://console.apolo.us"],
+                additional_cors_origins=["https://custom.app"],
             ),
             created_at=datetime.now(),
         )
@@ -533,8 +531,8 @@ def gcp_platform_config(
         ingress_controller_replicas=2,
         ingress_public_ips=[],
         ingress_cors_origins=[
-            "https://release--neuro-web.netlify.app",
-            "https://app.neu.ro",
+            "https://console.apolo.us",
+            "https://custom.app",
         ],
         ingress_service_type=IngressServiceType.LOAD_BALANCER,
         ingress_service_name="traefik",
