@@ -95,8 +95,8 @@ class TestHelmValuesFactory:
                 "ingressAuthHost": "platformingressauth",
                 "cors": {
                     "originList": [
-                        "https://release--neuro-web.netlify.app",
-                        "https://app.neu.ro",
+                        "https://console.apolo.us",
+                        "https://custom.app",
                     ]
                 },
             },
