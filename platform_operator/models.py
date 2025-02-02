@@ -1035,9 +1035,11 @@ class PlatformConfigFactory:
             ingress_controller_install=spec.ingress_controller.enabled,
             ingress_controller_replicas=spec.ingress_controller.replicas or 2,
             ingress_public_ips=spec.ingress_controller.public_ips,
-            ingress_cors_origins=(
-                sorted(cluster.ingress.default_cors_origins)
-                + sorted(cluster.ingress.additional_cors_origins)
+            ingress_cors_origins=sorted(
+                {
+                    *cluster.ingress.default_cors_origins,
+                    *cluster.ingress.additional_cors_origins,
+                }
             ),
             ingress_service_type=IngressServiceType(
                 spec.ingress_controller.service_type or IngressServiceType.LOAD_BALANCER
