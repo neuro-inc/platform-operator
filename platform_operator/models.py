@@ -5,7 +5,7 @@ import os
 from base64 import b64decode, urlsafe_b64decode
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass, replace, field
+from dataclasses import asdict, dataclass, field, replace
 from enum import Enum
 from hashlib import sha256
 from ipaddress import IPv4Address, IPv4Network
