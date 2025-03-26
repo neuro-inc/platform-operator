@@ -59,3 +59,12 @@ dependencies:
   - name: k8s-resources
     version: "1.0.1"
     repository: https://neuro-inc.github.io/helm-charts
+  - name: pgo
+    alias: apps-postgres-operator
+    version: "5.6.1"
+    repository: oci://ghcr.io/neuro-inc/helm-charts
+    condition: appsPostgresOperatorEnabled
+  - name: keda
+    version: "2.16.1"
+    repository: https://kedacore.github.io/charts
+    condition: appsKedaEnabled

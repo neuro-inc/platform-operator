@@ -5,7 +5,7 @@ import os
 from base64 import b64decode, urlsafe_b64decode
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, replace, field
 from enum import Enum
 from hashlib import sha256
 from ipaddress import IPv4Address, IPv4Network
@@ -126,7 +126,8 @@ class HelmChartNames:
     platform_disks: str = "platform-disks"
     platform_api_poller: str = "platform-api-poller"
     platform_buckets: str = "platform-buckets"
-    platform_apps: str = "platform-apps"
+    pgo: str = "pgo"
+    keda: str = "keda"
 
 
 @dataclass(frozen=True)
@@ -739,6 +740,12 @@ class BucketsConfig:
 
 
 @dataclass(frozen=True)
+class AppsOperatorsConfig:
+    postgres_operator_enabled: bool = False
+    keda_enabled: bool = False
+
+
+@dataclass(frozen=True)
 class MinioGatewayConfig:
     root_user: str
     root_user_password: str
@@ -832,6 +839,9 @@ class PlatformConfig:
     gcp_service_account_key_base64: str = ""
     services_priority_class_name: str = ""
     minio_gateway: MinioGatewayConfig | None = None
+    apps_operator_config: AppsOperatorsConfig = field(
+        default_factory=AppsOperatorsConfig
+    )
 
     def get_storage_claim_name(self, path: str) -> str:
         name = f"{self.release_name}-storage"

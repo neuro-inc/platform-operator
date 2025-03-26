@@ -35,6 +35,8 @@ class HelmValuesFactory:
             "traefikEnabled": platform.ingress_controller_install,
             "acmeEnabled": platform.ingress_acme_enabled,
             "dockerRegistryEnabled": platform.registry.docker_registry_install,
+            "appsPostgresOperatorEnabled": platform.apps_operator_config.postgres_operator_enabled,
+            "appsKedaEnabled": platform.apps_operator_config.keda_enabled,
             "minioEnabled": platform.buckets.minio_install,
             "minioGatewayEnabled": platform.minio_gateway is not None,
             "platformReportsEnabled": platform.monitoring.metrics_enabled,
