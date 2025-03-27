@@ -115,6 +115,8 @@ acmeEnabled: false
 dockerRegistryEnabled: false
 minioEnabled: false
 platformReportsEnabled: true
+appsPostgresOperatorEnabled: false
+appsKedaEnabled: false
 
 tags:
   gcp: false
