@@ -117,6 +117,8 @@ minioEnabled: false
 platformReportsEnabled: true
 appsPostgresOperatorEnabled: false
 appsKedaEnabled: false
+lokiEnabled: true
+alloyEnabled: true
 
 tags:
   gcp: false

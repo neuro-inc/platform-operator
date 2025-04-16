@@ -129,6 +129,8 @@ class HelmChartNames:
     platform_apps: str = "platform-apps"
     pgo: str = "apps-postgres-operator"
     keda: str = "keda"
+    alloy: str = "alloy"
+    loki: str = "loki"
 
 
 @dataclass(frozen=True)
