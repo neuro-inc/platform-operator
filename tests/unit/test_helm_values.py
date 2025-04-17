@@ -2478,6 +2478,9 @@ class TestHelmValuesFactory:
                         },
                     },
                 },
+                "nodeExporter": {
+                    "enabled": True,
+                },
                 "prometheus-node-exporter": {
                     "image": {
                         "registry": "ghcr.io",
