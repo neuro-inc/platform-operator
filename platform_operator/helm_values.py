@@ -1366,6 +1366,9 @@ class HelmValuesFactory:
                         },
                     },
                 },
+                "nodeExporter": {
+                    "enabled": platform.monitoring.metrics_node_exporter_enabled,
+                },
                 "prometheus-node-exporter": {
                     "image": {
                         "registry": platform.image_registry,

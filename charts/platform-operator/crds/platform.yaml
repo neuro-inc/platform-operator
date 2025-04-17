@@ -401,6 +401,12 @@ spec:
                         type: string
                       retentionTime:
                         type: string
+                      nodeExporter:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                            default: true
                       blobStorage:
                         type: object
                         required: [bucket]
