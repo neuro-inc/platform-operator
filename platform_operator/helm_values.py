@@ -248,7 +248,6 @@ class HelmValuesFactory:
                     f"*.apps.{platform.ingress_url.host}",
                 ],
                 "sslCertSecretName": f"{platform.release_name}-ssl-cert",
-                "rolloutDeploymentName": "traefik",
             },
             "podLabels": {"service": "acme"},
             "env": [
@@ -507,19 +506,6 @@ class HelmValuesFactory:
                 "--entryPoints.websecure.forwardedHeaders.insecure=true",
                 "--entryPoints.websecure.http.middlewares="
                 f"{platform.namespace}-{platform.release_name}-cors@kubernetescrd",
-                "--providers.file.filename=/etc/traefik/dynamic/config.yaml",
-            ],
-            "volumes": [
-                {
-                    "name": f"{platform.release_name}-traefik-dynamic-config",
-                    "mountPath": "/etc/traefik/dynamic",
-                    "type": "configMap",
-                },
-                {
-                    "name": f"{platform.release_name}-ssl-cert",
-                    "mountPath": "/etc/certs",
-                    "type": "secret",
-                },
             ],
             "providers": {
                 "kubernetesCRD": {
@@ -531,6 +517,13 @@ class HelmValuesFactory:
                     "enabled": True,
                     "allowExternalNameServices": True,
                 },
+            },
+            "tlsStore": {
+                "default": {
+                    "defaultCertificate": {
+                        "secretName": f"{platform.release_name}-ssl-cert"
+                    },
+                }
             },
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
