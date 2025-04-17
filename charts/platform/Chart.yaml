@@ -68,3 +68,11 @@ dependencies:
     version: "2.16.1"
     repository: https://kedacore.github.io/charts
     condition: appsKedaEnabled
+  - name: loki
+    version: "6.29.0"
+    repository: https://grafana.github.io/helm-charts
+    condition: lokiEnabled
+  - name: alloy
+    version: "1.0.1"
+    repository: https://grafana.github.io/helm-charts
+    condition: alloyEnabled
