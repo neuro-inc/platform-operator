@@ -10,7 +10,7 @@ dependencies:
     repository: https://helm.traefik.io/traefik
     condition: traefikEnabled
   - name: acme
-    version: "1.3.1"
+    version: "1.3.2"
     repository: https://neuro-inc.github.io/helm-charts
     condition: acmeEnabled
   - name: docker-registry
