@@ -1868,61 +1868,40 @@ class HelmValuesFactory:
         return result
 
     def create_loki_values(self, platform: PlatformConfig) -> dict[str, Any]:
-        result: dict[str, Any] = {
+        result = {
             "deploymentMode": "SimpleScalable",
             "loki": {
-                "auth_enabled": False,
                 "commonConfig": {"replication_factor": 1},
-                "rulerConfig": {
-                    "storage": {
-                        "type": "s3",
-                        "s3": {
-                            "bucketnames": "logs",
-                            "insecure": False,
-                            "region": "minio",
-                            "access_key_id": "access_key",
-                            "endpoint": "http://minio:9000",
-                            "s3forcepathstyle": True,
-                            "secret_access_key": "secret_key",
-                        },
-                    }
-                },
-                "schemaConfig": {
-                    "configs": [
-                        {
-                            "from": "2025-01-01",
-                            "object_store": "s3",
-                            "store": "tsdb",
-                            "schema": "v13",
-                            "index": {"prefix": "index_", "period": "24h"},
-                        }
-                    ]
-                },
-                "storage": {
-                    "bucketNames": {"chunks": "logs", "ruler": "logs", "admin": "logs"},
-                    "type": "s3",
-                },
-                "storage_config": {
-                    "aws": {
-                        "bucketnames": "logs",
-                        "endpoint": "http://minio:9000",
-                        "region": "minio",
-                        "access_key_id": "access_key",
-                        "secret_access_key": "secret_key",
-                        "insecure": False,
-                        "s3forcepathstyle": True,
-                    }
-                },
+                "auth_enabled": False,
             },
             "test": {"enabled": False},
             "lokiCanary": {"enabled": False},
-            "resultsCache": {"allocatedMemory": 128},
-            "chunksCache": {"allocatedMemory": 512},
+            "resultsCache": {"allocatedMemory": 512},
+            "chunksCache": {"allocatedMemory": 2048},
+            "ingester": {"chunk_encoding": "snappy"},
+            "table_manager": {
+                "retention_deletes_enabled": True,
+                "retention_period": "2160h",
+            },
+            "query_scheduler": {
+                "max_outstanding_requests_per_tenant": 32768,
+            },
+            "querier": {
+                "max_concurrent": 4,  # Default is 4, adjust based on memory and CPU
+            },
+            "pattern_ingester": {
+                "enabled": True,
+            },
+            "limits_config": {
+                "allow_structured_metadata": True,
+                "volume_enabled": True,
+                "retention_period": "90d",
+            },
             "minio": {"enabled": False},
             "gateway": {
                 "replicas": 1,
                 "resources": {
-                    "requests": {"memory": "50Mi", "cpu": "10m"},
+                    "requests": {"memory": "100Mi", "cpu": "10m"},
                     "limits": {"memory": "100Mi"},
                 },
             },
@@ -1948,6 +1927,153 @@ class HelmValuesFactory:
                 },
             },
         }
+
+        if platform.buckets.provider == BucketsProvider.GCP:
+            bucket_name = platform.monitoring.logs_bucket_name
+            gcp_loki_sa_access_secret_name = f"{platform.release_name}-loki-access-gcs"
+            result["extraObjects"] = [
+                f"apiVersion: v1"
+                f"data:"
+                f"  key.json: {platform.gcp_service_account_key_base64}"
+                f"kind: Secret"
+                f"metadata:"
+                f"  name: f{gcp_loki_sa_access_secret_name}"
+                f"  namespace: {platform.namespace}"
+                f"type: Opaque"
+            ]
+
+            extra_env = {
+                "extraEnv": [
+                    {
+                        "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                        "value": "/etc/secrets/key.json",
+                    }
+                ],
+                "extraVolumes": [
+                    {
+                        "name": "loki-access-gcs",
+                        "secret": {
+                            "secretName": gcp_loki_sa_access_secret_name,
+                        },
+                    }
+                ],
+                "extraVolumeMounts": [
+                    {
+                        "name": "loki-access-gcs",
+                        "mountPath": "/etc/secrets",
+                    }
+                ],
+            }
+
+            result["loki"].update(  # type: ignore
+                {
+                    "storage": {
+                        "bucketNames": {
+                            "chunks": bucket_name,
+                            "ruler": bucket_name,
+                            "admin": bucket_name,
+                        },
+                        "type": "gcs",
+                    },
+                    "schemaConfig": {
+                        "configs": [
+                            {
+                                "from": "2025-01-01",
+                                "object_store": "gcs",
+                                "store": "tsdb",
+                                "schema": "v13",
+                                "index": {"prefix": "index_", "period": "24h"},
+                            }
+                        ]
+                    },
+                }
+            )
+            result["write"].update(extra_env)  # type: ignore
+            result["read"].update(extra_env)  # type: ignore
+            result["backend"].update(extra_env)  # type: ignore
+
+        elif platform.buckets.provider in [
+            BucketsProvider.MINIO,
+            BucketsProvider.EMC_ECS,
+            BucketsProvider.OPEN_STACK,
+        ]:
+            s3_bucket_name = platform.monitoring.logs_bucket_name
+            s3_region = platform.buckets.minio_region
+
+            if platform.buckets.provider == BucketsProvider.MINIO:
+                s3_endpoint_url = str(platform.buckets.minio_url)
+                s3_secret_name = f"{platform.release_name}-monitoring-s3"
+                s3_access_key_id = self._create_value_from_secret(
+                    name=s3_secret_name, key="access_key_id"
+                )
+                s3_secret_access_key = self._create_value_from_secret(
+                    name=s3_secret_name, key="secret_access_key"
+                )
+            elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+                s3_endpoint_url = str(platform.buckets.emc_ecs_s3_endpoint)
+                s3_access_key_id = (
+                    platform.buckets.emc_ecs_access_key_id  # type: ignore
+                )
+                s3_secret_access_key = (
+                    platform.buckets.emc_ecs_secret_access_key  # type: ignore
+                )
+            elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+                s3_endpoint_url = str(platform.buckets.open_stack_s3_endpoint)
+                s3_access_key_id = platform.buckets.open_stack_username
+                s3_secret_access_key = platform.buckets.open_stack_password
+
+            result["loki"].update(  # type: ignore
+                {
+                    "rulerConfig": {
+                        "storage": {
+                            "type": "s3",
+                            "s3": {
+                                "endpoint": s3_endpoint_url,
+                                "bucketnames": s3_bucket_name,
+                                "region": s3_region,
+                                "access_key_id": s3_access_key_id,
+                                "secret_access_key": s3_secret_access_key,
+                                "insecure": False,
+                                "s3forcepathstyle": True,
+                            },
+                        }
+                    },
+                    "schemaConfig": {
+                        "configs": [
+                            {
+                                "from": "2025-01-01",
+                                "object_store": "s3",
+                                "store": "tsdb",
+                                "schema": "v13",
+                                "index": {"prefix": "index_", "period": "24h"},
+                            }
+                        ]
+                    },
+                    "storage": {
+                        "bucketNames": {
+                            "chunks": s3_bucket_name,
+                            "ruler": s3_bucket_name,
+                            "admin": s3_bucket_name,
+                        },
+                        "type": "s3",
+                    },
+                    "storage_config": {
+                        "aws": {
+                            "endpoint": s3_endpoint_url,
+                            "bucketnames": s3_bucket_name,
+                            "region": s3_region,
+                            "access_key_id": s3_access_key_id,
+                            "secret_access_key": s3_secret_access_key,
+                            "insecure": False,
+                            "s3forcepathstyle": True,
+                        }
+                    },
+                }
+            )
+
+        else:
+            raise ValueError("Bucket provider is not supported")
+
         return result
 
     def create_alloy_values(self, platform: PlatformConfig) -> dict[str, Any]:

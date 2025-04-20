@@ -19,7 +19,7 @@ from neuro_config_client import (
     PatchClusterRequest,
 )
 
-from .aws_client import AwsElbClient
+from .aws_client import AwsElbClient, S3Client
 from .helm_client import HelmClient, ReleaseStatus
 from .helm_values import HelmValuesFactory
 from .kube_client import (
@@ -31,7 +31,7 @@ from .kube_client import (
     PlatformPhase,
     PlatformStatusManager,
 )
-from .models import Config, PlatformConfig, PlatformConfigFactory
+from .models import BucketsProvider, Config, PlatformConfig, PlatformConfigFactory
 
 logger = logging.getLogger(__name__)
 
@@ -394,6 +394,40 @@ async def complete_deployment(cluster: Cluster, platform: PlatformConfig) -> Non
             ready=True,
             token=platform.token,
         )
+
+    # create bucket for logs
+    if platform.monitoring.logs_bucket_name:
+        if platform.buckets.provider == BucketsProvider.GCP:
+            region = platform.minio_gateway  # ???
+            access_key_id = platform.minio_gateway.root_user
+            secret_access_key = platform.minio_gateway.root_password
+            endpoint_url = platform.minio_gateway  # ???
+        elif platform.buckets.provider == BucketsProvider.MINIO:
+            region = platform.buckets.minio_region
+            access_key_id = platform.buckets.minio_username
+            secret_access_key = platform.buckets.minio_password
+            endpoint_url = platform.buckets.minio_url
+        elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+            region = platform.buckets.emc_ecs_region
+            access_key_id = platform.buckets.emc_ecs_access_key_id
+            secret_access_key = platform.buckets.emc_ecs_secret_access_key
+            endpoint_url = platform.buckets.emc_ecs_s3_endpoint
+        elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+            region = platform.buckets.open_stack_region_name
+            access_key_id = platform.buckets.open_stack_username
+            secret_access_key = platform.buckets.open_stack_password
+            endpoint_url = platform.buckets.open_stack_s3_endpoint
+        else:
+            raise ValueError(f"Unknown buckets provider: {platform.buckets.provider}")
+        async with S3Client(
+            region=region,
+            access_key_id=access_key_id,
+            secret_access_key=secret_access_key,
+            endpoint_url=endpoint_url,
+        ) as s3_client:
+            await s3_client.create_bucket(
+                bucket_name=platform.monitoring.logs_bucket_name
+            )
 
 
 async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
