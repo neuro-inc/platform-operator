@@ -719,6 +719,7 @@ class BucketsConfig:
 
     azure_storage_account_name: str = ""
     azure_storage_account_key: str = ""
+    azure_minio_gateway_region: str = "minio"
 
     minio_install: bool = False
     minio_url: URL | None = None
@@ -752,6 +753,7 @@ class AppsOperatorsConfig:
 class MinioGatewayConfig:
     root_user: str
     root_user_password: str
+    endpoint_url: str = "http://minio-gateway:9000"
 
 
 class MetricsStorageType(Enum):

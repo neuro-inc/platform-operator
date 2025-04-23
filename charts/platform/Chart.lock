@@ -53,5 +53,11 @@ dependencies:
 - name: keda
   repository: https://kedacore.github.io/charts
   version: 2.16.1
-digest: sha256:54fd3c9079e3f92365ce55d8a3610bf1b8b63dd55c214eaa4fbedd858fdd9a6a
-generated: "2025-03-26T13:29:36.204172Z"
+- name: loki
+  repository: https://grafana.github.io/helm-charts
+  version: 6.29.0
+- name: alloy
+  repository: https://grafana.github.io/helm-charts
+  version: 1.0.1
+digest: sha256:d84af095905aeea72bf2204c1e367dbba8601671ab53d7254929eb627aca2442
+generated: "2025-04-23T18:23:19.637498306+03:00"

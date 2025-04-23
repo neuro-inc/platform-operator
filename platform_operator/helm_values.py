@@ -1869,6 +1869,8 @@ class HelmValuesFactory:
 
     def create_loki_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result = {
+            "nameOverride": "loki",
+            "fullnameOverride": "loki",
             "deploymentMode": "SimpleScalable",
             "loki": {
                 "commonConfig": {"replication_factor": 1},
@@ -1928,8 +1930,8 @@ class HelmValuesFactory:
             },
         }
 
+        bucket_name = platform.monitoring.logs_bucket_name
         if platform.buckets.provider == BucketsProvider.GCP:
-            bucket_name = platform.monitoring.logs_bucket_name
             gcp_loki_sa_access_secret_name = f"{platform.release_name}-loki-access-gcs"
             result["extraObjects"] = [
                 f"apiVersion: v1"
@@ -1992,12 +1994,105 @@ class HelmValuesFactory:
             result["read"].update(extra_env)  # type: ignore
             result["backend"].update(extra_env)  # type: ignore
 
+        elif platform.buckets.provider == BucketsProvider.AZURE:
+            result["loki"].update(  # type: ignore
+                {
+                    "rulerConfig": {
+                        "storage": {
+                            "type": "azure",
+                            "azure": {
+                                "account_key": (
+                                    platform.buckets.azure_storage_account_key
+                                ),
+                                "account_name": (
+                                    platform.buckets.azure_storage_account_name
+                                ),
+                                "container_name": bucket_name,
+                                "use_managed_identity": False,
+                                "request_timeout": 0,
+                            },
+                        }
+                    },
+                    "schemaConfig": {
+                        "configs": [
+                            {
+                                "from": "2025-01-01",
+                                "object_store": "azure",
+                                "store": "tsdb",
+                                "schema": "v13",
+                                "index": {"prefix": "index_", "period": "24h"},
+                            }
+                        ]
+                    },
+                    "storage": {
+                        "bucketNames": {
+                            "chunks": bucket_name,
+                            "ruler": bucket_name,
+                            "admin": bucket_name,
+                        },
+                        "type": "azure",
+                    },
+                    "storage_config": {
+                        "azure": {
+                            "account_key": platform.buckets.azure_storage_account_key,
+                            "account_name": platform.buckets.azure_storage_account_name,
+                            "container_name": bucket_name,
+                            "use_managed_identity": False,
+                            "request_timeout": 0,
+                        }
+                    },
+                }
+            )
+
+        elif platform.buckets.provider == BucketsProvider.AWS:
+            result["loki"].update(  # type: ignore
+                {
+                    "rulerConfig": {
+                        "storage": {
+                            "type": "s3",
+                            "s3": {
+                                "bucketnames": bucket_name,
+                                "region": platform.buckets.aws_region,
+                                "insecure": False,
+                                "s3forcepathstyle": True,
+                            },
+                        }
+                    },
+                    "schemaConfig": {
+                        "configs": [
+                            {
+                                "from": "2025-01-01",
+                                "object_store": "s3",
+                                "store": "tsdb",
+                                "schema": "v13",
+                                "index": {"prefix": "index_", "period": "24h"},
+                            }
+                        ]
+                    },
+                    "storage": {
+                        "bucketNames": {
+                            "chunks": bucket_name,
+                            "ruler": bucket_name,
+                            "admin": bucket_name,
+                        },
+                        "type": "s3",
+                    },
+                    "storage_config": {
+                        "aws": {
+                            "bucketnames": bucket_name,
+                            "region": platform.buckets.aws_region,
+                            "insecure": False,
+                            "s3forcepathstyle": True,
+                        }
+                    },
+                }
+            )
+
         elif platform.buckets.provider in [
             BucketsProvider.MINIO,
             BucketsProvider.EMC_ECS,
             BucketsProvider.OPEN_STACK,
         ]:
-            s3_bucket_name = platform.monitoring.logs_bucket_name
             s3_region = platform.buckets.minio_region
 
             if platform.buckets.provider == BucketsProvider.MINIO:
@@ -2029,7 +2124,7 @@ class HelmValuesFactory:
                             "type": "s3",
                             "s3": {
                                 "endpoint": s3_endpoint_url,
-                                "bucketnames": s3_bucket_name,
+                                "bucketnames": bucket_name,
                                 "region": s3_region,
                                 "access_key_id": s3_access_key_id,
                                 "secret_access_key": s3_secret_access_key,
@@ -2051,16 +2146,16 @@ class HelmValuesFactory:
                     },
                     "storage": {
                         "bucketNames": {
-                            "chunks": s3_bucket_name,
-                            "ruler": s3_bucket_name,
-                            "admin": s3_bucket_name,
+                            "chunks": bucket_name,
+                            "ruler": bucket_name,
+                            "admin": bucket_name,
                         },
                         "type": "s3",
                     },
                     "storage_config": {
                         "aws": {
                             "endpoint": s3_endpoint_url,
-                            "bucketnames": s3_bucket_name,
+                            "bucketnames": bucket_name,
                             "region": s3_region,
                             "access_key_id": s3_access_key_id,
                             "secret_access_key": s3_secret_access_key,
@@ -2078,6 +2173,8 @@ class HelmValuesFactory:
 
     def create_alloy_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {
+            "nameOverride": "loki",
+            "fullnameOverride": "loki",
             "alloy": {
                 "configMap": {
                     "create": True,
@@ -2167,17 +2264,17 @@ class HelmValuesFactory:
 
                           rule {
                             source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_org"]
-                            target_label  = "org"
+                            target_label  = "apolo_org_name"
                           }
 
                           rule {
                             source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_project"]
-                            target_label  = "project"
+                            target_label  = "apolo_project_name"
                           }
 
                           rule {
                             source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_app"]
-                            target_label  = "app_instance_id"
+                            target_label  = "apolo_app_id"
                           }
                         }
 
@@ -2229,7 +2326,7 @@ class HelmValuesFactory:
                           }
 
                           stage.pack {
-                            labels           = ["stream", "node_name", "level", "logger", "context", "pod", "container", "org", "project", "app_instance_id"]
+                            labels           = ["stream", "node_name", "level", "logger", "context", "pod", "container", "apolo_org_name", "apolo_project_name", "apolo_app_id"]
                             ingest_timestamp = False
                           }
 
@@ -2244,7 +2341,7 @@ class HelmValuesFactory:
                         }
                     """,  # noqa: E501
                 }
-            }
+            },
         }
         result["alloy"]["configMap"]["content"] = result["alloy"]["configMap"][
             "content"

@@ -378,37 +378,30 @@ async def is_helm_deploy_failed(release_name: str) -> bool:
     return release.status == ReleaseStatus.FAILED
 
 
-async def complete_deployment(cluster: Cluster, platform: PlatformConfig) -> None:
-    await app.status_manager.complete_deployment(cluster.name)
-    if cluster.cloud_provider and cluster.cloud_provider.storage:
-        storage_names = [s.name for s in cluster.cloud_provider.storage.instances]
-    else:
-        storage_names = []
-    for storage in platform.storages:
-        storage_name = storage.path.lstrip("/") if storage.path else "default"
-        if storage_name not in storage_names:
-            continue
-        await app.config_client.patch_storage(
-            cluster_name=cluster.name,
-            storage_name=storage_name,
-            ready=True,
-            token=platform.token,
-        )
-
-    # create bucket for logs
+async def create_storage_buckets(platform: PlatformConfig) -> None:
     if platform.monitoring.logs_bucket_name:
         if platform.buckets.provider == BucketsProvider.GCP:
-            region = platform.minio_gateway  # ???
+            region = platform.buckets.gcp_location
             access_key_id = platform.minio_gateway.root_user
-            secret_access_key = platform.minio_gateway.root_password
-            endpoint_url = platform.minio_gateway  # ???
+            secret_access_key = platform.minio_gateway.root_user_password
+            endpoint_url = platform.minio_gateway.endpoint_url
+        elif platform.buckets.provider == BucketsProvider.AZURE:
+            region = platform.buckets.azure_minio_gateway_region
+            access_key_id = platform.minio_gateway.root_user
+            secret_access_key = platform.minio_gateway.root_user_password
+            endpoint_url = platform.minio_gateway.endpoint_url
+        elif platform.buckets.provider == BucketsProvider.AWS:
+            region = platform.buckets.aws_region
+            access_key_id = None
+            secret_access_key = None
+            endpoint_url = None
         elif platform.buckets.provider == BucketsProvider.MINIO:
             region = platform.buckets.minio_region
-            access_key_id = platform.buckets.minio_username
-            secret_access_key = platform.buckets.minio_password
+            access_key_id = platform.buckets.minio_access_key
+            secret_access_key = platform.buckets.minio_secret_key
             endpoint_url = platform.buckets.minio_url
         elif platform.buckets.provider == BucketsProvider.EMC_ECS:
-            region = platform.buckets.emc_ecs_region
+            region = platform.buckets.emc_ecs_region  # ???
             access_key_id = platform.buckets.emc_ecs_access_key_id
             secret_access_key = platform.buckets.emc_ecs_secret_access_key
             endpoint_url = platform.buckets.emc_ecs_s3_endpoint
@@ -428,6 +421,26 @@ async def complete_deployment(cluster: Cluster, platform: PlatformConfig) -> Non
             await s3_client.create_bucket(
                 bucket_name=platform.monitoring.logs_bucket_name
             )
+
+
+async def complete_deployment(cluster: Cluster, platform: PlatformConfig) -> None:
+    await app.status_manager.complete_deployment(cluster.name)
+    if cluster.cloud_provider and cluster.cloud_provider.storage:
+        storage_names = [s.name for s in cluster.cloud_provider.storage.instances]
+    else:
+        storage_names = []
+    for storage in platform.storages:
+        storage_name = storage.path.lstrip("/") if storage.path else "default"
+        if storage_name not in storage_names:
+            continue
+        await app.config_client.patch_storage(
+            cluster_name=cluster.name,
+            storage_name=storage_name,
+            ready=True,
+            token=platform.token,
+        )
+
+    await create_storage_buckets(platform)
 
 
 async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
