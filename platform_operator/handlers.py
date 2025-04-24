@@ -401,7 +401,7 @@ async def create_storage_buckets(platform: PlatformConfig) -> None:
             secret_access_key = platform.buckets.minio_secret_key
             endpoint_url = platform.buckets.minio_url
         elif platform.buckets.provider == BucketsProvider.EMC_ECS:
-            region = platform.buckets.emc_ecs_region  # ???
+            region = platform.buckets.emc_ecs_region
             access_key_id = platform.buckets.emc_ecs_access_key_id
             secret_access_key = platform.buckets.emc_ecs_secret_access_key
             endpoint_url = platform.buckets.emc_ecs_s3_endpoint
