@@ -381,7 +381,7 @@ async def is_helm_deploy_failed(release_name: str) -> bool:
 async def create_storage_buckets(platform: PlatformConfig) -> None:
     if platform.monitoring.logs_bucket_name:
         if platform.buckets.provider == BucketsProvider.GCP:
-            region = platform.buckets.gcp_location
+            region = platform.monitoring.logs_region or platform.buckets.gcp_location
             access_key_id = platform.minio_gateway.root_user
             secret_access_key = platform.minio_gateway.root_user_password
             endpoint_url = platform.minio_gateway.endpoint_url

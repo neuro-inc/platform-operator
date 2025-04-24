@@ -735,6 +735,7 @@ class BucketsConfig:
     emc_ecs_s3_endpoint: URL | None = None
     emc_ecs_management_endpoint: URL | None = None
     emc_ecs_s3_assumable_role: str = ""
+    emc_ecs_region: str = "emc-ecs"
 
     open_stack_username: str = ""
     open_stack_password: str = ""
