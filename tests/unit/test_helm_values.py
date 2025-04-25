@@ -189,6 +189,7 @@ class TestHelmValuesFactory:
             "platform-api-poller": mock.ANY,
             "platform-buckets": mock.ANY,
             "platform-apps": mock.ANY,
+            "platform-metadata": mock.ANY,
         }
 
     def test_create_gcp_platform_with_ssl_cert(
@@ -3023,4 +3024,21 @@ class TestHelmValuesFactory:
             "priorityClassName": "platform-services",
             "rbac": {"create": True},
             "serviceAccount": {"create": True},
+        }
+
+    def test_create_platform_metadata_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_metadata_values(gcp_platform_config)
+
+        assert result == {
+            "nameOverride": "platform-metadata",
+            "fullnameOverride": "platform-metadata",
+            "image": {"repository": "ghcr.io/neuro-inc/platform-metadata"},
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
+            },
+            "priorityClassName": "platform-services",
         }

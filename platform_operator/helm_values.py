@@ -118,6 +118,9 @@ class HelmValuesFactory:
                 platform
             ),
             self._chart_names.platform_apps: self.create_platform_apps_values(platform),
+            self._chart_names.platform_metadata: self.create_platform_metadata_values(
+                platform
+            ),
         }
         if platform.ingress_acme_enabled:
             result["acme"] = self.create_acme_values(platform)
@@ -1857,6 +1860,18 @@ class HelmValuesFactory:
             "priorityClassName": platform.services_priority_class_name,
             "rbac": {"create": True},
             "serviceAccount": {"create": True},
+        }
+        result.update(**self._create_tracing_values(platform))
+        return result
+
+    def create_platform_metadata_values(
+        self, platform: PlatformConfig
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "nameOverride": f"{platform.release_name}-metadata",
+            "fullnameOverride": f"{platform.release_name}-metadata",
+            "image": {"repository": platform.get_image("platform-metadata")},
+            "priorityClassName": platform.services_priority_class_name,
         }
         result.update(**self._create_tracing_values(platform))
         return result
