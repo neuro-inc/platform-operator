@@ -2326,12 +2326,12 @@ class HelmValuesFactory:
                           }
 
                           stage.pack {
-                            labels           = ["stream", "node_name", "level", "logger", "context", "pod", "container", "apolo_org_name", "apolo_project_name", "apolo_app_id"]
+                            labels           = ["stream", "node_name", "level", "logger", "context"]
                             ingest_timestamp = False
                           }
 
                           stage.label_keep {
-                            values = ["app", "instance", "namespace"]
+                            values = ["app", "instance", "namespace", "pod", "container", "apolo_org_name", "apolo_project_name", "apolo_app_id"]
                           }
                         }
 
