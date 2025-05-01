@@ -5,6 +5,7 @@ import logging
 import ssl
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from logging import Logger
 from typing import Any
 
@@ -31,6 +32,8 @@ from .kube_client import (
     PlatformStatusManager,
 )
 from .models import Config, PlatformConfig, PlatformConfigFactory
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -90,27 +93,15 @@ async def cleanup(**_: Any) -> None:
 
 @kopf.on.login()
 def login(**_: Any) -> kopf.ConnectionInfo:
-    ca_path = None
-    if config.kube_config.cert_authority_path:
-        ca_path = str(config.kube_config.cert_authority_path)
-
-    ca_data = None
-    if config.kube_config.cert_authority_data_pem:
-        ca_data = config.kube_config.cert_authority_data_pem.encode()
-
-    token = None
-    if config.kube_config.auth_token:
-        token = config.kube_config.auth_token
-    if config.kube_config.auth_token_path:
-        token = config.kube_config.auth_token_path.read_text()
-
     return kopf.ConnectionInfo(
         server=str(config.kube_config.url),
         scheme="Bearer",
-        token=token,
-        ca_path=ca_path,
-        ca_data=ca_data,
+        ca_path=str(config.kube_config.cert_authority_path),
+        token=config.kube_config.read_auth_token_from_path(),
         default_namespace=config.platform_namespace,
+        expiration=datetime.fromtimestamp(
+            config.kube_config.auth_token_exp_ts, tz=timezone.utc
+        ),
     )
 
 
@@ -394,10 +385,7 @@ async def complete_deployment(cluster: Cluster, platform: PlatformConfig) -> Non
     else:
         storage_names = []
     for storage in platform.storages:
-        if storage.path:
-            storage_name = storage.path.lstrip("/")
-        else:
-            storage_name = "default"
+        storage_name = storage.path.lstrip("/") if storage.path else "default"
         if storage_name not in storage_names:
             continue
         await app.config_client.patch_storage(
@@ -484,7 +472,7 @@ async def _configure_cluster(cluster: Cluster, platform: PlatformConfig) -> None
                     ingress_service.load_balancer_host
                 )
 
-    orchestrator = platform.create_orchestrator_config(cluster)
+    orchestrator = platform.create_patch_orchestrator_config_request(cluster)
     dns = platform.create_dns_config(
         ingress_service=ingress_service, aws_ingress_lb=aws_ingress_lb
     )

@@ -72,6 +72,7 @@ class TestConfig:
             "NP_ACME_CA_STAGING_PATH": "/ca.pem",
             "NP_STANDALONE": "true",
         }
+
         assert Config.load_from_env(env) == Config(
             node_name="minikube",
             log_level="DEBUG",
@@ -80,13 +81,11 @@ class TestConfig:
             kube_config=KubeConfig(
                 version="1.14.10",
                 url=URL("https://kubernetes.default"),
-                cert_authority_path=Path("/ca.crt"),
-                cert_authority_data_pem="cert-authority-data",
                 auth_type=KubeClientAuthType.CERTIFICATE,
+                cert_authority_path=Path("/ca.crt"),
                 auth_cert_path=Path("/client.crt"),
                 auth_cert_key_path=Path("/client.key"),
                 auth_token_path=Path("/token"),
-                auth_token="token",
                 conn_timeout_s=300,
                 read_timeout_s=100,
                 conn_pool_size=100,
@@ -277,7 +276,7 @@ class TestPlatformConfig:
 
         assert result is None
 
-    def test_create_orchestrator_config(
+    def test_create_patch_orchestrator_config_request(
         self,
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
@@ -290,12 +289,13 @@ class TestPlatformConfig:
             orchestrator=replace(
                 gcp_cluster.orchestrator,
                 resource_pool_types=[
-                    resource_pool_type_factory("n1-highmem-8", "0.0.0.0/0")
+                    resource_pool_type_factory("n1-highmem-8", "1.2.3.4/16")
                 ],
             ),
         )
-
-        result = gcp_platform_config.create_orchestrator_config(gcp_cluster)
+        result = gcp_platform_config.create_patch_orchestrator_config_request(
+            gcp_cluster
+        )
 
         assert result == PatchOrchestratorConfigRequest(
             job_internal_hostname_template="{job_id}.platform-jobs",
@@ -304,7 +304,7 @@ class TestPlatformConfig:
             ],
         )
 
-    def test_create_orchestrator_config_none(
+    def test_create_patch_orchestrator_config_request_none(
         self,
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
@@ -319,7 +319,9 @@ class TestPlatformConfig:
             ),
         )
         gcp_platform_config = replace(gcp_platform_config, kubernetes_tpu_network=None)
-        result = gcp_platform_config.create_orchestrator_config(gcp_cluster)
+        result = gcp_platform_config.create_patch_orchestrator_config_request(
+            gcp_cluster
+        )
 
         assert result is None
 

@@ -297,7 +297,9 @@ async def test_configure_aws_cluster(
     config_client.patch_cluster.assert_awaited_with(
         aws_platform_config.cluster_name,
         PatchClusterRequest(
-            orchestrator=aws_platform_config.create_orchestrator_config(aws_cluster),
+            orchestrator=aws_platform_config.create_patch_orchestrator_config_request(
+                aws_cluster
+            ),
             dns=aws_platform_config.create_dns_config(
                 ingress_service=aws_traefik_service,
                 aws_ingress_lb=aws_traefik_lb,
@@ -326,7 +328,9 @@ async def test_configure_cluster(
     config_client.patch_cluster.assert_awaited_with(
         gcp_platform_config.cluster_name,
         PatchClusterRequest(
-            orchestrator=gcp_platform_config.create_orchestrator_config(gcp_cluster),
+            orchestrator=gcp_platform_config.create_patch_orchestrator_config_request(
+                gcp_cluster
+            ),
             dns=gcp_platform_config.create_dns_config(ingress_service=traefik_service),
         ),
         token=gcp_platform_config.token,
@@ -347,7 +351,9 @@ async def test_configure_cluster_with_ingress_controller_disabled(
     config_client.patch_cluster.assert_awaited_with(
         gcp_platform_config.cluster_name,
         PatchClusterRequest(
-            orchestrator=gcp_platform_config.create_orchestrator_config(gcp_cluster),
+            orchestrator=gcp_platform_config.create_patch_orchestrator_config_request(
+                gcp_cluster
+            ),
             dns=gcp_platform_config.create_dns_config(),
         ),
         token=gcp_platform_config.token,

@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import json
 import os
-from base64 import b64decode
+from base64 import b64decode, urlsafe_b64decode
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from hashlib import sha256
 from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import kopf
 from neuro_config_client import (
@@ -41,14 +42,11 @@ class KubeClientAuthType(str, Enum):
 class KubeConfig:
     version: str
     url: URL
-    cert_authority_path: Path | None = None
-    cert_authority_data_pem: str | None = None
     auth_type: KubeClientAuthType = KubeClientAuthType.NONE
+    cert_authority_path: Path | None = None
     auth_cert_path: Path | None = None
     auth_cert_key_path: Path | None = None
-    auth_token: str | None = None
     auth_token_path: Path | None = None
-    auth_token_update_interval_s: int = 300
     conn_timeout_s: int = 300
     read_timeout_s: int = 100
     conn_pool_size: int = 100
@@ -59,21 +57,32 @@ class KubeConfig:
         return cls(
             version=env["NP_KUBE_VERSION"].lstrip("v"),
             url=URL(env["NP_KUBE_URL"]),
+            auth_type=KubeClientAuthType(env["NP_KUBE_AUTH_TYPE"]),
             cert_authority_path=cls._convert_to_path(
                 env.get("NP_KUBE_CERT_AUTHORITY_PATH")
             ),
-            cert_authority_data_pem=env.get("NP_KUBE_CERT_AUTHORITY_DATA_PEM"),
-            auth_type=KubeClientAuthType(env["NP_KUBE_AUTH_TYPE"]),
             auth_cert_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_CERT_PATH")),
             auth_cert_key_path=cls._convert_to_path(
                 env.get("NP_KUBE_AUTH_CERT_KEY_PATH")
             ),
             auth_token_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_TOKEN_PATH")),
-            auth_token=env.get("NP_KUBE_AUTH_TOKEN"),
         )
 
-    @classmethod
-    def _convert_to_path(cls, value: str | None) -> Path | None:
+    def read_auth_token_from_path(self) -> str | NoReturn:
+        if not self.auth_token_path:
+            raise ValueError("auth_token_path must be set")
+        return Path(self.auth_token_path).read_text()
+
+    @property
+    def auth_token_exp_ts(self) -> int | NoReturn:
+        payload = self.read_auth_token_from_path().split(".")[1]
+        decoded_payload = json.loads(
+            urlsafe_b64decode(payload + "=" * (4 - len(payload) % 4))
+        )
+        return decoded_payload["exp"]
+
+    @staticmethod
+    def _convert_to_path(value: str | None) -> Path | None:
         return Path(value) if value else None
 
 
@@ -118,6 +127,9 @@ class HelmChartNames:
     platform_api_poller: str = "platform-api-poller"
     platform_buckets: str = "platform-buckets"
     platform_apps: str = "platform-apps"
+    platform_metadata: str = "platform-metadata"
+    pgo: str = "apps-postgres-operator"
+    keda: str = "keda"
 
 
 @dataclass(frozen=True)
@@ -470,6 +482,10 @@ class MonitoringSpec(dict[str, Any]):
     def metrics_storage_class_name(self) -> str:
         return self["metrics"]["kubernetes"]["persistence"].get("storageClassName", "")
 
+    @property
+    def metrics_node_exporter_enabled(self) -> bool:
+        return self["metrics"].get("nodeExporter", {}).get("enabled", True)
+
 
 class DisksSpec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
@@ -730,6 +746,12 @@ class BucketsConfig:
 
 
 @dataclass(frozen=True)
+class AppsOperatorsConfig:
+    postgres_operator_enabled: bool = False
+    keda_enabled: bool = False
+
+
+@dataclass(frozen=True)
 class MinioGatewayConfig:
     root_user: str
     root_user_password: str
@@ -751,6 +773,7 @@ class MonitoringConfig:
     metrics_storage_size: str = ""
     metrics_retention_time: str = "3d"
     metrics_region: str = ""
+    metrics_node_exporter_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -823,6 +846,9 @@ class PlatformConfig:
     gcp_service_account_key_base64: str = ""
     services_priority_class_name: str = ""
     minio_gateway: MinioGatewayConfig | None = None
+    apps_operator_config: AppsOperatorsConfig = field(
+        default_factory=AppsOperatorsConfig
+    )
 
     def get_storage_claim_name(self, path: str) -> str:
         name = f"{self.release_name}-storage"
@@ -906,7 +932,7 @@ class PlatformConfig:
             return None
         return DNSConfig(name=self.ingress_dns_name, a_records=a_records)
 
-    def create_orchestrator_config(
+    def create_patch_orchestrator_config_request(
         self, cluster: Cluster
     ) -> PatchOrchestratorConfigRequest | None:
         assert cluster.orchestrator
@@ -1032,7 +1058,12 @@ class PlatformConfigFactory:
             ingress_controller_install=spec.ingress_controller.enabled,
             ingress_controller_replicas=spec.ingress_controller.replicas or 2,
             ingress_public_ips=spec.ingress_controller.public_ips,
-            ingress_cors_origins=cluster.ingress.cors_origins,
+            ingress_cors_origins=sorted(
+                {
+                    *cluster.ingress.default_cors_origins,
+                    *cluster.ingress.additional_cors_origins,
+                }
+            ),
             ingress_service_type=IngressServiceType(
                 spec.ingress_controller.service_type or IngressServiceType.LOAD_BALANCER
             ),
@@ -1353,6 +1384,7 @@ class PlatformConfigFactory:
                     spec.metrics_retention_time
                     or MonitoringConfig.metrics_retention_time
                 ),
+                metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
             )
         elif "kubernetes" in spec.metrics:
             return MonitoringConfig(
@@ -1366,6 +1398,7 @@ class PlatformConfigFactory:
                     or MonitoringConfig.metrics_retention_time
                 ),
                 metrics_region=spec.metrics_region,
+                metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
             )
         else:
             raise ValueError("Metrics storage type is not supported")
