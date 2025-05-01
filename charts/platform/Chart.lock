@@ -44,6 +44,9 @@ dependencies:
 - name: platform-apps
   repository: oci://ghcr.io/neuro-inc/helm-charts
   version: 24.4.4
+- name: platform-metadata
+  repository: oci://ghcr.io/neuro-inc/helm-charts
+  version: 25.4.0
 - name: k8s-resources
   repository: https://neuro-inc.github.io/helm-charts
   version: 1.0.1
@@ -53,5 +56,5 @@ dependencies:
 - name: keda
   repository: https://kedacore.github.io/charts
   version: 2.16.1
-digest: sha256:b8862a90896e527ba35c50513d404b59fec8d9d0b9b4cae0139015707be023a7
-generated: "2025-04-18T11:04:10.314004438+02:00"
+digest: sha256:3ded8940359ff02f9959d45d6f837e486e926edbd444a73a1508bf0ce6ef4d22
+generated: "2025-05-01T10:54:34.946116796+02:00"
