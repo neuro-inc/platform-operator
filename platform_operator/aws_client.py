@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
 from typing import Any
 
 import aiobotocore.session
 from aiobotocore.config import AioConfig
 from aiobotocore.session import ClientCreatorContext
-from botocore.exceptions import ClientError as S3ClientError, NoCredentialsError
+from botocore.exceptions import ClientError as S3ClientError
 from yarl import URL
 
 logger = logging.getLogger(__name__)
@@ -100,7 +99,3 @@ class S3Client(BaseAwsClient):
             logger.info("Bucket %r created", bucket_name)
         except s3_client_error(409):
             logger.info("Bucket %r already exists", bucket_name)
-        except NoCredentialsError as e:
-            # ignore this error for unit tests
-            if "PYTEST_CURRENT_TEST" not in os.environ:
-                raise e

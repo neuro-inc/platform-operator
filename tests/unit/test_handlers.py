@@ -18,7 +18,7 @@ from neuro_config_client import (
     StorageInstance,
 )
 
-from platform_operator.aws_client import AwsElbClient
+from platform_operator.aws_client import AwsElbClient, S3Client
 from platform_operator.helm_client import HelmClient, Release, ReleaseStatus
 from platform_operator.helm_values import HelmValuesFactory
 from platform_operator.kube_client import (
@@ -362,6 +362,12 @@ async def test_configure_cluster_with_ingress_controller_disabled(
     )
 
 
+@pytest.fixture
+def _create_bucket_mock(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(S3Client, "create_bucket", mock.AsyncMock())
+
+
+@pytest.mark.usefixtures("_create_bucket_mock")
 async def test_deploy(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -437,7 +443,10 @@ async def test_deploy(
         gcp_platform_config.cluster_name
     )
 
+    S3Client.create_bucket.assert_awaited_once()
 
+
+@pytest.mark.usefixtures("_create_bucket_mock")
 async def test_deploy_storage_configs_patched(
     config_client: mock.AsyncMock,
     logger: logging.Logger,
@@ -494,8 +503,10 @@ async def test_deploy_storage_configs_patched(
             ),
         ]
     )
+    S3Client.create_bucket.assert_awaited_once()
 
 
+@pytest.mark.usefixtures("_create_bucket_mock")
 async def test_deploy_with_ingress_controller_disabled(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -556,8 +567,10 @@ async def test_deploy_with_ingress_controller_disabled(
     status_manager.complete_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
     )
+    S3Client.create_bucket.assert_awaited_once()
 
 
+@pytest.mark.usefixtures("_create_bucket_mock")
 async def test_deploy_all_charts_deployed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -607,6 +620,7 @@ async def test_deploy_all_charts_deployed(
     status_manager.transition.assert_any_call(
         gcp_platform_config.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
     )
+    S3Client.create_bucket.assert_awaited_once()
 
 
 async def test_deploy_with_retries_exceeded(
