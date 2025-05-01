@@ -11,6 +11,7 @@ from platform_operator.models import (
     BucketsProvider,
     Config,
     DockerConfig,
+    DockerRegistryStorageDriver,
     IngressServiceType,
     LabelsConfig,
     MetricsStorageType,
@@ -39,7 +40,10 @@ class TestHelmValuesFactory:
             "traefikEnabled": True,
             "acmeEnabled": True,
             "dockerRegistryEnabled": False,
+            "appsPostgresOperatorEnabled": False,
+            "appsKedaEnabled": False,
             "minioEnabled": False,
+            "minioGatewayEnabled": True,
             "platformReportsEnabled": True,
             "alpineImage": {"repository": "ghcr.io/neuro-inc/alpine"},
             "pauseImage": {"repository": "ghcr.io/neuro-inc/pause"},
@@ -48,7 +52,7 @@ class TestHelmValuesFactory:
             "clusterName": cluster_name,
             "serviceToken": "token",
             "nodePools": [
-                {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "gpu": 1}
+                {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "nvidiaGpu": 1}
             ],
             "nodeLabels": {
                 "nodePool": "platform.neuromation.io/nodepool",
@@ -91,6 +95,12 @@ class TestHelmValuesFactory:
                 "jobFallbackHost": "default.jobs-dev.neu.ro",
                 "registryHost": f"registry.{cluster_name}.org.neu.ro",
                 "ingressAuthHost": "platformingressauth",
+                "cors": {
+                    "originList": [
+                        "https://console.apolo.us",
+                        "https://custom.app",
+                    ]
+                },
             },
             "jobs": {
                 "namespace": {"create": True, "name": "platform-jobs"},
@@ -112,9 +122,63 @@ class TestHelmValuesFactory:
                     "nfs": {"server": "192.168.0.3", "path": "/"},
                 }
             ],
+            "alertmanager": {
+                "config": {
+                    "route": {
+                        "receiver": "platform-notifications",
+                        "group_wait": "30s",
+                        "group_interval": "5m",
+                        "repeat_interval": "4h",
+                        "group_by": ["alertname"],
+                        "routes": [
+                            {
+                                "receiver": "ignore",
+                                "matchers": [
+                                    'exported_service="default-backend@kubernetes"'
+                                ],
+                                "continue": False,
+                            },
+                            {
+                                "receiver": "ignore",
+                                "matchers": ['exported_service=~"platform-jobs-.+"'],
+                                "continue": False,
+                            },
+                            {
+                                "receiver": "ignore",
+                                "matchers": ['namespace="platform-jobs"'],
+                                "continue": False,
+                            },
+                        ],
+                    },
+                    "receivers": [
+                        {"name": "ignore"},
+                        {
+                            "name": "platform-notifications",
+                            "webhook_configs": [
+                                {
+                                    "url": (
+                                        "https://dev.neu.ro/api"
+                                        "/v1/notifications/alert-manager-notification"
+                                    ),
+                                    "http_config": {
+                                        "authorization": {
+                                            "type": "Bearer",
+                                            "credentials_file": (
+                                                "/etc/alertmanager"
+                                                "/secrets/platform-token/token"
+                                            ),
+                                        }
+                                    },
+                                }
+                            ],
+                        },
+                    ],
+                }
+            },
             "ssl": {"cert": "", "key": ""},
             "acme": mock.ANY,
             "traefik": mock.ANY,
+            "minio-gateway": mock.ANY,
             "platform-storage": mock.ANY,
             "platform-registry": mock.ANY,
             "platform-monitoring": mock.ANY,
@@ -124,6 +188,10 @@ class TestHelmValuesFactory:
             "platform-disks": mock.ANY,
             "platform-api-poller": mock.ANY,
             "platform-buckets": mock.ANY,
+            "platform-apps": mock.ANY,
+            "platform-metadata": mock.ANY,
+            "loki": mock.ANY,
+            "alloy": mock.ANY,
         }
 
     def test_create_gcp_platform_with_ssl_cert(
@@ -156,7 +224,7 @@ class TestHelmValuesFactory:
                     name="miner",
                     count=1,
                     image="miner",
-                    resources=Resources(cpu_m=1000, memory=2**30, gpu=1),
+                    resources=Resources(cpu=1, memory=2**30, nvidia_gpu=1),
                 ),
                 IdleJobConfig(
                     name="miner",
@@ -165,7 +233,7 @@ class TestHelmValuesFactory:
                     command=["bash"],
                     args=["-c", "sleep infinity"],
                     image_pull_secret="secret",
-                    resources=Resources(cpu_m=1000, memory=2**30, gpu=1),
+                    resources=Resources(cpu=1, memory=2**30, nvidia_gpu=1),
                     env={"NAME": "VALUE"},
                     node_selector={"gpu": "nvidia-tesla-k80"},
                 ),
@@ -200,55 +268,6 @@ class TestHelmValuesFactory:
                 "env": {"NAME": "VALUE"},
                 "nodeSelector": {"gpu": "nvidia-tesla-k80"},
             },
-        ]
-
-    def test_create_gcp_platform_values_with_kubernetes_storage(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(
-            replace(
-                gcp_platform_config,
-                storages=[
-                    StorageConfig(
-                        type=StorageType.KUBERNETES,
-                        storage_class_name="storage-class",
-                        storage_size="100Gi",
-                    )
-                ],
-            )
-        )
-
-        assert result["storages"] == [
-            {
-                "type": "kubernetes",
-                "path": "",
-                "storageClassName": "storage-class",
-                "size": "100Gi",
-            }
-        ]
-
-    def test_create_gcp_platform_values_with_gcs_storage(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(
-            replace(
-                gcp_platform_config,
-                storages=[
-                    StorageConfig(
-                        type=StorageType.GCS,
-                        gcs_bucket_name="platform-storage",
-                    )
-                ],
-            )
-        )
-
-        assert result["storages"] == [
-            {
-                "type": "gcs",
-                "path": "",
-                "size": "10Gi",
-                "gcs": {"bucketName": "platform-storage"},
-            }
         ]
 
     def test_create_gcp_platform_values_without_docker_config_secret(
@@ -294,31 +313,6 @@ class TestHelmValuesFactory:
 
         assert result["serviceAccount"] == {"annotations": {"role-arn": "role"}}
 
-    def test_create_aws_platform_values_with_kubernetes_storage(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(
-            replace(
-                aws_platform_config,
-                storages=[
-                    StorageConfig(
-                        type=StorageType.KUBERNETES,
-                        storage_class_name="storage-class",
-                        storage_size="100Gi",
-                    )
-                ],
-            )
-        )
-
-        assert result["storages"] == [
-            {
-                "type": "kubernetes",
-                "path": "",
-                "size": "100Gi",
-                "storageClassName": "storage-class",
-            }
-        ]
-
     def test_create_azure_platform_values(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -334,31 +328,6 @@ class TestHelmValuesFactory:
                     "storageAccountKey": "accountKey1",
                     "shareName": "share",
                 },
-            }
-        ]
-
-    def test_create_azure_platform_values_with_kubernetes_storage(
-        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(
-            replace(
-                azure_platform_config,
-                storages=[
-                    StorageConfig(
-                        type=StorageType.KUBERNETES,
-                        storage_class_name="storage-class",
-                        storage_size="100Gi",
-                    )
-                ],
-            )
-        )
-
-        assert result["storages"] == [
-            {
-                "type": "kubernetes",
-                "path": "",
-                "size": "100Gi",
-                "storageClassName": "storage-class",
             }
         ]
 
@@ -394,13 +363,15 @@ class TestHelmValuesFactory:
 
         assert result["storages"] == [
             {
-                "type": "kubernetes",
+                "type": "nfs",
                 "path": "",
-                "storageClassName": "storage-standard",
-                "size": "1000Gi",
+                "size": "10Gi",
+                "nfs": {"server": "192.168.0.3", "path": "/"},
             }
         ]
         assert result["dockerRegistryEnabled"] is True
+        assert result["appsKedaEnabled"] is False
+        assert result["appsPostgresOperatorEnabled"] is False
         assert "docker-registry" in result
         assert result["minioEnabled"] is True
         assert (
@@ -484,6 +455,7 @@ class TestHelmValuesFactory:
 
         assert result["nvidiaDCGMExporter"]["serviceMonitor"]["enabled"] is False
         assert result["platformReportsEnabled"] is False
+        assert "alertmanager" not in result
         assert "platform-reports" not in result
 
     def test_create_vcd_platform_values(
@@ -492,6 +464,15 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(vcd_platform_config)
 
         assert result["kubernetesProvider"] == "kubeadm"
+
+    def test_create_platform_values_without_notifications_url(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        gcp_platform_config = replace(gcp_platform_config, notifications_url=URL("-"))
+
+        result = factory.create_platform_values(gcp_platform_config)
+
+        assert result["alertmanager"] == {}
 
     def test_create_acme_values(
         self,
@@ -513,10 +494,9 @@ class TestHelmValuesFactory:
                     f"{cluster_name}.org.neu.ro",
                     f"*.{cluster_name}.org.neu.ro",
                     f"*.jobs.{cluster_name}.org.neu.ro",
+                    f"*.apps.{cluster_name}.org.neu.ro",
                 ],
-                "notifyHook": "neuro",
                 "sslCertSecretName": "platform-ssl-cert",
-                "rolloutDeploymentName": "traefik",
             },
             "podLabels": {"service": "acme"},
             "env": [
@@ -546,7 +526,7 @@ class TestHelmValuesFactory:
 
         assert result["acme"]["server"] == "letsencrypt_test"
 
-    def test_create_docker_registry_values(
+    def test_create_docker_registry_values_with_filesystem_storage(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_docker_registry_values(on_prem_platform_config)
@@ -560,7 +540,56 @@ class TestHelmValuesFactory:
                 "size": "100Gi",
             },
             "secrets": {"haSharedSecret": mock.ANY},
+            "storage": "filesystem",
             "configData": {"storage": {"delete": {"enabled": True}}},
+            "podLabels": {"service": "docker-registry"},
+            "priorityClassName": "platform-services",
+        }
+        assert result["secrets"]["haSharedSecret"]
+
+    def test_create_docker_registry_values_with_s3_minio_storage(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        on_prem_platform_config = replace(
+            on_prem_platform_config,
+            registry=replace(
+                on_prem_platform_config.registry,
+                docker_registry_storage_driver=DockerRegistryStorageDriver.S3,
+                docker_registry_s3_endpoint=URL("http://platform-minio:9000"),
+                docker_registry_s3_region="minio",
+                docker_registry_s3_bucket="job-images",
+                docker_registry_s3_access_key="minio-access-key",
+                docker_registry_s3_secret_key="minio-secret-key",
+                docker_registry_s3_disable_redirect=True,
+                docker_registry_s3_force_path_style=True,
+            ),
+        )
+        result = factory.create_docker_registry_values(on_prem_platform_config)
+
+        assert result == {
+            "replicaCount": 2,
+            "image": {"repository": "ghcr.io/neuro-inc/registry"},
+            "ingress": {"enabled": False},
+            "secrets": {
+                "haSharedSecret": mock.ANY,
+                "s3": {
+                    "accessKey": "minio-access-key",
+                    "secretKey": "minio-secret-key",
+                },
+            },
+            "storage": "s3",
+            "s3": {
+                "region": "minio",
+                "regionEndpoint": "platform-minio:9000",
+                "bucket": "job-images",
+            },
+            "configData": {
+                "storage": {
+                    "delete": {"enabled": True},
+                    "redirect": {"disable": True},
+                    "s3": {"secure": False, "forcepathstyle": True},
+                }
+            },
             "podLabels": {"service": "docker-registry"},
             "priorityClassName": "platform-services",
         }
@@ -604,6 +633,78 @@ class TestHelmValuesFactory:
             "priorityClassName": "platform-services",
         }
 
+    def test_create_minio_gateway_values__gcp(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_minio_gateway_values(gcp_platform_config)
+
+        assert gcp_platform_config.minio_gateway
+        assert result == {
+            "nameOverride": "minio-gateway",
+            "fullnameOverride": "minio-gateway",
+            "image": {"repository": "ghcr.io/neuro-inc/minio"},
+            "imagePullSecrets": [
+                {"name": "platform-docker-config"},
+                {"name": "platform-docker-hub-config"},
+            ],
+            "replicaCount": 2,
+            "env": [
+                {
+                    "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                    "value": "/etc/config/minio/gcs/key.json",
+                }
+            ],
+            "rootUser": {
+                "user": gcp_platform_config.minio_gateway.root_user,
+                "password": gcp_platform_config.minio_gateway.root_user_password,
+            },
+            "secrets": [
+                {
+                    "data": {"key.json": "{}"},
+                    "name": "minio-gateway-gcs-key",
+                }
+            ],
+            "volumeMounts": [
+                {
+                    "name": "gcp-credentials",
+                    "mountPath": "/etc/config/minio/gcs",
+                    "readOnly": True,
+                }
+            ],
+            "volumes": [
+                {
+                    "name": "gcp-credentials",
+                    "secret": {
+                        "secretName": "minio-gateway-gcs-key",
+                        "optional": False,
+                    },
+                }
+            ],
+            "cloudStorage": {"type": "gcs", "gcs": {"project": "project"}},
+        }
+
+    def test_create_minio_gateway_values__azure(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_minio_gateway_values(azure_platform_config)
+
+        assert azure_platform_config.minio_gateway
+        assert result == {
+            "nameOverride": "minio-gateway",
+            "fullnameOverride": "minio-gateway",
+            "image": {"repository": "ghcr.io/neuro-inc/minio"},
+            "imagePullSecrets": [
+                {"name": "platform-docker-config"},
+                {"name": "platform-docker-hub-config"},
+            ],
+            "replicaCount": 2,
+            "rootUser": {
+                "user": azure_platform_config.minio_gateway.root_user,
+                "password": azure_platform_config.minio_gateway.root_user_password,
+            },
+            "cloudStorage": {"type": "azure"},
+        }
+
     def test_create_gcp_traefik_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -612,6 +713,7 @@ class TestHelmValuesFactory:
         assert result == {
             "nameOverride": "traefik",
             "fullnameOverride": "traefik",
+            "instanceLabelOverride": "platform",
             "image": {"name": "ghcr.io/neuro-inc/traefik"},
             "deployment": {
                 "replicas": 2,
@@ -631,61 +733,50 @@ class TestHelmValuesFactory:
                 "annotations": {},
             },
             "ports": {
-                "web": {"redirectTo": "websecure"},
+                "web": {"redirectTo": {"port": "websecure"}},
                 "websecure": {"tls": {"enabled": True}},
             },
             "additionalArguments": [
                 "--entryPoints.websecure.proxyProtocol.insecure=true",
                 "--entryPoints.websecure.forwardedHeaders.insecure=true",
-                "--providers.file.filename=/etc/traefik/dynamic/config.yaml",
-            ],
-            "volumes": [
-                {
-                    "name": "platform-traefik-dynamic-config",
-                    "mountPath": "/etc/traefik/dynamic",
-                    "type": "configMap",
-                },
-                {
-                    "name": "platform-ssl-cert",
-                    "mountPath": "/etc/certs",
-                    "type": "secret",
-                },
+                "--entryPoints.websecure.http.middlewares="
+                "platform-platform-cors@kubernetescrd",
+                "--providers.kubernetesingress.ingressendpoint.ip=1.2.3.4",
             ],
             "providers": {
                 "kubernetesCRD": {
                     "enabled": True,
                     "allowCrossNamespace": True,
                     "allowExternalNameServices": True,
-                    "namespaces": ["platform", "platform-jobs"],
                 },
                 "kubernetesIngress": {
                     "enabled": True,
                     "allowExternalNameServices": True,
-                    "namespaces": ["platform", "platform-jobs"],
+                    "publishedService": {"enabled": False},
+                },
+            },
+            "tlsStore": {
+                "default": {
+                    "defaultCertificate": {
+                        "secretName": "platform-ssl-cert",
+                    },
                 },
             },
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
             "priorityClassName": "platform-services",
+            "metrics": {
+                "prometheus": {
+                    "service": {"enabled": True},
+                    "serviceMonitor": {
+                        "jobLabel": "app.kubernetes.io/name",
+                        "additionalLabels": {
+                            "platform.apolo.us/scrape-metrics": "true"
+                        },
+                    },
+                }
+            },
         }
-
-    def test_create_gcp_traefik_values_with_ingress_namespaces(
-        self,
-        gcp_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
-    ) -> None:
-        result = factory.create_traefik_values(
-            replace(
-                gcp_platform_config,
-                ingress_namespaces=["default", "platform", "platform-jobs"],
-            )
-        )
-
-        assert result["providers"]["kubernetesIngress"]["namespaces"] == [
-            "default",
-            "platform",
-            "platform-jobs",
-        ]
 
     def test_create_gcp_traefik_values_with_ingress_class(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -757,14 +848,16 @@ class TestHelmValuesFactory:
             )
         )
 
-        assert result["rollingUpdate"] == {"maxSurge": 0, "maxUnavailable": 1}
+        assert result["updateStrategy"] == {
+            "rollingUpdate": {"maxSurge": 0, "maxUnavailable": 1}
+        }
         assert result["service"]["type"] == "NodePort"
         assert result["ports"]["web"]["nodePort"] == 30080
         assert result["ports"]["web"]["hostPort"] == 80
         assert result["ports"]["websecure"]["nodePort"] == 30443
         assert result["ports"]["websecure"]["hostPort"] == 443
 
-    def test_create_platform_storage_values(
+    def test_create_platform_storage_values__gcp(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_storage_values(gcp_platform_config)
@@ -789,6 +882,7 @@ class TestHelmValuesFactory:
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
+                "adminUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -799,21 +893,254 @@ class TestHelmValuesFactory:
                 },
             },
             "storages": [{"type": "pvc", "path": "", "claimName": "platform-storage"}],
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
-            },
             "sentry": {
                 "dsn": "https://sentry",
                 "clusterName": gcp_platform_config.cluster_name,
                 "sampleRate": 0.1,
             },
             "priorityClassName": "platform-services",
+            "s3": {
+                "endpoint": "http://minio-gateway:9000",
+                "region": "us",
+                "accessKeyId": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-storage-s3",
+                            "key": "access_key_id",
+                        }
+                    }
+                },
+                "secretAccessKey": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "platform-storage-s3",
+                            "key": "secret_access_key",
+                        }
+                    }
+                },
+                "bucket": "job-metrics",
+                "keyPrefix": "storage/",
+            },
+            "secrets": [
+                {
+                    "name": "platform-storage-s3",
+                    "data": {
+                        "access_key_id": "admin",
+                        "secret_access_key": mock.ANY,
+                    },
+                }
+            ],
+            "storageUsageCollector": {
+                "resources": {
+                    "requests": {"cpu": "250m", "memory": "500Mi"},
+                    "limits": {"cpu": "1000m", "memory": "1Gi"},
+                }
+            },
         }
 
-    def test_create_platform_storage_values_with_multiple_storages(
+    def test_create_platform_storage_values__aws(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_storage_values(aws_platform_config)
+
+        assert result["s3"] == {
+            "region": "us-east-1",
+            "bucket": "job-metrics",
+            "keyPrefix": "storage/",
+        }
+
+    def test_create_platform_storage_values__azure(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_storage_values(azure_platform_config)
+
+        assert result["secrets"] == [
+            {
+                "name": "platform-storage-s3",
+                "data": {
+                    "access_key_id": "accountName2",
+                    "secret_access_key": "accountKey2",
+                },
+            }
+        ]
+        assert result["s3"] == {
+            "endpoint": "http://minio-gateway:9000",
+            "accessKeyId": {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": "platform-storage-s3",
+                        "key": "access_key_id",
+                    }
+                }
+            },
+            "secretAccessKey": {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": "platform-storage-s3",
+                        "key": "secret_access_key",
+                    }
+                }
+            },
+            "region": "minio",
+            "bucket": "job-metrics",
+            "keyPrefix": "storage/",
+        }
+
+    def test_create_platform_storage_values__minio(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_storage_values(
+            replace(
+                on_prem_platform_config,
+                monitoring=MonitoringConfig(
+                    metrics_storage_type=MetricsStorageType.BUCKETS,
+                    logs_bucket_name="job-logs",
+                    metrics_bucket_name="job-metrics",
+                ),
+            )
+        )
+
+        assert result["secrets"] == [
+            {
+                "name": "platform-storage-s3",
+                "data": {
+                    "access_key_id": "username",
+                    "secret_access_key": "password",
+                },
+            }
+        ]
+        assert result["s3"] == {
+            "endpoint": "http://platform-minio:9000",
+            "accessKeyId": {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": "platform-storage-s3",
+                        "key": "access_key_id",
+                    }
+                }
+            },
+            "secretAccessKey": {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": "platform-storage-s3",
+                        "key": "secret_access_key",
+                    }
+                }
+            },
+            "region": "minio",
+            "bucket": "job-metrics",
+            "keyPrefix": "storage/",
+        }
+
+    def test_create_platform_storage_values__emc_ecs(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_storage_values(
+            replace(
+                on_prem_platform_config,
+                buckets=BucketsConfig(
+                    provider=BucketsProvider.EMC_ECS,
+                    emc_ecs_access_key_id="emc_ecs_access_key",
+                    emc_ecs_secret_access_key="emc_ecs_secret_key",
+                    emc_ecs_s3_endpoint=URL("https://emc-ecs.s3"),
+                    emc_ecs_management_endpoint=URL("https://emc-ecs.management"),
+                    emc_ecs_s3_assumable_role="s3-role",
+                ),
+                monitoring=MonitoringConfig(
+                    metrics_storage_type=MetricsStorageType.BUCKETS,
+                    logs_bucket_name="job-logs",
+                    metrics_bucket_name="job-metrics",
+                ),
+            )
+        )
+
+        assert result["secrets"] == [
+            {
+                "name": "platform-storage-s3",
+                "data": {
+                    "access_key_id": "emc_ecs_access_key",
+                    "secret_access_key": "emc_ecs_secret_key",
+                },
+            }
+        ]
+        assert result["s3"] == {
+            "endpoint": "https://emc-ecs.s3",
+            "region": "emc-ecs",
+            "accessKeyId": {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": "platform-storage-s3",
+                        "key": "access_key_id",
+                    }
+                }
+            },
+            "secretAccessKey": {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": "platform-storage-s3",
+                        "key": "secret_access_key",
+                    }
+                }
+            },
+            "bucket": "job-metrics",
+            "keyPrefix": "storage/",
+        }
+
+    def test_create_platform_storage_values__open_stack(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_storage_values(
+            replace(
+                on_prem_platform_config,
+                buckets=BucketsConfig(
+                    provider=BucketsProvider.OPEN_STACK,
+                    open_stack_username="os_user",
+                    open_stack_password="os_password",
+                    open_stack_s3_endpoint=URL("https://os.s3"),
+                    open_stack_endpoint=URL("https://os.management"),
+                    open_stack_region_name="os_region",
+                ),
+                monitoring=MonitoringConfig(
+                    metrics_storage_type=MetricsStorageType.BUCKETS,
+                    logs_bucket_name="job-logs",
+                    metrics_bucket_name="job-metrics",
+                ),
+            )
+        )
+
+        assert result["secrets"] == [
+            {
+                "name": "platform-storage-s3",
+                "data": {
+                    "access_key_id": "os_user",
+                    "secret_access_key": "os_password",
+                },
+            }
+        ]
+        assert result["s3"] == {
+            "endpoint": "https://os.s3",
+            "accessKeyId": {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": "platform-storage-s3",
+                        "key": "access_key_id",
+                    }
+                }
+            },
+            "secretAccessKey": {
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": "platform-storage-s3",
+                        "key": "secret_access_key",
+                    }
+                }
+            },
+            "region": "os_region",
+            "bucket": "job-metrics",
+            "keyPrefix": "storage/",
+        }
+
+    def test_create_platform_storage_values__multiple_storages(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_storage_values(
@@ -821,14 +1148,16 @@ class TestHelmValuesFactory:
                 gcp_platform_config,
                 storages=[
                     StorageConfig(
-                        type=StorageType.KUBERNETES,
+                        type=StorageType.NFS,
                         path="/storage1",
-                        storage_class_name="class",
+                        nfs_server="test-nfs-server-1",
+                        nfs_export_path="/test/export/path/1",
                     ),
                     StorageConfig(
-                        type=StorageType.KUBERNETES,
+                        type=StorageType.NFS,
                         path="/storage2",
-                        storage_class_name="class",
+                        nfs_server="test-nfs-server-2",
+                        nfs_export_path="/test/export/path/2",
                     ),
                 ],
             )
@@ -847,7 +1176,7 @@ class TestHelmValuesFactory:
             },
         ]
 
-    def test_create_platform_storage_without_auth_url(
+    def test_create_platform_storage_values__no_auth_url(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         gcp_platform_config = replace(gcp_platform_config, auth_url=URL("-"), token="")
@@ -857,7 +1186,7 @@ class TestHelmValuesFactory:
         assert result["platform"]["authUrl"] == "-"
         assert result["platform"]["token"] == {"value": ""}
 
-    def test_create_platform_storage_without_tracing_values(
+    def test_create_platform_storage_values__no_tracing_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         gcp_platform_config = replace(gcp_platform_config, sentry_dsn=None)
@@ -878,12 +1207,6 @@ class TestHelmValuesFactory:
             "bucketProvider": {
                 "type": "aws",
                 "aws": {"regionName": "us-east-1", "s3RoleArn": ""},
-            },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
             },
             "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
@@ -973,12 +1296,6 @@ class TestHelmValuesFactory:
                     },
                 },
             },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
-            },
             "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
                 "annotations": {
@@ -1063,12 +1380,6 @@ class TestHelmValuesFactory:
                     },
                 },
             },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
-            },
             "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
                 "annotations": {
@@ -1126,12 +1437,6 @@ class TestHelmValuesFactory:
                     "publicUrl": f"https://blob.{cluster_name}.org.neu.ro",
                 },
             },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
-            },
             "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
                 "annotations": {
@@ -1185,12 +1490,6 @@ class TestHelmValuesFactory:
                         }
                     }
                 },
-            },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
             },
             "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
@@ -1248,12 +1547,6 @@ class TestHelmValuesFactory:
                     },
                     "url": "https://accountName2.blob.core.windows.net",
                 },
-            },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
             },
             "image": {"repository": "ghcr.io/neuro-inc/platformbucketsapi"},
             "service": {
@@ -1364,12 +1657,6 @@ class TestHelmValuesFactory:
                 "clusterName": gcp_platform_config.cluster_name,
                 "sampleRate": 0.1,
             },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
-            },
             "priorityClassName": "platform-services",
         }
 
@@ -1416,7 +1703,6 @@ class TestHelmValuesFactory:
                 "project": "neuro",
             },
             "sentry": mock.ANY,
-            "cors": mock.ANY,
             "priorityClassName": "platform-services",
         }
 
@@ -1488,7 +1774,6 @@ class TestHelmValuesFactory:
                 "url": "https://platform.azurecr.io",
             },
             "sentry": mock.ANY,
-            "cors": mock.ANY,
             "priorityClassName": "platform-services",
         }
 
@@ -1560,11 +1845,10 @@ class TestHelmValuesFactory:
                 },
             },
             "sentry": mock.ANY,
-            "cors": mock.ANY,
             "priorityClassName": "platform-services",
         }
 
-    def test_create_gcp_platform_monitoring_values(
+    def test_create_platform_monitoring_values__gcp(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_monitoring_values(gcp_platform_config)
@@ -1577,12 +1861,11 @@ class TestHelmValuesFactory:
             "nvidiaDCGMPort": 9400,
             "jobsNamespace": "platform-jobs",
             "nodeLabels": {
-                "job": "platform.neuromation.io/job",
                 "nodePool": "platform.neuromation.io/nodepool",
             },
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
-                "apiUrl": "https://dev.neu.ro/api/v1",
+                "apiUrl": "https://dev.neu.ro",
                 "authUrl": "https://dev.neu.ro",
                 "configUrl": "https://dev.neu.ro",
                 "registryUrl": (
@@ -1610,32 +1893,42 @@ class TestHelmValuesFactory:
                 "ingressClassName": "traefik",
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
             },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
-            },
             "containerRuntime": {"name": "docker"},
             "fluentbit": {
                 "image": {"repository": "ghcr.io/neuro-inc/fluent-bit"},
             },
-            "fluentd": {
-                "image": {"repository": "ghcr.io/neuro-inc/fluentd"},
-                "persistence": {
-                    "enabled": True,
-                    "storageClassName": "platform-standard-topology-aware",
-                },
-            },
-            "minio": {"image": {"repository": "ghcr.io/neuro-inc/minio"}},
+            "secrets": [
+                {
+                    "name": "platform-monitoring-s3",
+                    "data": {
+                        "access_key_id": "admin",
+                        "secret_access_key": mock.ANY,
+                    },
+                }
+            ],
             "logs": {
                 "persistence": {
-                    "type": "gcp",
-                    "gcp": {
+                    "type": "s3",
+                    "s3": {
+                        "endpoint": "http://minio-gateway:9000",
+                        "region": "us",
+                        "accessKeyId": {
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "name": "platform-monitoring-s3",
+                                    "key": "access_key_id",
+                                }
+                            }
+                        },
+                        "secretAccessKey": {
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "name": "platform-monitoring-s3",
+                                    "key": "secret_access_key",
+                                }
+                            }
+                        },
                         "bucket": "job-logs",
-                        "project": "project",
-                        "location": "us",
-                        "serviceAccountKeyBase64": "e30=",
                     },
                 }
             },
@@ -1647,7 +1940,7 @@ class TestHelmValuesFactory:
             "priorityClassName": "platform-services",
         }
 
-    def test_create_platform_storage_without_api_url(
+    def test_create_platform_monitoring_values__no_api_url(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         gcp_platform_config = replace(gcp_platform_config, api_url=URL("-"), token="")
@@ -1657,7 +1950,7 @@ class TestHelmValuesFactory:
         assert result["platform"]["apiUrl"] == "-"
         assert result["platform"]["token"] == {"value": ""}
 
-    def test_create_gcp_platform_monitoring_values_with_custom_logs_region(
+    def test_create_platform_monitoring_values__gcp__custom_logs_region(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_monitoring_values(
@@ -1669,65 +1962,137 @@ class TestHelmValuesFactory:
             )
         )
 
+        assert result["secrets"] == [
+            {
+                "name": "platform-monitoring-s3",
+                "data": {
+                    "access_key_id": "admin",
+                    "secret_access_key": mock.ANY,
+                },
+            }
+        ]
         assert result["logs"] == {
             "persistence": {
-                "type": "gcp",
-                "gcp": {
+                "type": "s3",
+                "s3": {
+                    "endpoint": "http://minio-gateway:9000",
+                    "region": "us-central1",
+                    "accessKeyId": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": "platform-monitoring-s3",
+                                "key": "access_key_id",
+                            }
+                        }
+                    },
+                    "secretAccessKey": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": "platform-monitoring-s3",
+                                "key": "secret_access_key",
+                            }
+                        }
+                    },
                     "bucket": "job-logs",
-                    "project": "project",
-                    "location": "us-central1",
-                    "serviceAccountKeyBase64": "e30=",
                 },
             }
         }
 
-    def test_create_aws_platform_monitoring_values(
+    def test_create_platform_monitoring_values__aws(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_monitoring_values(aws_platform_config)
 
         assert result["logs"] == {
             "persistence": {
-                "type": "aws",
-                "aws": {"bucket": "job-logs", "region": "us-east-1"},
+                "type": "s3",
+                "s3": {"bucket": "job-logs", "region": "us-east-1"},
             },
         }
 
-    def test_create_azure_platform_monitoring_values(
+    def test_create_platform_monitoring_values__azure(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_monitoring_values(azure_platform_config)
 
-        assert result["logs"] == {
-            "persistence": {
-                "type": "azure",
-                "azure": {
-                    "bucket": "job-logs",
-                    "storageAccountKey": "accountKey2",
-                    "storageAccountName": "accountName2",
+        assert result["secrets"] == [
+            {
+                "name": "platform-monitoring-s3",
+                "data": {
+                    "access_key_id": "accountName2",
+                    "secret_access_key": "accountKey2",
                 },
-            },
-        }
-
-    def test_create_on_prem_platform_monitoring_values(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_monitoring_values(on_prem_platform_config)
-
+            }
+        ]
         assert result["logs"] == {
             "persistence": {
-                "type": "minio",
-                "minio": {
-                    "url": "http://platform-minio:9000",
-                    "accessKey": "username",
-                    "secretKey": "password",
+                "type": "s3",
+                "s3": {
+                    "endpoint": "http://minio-gateway:9000",
+                    "accessKeyId": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": "platform-monitoring-s3",
+                                "key": "access_key_id",
+                            }
+                        }
+                    },
+                    "secretAccessKey": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": "platform-monitoring-s3",
+                                "key": "secret_access_key",
+                            }
+                        }
+                    },
                     "region": "minio",
                     "bucket": "job-logs",
                 },
             },
         }
 
-    def test_create_on_prem_platform_monitoring_values_with_emc_ecs(
+    def test_create_platform_monitoring_values__minio(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_monitoring_values(on_prem_platform_config)
+
+        assert result["secrets"] == [
+            {
+                "name": "platform-monitoring-s3",
+                "data": {
+                    "access_key_id": "username",
+                    "secret_access_key": "password",
+                },
+            }
+        ]
+        assert result["logs"] == {
+            "persistence": {
+                "type": "s3",
+                "s3": {
+                    "endpoint": "http://platform-minio:9000",
+                    "accessKeyId": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": "platform-monitoring-s3",
+                                "key": "access_key_id",
+                            }
+                        }
+                    },
+                    "secretAccessKey": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": "platform-monitoring-s3",
+                                "key": "secret_access_key",
+                            }
+                        }
+                    },
+                    "region": "minio",
+                    "bucket": "job-logs",
+                },
+            },
+        }
+
+    def test_create_platform_monitoring_values__emc_ecs(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_monitoring_values(
@@ -1744,20 +2109,43 @@ class TestHelmValuesFactory:
             )
         )
 
+        assert result["secrets"] == [
+            {
+                "name": "platform-monitoring-s3",
+                "data": {
+                    "access_key_id": "emc_ecs_access_key",
+                    "secret_access_key": "emc_ecs_secret_key",
+                },
+            }
+        ]
         assert result["logs"] == {
             "persistence": {
-                "type": "aws",
-                "aws": {
+                "type": "s3",
+                "s3": {
                     "endpoint": "https://emc-ecs.s3",
-                    "accessKeyId": "emc_ecs_access_key",
-                    "secretAccessKey": "emc_ecs_secret_key",
+                    "region": "emc-ecs",
+                    "accessKeyId": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": "platform-monitoring-s3",
+                                "key": "access_key_id",
+                            }
+                        }
+                    },
+                    "secretAccessKey": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": "platform-monitoring-s3",
+                                "key": "secret_access_key",
+                            }
+                        }
+                    },
                     "bucket": "job-logs",
-                    "forcePathStyle": True,
                 },
             },
         }
 
-    def test_create_on_prem_platform_monitoring_values_with_open_stack(
+    def test_create_platform_monitoring_values__open_stack(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_monitoring_values(
@@ -1774,16 +2162,38 @@ class TestHelmValuesFactory:
             )
         )
 
+        assert result["secrets"] == [
+            {
+                "name": "platform-monitoring-s3",
+                "data": {
+                    "access_key_id": "os_user",
+                    "secret_access_key": "os_password",
+                },
+            }
+        ]
         assert result["logs"] == {
             "persistence": {
-                "type": "aws",
-                "aws": {
+                "type": "s3",
+                "s3": {
                     "endpoint": "https://os.s3",
-                    "accessKeyId": "os_user",
-                    "secretAccessKey": "os_password",
+                    "accessKeyId": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": "platform-monitoring-s3",
+                                "key": "access_key_id",
+                            }
+                        }
+                    },
+                    "secretAccessKey": {
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": "platform-monitoring-s3",
+                                "key": "secret_access_key",
+                            }
+                        }
+                    },
                     "region": "os_region",
                     "bucket": "job-logs",
-                    "forcePathStyle": True,
                 },
             },
         }
@@ -1856,12 +2266,6 @@ class TestHelmValuesFactory:
                     }
                 },
             },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
-            },
             "sentry": {
                 "dsn": "https://sentry",
                 "clusterName": gcp_platform_config.cluster_name,
@@ -1882,17 +2286,13 @@ class TestHelmValuesFactory:
                 "nodePool": "platform.neuromation.io/nodepool",
                 "preemptible": "platform.neuromation.io/preemptible",
             },
-            "objectStore": {
-                "supported": True,
-                "configMapName": "thanos-object-storage-config",
-            },
             "image": {"repository": "ghcr.io/neuro-inc/platform-reports"},
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
                 "ingressAuthUrl": "https://platformingressauth",
                 "configUrl": "https://dev.neu.ro",
-                "apiUrl": "https://dev.neu.ro/api/v1",
+                "apiUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -1914,11 +2314,21 @@ class TestHelmValuesFactory:
                 "sampleRate": 0.1,
             },
             "platformJobs": {"namespace": "platform-jobs"},
+            "metricsApi": {
+                "ingress": {
+                    "enabled": True,
+                    "ingressClassName": "traefik",
+                    "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+                }
+            },
             "grafanaProxy": {
                 "ingress": {
                     "enabled": True,
                     "ingressClassName": "traefik",
-                    "hosts": [f"metrics.{gcp_platform_config.cluster_name}.org.neu.ro"],
+                    "hosts": [
+                        f"grafana.{gcp_platform_config.cluster_name}.org.neu.ro",
+                        f"metrics.{gcp_platform_config.cluster_name}.org.neu.ro",
+                    ],
                     "annotations": {
                         "traefik.ingress.kubernetes.io/router.middlewares": (
                             "platform-platform-ingress-auth@kubernetescrd"
@@ -1926,23 +2336,34 @@ class TestHelmValuesFactory:
                     },
                 }
             },
+            "prometheus": {
+                "url": "http://thanos-query-http:10902",
+                "remoteStorageEnabled": True,
+            },
             "kube-prometheus-stack": {
                 "global": {
+                    "imageRegistry": "ghcr.io",
                     "imagePullSecrets": [
                         {"name": "platform-docker-config"},
                         {"name": "platform-docker-hub-config"},
-                    ]
+                    ],
                 },
                 "prometheus": {
                     "prometheusSpec": {
-                        "image": {"repository": "ghcr.io/neuro-inc/prometheus"},
+                        "image": {
+                            "registry": "ghcr.io",
+                            "repository": "neuro-inc/prometheus",
+                        },
                         "retention": "3d",
                         "thanos": {
-                            "image": "ghcr.io/neuro-inc/thanos:v0.24.0",
-                            "version": "v0.14.0",
                             "objectStorageConfig": {
-                                "name": "thanos-object-storage-config",
-                                "key": "thanos-object-storage.yaml",
+                                "secret": {
+                                    "type": "GCS",
+                                    "config": {
+                                        "bucket": "job-metrics",
+                                        "service_account": "{}",
+                                    },
+                                }
                             },
                         },
                         "storageSpec": {
@@ -1961,23 +2382,25 @@ class TestHelmValuesFactory:
                     }
                 },
                 "prometheusOperator": {
-                    "image": {"repository": "ghcr.io/neuro-inc/prometheus-operator"},
-                    "prometheusConfigReloaderImage": {
-                        "repository": ("ghcr.io/neuro-inc/prometheus-config-reloader")
+                    "image": {
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/prometheus-operator",
                     },
-                    "configmapReloadImage": {
-                        "repository": "ghcr.io/neuro-inc/configmap-reload"
+                    "prometheusConfigReloader": {
+                        "image": {
+                            "registry": "ghcr.io",
+                            "repository": "neuro-inc/prometheus-config-reloader",
+                        }
                     },
-                    "kubectlImage": {"repository": "ghcr.io/neuro-inc/kubectl"},
-                    "tlsProxy": {
-                        "image": {"repository": "ghcr.io/neuro-inc/ghostunnel"}
+                    "thanosImage": {
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/thanos",
                     },
                     "admissionWebhooks": {
                         "patch": {
                             "image": {
-                                "repository": (
-                                    "ghcr.io/neuro-inc/nginx-kube-webhook-certgen"
-                                )
+                                "registry": "ghcr.io",
+                                "repository": "neuro-inc/kube-webhook-certgen",
                             },
                             "priorityClassName": "platform-services",
                         }
@@ -1999,7 +2422,10 @@ class TestHelmValuesFactory:
                     }
                 },
                 "kube-state-metrics": {
-                    "image": {"repository": "ghcr.io/neuro-inc/kube-state-metrics"},
+                    "image": {
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/kube-state-metrics",
+                    },
                     "serviceAccount": {
                         "imagePullSecrets": [
                             {"name": "platform-docker-config"},
@@ -2007,15 +2433,80 @@ class TestHelmValuesFactory:
                         ]
                     },
                     "priorityClassName": "platform-services",
+                    "rbac": {
+                        "extraRules": [
+                            {
+                                "apiGroups": ["neuromation.io"],
+                                "resources": ["platforms"],
+                                "verbs": ["list", "watch"],
+                            }
+                        ]
+                    },
+                    "customResourceState": {
+                        "enabled": True,
+                        "config": {
+                            "spec": {
+                                "resources": [
+                                    {
+                                        "groupVersionKind": {
+                                            "group": "neuromation.io",
+                                            "version": "*",
+                                            "kind": "Platform",
+                                        },
+                                        "labelsFromPath": {
+                                            "name": ["metadata", "name"],
+                                        },
+                                        "metricNamePrefix": "kube_platform",
+                                        "metrics": [
+                                            {
+                                                "name": "status_phase",
+                                                "help": "Platform status phase",
+                                                "each": {
+                                                    "type": "StateSet",
+                                                    "stateSet": {
+                                                        "labelName": "phase",
+                                                        "path": ["status", "phase"],
+                                                        "list": [
+                                                            "Pending",
+                                                            "Deploying",
+                                                            "Deleting",
+                                                            "Deployed",
+                                                            "Failed",
+                                                        ],
+                                                    },
+                                                },
+                                            }
+                                        ],
+                                    }
+                                ]
+                            }
+                        },
+                    },
+                },
+                "nodeExporter": {
+                    "enabled": True,
                 },
                 "prometheus-node-exporter": {
-                    "image": {"repository": "ghcr.io/neuro-inc/node-exporter"},
+                    "image": {
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/node-exporter",
+                    },
                     "serviceAccount": {
                         "imagePullSecrets": [
                             {"name": "platform-docker-config"},
                             {"name": "platform-docker-hub-config"},
                         ]
                     },
+                },
+                "alertmanager": {
+                    "alertmanagerSpec": {
+                        "image": {
+                            "registry": "ghcr.io",
+                            "repository": "neuro-inc/alertmanager",
+                        },
+                        "configSecret": "platform-alertmanager-config",
+                        "secrets": ["platform-token"],
+                    }
                 },
             },
             "thanos": {
@@ -2035,6 +2526,7 @@ class TestHelmValuesFactory:
                     "config": {"bucket": "job-metrics", "service_account": "{}"},
                 },
                 "priorityClassName": "platform-services",
+                "sidecar": {"selector": {"app": None}},
             },
             "cloudProvider": {
                 "type": "gcp",
@@ -2046,7 +2538,8 @@ class TestHelmValuesFactory:
             },
             "grafana": {
                 "image": {
-                    "repository": "ghcr.io/neuro-inc/grafana",
+                    "registry": "ghcr.io",
+                    "repository": "neuro-inc/grafana",
                     "pullSecrets": [
                         "platform-docker-config",
                         "platform-docker-hub-config",
@@ -2054,7 +2547,8 @@ class TestHelmValuesFactory:
                 },
                 "initChownData": {
                     "image": {
-                        "repository": "ghcr.io/neuro-inc/busybox",
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/busybox",
                         "pullSecrets": [
                             "platform-docker-config",
                             "platform-docker-hub-config",
@@ -2063,7 +2557,8 @@ class TestHelmValuesFactory:
                 },
                 "sidecar": {
                     "image": {
-                        "repository": "ghcr.io/neuro-inc/k8s-sidecar",
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/k8s-sidecar",
                         "pullSecrets": [
                             "platform-docker-config",
                             "platform-docker-hub-config",
@@ -2143,6 +2638,9 @@ class TestHelmValuesFactory:
                 "endpoint": "s3.us-east-1.amazonaws.com",
             },
         }
+        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
+            "thanos"
+        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
         assert result["cloudProvider"] == {"type": "aws", "region": "us-east-1"}
 
     def test_create_azure_platform_reports_values(
@@ -2158,6 +2656,9 @@ class TestHelmValuesFactory:
                 "storage_account_key": "accountKey2",
             },
         }
+        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
+            "thanos"
+        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
         assert result["cloudProvider"] == {"type": "azure", "region": "westus"}
 
     def test_create_on_prem_platform_reports_values(
@@ -2165,7 +2666,10 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_reports_values(on_prem_platform_config)
 
-        assert result["objectStore"] == {"supported": False}
+        assert result["prometheus"] == {
+            "url": "http://prometheus-prometheus:9090",
+            "remoteStorageEnabled": False,
+        }
         assert result["prometheusProxy"] == {
             "prometheus": {"host": "prometheus-prometheus", "port": 9090}
         }
@@ -2174,8 +2678,8 @@ class TestHelmValuesFactory:
             == "3d"
         )
         assert (
-            result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]["thanos"]
-            == ""
+            "thanos"
+            not in result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]
         )
         assert "cloudProvider" not in result
 
@@ -2211,8 +2715,12 @@ class TestHelmValuesFactory:
                 "endpoint": "platform-minio:9000",
                 "access_key": "minio_access_key",
                 "secret_key": "minio_secret_key",
+                "insecure": True,
             },
         }
+        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
+            "thanos"
+        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
 
     def test_create_on_prem_platform_reports_values_with_emc_ecs(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -2245,6 +2753,9 @@ class TestHelmValuesFactory:
                 "secret_key": "emc_ecs_secret_key",
             },
         }
+        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
+            "thanos"
+        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
 
     def test_create_on_prem_platform_reports_values_with_open_stack(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -2278,6 +2789,9 @@ class TestHelmValuesFactory:
                 "secret_key": "os_password",
             },
         }
+        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
+            "thanos"
+        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
 
     def test_create_on_prem_platform_reports_values_with_retention(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -2326,12 +2840,6 @@ class TestHelmValuesFactory:
                         "secretKeyRef": {"key": "token", "name": "platform-token"}
                     }
                 },
-            },
-            "cors": {
-                "origins": [
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ]
             },
             "service": {
                 "annotations": {
@@ -2416,7 +2924,6 @@ class TestHelmValuesFactory:
             "storages": [{"path": "", "type": "pvc", "claimName": "platform-storage"}],
             "nodeLabels": {
                 "job": "platform.neuromation.io/job",
-                "gpu": "platform.neuromation.io/accelerator",
                 "preemptible": "platform.neuromation.io/preemptible",
                 "nodePool": "platform.neuromation.io/nodepool",
             },
@@ -2441,14 +2948,16 @@ class TestHelmValuesFactory:
                 gcp_platform_config,
                 storages=[
                     StorageConfig(
-                        type=StorageType.KUBERNETES,
+                        type=StorageType.NFS,
                         path="/storage1",
-                        storage_class_name="class",
+                        nfs_server="test-nfs-server-1",
+                        nfs_export_path="/test/export/path/1",
                     ),
                     StorageConfig(
-                        type=StorageType.KUBERNETES,
+                        type=StorageType.NFS,
                         path="/storage2",
-                        storage_class_name="class",
+                        nfs_server="test-nfs-server-2",
+                        nfs_export_path="/test/export/path/2",
                     ),
                 ],
             )
@@ -2484,3 +2993,56 @@ class TestHelmValuesFactory:
         prom = result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]
         assert prom["externalLabels"]["cluster"]
         assert prom["externalLabels"]["cluster"] == gcp_platform_config.cluster_name
+
+    def test_create_platform_apps_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_apps_values(gcp_platform_config)
+
+        assert result == {
+            "nameOverride": "platform-apps",
+            "fullnameOverride": "platform-apps",
+            "image": {"repository": "ghcr.io/neuro-inc/platform-apps"},
+            "platform": {
+                "clusterName": gcp_platform_config.cluster_name,
+                "authUrl": "https://dev.neu.ro",
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "key": "token",
+                            "name": "platform-token",
+                        }
+                    }
+                },
+            },
+            "ingress": {
+                "enabled": True,
+                "className": "traefik",
+                "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
+            },
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
+            },
+            "priorityClassName": "platform-services",
+            "rbac": {"create": True},
+            "serviceAccount": {"create": True},
+        }
+
+    def test_create_platform_metadata_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_metadata_values(gcp_platform_config)
+
+        assert result == {
+            "nameOverride": "platform-metadata",
+            "fullnameOverride": "platform-metadata",
+            "image": {"repository": "ghcr.io/neuro-inc/platform-metadata"},
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
+            },
+            "priorityClassName": "platform-services",
+        }

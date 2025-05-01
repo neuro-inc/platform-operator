@@ -28,3 +28,4 @@ platform:
   configUrl: https://staging.neu.ro
   apiUrl: https://staging.neu.ro
   adminUrl: https://staging.neu.ro
+  notificationsUrl: https://staging.neu.ro

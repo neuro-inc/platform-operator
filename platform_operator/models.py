@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import json
 import os
-from base64 import b64decode
+from base64 import b64decode, urlsafe_b64decode
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from enum import Enum
+from hashlib import sha256
 from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import kopf
 from neuro_config_client import (
@@ -18,7 +20,7 @@ from neuro_config_client import (
     DNSConfig,
     DockerRegistryConfig,
     IdleJobConfig,
-    OrchestratorConfig,
+    PatchOrchestratorConfigRequest,
     ResourcePoolType,
 )
 from yarl import URL
@@ -40,14 +42,11 @@ class KubeClientAuthType(str, Enum):
 class KubeConfig:
     version: str
     url: URL
-    cert_authority_path: Path | None = None
-    cert_authority_data_pem: str | None = None
     auth_type: KubeClientAuthType = KubeClientAuthType.NONE
+    cert_authority_path: Path | None = None
     auth_cert_path: Path | None = None
     auth_cert_key_path: Path | None = None
-    auth_token: str | None = None
     auth_token_path: Path | None = None
-    auth_token_update_interval_s: int = 300
     conn_timeout_s: int = 300
     read_timeout_s: int = 100
     conn_pool_size: int = 100
@@ -58,21 +57,32 @@ class KubeConfig:
         return cls(
             version=env["NP_KUBE_VERSION"].lstrip("v"),
             url=URL(env["NP_KUBE_URL"]),
+            auth_type=KubeClientAuthType(env["NP_KUBE_AUTH_TYPE"]),
             cert_authority_path=cls._convert_to_path(
                 env.get("NP_KUBE_CERT_AUTHORITY_PATH")
             ),
-            cert_authority_data_pem=env.get("NP_KUBE_CERT_AUTHORITY_DATA_PEM"),
-            auth_type=KubeClientAuthType(env["NP_KUBE_AUTH_TYPE"]),
             auth_cert_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_CERT_PATH")),
             auth_cert_key_path=cls._convert_to_path(
                 env.get("NP_KUBE_AUTH_CERT_KEY_PATH")
             ),
             auth_token_path=cls._convert_to_path(env.get("NP_KUBE_AUTH_TOKEN_PATH")),
-            auth_token=env.get("NP_KUBE_AUTH_TOKEN"),
         )
 
-    @classmethod
-    def _convert_to_path(cls, value: str | None) -> Path | None:
+    def read_auth_token_from_path(self) -> str | NoReturn:
+        if not self.auth_token_path:
+            raise ValueError("auth_token_path must be set")
+        return Path(self.auth_token_path).read_text()
+
+    @property
+    def auth_token_exp_ts(self) -> int | NoReturn:
+        payload = self.read_auth_token_from_path().split(".")[1]
+        decoded_payload = json.loads(
+            urlsafe_b64decode(payload + "=" * (4 - len(payload) % 4))
+        )
+        return decoded_payload["exp"]
+
+    @staticmethod
+    def _convert_to_path(value: str | None) -> Path | None:
         return Path(value) if value else None
 
 
@@ -101,6 +111,7 @@ class HelmReleaseNames:
 class HelmChartNames:
     docker_registry: str = "docker-registry"
     minio: str = "minio"
+    minio_gateway: str = "minio-gateway"
     traefik: str = "traefik"
     adjust_inotify: str = "adjust-inotify"
     nvidia_gpu_driver: str = "nvidia-gpu-driver"
@@ -115,6 +126,12 @@ class HelmChartNames:
     platform_disks: str = "platform-disks"
     platform_api_poller: str = "platform-api-poller"
     platform_buckets: str = "platform-buckets"
+    platform_apps: str = "platform-apps"
+    platform_metadata: str = "platform-metadata"
+    pgo: str = "apps-postgres-operator"
+    keda: str = "keda"
+    alloy: str = "alloy"
+    loki: str = "loki"
 
 
 @dataclass(frozen=True)
@@ -138,6 +155,7 @@ class Config:
     platform_admin_url: URL
     platform_config_watch_interval_s: float
     platform_api_url: URL
+    platform_notifications_url: URL
     platform_namespace: str
     platform_lock_secret_name: str
     acme_ca_staging_path: str
@@ -165,6 +183,7 @@ class Config:
                 env.get("NP_PLATFORM_CONFIG_WATCH_INTERVAL_S", "15")
             ),
             platform_api_url=URL(env["NP_PLATFORM_API_URL"]),
+            platform_notifications_url=URL(env["NP_PLATFORM_NOTIFICATIONS_URL"]),
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
             platform_lock_secret_name=env["NP_PLATFORM_LOCK_SECRET_NAME"],
             acme_ca_staging_path=env["NP_ACME_CA_STAGING_PATH"],
@@ -255,14 +274,6 @@ class StorageSpec(dict[str, Any]):
         return self.get("path", "")
 
     @property
-    def storage_size(self) -> str:
-        return self["kubernetes"]["persistence"].get("size", "")
-
-    @property
-    def storage_class_name(self) -> str:
-        return self["kubernetes"]["persistence"].get("storageClassName", "")
-
-    @property
     def nfs_server(self) -> str:
         return self["nfs"].get("server", "")
 
@@ -285,10 +296,6 @@ class StorageSpec(dict[str, Any]):
     @property
     def smb_password(self) -> str:
         return self["smb"].get("password", "")
-
-    @property
-    def gcs_bucket_name(self) -> str:
-        return self["gcs"].get("bucket", "")
 
     @property
     def azure_storage_account_name(self) -> str:
@@ -436,6 +443,10 @@ class RegistrySpec(dict[str, Any]):
     def kubernetes_storage_size(self) -> str:
         return self["kubernetes"]["persistence"].get("size", "")
 
+    @property
+    def blob_storage_bucket(self) -> str:
+        return self["blobStorage"].get("bucket", "")
+
 
 class MonitoringSpec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
@@ -472,6 +483,10 @@ class MonitoringSpec(dict[str, Any]):
     @property
     def metrics_storage_class_name(self) -> str:
         return self["metrics"]["kubernetes"]["persistence"].get("storageClassName", "")
+
+    @property
+    def metrics_node_exporter_enabled(self) -> bool:
+        return self["metrics"].get("nodeExporter", {}).get("enabled", True)
 
 
 class DisksSpec(dict[str, Any]):
@@ -621,10 +636,8 @@ class IngressServiceType(str, Enum):
 
 
 class StorageType(str, Enum):
-    KUBERNETES = "kubernetes"
     NFS = "nfs"
     SMB = "smb"
-    GCS = "gcs"
     AZURE_fILE = "azureFile"
 
 
@@ -632,8 +645,7 @@ class StorageType(str, Enum):
 class StorageConfig:
     type: StorageType
     path: str = ""
-    storage_size: str = "10Gi"
-    storage_class_name: str = ""
+    size: str = "10Gi"
     nfs_export_path: str = ""
     nfs_server: str = ""
     smb_server: str = ""
@@ -643,7 +655,6 @@ class StorageConfig:
     azure_storage_account_name: str = ""
     azure_storage_account_key: str = ""
     azure_share_name: str = ""
-    gcs_bucket_name: str = ""
 
 
 class RegistryProvider(str, Enum):
@@ -651,6 +662,11 @@ class RegistryProvider(str, Enum):
     AZURE = "azure"
     GCP = "gcp"
     DOCKER = "docker"
+
+
+class DockerRegistryStorageDriver(str, Enum):
+    FILE_SYSTEM = "file_system"
+    S3 = "s3"
 
 
 @dataclass(frozen=True)
@@ -670,8 +686,21 @@ class RegistryConfig:
     docker_registry_url: URL | None = None
     docker_registry_username: str = ""
     docker_registry_password: str = ""
-    docker_registry_storage_class_name: str = ""
-    docker_registry_storage_size: str = ""
+
+    docker_registry_storage_driver: DockerRegistryStorageDriver = (
+        DockerRegistryStorageDriver.FILE_SYSTEM
+    )
+
+    docker_registry_file_system_storage_class_name: str = ""
+    docker_registry_file_system_storage_size: str = ""
+
+    docker_registry_s3_endpoint: URL | None = None
+    docker_registry_s3_region: str = ""
+    docker_registry_s3_bucket: str = ""
+    docker_registry_s3_access_key: str = ""
+    docker_registry_s3_secret_key: str = ""
+    docker_registry_s3_disable_redirect: bool = False
+    docker_registry_s3_force_path_style: bool = False
 
 
 class BucketsProvider(str, Enum):
@@ -695,6 +724,7 @@ class BucketsConfig:
 
     azure_storage_account_name: str = ""
     azure_storage_account_key: str = ""
+    azure_minio_gateway_region: str = "minio"
 
     minio_install: bool = False
     minio_url: URL | None = None
@@ -710,12 +740,26 @@ class BucketsConfig:
     emc_ecs_s3_endpoint: URL | None = None
     emc_ecs_management_endpoint: URL | None = None
     emc_ecs_s3_assumable_role: str = ""
+    emc_ecs_region: str = "emc-ecs"
 
     open_stack_username: str = ""
     open_stack_password: str = ""
     open_stack_endpoint: URL | None = None
     open_stack_s3_endpoint: URL | None = None
     open_stack_region_name: str = ""
+
+
+@dataclass(frozen=True)
+class AppsOperatorsConfig:
+    postgres_operator_enabled: bool = False
+    keda_enabled: bool = False
+
+
+@dataclass(frozen=True)
+class MinioGatewayConfig:
+    root_user: str
+    root_user_password: str
+    endpoint_url: str = "http://minio-gateway:9000"
 
 
 class MetricsStorageType(Enum):
@@ -734,6 +778,7 @@ class MonitoringConfig:
     metrics_storage_size: str = ""
     metrics_retention_time: str = "3d"
     metrics_region: str = ""
+    metrics_node_exporter_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -744,6 +789,7 @@ class PlatformConfig:
     config_url: URL
     admin_url: URL
     api_url: URL
+    notifications_url: URL
     token: str
     cluster_name: str
     service_account_name: str
@@ -762,6 +808,7 @@ class PlatformConfig:
     ingress_url: URL
     ingress_registry_url: URL
     ingress_metrics_url: URL
+    ingress_grafana_url: URL
     ingress_acme_enabled: bool
     ingress_acme_environment: ACMEEnvironment
     ingress_controller_install: bool
@@ -776,7 +823,6 @@ class PlatformConfig:
     ingress_service_name: str
     ingress_service_annotations: dict[str, str]
     ingress_load_balancer_source_ranges: list[str]
-    ingress_namespaces: Sequence[str]
     ingress_ssl_cert_data: str
     ingress_ssl_cert_key_data: str
     disks_storage_limit_per_user: int
@@ -804,6 +850,10 @@ class PlatformConfig:
     gcp_service_account_key: str = ""
     gcp_service_account_key_base64: str = ""
     services_priority_class_name: str = ""
+    minio_gateway: MinioGatewayConfig | None = None
+    apps_operator_config: AppsOperatorsConfig = field(
+        default_factory=AppsOperatorsConfig
+    )
 
     def get_storage_claim_name(self, path: str) -> str:
         name = f"{self.release_name}-storage"
@@ -811,9 +861,19 @@ class PlatformConfig:
             name += path.replace("/", "-")
         return name
 
+    @property
+    def image_registry(self) -> str:
+        registry = self.docker_config.url.host
+        assert registry
+        return registry
+
     def get_image(self, name: str) -> str:
         url = str(self.docker_config.url / name)
         return url.replace("http://", "").replace("https://", "")
+
+    def get_image_repo(self, name: str) -> str:
+        url = self.docker_config.url / name
+        return url.path.lstrip("/")
 
     def create_dns_config(
         self,
@@ -828,15 +888,11 @@ class PlatformConfig:
             a_records.extend(
                 (
                     ARecord(name=f"{self.ingress_dns_name}.", ips=ips),
+                    ARecord(name=f"*.{self.ingress_dns_name}.", ips=ips),
                     ARecord(name=f"*.jobs.{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"registry.{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"metrics.{self.ingress_dns_name}.", ips=ips),
+                    ARecord(name=f"*.apps.{self.ingress_dns_name}.", ips=ips),
                 )
             )
-            if self.buckets.provider == BucketsProvider.MINIO:
-                a_records.append(
-                    ARecord(name=f"blob.{self.ingress_dns_name}.", ips=ips)
-                )
         elif aws_ingress_lb and ingress_service:
             ingress_host = ingress_service["status"]["loadBalancer"]["ingress"][0][
                 "hostname"
@@ -846,73 +902,68 @@ class PlatformConfig:
                 (
                     ARecord(
                         name=f"{self.ingress_dns_name}.",
-                        dns_name=ingress_host,
+                        dns_name=f"{ingress_host}.",
+                        zone_id=ingress_zone_id,
+                    ),
+                    ARecord(
+                        name=f"*.{self.ingress_dns_name}.",
+                        dns_name=f"{ingress_host}.",
                         zone_id=ingress_zone_id,
                     ),
                     ARecord(
                         name=f"*.jobs.{self.ingress_dns_name}.",
-                        dns_name=ingress_host,
+                        dns_name=f"{ingress_host}.",
                         zone_id=ingress_zone_id,
                     ),
                     ARecord(
-                        name=f"registry.{self.ingress_dns_name}.",
-                        dns_name=ingress_host,
-                        zone_id=ingress_zone_id,
-                    ),
-                    ARecord(
-                        name=f"metrics.{self.ingress_dns_name}.",
-                        dns_name=ingress_host,
+                        name=f"*.apps.{self.ingress_dns_name}.",
+                        dns_name=f"{ingress_host}.",
                         zone_id=ingress_zone_id,
                     ),
                 )
             )
         elif ingress_service and ingress_service["spec"]["type"] == "LoadBalancer":
             ingress_host = ingress_service["status"]["loadBalancer"]["ingress"][0]["ip"]
+            ips = [ingress_host]
             a_records.extend(
                 (
-                    ARecord(
-                        name=f"{self.ingress_dns_name}.",
-                        ips=[ingress_host],
-                    ),
-                    ARecord(
-                        name=f"*.jobs.{self.ingress_dns_name}.",
-                        ips=[ingress_host],
-                    ),
-                    ARecord(
-                        name=f"registry.{self.ingress_dns_name}.",
-                        ips=[ingress_host],
-                    ),
-                    ARecord(
-                        name=f"metrics.{self.ingress_dns_name}.",
-                        ips=[ingress_host],
-                    ),
+                    ARecord(name=f"{self.ingress_dns_name}.", ips=ips),
+                    ARecord(name=f"*.{self.ingress_dns_name}.", ips=ips),
+                    ARecord(name=f"*.jobs.{self.ingress_dns_name}.", ips=ips),
+                    ARecord(name=f"*.apps.{self.ingress_dns_name}.", ips=ips),
                 )
             )
-            if self.buckets.provider == BucketsProvider.MINIO:
-                a_records.append(
-                    ARecord(name=f"blob.{self.ingress_dns_name}.", ips=[ingress_host])
-                )
         else:
             return None
         return DNSConfig(name=self.ingress_dns_name, a_records=a_records)
 
-    def create_orchestrator_config(self, cluster: Cluster) -> OrchestratorConfig | None:
+    def create_patch_orchestrator_config_request(
+        self, cluster: Cluster
+    ) -> PatchOrchestratorConfigRequest | None:
         assert cluster.orchestrator
-        orchestrator = replace(
-            cluster.orchestrator,
-            job_internal_hostname_template=self.jobs_internal_host_template,
-        )
-        if self.kubernetes_tpu_network:
+        orchestrator = PatchOrchestratorConfigRequest()
+
+        if (
+            self.jobs_internal_host_template
+            != cluster.orchestrator.job_internal_hostname_template
+        ):
             orchestrator = replace(
                 orchestrator,
-                resource_pool_types=self._update_tpu_network(
-                    orchestrator.resource_pool_types,
-                    self.kubernetes_tpu_network,
-                ),
+                job_internal_hostname_template=self.jobs_internal_host_template,
             )
-        if cluster.orchestrator == orchestrator:
-            return None
-        return orchestrator
+
+        if self.kubernetes_tpu_network:
+            new_resource_pool_types = self._update_tpu_network(
+                cluster.orchestrator.resource_pool_types, self.kubernetes_tpu_network
+            )
+            if new_resource_pool_types != cluster.orchestrator.resource_pool_types:
+                orchestrator = replace(
+                    orchestrator, resource_pool_types=new_resource_pool_types
+                )
+
+        return (
+            None if orchestrator == PatchOrchestratorConfigRequest() else orchestrator
+        )
 
     @classmethod
     def _update_tpu_network(
@@ -958,9 +1009,10 @@ class PlatformConfigFactory:
         jobs_namespace = self._config.platform_namespace + "-jobs"
         service_account_annotations: dict[str, str] = {}
         if spec.iam.aws_role_arn:
-            service_account_annotations[
-                "eks.amazonaws.com/role-arn"
-            ] = spec.iam.aws_role_arn
+            service_account_annotations["eks.amazonaws.com/role-arn"] = (
+                spec.iam.aws_role_arn
+            )
+        buckets_config = self._create_buckets(spec.blob_storage, cluster)
         return PlatformConfig(
             release_name=release_name,
             auth_url=self._config.platform_auth_url,
@@ -968,6 +1020,7 @@ class PlatformConfigFactory:
             config_url=self._config.platform_config_url,
             admin_url=self._config.platform_admin_url,
             api_url=self._config.platform_api_url,
+            notifications_url=self._config.platform_notifications_url,
             token=spec.token,
             cluster_name=metadata.name,
             namespace=self._config.platform_namespace,
@@ -1000,6 +1053,7 @@ class PlatformConfigFactory:
             ingress_dns_name=cluster.dns.name,
             ingress_url=URL(f"https://{cluster.dns.name}"),
             ingress_registry_url=URL(f"https://registry.{cluster.dns.name}"),
+            ingress_grafana_url=URL(f"https://grafana.{cluster.dns.name}"),
             ingress_metrics_url=URL(f"https://metrics.{cluster.dns.name}"),
             ingress_acme_enabled=(
                 not spec.ingress_controller.ssl_cert_data
@@ -1009,7 +1063,12 @@ class PlatformConfigFactory:
             ingress_controller_install=spec.ingress_controller.enabled,
             ingress_controller_replicas=spec.ingress_controller.replicas or 2,
             ingress_public_ips=spec.ingress_controller.public_ips,
-            ingress_cors_origins=cluster.ingress.cors_origins,
+            ingress_cors_origins=sorted(
+                {
+                    *cluster.ingress.default_cors_origins,
+                    *cluster.ingress.additional_cors_origins,
+                }
+            ),
             ingress_service_type=IngressServiceType(
                 spec.ingress_controller.service_type or IngressServiceType.LOAD_BALANCER
             ),
@@ -1017,13 +1076,6 @@ class PlatformConfigFactory:
             ingress_service_annotations=spec.ingress_controller.service_annotations,
             ingress_load_balancer_source_ranges=(
                 spec.ingress_controller.load_balancer_source_ranges
-            ),
-            ingress_namespaces=sorted(
-                {
-                    self._config.platform_namespace,
-                    jobs_namespace,
-                    *spec.ingress_controller.namespaces,
-                }
             ),
             ingress_node_port_http=spec.ingress_controller.node_port_http,
             ingress_node_port_https=spec.ingress_controller.node_port_https,
@@ -1038,26 +1090,36 @@ class PlatformConfigFactory:
             jobs_fallback_host=cluster.orchestrator.job_fallback_hostname,
             idle_jobs=cluster.orchestrator.idle_jobs,
             storages=[self._create_storage(s) for s in spec.storages],
-            buckets=self._create_buckets(spec.blob_storage, cluster),
-            registry=self._create_registry(spec.registry),
+            buckets=buckets_config,
+            registry=self._create_registry(
+                spec.registry, buckets_config=buckets_config
+            ),
             monitoring=self._create_monitoring(spec.monitoring),
             disks_storage_limit_per_user=cluster.disks.storage_limit_per_user,
             disks_storage_class_name=spec.disks.storage_class_name or None,
             helm_repo=self._create_helm_repo(cluster),
             docker_config=docker_config,
             docker_hub_config=docker_hub_config,
-            grafana_username=cluster.credentials.grafana.username
-            if cluster.credentials.grafana
-            else None,
-            grafana_password=cluster.credentials.grafana.password
-            if cluster.credentials.grafana
-            else None,
-            sentry_dsn=cluster.credentials.sentry.public_dsn
-            if cluster.credentials.sentry
-            else None,
-            sentry_sample_rate=cluster.credentials.sentry.sample_rate
-            if cluster.credentials.sentry
-            else None,
+            grafana_username=(
+                cluster.credentials.grafana.username
+                if cluster.credentials.grafana
+                else None
+            ),
+            grafana_password=(
+                cluster.credentials.grafana.password
+                if cluster.credentials.grafana
+                else None
+            ),
+            sentry_dsn=(
+                cluster.credentials.sentry.public_dsn
+                if cluster.credentials.sentry
+                else None
+            ),
+            sentry_sample_rate=(
+                cluster.credentials.sentry.sample_rate
+                if cluster.credentials.sentry
+                else None
+            ),
             aws_region=spec.iam.aws_region,
             aws_role_arn=spec.iam.aws_role_arn,
             aws_s3_role_arn=spec.iam.aws_s3_role_arn,
@@ -1066,6 +1128,7 @@ class PlatformConfigFactory:
             ),
             gcp_service_account_key_base64=spec.iam.gcp_service_account_key_base64,
             services_priority_class_name=f"{self._config.platform_namespace}-services",
+            minio_gateway=self._create_minio_gateway(spec),
         )
 
     def _create_helm_repo(self, cluster: Cluster) -> HelmRepo:
@@ -1124,14 +1187,7 @@ class PlatformConfigFactory:
         if not spec:
             raise ValueError("Storage spec is empty")
 
-        if StorageType.KUBERNETES in spec:
-            return StorageConfig(
-                type=StorageType.KUBERNETES,
-                path=spec.path,
-                storage_class_name=spec.storage_class_name,
-                storage_size=spec.storage_size,
-            )
-        elif StorageType.NFS in spec:
+        if StorageType.NFS in spec:
             return StorageConfig(
                 type=StorageType.NFS,
                 path=spec.path,
@@ -1154,10 +1210,6 @@ class PlatformConfigFactory:
                 azure_storage_account_name=spec.azure_storage_account_name,
                 azure_storage_account_key=spec.azure_storage_account_key,
                 azure_share_name=spec.azure_share_name,
-            )
-        elif StorageType.GCS in spec:
-            return StorageConfig(
-                type=StorageType.GCS, gcs_bucket_name=spec.gcs_bucket_name
             )
         else:
             raise ValueError("Storage type is not supported")
@@ -1242,7 +1294,9 @@ class PlatformConfigFactory:
         else:
             raise ValueError("Bucket provider is not supported")
 
-    def _create_registry(self, spec: RegistrySpec) -> RegistryConfig:
+    def _create_registry(
+        self, spec: RegistrySpec, *, buckets_config: BucketsConfig
+    ) -> RegistryConfig:
         if not spec:
             raise ValueError("Registry spec is empty")
 
@@ -1283,8 +1337,30 @@ class PlatformConfigFactory:
                     host=f"{self._config.helm_release_names.platform}-docker-registry",
                     port=5000,
                 ),
-                docker_registry_storage_class_name=spec.kubernetes_storage_class_name,
-                docker_registry_storage_size=spec.kubernetes_storage_size or "10Gi",
+                docker_registry_storage_driver=DockerRegistryStorageDriver.FILE_SYSTEM,
+                docker_registry_file_system_storage_class_name=(
+                    spec.kubernetes_storage_class_name
+                ),
+                docker_registry_file_system_storage_size=spec.kubernetes_storage_size
+                or "10Gi",
+            )
+        elif "blobStorage" in spec and buckets_config.provider == BucketsProvider.MINIO:
+            return RegistryConfig(
+                provider=RegistryProvider.DOCKER,
+                docker_registry_install=True,
+                docker_registry_url=URL.build(
+                    scheme="http",
+                    host=f"{self._config.helm_release_names.platform}-docker-registry",
+                    port=5000,
+                ),
+                docker_registry_storage_driver=DockerRegistryStorageDriver.S3,
+                docker_registry_s3_endpoint=buckets_config.minio_url,
+                docker_registry_s3_region=buckets_config.minio_region,
+                docker_registry_s3_bucket=spec.blob_storage_bucket,
+                docker_registry_s3_access_key=buckets_config.minio_access_key,
+                docker_registry_s3_secret_key=buckets_config.minio_secret_key,
+                docker_registry_s3_disable_redirect=True,
+                docker_registry_s3_force_path_style=True,
             )
         else:
             raise ValueError("Registry provider is not supported")
@@ -1313,6 +1389,7 @@ class PlatformConfigFactory:
                     spec.metrics_retention_time
                     or MonitoringConfig.metrics_retention_time
                 ),
+                metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
             )
         elif "kubernetes" in spec.metrics:
             return MonitoringConfig(
@@ -1326,9 +1403,25 @@ class PlatformConfigFactory:
                     or MonitoringConfig.metrics_retention_time
                 ),
                 metrics_region=spec.metrics_region,
+                metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
             )
         else:
             raise ValueError("Metrics storage type is not supported")
+
+    def _create_minio_gateway(self, spec: Spec) -> MinioGatewayConfig | None:
+        if BucketsProvider.GCP in spec.blob_storage:
+            return MinioGatewayConfig(
+                root_user="admin",
+                root_user_password=sha256(
+                    spec.iam.gcp_service_account_key_base64.encode()
+                ).hexdigest(),
+            )
+        if BucketsProvider.AZURE in spec.blob_storage:
+            return MinioGatewayConfig(
+                root_user=spec.blob_storage.azure_storrage_account_name,
+                root_user_password=spec.blob_storage.azure_storrage_account_key,
+            )
+        return None
 
     @classmethod
     def _base64_decode(cls, value: str | None) -> str:

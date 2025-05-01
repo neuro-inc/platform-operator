@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import os
-import tempfile
-from collections.abc import AsyncIterator, Iterator
+import json
+from base64 import urlsafe_b64encode
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
+from time import time
 from typing import Any
 
 import aiohttp
@@ -50,41 +51,93 @@ class TestKubeClientTokenUpdater:
             yield f"http://{address.host}:{address.port}"
 
     @pytest.fixture
-    def kube_token_path(self) -> Iterator[str]:
-        _, path = tempfile.mkstemp()
-        Path(path).write_text("token-1")
-        yield path
-        os.remove(path)
+    def jwt_kube_token_with_exp_factory(self) -> Callable[[int], str]:
+        def _create_jwt_kube_token_with_exp(exp: int) -> str:
+            payload = {"exp": exp}
+            payload_encoded = (
+                urlsafe_b64encode(json.dumps(payload).encode("utf-8"))
+                .rstrip(b"=")
+                .decode("utf-8")
+            )
+            return f"header.{payload_encoded}.signature"
+
+        return _create_jwt_kube_token_with_exp
+
+    @pytest.fixture
+    def kube_auth_token(
+        self, jwt_kube_token_with_exp_factory: Callable[[int], str]
+    ) -> str:
+        return jwt_kube_token_with_exp_factory(int(time()) + 2)
+
+    @pytest.fixture
+    def kube_auth_token_path(self, kube_auth_token: str, tmp_path: Path) -> Path:
+        token_file = tmp_path / "token"
+        token_file.write_text(kube_auth_token)
+        return token_file
 
     @pytest.fixture
     async def kube_client(
-        self, kube_server: str, kube_token_path: str
+        self, kube_server: str, kube_auth_token_path: Path
     ) -> AsyncIterator[KubeClient]:
         async with KubeClient(
             config=KubeConfig(
                 version="1.25",
                 url=URL(kube_server),
                 auth_type=KubeClientAuthType.TOKEN,
-                auth_token_path=Path(kube_token_path),
-                auth_token_update_interval_s=1,
+                auth_token_path=kube_auth_token_path,
             )
         ) as client:
             yield client
+
+    async def test_auth_token_exp_ts_value_error(self, kube_server: str) -> None:
+        kube_config = KubeConfig(
+            version="1.25",
+            url=URL(kube_server),
+            auth_type=KubeClientAuthType.TOKEN,
+            auth_token_path=None,
+        )
+        with pytest.raises(ValueError, match="auth_token_path must be set"):
+            _ = kube_config.read_auth_token_from_path()
+
+        with pytest.raises(ValueError, match="auth_token_path must be set"):
+            _ = kube_config.auth_token_exp_ts
+
+    async def test_read_auth_token_from_path(
+        self,
+        kube_client: KubeClient,
+        jwt_kube_token_with_exp_factory: Callable[[int], str],
+    ) -> None:
+        assert kube_client._config.auth_token_path
+
+        old_token = kube_client._config.read_auth_token_from_path()
+
+        new_token = jwt_kube_token_with_exp_factory(int(time()) + 3)
+        kube_client._config.auth_token_path.write_text(new_token)
+
+        assert kube_client._config.read_auth_token_from_path() == new_token
+        assert kube_client._config.read_auth_token_from_path() != old_token
 
     async def test_token_periodically_updated(
         self,
         kube_app: aiohttp.web.Application,
         kube_client: KubeClient,
-        kube_token_path: str,
+        jwt_kube_token_with_exp_factory: Callable[[int], str],
     ) -> None:
-        await kube_client.get_pods("default")
-        assert kube_app["token"]["value"] == "token-1"
-
-        Path(kube_token_path).write_text("token-2")
-        await asyncio.sleep(2)
+        assert kube_client._config.auth_token_path
 
         await kube_client.get_pods("default")
-        assert kube_app["token"]["value"] == "token-2"
+        assert (
+            kube_app["token"]["value"]
+            == kube_client._config.read_auth_token_from_path()
+        )
+
+        new_token = jwt_kube_token_with_exp_factory(int(time()) + 5)
+        kube_client._config.auth_token_path.write_text(new_token)
+
+        await asyncio.sleep(11)
+
+        await kube_client.get_pods("default")
+        assert kube_app["token"]["value"] == new_token
 
 
 class TestKubeClient:

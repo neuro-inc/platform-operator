@@ -27,6 +27,7 @@ spec:
           echo "inotify status BEFORE changes:\n"
           sysctl -a | grep inotify
           echo
+          sysctl -w fs.inotify.max_user_instances={{ .Values.inotify.maxInstances }}
           sysctl -w fs.inotify.max_user_watches={{ .Values.inotify.maxWatchers }}
           echo
           echo "inotify status AFTER changes:\n"
@@ -36,6 +37,7 @@ spec:
       containers:
       - name: pause
         image: {{ .Values.pauseImage.repository }}:{{ .Values.pauseImage.tag }}
-      restartPolicy: Always
   updateStrategy:
-    type: OnDelete
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1

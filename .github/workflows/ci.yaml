@@ -6,50 +6,42 @@ on:
     tags: ['v*']
   pull_request:
     branches: [master]
-  pull_request_target:
-    branches: [master]
   schedule:
   - cron: 0 4 * * *
 
 jobs:
   test:
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
-      (github.event_name != 'pull_request_target' && !endsWith(github.actor, '[bot]')) ||
-      (github.event_name == 'pull_request_target' && endsWith(github.actor, '[bot]'))
     name: All checks are passed
     uses: ./.github/workflows/test.yaml
 
   approve:
     name: Approve bot PR
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request_target'
+    if: endsWith(github.actor, '[bot]')
     needs: test
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
-    - id: generate_token
-      uses: tibdex/github-app-token@v2
-      with:
-        app_id: ${{ secrets.BOT_APP_ID }}
-        private_key: ${{ secrets.BOT_PRIVATE_KEY }}
+      uses: actions/checkout@v4
     - name: metadata
       id: metadata
       if: github.actor == 'dependabot[bot]'
-      uses: dependabot/fetch-metadata@v1.5.1
+      uses: dependabot/fetch-metadata@v2
       with:
-        github-token: ${{ steps.generate_token.outputs.token }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
     - name: Enable auto-merge for bot PRs
       run: gh pr merge --auto --squash --delete-branch "$PR_URL"
       env:
         PR_URL: ${{ github.event.pull_request.html_url }}
-        GH_TOKEN: ${{ steps.generate_token.outputs.token }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release:
     name: Create release
     needs: test
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-    uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v0.0.31
+    uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v25.4.0
     with:
       image: platform-operator-controller
       helm_charts: platform platform-operator
