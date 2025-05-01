@@ -509,6 +509,7 @@ class HelmValuesFactory:
                 "--entryPoints.websecure.forwardedHeaders.insecure=true",
                 "--entryPoints.websecure.http.middlewares="
                 f"{platform.namespace}-{platform.release_name}-cors@kubernetescrd",
+                "--providers.kubernetesingress.ingressendpoint.ip=1.2.3.4",
             ],
             "providers": {
                 "kubernetesCRD": {
@@ -519,6 +520,8 @@ class HelmValuesFactory:
                 "kubernetesIngress": {
                     "enabled": True,
                     "allowExternalNameServices": True,
+                    # published service conflicts with ingressendpoint.ip arg
+                    "publishedService": {"enabled": False},
                 },
             },
             "tlsStore": {

@@ -739,6 +739,7 @@ class TestHelmValuesFactory:
                 "--entryPoints.websecure.forwardedHeaders.insecure=true",
                 "--entryPoints.websecure.http.middlewares="
                 "platform-platform-cors@kubernetescrd",
+                "--providers.kubernetesingress.ingressendpoint.ip=1.2.3.4",
             ],
             "providers": {
                 "kubernetesCRD": {
@@ -749,6 +750,7 @@ class TestHelmValuesFactory:
                 "kubernetesIngress": {
                     "enabled": True,
                     "allowExternalNameServices": True,
+                    "publishedService": {"enabled": False},
                 },
             },
             "tlsStore": {
