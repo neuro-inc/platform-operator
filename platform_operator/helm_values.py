@@ -35,6 +35,10 @@ class HelmValuesFactory:
             "traefikEnabled": platform.ingress_controller_install,
             "acmeEnabled": platform.ingress_acme_enabled,
             "dockerRegistryEnabled": platform.registry.docker_registry_install,
+            "appsPostgresOperatorEnabled": (
+                platform.apps_operator_config.postgres_operator_enabled
+            ),
+            "appsKedaEnabled": platform.apps_operator_config.keda_enabled,
             "minioEnabled": platform.buckets.minio_install,
             "minioGatewayEnabled": platform.minio_gateway is not None,
             "platformReportsEnabled": platform.monitoring.metrics_enabled,
@@ -49,7 +53,7 @@ class HelmValuesFactory:
                     "name": rpt.name,
                     "idleSize": rpt.idle_size,
                     "cpu": rpt.available_cpu,
-                    "gpu": rpt.gpu or 0,
+                    "nvidiaGpu": rpt.nvidia_gpu or 0,
                 }
                 for rpt in platform.jobs_resource_pool_types
             ],
@@ -114,6 +118,9 @@ class HelmValuesFactory:
                 platform
             ),
             self._chart_names.platform_apps: self.create_platform_apps_values(platform),
+            self._chart_names.platform_metadata: self.create_platform_metadata_values(
+                platform
+            ),
         }
         if platform.ingress_acme_enabled:
             result["acme"] = self.create_acme_values(platform)
@@ -244,7 +251,6 @@ class HelmValuesFactory:
                     f"*.apps.{platform.ingress_url.host}",
                 ],
                 "sslCertSecretName": f"{platform.release_name}-ssl-cert",
-                "rolloutDeploymentName": "traefik",
             },
             "podLabels": {"service": "acme"},
             "env": [
@@ -503,19 +509,7 @@ class HelmValuesFactory:
                 "--entryPoints.websecure.forwardedHeaders.insecure=true",
                 "--entryPoints.websecure.http.middlewares="
                 f"{platform.namespace}-{platform.release_name}-cors@kubernetescrd",
-                "--providers.file.filename=/etc/traefik/dynamic/config.yaml",
-            ],
-            "volumes": [
-                {
-                    "name": f"{platform.release_name}-traefik-dynamic-config",
-                    "mountPath": "/etc/traefik/dynamic",
-                    "type": "configMap",
-                },
-                {
-                    "name": f"{platform.release_name}-ssl-cert",
-                    "mountPath": "/etc/certs",
-                    "type": "secret",
-                },
+                "--providers.kubernetesingress.ingressendpoint.ip=1.2.3.4",
             ],
             "providers": {
                 "kubernetesCRD": {
@@ -526,7 +520,16 @@ class HelmValuesFactory:
                 "kubernetesIngress": {
                     "enabled": True,
                     "allowExternalNameServices": True,
+                    # published service conflicts with ingressendpoint.ip arg
+                    "publishedService": {"enabled": False},
                 },
+            },
+            "tlsStore": {
+                "default": {
+                    "defaultCertificate": {
+                        "secretName": f"{platform.release_name}-ssl-cert"
+                    },
+                }
             },
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
@@ -1369,6 +1372,9 @@ class HelmValuesFactory:
                         },
                     },
                 },
+                "nodeExporter": {
+                    "enabled": platform.monitoring.metrics_node_exporter_enabled,
+                },
                 "prometheus-node-exporter": {
                     "image": {
                         "registry": platform.image_registry,
@@ -1857,6 +1863,18 @@ class HelmValuesFactory:
             "priorityClassName": platform.services_priority_class_name,
             "rbac": {"create": True},
             "serviceAccount": {"create": True},
+        }
+        result.update(**self._create_tracing_values(platform))
+        return result
+
+    def create_platform_metadata_values(
+        self, platform: PlatformConfig
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "nameOverride": f"{platform.release_name}-metadata",
+            "fullnameOverride": f"{platform.release_name}-metadata",
+            "image": {"repository": platform.get_image("platform-metadata")},
+            "priorityClassName": platform.services_priority_class_name,
         }
         result.update(**self._create_tracing_values(platform))
         return result

@@ -110,8 +110,8 @@ def resource_pool_type_factory() -> Callable[..., ResourcePoolType]:
             available_cpu=1,
             memory=2**30,
             available_memory=2**30,
-            gpu=1,
-            gpu_model="nvidia-tesla-k80",
+            nvidia_gpu=1,
+            nvidia_gpu_model="nvidia-tesla-k80",
             tpu=(
                 TPUResource(ipv4_cidr_block=tpu_ipv4_cidr_block)
                 if tpu_ipv4_cidr_block
@@ -171,6 +171,7 @@ def cluster_factory(
                         memory=2**30,
                         nvidia_gpu=1,
                         nvidia_gpu_model="nvidia-tesla-k80",
+                        resource_pool_names=[resource_pool_name],
                         available_resource_pool_names=[resource_pool_name],
                     )
                 ],

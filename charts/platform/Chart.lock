@@ -4,7 +4,7 @@ dependencies:
   version: 25.0.0
 - name: acme
   repository: https://neuro-inc.github.io/helm-charts
-  version: 1.2.0
+  version: 1.3.2
 - name: docker-registry
   repository: https://charts.helm.sh/stable
   version: 1.9.2
@@ -44,8 +44,17 @@ dependencies:
 - name: platform-apps
   repository: oci://ghcr.io/neuro-inc/helm-charts
   version: 24.4.4
+- name: platform-metadata
+  repository: oci://ghcr.io/neuro-inc/helm-charts
+  version: 25.4.0
 - name: k8s-resources
   repository: https://neuro-inc.github.io/helm-charts
   version: 1.0.1
-digest: sha256:d82336a5219ad66912b8a1821c962d10903f45de14259c8083399aa64192897f
-generated: "2025-02-28T14:00:57.925060428+01:00"
+- name: pgo
+  repository: oci://ghcr.io/neuro-inc/helm-charts
+  version: 5.6.1
+- name: keda
+  repository: https://kedacore.github.io/charts
+  version: 2.16.1
+digest: sha256:3ded8940359ff02f9959d45d6f837e486e926edbd444a73a1508bf0ce6ef4d22
+generated: "2025-05-01T10:54:34.946116796+02:00"

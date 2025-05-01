@@ -234,8 +234,7 @@ async def test_is_platform_deploy_required_on_values_update_true(
         name=config.helm_release_names.platform,
         namespace=config.platform_namespace,
         chart=(
-            f"{config.helm_chart_names.platform}"
-            f"-{config.helm_chart_versions.platform}"
+            f"{config.helm_chart_names.platform}-{config.helm_chart_versions.platform}"
         ),
         status=ReleaseStatus.DEPLOYED,
     )
@@ -261,8 +260,7 @@ async def test_is_platform_deploy_required_no_update_false(
         name=config.helm_release_names.platform,
         namespace=config.platform_namespace,
         chart=(
-            f"{config.helm_chart_names.platform}"
-            f"-{config.helm_chart_versions.platform}"
+            f"{config.helm_chart_names.platform}-{config.helm_chart_versions.platform}"
         ),
         status=ReleaseStatus.DEPLOYED,
     )
@@ -298,8 +296,7 @@ async def test_configure_aws_cluster(
     )
     config_client.patch_cluster.assert_awaited_with(
         aws_platform_config.cluster_name,
-        token=aws_platform_config.token,
-        request=PatchClusterRequest(
+        PatchClusterRequest(
             orchestrator=aws_platform_config.create_patch_orchestrator_config_request(
                 aws_cluster
             ),
@@ -308,6 +305,7 @@ async def test_configure_aws_cluster(
                 aws_ingress_lb=aws_traefik_lb,
             ),
         ),
+        token=aws_platform_config.token,
     )
 
 
@@ -329,13 +327,13 @@ async def test_configure_cluster(
     )
     config_client.patch_cluster.assert_awaited_with(
         gcp_platform_config.cluster_name,
-        token=gcp_platform_config.token,
-        request=PatchClusterRequest(
+        PatchClusterRequest(
             orchestrator=gcp_platform_config.create_patch_orchestrator_config_request(
                 gcp_cluster
             ),
             dns=gcp_platform_config.create_dns_config(ingress_service=traefik_service),
         ),
+        token=gcp_platform_config.token,
     )
 
 
@@ -352,13 +350,13 @@ async def test_configure_cluster_with_ingress_controller_disabled(
 
     config_client.patch_cluster.assert_awaited_with(
         gcp_platform_config.cluster_name,
-        token=gcp_platform_config.token,
-        request=PatchClusterRequest(
+        PatchClusterRequest(
             orchestrator=gcp_platform_config.create_patch_orchestrator_config_request(
                 gcp_cluster
             ),
             dns=gcp_platform_config.create_dns_config(),
         ),
+        token=gcp_platform_config.token,
     )
 
 

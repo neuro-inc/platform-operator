@@ -478,6 +478,9 @@ async def _configure_cluster(cluster: Cluster, platform: PlatformConfig) -> None
     )
     await app.config_client.patch_cluster(
         platform.cluster_name,
+        PatchClusterRequest(
+            orchestrator=orchestrator,
+            dns=dns,
+        ),
         token=platform.token,
-        request=PatchClusterRequest(orchestrator=orchestrator, dns=dns),
     )
