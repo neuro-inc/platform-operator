@@ -50,7 +50,7 @@ class TestHelmValuesFactory:
             "clusterName": cluster_name,
             "serviceToken": "token",
             "nodePools": [
-                {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "gpu": 1}
+                {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "nvidiaGpu": 1}
             ],
             "nodeLabels": {
                 "nodePool": "platform.neuromation.io/nodepool",
@@ -109,7 +109,7 @@ class TestHelmValuesFactory:
                     "name": "miner",
                     "count": 1,
                     "image": "miner",
-                    "resources": {"cpu": "1000m", "memory": str(2**30)},
+                    "resources": {"cpu": "1", "memory": str(2**30)},
                 }
             ],
             "storages": [
@@ -219,7 +219,7 @@ class TestHelmValuesFactory:
                     name="miner",
                     count=1,
                     image="miner",
-                    resources=Resources(cpu_m=1000, memory=2**30, gpu=1),
+                    resources=Resources(cpu=1, memory=2**30, nvidia_gpu=1),
                 ),
                 IdleJobConfig(
                     name="miner",
@@ -228,7 +228,7 @@ class TestHelmValuesFactory:
                     command=["bash"],
                     args=["-c", "sleep infinity"],
                     image_pull_secret="secret",
-                    resources=Resources(cpu_m=1000, memory=2**30, gpu=1),
+                    resources=Resources(cpu=1, memory=2**30, nvidia_gpu=1),
                     env={"NAME": "VALUE"},
                     node_selector={"gpu": "nvidia-tesla-k80"},
                 ),
@@ -243,7 +243,7 @@ class TestHelmValuesFactory:
                 "count": 1,
                 "image": "miner",
                 "resources": {
-                    "cpu": "1000m",
+                    "cpu": "1",
                     "memory": str(2**30),
                     "nvidia.com/gpu": 1,
                 },
@@ -256,7 +256,7 @@ class TestHelmValuesFactory:
                 "args": ["-c", "sleep infinity"],
                 "imagePullSecrets": [{"name": "secret"}],
                 "resources": {
-                    "cpu": "1000m",
+                    "cpu": "1",
                     "memory": str(2**30),
                     "nvidia.com/gpu": 1,
                 },

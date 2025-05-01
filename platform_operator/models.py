@@ -19,7 +19,7 @@ from neuro_config_client import (
     DNSConfig,
     DockerRegistryConfig,
     IdleJobConfig,
-    OrchestratorConfig,
+    PatchOrchestratorConfigRequest,
     ResourcePoolType,
 )
 from yarl import URL
@@ -906,23 +906,33 @@ class PlatformConfig:
             return None
         return DNSConfig(name=self.ingress_dns_name, a_records=a_records)
 
-    def create_orchestrator_config(self, cluster: Cluster) -> OrchestratorConfig | None:
+    def create_orchestrator_config(
+        self, cluster: Cluster
+    ) -> PatchOrchestratorConfigRequest | None:
         assert cluster.orchestrator
-        orchestrator = replace(
-            cluster.orchestrator,
-            job_internal_hostname_template=self.jobs_internal_host_template,
-        )
-        if self.kubernetes_tpu_network:
+        orchestrator = PatchOrchestratorConfigRequest()
+
+        if (
+            self.jobs_internal_host_template
+            != cluster.orchestrator.job_internal_hostname_template
+        ):
             orchestrator = replace(
                 orchestrator,
-                resource_pool_types=self._update_tpu_network(
-                    orchestrator.resource_pool_types,
-                    self.kubernetes_tpu_network,
-                ),
+                job_internal_hostname_template=self.jobs_internal_host_template,
             )
-        if cluster.orchestrator == orchestrator:
-            return None
-        return orchestrator
+
+        if self.kubernetes_tpu_network:
+            new_resource_pool_types = self._update_tpu_network(
+                cluster.orchestrator.resource_pool_types, self.kubernetes_tpu_network
+            )
+            if new_resource_pool_types != cluster.orchestrator.resource_pool_types:
+                orchestrator = replace(
+                    orchestrator, resource_pool_types=new_resource_pool_types
+                )
+
+        return (
+            None if orchestrator == PatchOrchestratorConfigRequest() else orchestrator
+        )
 
     @classmethod
     def _update_tpu_network(

@@ -72,19 +72,19 @@ spec:
       {{- end }}
         resources:
           requests:
-{{- if gt (.gpu | int) 0 }}
+{{- if gt (.nvidiaGpu | int) 0 }}
             cpu: "1"
             memory: 1Gi
-            nvidia.com/gpu: {{ .gpu }}
+            nvidia.com/gpu: {{ .nvidiaGpu }}
 {{- else }}
             cpu: {{ .cpu | quote }}
             memory: 1Gi
 {{- end }}
           limits:
-{{- if gt (.gpu | int) 0 }}
+{{- if gt (.nvidiaGpu | int) 0 }}
             cpu: "1"
             memory: 1Gi
-            nvidia.com/gpu: {{ .gpu }}
+            nvidia.com/gpu: {{ .nvidiaGpu }}
 {{- else }}
             cpu: {{ .cpu | quote }}
             memory: 1Gi

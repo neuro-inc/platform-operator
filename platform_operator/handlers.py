@@ -15,6 +15,7 @@ from neuro_config_client import (
     CloudProviderType,
     Cluster,
     ConfigClient,
+    PatchClusterRequest,
 )
 
 from .aws_client import AwsElbClient
@@ -393,9 +394,10 @@ async def complete_deployment(cluster: Cluster, platform: PlatformConfig) -> Non
     else:
         storage_names = []
     for storage in platform.storages:
-        storage_name: str | None = None
         if storage.path:
             storage_name = storage.path.lstrip("/")
+        else:
+            storage_name = "default"
         if storage_name not in storage_names:
             continue
         await app.config_client.patch_storage(
@@ -488,7 +490,9 @@ async def _configure_cluster(cluster: Cluster, platform: PlatformConfig) -> None
     )
     await app.config_client.patch_cluster(
         platform.cluster_name,
+        PatchClusterRequest(
+            orchestrator=orchestrator,
+            dns=dns,
+        ),
         token=platform.token,
-        orchestrator=orchestrator,
-        dns=dns,
     )

@@ -28,7 +28,7 @@ def _kube_config_payload() -> dict[str, Any]:
 
 @pytest.fixture(scope="session")
 def _kube_config_cluster_payload(
-    _kube_config_payload: dict[str, Any]
+    _kube_config_payload: dict[str, Any],
 ) -> dict[str, Any]:
     cluster_name = "minikube"
     clusters = {
