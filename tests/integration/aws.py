@@ -49,18 +49,14 @@ def create_app_server(app: Any, port: int = 8080) -> Iterator[AppAddress]:
 
 @pytest.fixture(scope="session")
 def elb_endpoint_url() -> Iterator[URL]:
-    app = moto.server.DomainDispatcherApplication(
-        moto.server.create_backend_app, service="elbv2"
-    )
+    app = moto.server.DomainDispatcherApplication(moto.server.create_backend_app)
     with create_app_server(app, port=5000) as api_address:
         yield URL(f"http://{api_address.host}:{api_address.port}")
 
 
 @pytest.fixture(scope="session")
 def ec2_endpoint_url() -> Iterator[URL]:
-    app = moto.server.DomainDispatcherApplication(
-        moto.server.create_backend_app, service="ec2"
-    )
+    app = moto.server.DomainDispatcherApplication(moto.server.create_backend_app)
     with create_app_server(app, port=5001) as api_address:
         yield URL(f"http://{api_address.host}:{api_address.port}")
 
