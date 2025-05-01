@@ -52,7 +52,7 @@ class TestHelmValuesFactory:
             "clusterName": cluster_name,
             "serviceToken": "token",
             "nodePools": [
-                {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "gpu": 1}
+                {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "nvidiaGpu": 1}
             ],
             "nodeLabels": {
                 "nodePool": "platform.neuromation.io/nodepool",
@@ -189,6 +189,7 @@ class TestHelmValuesFactory:
             "platform-api-poller": mock.ANY,
             "platform-buckets": mock.ANY,
             "platform-apps": mock.ANY,
+            "platform-metadata": mock.ANY,
             "loki": mock.ANY,
             "alloy": mock.ANY,
         }
@@ -740,6 +741,7 @@ class TestHelmValuesFactory:
                 "--entryPoints.websecure.forwardedHeaders.insecure=true",
                 "--entryPoints.websecure.http.middlewares="
                 "platform-platform-cors@kubernetescrd",
+                "--providers.kubernetesingress.ingressendpoint.ip=1.2.3.4",
             ],
             "providers": {
                 "kubernetesCRD": {
@@ -750,6 +752,7 @@ class TestHelmValuesFactory:
                 "kubernetesIngress": {
                     "enabled": True,
                     "allowExternalNameServices": True,
+                    "publishedService": {"enabled": False},
                 },
             },
             "tlsStore": {
@@ -3025,4 +3028,21 @@ class TestHelmValuesFactory:
             "priorityClassName": "platform-services",
             "rbac": {"create": True},
             "serviceAccount": {"create": True},
+        }
+
+    def test_create_platform_metadata_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_metadata_values(gcp_platform_config)
+
+        assert result == {
+            "nameOverride": "platform-metadata",
+            "fullnameOverride": "platform-metadata",
+            "image": {"repository": "ghcr.io/neuro-inc/platform-metadata"},
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
+            },
+            "priorityClassName": "platform-services",
         }
