@@ -190,6 +190,8 @@ class TestHelmValuesFactory:
             "platform-buckets": mock.ANY,
             "platform-apps": mock.ANY,
             "platform-metadata": mock.ANY,
+            "loki": mock.ANY,
+            "alloy": mock.ANY,
         }
 
     def test_create_gcp_platform_with_ssl_cert(

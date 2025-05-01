@@ -18,7 +18,7 @@ from neuro_config_client import (
     StorageInstance,
 )
 
-from platform_operator.aws_client import AwsElbClient
+from platform_operator.aws_client import AwsElbClient, S3Client
 from platform_operator.helm_client import HelmClient, Release, ReleaseStatus
 from platform_operator.helm_values import HelmValuesFactory
 from platform_operator.kube_client import (
@@ -122,6 +122,17 @@ def aws_elb_client() -> Iterator[mock.Mock]:
         "platform_operator.handlers.AwsElbClient", spec=AwsElbClient
     ) as client_class:
         client_instance = mock.AsyncMock(AwsElbClient)
+        client_instance.__aenter__.return_value = client_instance
+        client_class.return_value = client_instance
+        yield client_instance
+
+
+@pytest.fixture
+def aws_s3_client() -> Iterator[mock.Mock]:
+    with mock.patch(
+        "platform_operator.handlers.S3Client", spec=S3Client
+    ) as client_class:
+        client_instance = mock.AsyncMock(S3Client)
         client_instance.__aenter__.return_value = client_instance
         client_class.return_value = client_instance
         yield client_instance
@@ -362,6 +373,7 @@ async def test_configure_cluster_with_ingress_controller_disabled(
 
 async def test_deploy(
     status_manager: mock.AsyncMock,
+    aws_s3_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -435,8 +447,11 @@ async def test_deploy(
         gcp_platform_config.cluster_name
     )
 
+    aws_s3_client.create_bucket.assert_awaited_once()
+
 
 async def test_deploy_storage_configs_patched(
+    aws_s3_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
@@ -492,9 +507,11 @@ async def test_deploy_storage_configs_patched(
             ),
         ]
     )
+    aws_s3_client.create_bucket.assert_awaited_once()
 
 
 async def test_deploy_with_ingress_controller_disabled(
+    aws_s3_client: mock.AsyncMock,
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -554,9 +571,11 @@ async def test_deploy_with_ingress_controller_disabled(
     status_manager.complete_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
     )
+    aws_s3_client.create_bucket.assert_awaited_once()
 
 
 async def test_deploy_all_charts_deployed(
+    aws_s3_client: mock.AsyncMock,
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
@@ -605,6 +624,7 @@ async def test_deploy_all_charts_deployed(
     status_manager.transition.assert_any_call(
         gcp_platform_config.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
     )
+    aws_s3_client.create_bucket.assert_awaited_once()
 
 
 async def test_deploy_with_retries_exceeded(

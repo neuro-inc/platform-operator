@@ -121,6 +121,8 @@ class HelmValuesFactory:
             self._chart_names.platform_metadata: self.create_platform_metadata_values(
                 platform
             ),
+            self._chart_names.alloy: self.create_alloy_values(platform),
+            self._chart_names.loki: self.create_loki_values(platform),
         }
         if platform.ingress_acme_enabled:
             result["acme"] = self.create_acme_values(platform)
@@ -1865,6 +1867,489 @@ class HelmValuesFactory:
             "serviceAccount": {"create": True},
         }
         result.update(**self._create_tracing_values(platform))
+        return result
+
+    def create_loki_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        result = {
+            "nameOverride": "loki",
+            "fullnameOverride": "loki",
+            "deploymentMode": "SimpleScalable",
+            "loki": {
+                "commonConfig": {"replication_factor": 1},
+                "auth_enabled": False,
+            },
+            "test": {"enabled": False},
+            "lokiCanary": {"enabled": False},
+            "resultsCache": {"allocatedMemory": 512},
+            "chunksCache": {"allocatedMemory": 2048},
+            "ingester": {"chunk_encoding": "snappy"},
+            "table_manager": {
+                "retention_deletes_enabled": True,
+                "retention_period": "2160h",
+            },
+            "query_scheduler": {
+                "max_outstanding_requests_per_tenant": 32768,
+            },
+            "querier": {
+                "max_concurrent": 4,  # Default is 4, adjust based on memory and CPU
+            },
+            "pattern_ingester": {
+                "enabled": True,
+            },
+            "limits_config": {
+                "allow_structured_metadata": True,
+                "volume_enabled": True,
+                "retention_period": "90d",
+            },
+            "minio": {"enabled": False},
+            "gateway": {
+                "replicas": 1,
+                "resources": {
+                    "requests": {"memory": "100Mi", "cpu": "10m"},
+                    "limits": {"memory": "100Mi"},
+                },
+            },
+            "write": {
+                "replicas": 1,
+                "resources": {
+                    "requests": {"memory": "512Mi", "cpu": "100m"},
+                    "limits": {"memory": "1024Mi"},
+                },
+            },
+            "read": {
+                "replicas": 1,
+                "resources": {
+                    "requests": {"memory": "100Mi", "cpu": "100m"},
+                    "limits": {"memory": "2048Mi"},
+                },
+            },
+            "backend": {
+                "replicas": 1,
+                "resources": {
+                    "requests": {"memory": "100Mi", "cpu": "100m"},
+                    "limits": {"memory": "512Mi", "cpu": "100m"},
+                },
+            },
+        }
+
+        bucket_name = platform.monitoring.logs_bucket_name
+        if platform.buckets.provider == BucketsProvider.GCP:
+            gcp_loki_sa_access_secret_name = f"{platform.release_name}-loki-access-gcs"
+            result["extraObjects"] = [
+                f"apiVersion: v1"
+                f"data:"
+                f"  key.json: {platform.gcp_service_account_key_base64}"
+                f"kind: Secret"
+                f"metadata:"
+                f"  name: f{gcp_loki_sa_access_secret_name}"
+                f"  namespace: {platform.namespace}"
+                f"type: Opaque"
+            ]
+
+            extra_env = {
+                "extraEnv": [
+                    {
+                        "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                        "value": "/etc/secrets/key.json",
+                    }
+                ],
+                "extraVolumes": [
+                    {
+                        "name": "loki-access-gcs",
+                        "secret": {
+                            "secretName": gcp_loki_sa_access_secret_name,
+                        },
+                    }
+                ],
+                "extraVolumeMounts": [
+                    {
+                        "name": "loki-access-gcs",
+                        "mountPath": "/etc/secrets",
+                    }
+                ],
+            }
+
+            result["loki"].update(  # type: ignore
+                {
+                    "storage": {
+                        "bucketNames": {
+                            "chunks": bucket_name,
+                            "ruler": bucket_name,
+                            "admin": bucket_name,
+                        },
+                        "type": "gcs",
+                    },
+                    "schemaConfig": {
+                        "configs": [
+                            {
+                                "from": "2025-01-01",
+                                "object_store": "gcs",
+                                "store": "tsdb",
+                                "schema": "v13",
+                                "index": {"prefix": "index_", "period": "24h"},
+                            }
+                        ]
+                    },
+                }
+            )
+            result["write"].update(extra_env)  # type: ignore
+            result["read"].update(extra_env)  # type: ignore
+            result["backend"].update(extra_env)  # type: ignore
+
+        elif platform.buckets.provider == BucketsProvider.AZURE:
+            result["loki"].update(  # type: ignore
+                {
+                    "rulerConfig": {
+                        "storage": {
+                            "type": "azure",
+                            "azure": {
+                                "account_key": (
+                                    platform.buckets.azure_storage_account_key
+                                ),
+                                "account_name": (
+                                    platform.buckets.azure_storage_account_name
+                                ),
+                                "container_name": bucket_name,
+                                "use_managed_identity": False,
+                                "request_timeout": 0,
+                            },
+                        }
+                    },
+                    "schemaConfig": {
+                        "configs": [
+                            {
+                                "from": "2025-01-01",
+                                "object_store": "azure",
+                                "store": "tsdb",
+                                "schema": "v13",
+                                "index": {"prefix": "index_", "period": "24h"},
+                            }
+                        ]
+                    },
+                    "storage": {
+                        "bucketNames": {
+                            "chunks": bucket_name,
+                            "ruler": bucket_name,
+                            "admin": bucket_name,
+                        },
+                        "type": "azure",
+                    },
+                    "storage_config": {
+                        "azure": {
+                            "account_key": platform.buckets.azure_storage_account_key,
+                            "account_name": platform.buckets.azure_storage_account_name,
+                            "container_name": bucket_name,
+                            "use_managed_identity": False,
+                            "request_timeout": 0,
+                        }
+                    },
+                }
+            )
+
+        elif platform.buckets.provider == BucketsProvider.AWS:
+            result["loki"].update(  # type: ignore
+                {
+                    "rulerConfig": {
+                        "storage": {
+                            "type": "s3",
+                            "s3": {
+                                "bucketnames": bucket_name,
+                                "region": platform.buckets.aws_region,
+                                "insecure": False,
+                                "s3forcepathstyle": True,
+                            },
+                        }
+                    },
+                    "schemaConfig": {
+                        "configs": [
+                            {
+                                "from": "2025-01-01",
+                                "object_store": "s3",
+                                "store": "tsdb",
+                                "schema": "v13",
+                                "index": {"prefix": "index_", "period": "24h"},
+                            }
+                        ]
+                    },
+                    "storage": {
+                        "bucketNames": {
+                            "chunks": bucket_name,
+                            "ruler": bucket_name,
+                            "admin": bucket_name,
+                        },
+                        "type": "s3",
+                    },
+                    "storage_config": {
+                        "aws": {
+                            "bucketnames": bucket_name,
+                            "region": platform.buckets.aws_region,
+                            "insecure": False,
+                            "s3forcepathstyle": True,
+                        }
+                    },
+                }
+            )
+
+        elif platform.buckets.provider in [
+            BucketsProvider.MINIO,
+            BucketsProvider.EMC_ECS,
+            BucketsProvider.OPEN_STACK,
+        ]:
+            s3_region = platform.buckets.minio_region
+
+            if platform.buckets.provider == BucketsProvider.MINIO:
+                s3_endpoint_url = str(platform.buckets.minio_url)
+                s3_secret_name = f"{platform.release_name}-monitoring-s3"
+                s3_access_key_id = self._create_value_from_secret(
+                    name=s3_secret_name, key="access_key_id"
+                )
+                s3_secret_access_key = self._create_value_from_secret(
+                    name=s3_secret_name, key="secret_access_key"
+                )
+            elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+                s3_endpoint_url = str(platform.buckets.emc_ecs_s3_endpoint)
+                s3_access_key_id = (
+                    platform.buckets.emc_ecs_access_key_id  # type: ignore
+                )
+                s3_secret_access_key = (
+                    platform.buckets.emc_ecs_secret_access_key  # type: ignore
+                )
+            elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+                s3_endpoint_url = str(platform.buckets.open_stack_s3_endpoint)
+                s3_access_key_id = platform.buckets.open_stack_username  # type: ignore
+                s3_secret_access_key = (
+                    platform.buckets.open_stack_password  # type: ignore
+                )
+
+            result["loki"].update(  # type: ignore
+                {
+                    "rulerConfig": {
+                        "storage": {
+                            "type": "s3",
+                            "s3": {
+                                "endpoint": s3_endpoint_url,
+                                "bucketnames": bucket_name,
+                                "region": s3_region,
+                                "access_key_id": s3_access_key_id,
+                                "secret_access_key": s3_secret_access_key,
+                                "insecure": False,
+                                "s3forcepathstyle": True,
+                            },
+                        }
+                    },
+                    "schemaConfig": {
+                        "configs": [
+                            {
+                                "from": "2025-01-01",
+                                "object_store": "s3",
+                                "store": "tsdb",
+                                "schema": "v13",
+                                "index": {"prefix": "index_", "period": "24h"},
+                            }
+                        ]
+                    },
+                    "storage": {
+                        "bucketNames": {
+                            "chunks": bucket_name,
+                            "ruler": bucket_name,
+                            "admin": bucket_name,
+                        },
+                        "type": "s3",
+                    },
+                    "storage_config": {
+                        "aws": {
+                            "endpoint": s3_endpoint_url,
+                            "bucketnames": bucket_name,
+                            "region": s3_region,
+                            "access_key_id": s3_access_key_id,
+                            "secret_access_key": s3_secret_access_key,
+                            "insecure": False,
+                            "s3forcepathstyle": True,
+                        }
+                    },
+                }
+            )
+
+        else:
+            raise ValueError("Bucket provider is not supported")
+
+        return result
+
+    def create_alloy_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "nameOverride": "loki",
+            "fullnameOverride": "loki",
+            "alloy": {
+                "configMap": {
+                    "create": True,
+                    "content": """
+                        loki.write "default" {
+                          endpoint {
+                            url = "http://loki-gateway.{$namespace}.svc.cluster.local/loki/api/v1/push"
+                          }
+                        }
+
+                        discovery.kubernetes "kubernetes_pods" {
+                          role = "pod"
+
+                          selectors {
+                            role = "pod"
+                            field = "spec.nodeName=" + coalesce(env("HOSTNAME"), constants.hostname)
+                          }
+                        }
+
+                        discovery.relabel "kubernetes_pods" {
+                          targets = discovery.kubernetes.kubernetes_pods.targets
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_controller_name"]
+                            regex         = "([0-9a-z-.]+?)(-[0-9a-f]{8,10})?"
+                            target_label  = "__tmp_controller_name"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name", "__meta_kubernetes_pod_label_app", "__tmp_controller_name", "__meta_kubernetes_pod_name"]
+                            regex         = "^;*([^;]+)(;.*)?$"
+                            target_label  = "app"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_instance", "__meta_kubernetes_pod_label_instance"]
+                            regex         = "^;*([^;]+)(;.*)?$"
+                            target_label  = "instance"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_component", "__meta_kubernetes_pod_label_component"]
+                            regex         = "^;*([^;]+)(;.*)?$"
+                            target_label  = "component"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_node_name"]
+                            target_label  = "node_name"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_namespace"]
+                            target_label  = "namespace"
+                          }
+
+                          rule {
+                            source_labels = ["namespace", "app"]
+                            separator     = "/"
+                            target_label  = "job"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_name"]
+                            target_label  = "pod"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_container_name"]
+                            target_label  = "container"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+                            separator     = "/"
+                            target_label  = "__path__"
+                            replacement   = "/var/log/pods/*$1/*.log"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_annotationpresent_kubernetes_io_config_hash", "__meta_kubernetes_pod_annotation_kubernetes_io_config_hash", "__meta_kubernetes_pod_container_name"]
+                            separator     = "/"
+                            regex         = "true/(.*)"
+                            target_label  = "__path__"
+                            replacement   = "/var/log/pods/*$1/*.log"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_org"]
+                            target_label  = "apolo_org_name"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_project"]
+                            target_label  = "apolo_project_name"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_app"]
+                            target_label  = "apolo_app_id"
+                          }
+                        }
+
+                        loki.process "kubernetes_pods" {
+                          forward_to = [loki.write.default.receiver]
+
+                          stage.cri { }
+
+                          stage.replace {
+                            expression = "(\\n)"
+                          }
+
+                          stage.decolorize {}
+
+                          stage.multiline {
+                            firstline = "^\\S+.*"
+                            max_lines = 0
+                          }
+
+                          stage.match {
+                            selector = "{pod=~\".+\"} |~ \"^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}(?:\\\\.\\\\d+)?Z?\\\\s+\\\\S+\\\\s+\\\\S+\\\\s+(?:\\\\[[^\\\\]]*\\\\])?\\\\s+.*\""
+
+                            stage.regex {
+                              expression = "(?s)(?P<timestamp>\\S+)\\s+(?P<level>\\S+)\\s+(?P<logger>\\S+)\\s+(?:\\[(?P<context>[^\\]]*)\\])?\\s+(?P<message>.*)"
+                            }
+
+                            stage.timestamp {
+                              source = "timestamp"
+                              format = "RFC3339"
+                            }
+
+                            stage.labels {
+                              values = {
+                                context = "",
+                                level   = "",
+                                logger  = "",
+                              }
+                            }
+
+                            stage.structured_metadata {
+                              values = {
+                                level   = "",
+                              }
+                            }
+
+                            stage.output {
+                              source = "message"
+                            }
+                          }
+
+                          stage.pack {
+                            labels           = ["stream", "node_name", "level", "logger", "context"]
+                            ingest_timestamp = False
+                          }
+
+                          stage.label_keep {
+                            values = ["app", "instance", "namespace", "pod", "container", "apolo_org_name", "apolo_project_name", "apolo_app_id"]
+                          }
+                        }
+
+                        loki.source.kubernetes "kubernetes_pods" {
+                          targets    = discovery.relabel.kubernetes_pods.output
+                          forward_to = [loki.process.kubernetes_pods.receiver]
+                        }
+                    """,  # noqa: E501
+                }
+            },
+        }
+        result["alloy"]["configMap"]["content"] = result["alloy"]["configMap"][
+            "content"
+        ].replace("{$namespace}", platform.namespace)
         return result
 
     def create_platform_metadata_values(

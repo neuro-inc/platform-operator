@@ -130,6 +130,8 @@ class HelmChartNames:
     platform_metadata: str = "platform-metadata"
     pgo: str = "apps-postgres-operator"
     keda: str = "keda"
+    alloy: str = "alloy"
+    loki: str = "loki"
 
 
 @dataclass(frozen=True)
@@ -722,6 +724,7 @@ class BucketsConfig:
 
     azure_storage_account_name: str = ""
     azure_storage_account_key: str = ""
+    azure_minio_gateway_region: str = "minio"
 
     minio_install: bool = False
     minio_url: URL | None = None
@@ -737,6 +740,7 @@ class BucketsConfig:
     emc_ecs_s3_endpoint: URL | None = None
     emc_ecs_management_endpoint: URL | None = None
     emc_ecs_s3_assumable_role: str = ""
+    emc_ecs_region: str = "emc-ecs"
 
     open_stack_username: str = ""
     open_stack_password: str = ""
@@ -755,6 +759,7 @@ class AppsOperatorsConfig:
 class MinioGatewayConfig:
     root_user: str
     root_user_password: str
+    endpoint_url: str = "http://minio-gateway:9000"
 
 
 class MetricsStorageType(Enum):
