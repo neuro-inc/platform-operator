@@ -110,8 +110,8 @@ def resource_pool_type_factory() -> Callable[..., ResourcePoolType]:
             available_cpu=1,
             memory=2**30,
             available_memory=2**30,
-            gpu=1,
-            gpu_model="nvidia-tesla-k80",
+            nvidia_gpu=1,
+            nvidia_gpu_model="nvidia-tesla-k80",
             tpu=(
                 TPUResource(ipv4_cidr_block=tpu_ipv4_cidr_block)
                 if tpu_ipv4_cidr_block
@@ -169,9 +169,10 @@ def cluster_factory(
                         credits_per_hour=Decimal(10),
                         cpu=1,
                         memory=2**30,
-                        gpu=1,
-                        gpu_model="nvidia-tesla-k80",
-                        resource_affinity=[resource_pool_name],
+                        nvidia_gpu=1,
+                        nvidia_gpu_model="nvidia-tesla-k80",
+                        resource_pool_names=[resource_pool_name],
+                        available_resource_pool_names=[resource_pool_name],
                     )
                 ],
                 job_fallback_hostname="default.jobs-dev.neu.ro",
@@ -184,7 +185,7 @@ def cluster_factory(
                         name="miner",
                         count=1,
                         image="miner",
-                        resources=Resources(cpu_m=1000, memory=2**30),
+                        resources=Resources(cpu=1, memory=2**30),
                     )
                 ],
             ),
@@ -208,10 +209,8 @@ def cluster_factory(
             dns=DNSConfig(name=f"{name}.org.neu.ro"),
             ingress=IngressConfig(
                 acme_environment=ACMEEnvironment.PRODUCTION,
-                cors_origins=[
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ],
+                default_cors_origins=["https://console.apolo.us"],
+                additional_cors_origins=["https://custom.app"],
             ),
             created_at=datetime.now(),
         )
@@ -518,7 +517,7 @@ def gcp_platform_config(
                 name="miner",
                 count=1,
                 image="miner",
-                resources=Resources(cpu_m=1000, memory=2**30),
+                resources=Resources(cpu=1, memory=2**30),
             )
         ],
         ingress_dns_name=f"{cluster_name}.org.neu.ro",
@@ -533,8 +532,8 @@ def gcp_platform_config(
         ingress_controller_replicas=2,
         ingress_public_ips=[],
         ingress_cors_origins=[
-            "https://release--neuro-web.netlify.app",
-            "https://app.neu.ro",
+            "https://console.apolo.us",
+            "https://custom.app",
         ],
         ingress_service_type=IngressServiceType.LOAD_BALANCER,
         ingress_service_name="traefik",

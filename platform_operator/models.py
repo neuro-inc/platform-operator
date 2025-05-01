@@ -5,7 +5,7 @@ import os
 from base64 import b64decode, urlsafe_b64decode
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from hashlib import sha256
 from ipaddress import IPv4Address, IPv4Network
@@ -20,7 +20,7 @@ from neuro_config_client import (
     DNSConfig,
     DockerRegistryConfig,
     IdleJobConfig,
-    OrchestratorConfig,
+    PatchOrchestratorConfigRequest,
     ResourcePoolType,
 )
 from yarl import URL
@@ -127,6 +127,11 @@ class HelmChartNames:
     platform_api_poller: str = "platform-api-poller"
     platform_buckets: str = "platform-buckets"
     platform_apps: str = "platform-apps"
+    platform_metadata: str = "platform-metadata"
+    pgo: str = "apps-postgres-operator"
+    keda: str = "keda"
+    alloy: str = "alloy"
+    loki: str = "loki"
 
 
 @dataclass(frozen=True)
@@ -479,6 +484,10 @@ class MonitoringSpec(dict[str, Any]):
     def metrics_storage_class_name(self) -> str:
         return self["metrics"]["kubernetes"]["persistence"].get("storageClassName", "")
 
+    @property
+    def metrics_node_exporter_enabled(self) -> bool:
+        return self["metrics"].get("nodeExporter", {}).get("enabled", True)
+
 
 class DisksSpec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
@@ -715,6 +724,7 @@ class BucketsConfig:
 
     azure_storage_account_name: str = ""
     azure_storage_account_key: str = ""
+    azure_minio_gateway_region: str = "minio"
 
     minio_install: bool = False
     minio_url: URL | None = None
@@ -730,6 +740,7 @@ class BucketsConfig:
     emc_ecs_s3_endpoint: URL | None = None
     emc_ecs_management_endpoint: URL | None = None
     emc_ecs_s3_assumable_role: str = ""
+    emc_ecs_region: str = "emc-ecs"
 
     open_stack_username: str = ""
     open_stack_password: str = ""
@@ -739,9 +750,16 @@ class BucketsConfig:
 
 
 @dataclass(frozen=True)
+class AppsOperatorsConfig:
+    postgres_operator_enabled: bool = False
+    keda_enabled: bool = False
+
+
+@dataclass(frozen=True)
 class MinioGatewayConfig:
     root_user: str
     root_user_password: str
+    endpoint_url: str = "http://minio-gateway:9000"
 
 
 class MetricsStorageType(Enum):
@@ -760,6 +778,7 @@ class MonitoringConfig:
     metrics_storage_size: str = ""
     metrics_retention_time: str = "3d"
     metrics_region: str = ""
+    metrics_node_exporter_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -832,6 +851,9 @@ class PlatformConfig:
     gcp_service_account_key_base64: str = ""
     services_priority_class_name: str = ""
     minio_gateway: MinioGatewayConfig | None = None
+    apps_operator_config: AppsOperatorsConfig = field(
+        default_factory=AppsOperatorsConfig
+    )
 
     def get_storage_claim_name(self, path: str) -> str:
         name = f"{self.release_name}-storage"
@@ -915,23 +937,33 @@ class PlatformConfig:
             return None
         return DNSConfig(name=self.ingress_dns_name, a_records=a_records)
 
-    def create_orchestrator_config(self, cluster: Cluster) -> OrchestratorConfig | None:
+    def create_patch_orchestrator_config_request(
+        self, cluster: Cluster
+    ) -> PatchOrchestratorConfigRequest | None:
         assert cluster.orchestrator
-        orchestrator = replace(
-            cluster.orchestrator,
-            job_internal_hostname_template=self.jobs_internal_host_template,
-        )
-        if self.kubernetes_tpu_network:
+        orchestrator = PatchOrchestratorConfigRequest()
+
+        if (
+            self.jobs_internal_host_template
+            != cluster.orchestrator.job_internal_hostname_template
+        ):
             orchestrator = replace(
                 orchestrator,
-                resource_pool_types=self._update_tpu_network(
-                    orchestrator.resource_pool_types,
-                    self.kubernetes_tpu_network,
-                ),
+                job_internal_hostname_template=self.jobs_internal_host_template,
             )
-        if cluster.orchestrator == orchestrator:
-            return None
-        return orchestrator
+
+        if self.kubernetes_tpu_network:
+            new_resource_pool_types = self._update_tpu_network(
+                cluster.orchestrator.resource_pool_types, self.kubernetes_tpu_network
+            )
+            if new_resource_pool_types != cluster.orchestrator.resource_pool_types:
+                orchestrator = replace(
+                    orchestrator, resource_pool_types=new_resource_pool_types
+                )
+
+        return (
+            None if orchestrator == PatchOrchestratorConfigRequest() else orchestrator
+        )
 
     @classmethod
     def _update_tpu_network(
@@ -1031,7 +1063,12 @@ class PlatformConfigFactory:
             ingress_controller_install=spec.ingress_controller.enabled,
             ingress_controller_replicas=spec.ingress_controller.replicas or 2,
             ingress_public_ips=spec.ingress_controller.public_ips,
-            ingress_cors_origins=cluster.ingress.cors_origins,
+            ingress_cors_origins=sorted(
+                {
+                    *cluster.ingress.default_cors_origins,
+                    *cluster.ingress.additional_cors_origins,
+                }
+            ),
             ingress_service_type=IngressServiceType(
                 spec.ingress_controller.service_type or IngressServiceType.LOAD_BALANCER
             ),
@@ -1352,6 +1389,7 @@ class PlatformConfigFactory:
                     spec.metrics_retention_time
                     or MonitoringConfig.metrics_retention_time
                 ),
+                metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
             )
         elif "kubernetes" in spec.metrics:
             return MonitoringConfig(
@@ -1365,6 +1403,7 @@ class PlatformConfigFactory:
                     or MonitoringConfig.metrics_retention_time
                 ),
                 metrics_region=spec.metrics_region,
+                metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
             )
         else:
             raise ValueError("Metrics storage type is not supported")

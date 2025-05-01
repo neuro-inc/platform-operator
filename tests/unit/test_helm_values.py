@@ -40,6 +40,8 @@ class TestHelmValuesFactory:
             "traefikEnabled": True,
             "acmeEnabled": True,
             "dockerRegistryEnabled": False,
+            "appsPostgresOperatorEnabled": False,
+            "appsKedaEnabled": False,
             "minioEnabled": False,
             "minioGatewayEnabled": True,
             "platformReportsEnabled": True,
@@ -50,7 +52,7 @@ class TestHelmValuesFactory:
             "clusterName": cluster_name,
             "serviceToken": "token",
             "nodePools": [
-                {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "gpu": 1}
+                {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "nvidiaGpu": 1}
             ],
             "nodeLabels": {
                 "nodePool": "platform.neuromation.io/nodepool",
@@ -95,8 +97,8 @@ class TestHelmValuesFactory:
                 "ingressAuthHost": "platformingressauth",
                 "cors": {
                     "originList": [
-                        "https://release--neuro-web.netlify.app",
-                        "https://app.neu.ro",
+                        "https://console.apolo.us",
+                        "https://custom.app",
                     ]
                 },
             },
@@ -187,6 +189,9 @@ class TestHelmValuesFactory:
             "platform-api-poller": mock.ANY,
             "platform-buckets": mock.ANY,
             "platform-apps": mock.ANY,
+            "platform-metadata": mock.ANY,
+            "loki": mock.ANY,
+            "alloy": mock.ANY,
         }
 
     def test_create_gcp_platform_with_ssl_cert(
@@ -219,7 +224,7 @@ class TestHelmValuesFactory:
                     name="miner",
                     count=1,
                     image="miner",
-                    resources=Resources(cpu_m=1000, memory=2**30, gpu=1),
+                    resources=Resources(cpu=1, memory=2**30, nvidia_gpu=1),
                 ),
                 IdleJobConfig(
                     name="miner",
@@ -228,7 +233,7 @@ class TestHelmValuesFactory:
                     command=["bash"],
                     args=["-c", "sleep infinity"],
                     image_pull_secret="secret",
-                    resources=Resources(cpu_m=1000, memory=2**30, gpu=1),
+                    resources=Resources(cpu=1, memory=2**30, nvidia_gpu=1),
                     env={"NAME": "VALUE"},
                     node_selector={"gpu": "nvidia-tesla-k80"},
                 ),
@@ -365,6 +370,8 @@ class TestHelmValuesFactory:
             }
         ]
         assert result["dockerRegistryEnabled"] is True
+        assert result["appsKedaEnabled"] is False
+        assert result["appsPostgresOperatorEnabled"] is False
         assert "docker-registry" in result
         assert result["minioEnabled"] is True
         assert (
@@ -490,7 +497,6 @@ class TestHelmValuesFactory:
                     f"*.apps.{cluster_name}.org.neu.ro",
                 ],
                 "sslCertSecretName": "platform-ssl-cert",
-                "rolloutDeploymentName": "traefik",
             },
             "podLabels": {"service": "acme"},
             "env": [
@@ -735,19 +741,7 @@ class TestHelmValuesFactory:
                 "--entryPoints.websecure.forwardedHeaders.insecure=true",
                 "--entryPoints.websecure.http.middlewares="
                 "platform-platform-cors@kubernetescrd",
-                "--providers.file.filename=/etc/traefik/dynamic/config.yaml",
-            ],
-            "volumes": [
-                {
-                    "name": "platform-traefik-dynamic-config",
-                    "mountPath": "/etc/traefik/dynamic",
-                    "type": "configMap",
-                },
-                {
-                    "name": "platform-ssl-cert",
-                    "mountPath": "/etc/certs",
-                    "type": "secret",
-                },
+                "--providers.kubernetesingress.ingressendpoint.ip=1.2.3.4",
             ],
             "providers": {
                 "kubernetesCRD": {
@@ -758,6 +752,14 @@ class TestHelmValuesFactory:
                 "kubernetesIngress": {
                     "enabled": True,
                     "allowExternalNameServices": True,
+                    "publishedService": {"enabled": False},
+                },
+            },
+            "tlsStore": {
+                "default": {
+                    "defaultCertificate": {
+                        "secretName": "platform-ssl-cert",
+                    },
                 },
             },
             "ingressRoute": {"dashboard": {"enabled": False}},
@@ -2481,6 +2483,9 @@ class TestHelmValuesFactory:
                         },
                     },
                 },
+                "nodeExporter": {
+                    "enabled": True,
+                },
                 "prometheus-node-exporter": {
                     "image": {
                         "registry": "ghcr.io",
@@ -3023,4 +3028,21 @@ class TestHelmValuesFactory:
             "priorityClassName": "platform-services",
             "rbac": {"create": True},
             "serviceAccount": {"create": True},
+        }
+
+    def test_create_platform_metadata_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_metadata_values(gcp_platform_config)
+
+        assert result == {
+            "nameOverride": "platform-metadata",
+            "fullnameOverride": "platform-metadata",
+            "image": {"repository": "ghcr.io/neuro-inc/platform-metadata"},
+            "sentry": {
+                "dsn": "https://sentry",
+                "clusterName": gcp_platform_config.cluster_name,
+                "sampleRate": 0.1,
+            },
+            "priorityClassName": "platform-services",
         }
