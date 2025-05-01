@@ -128,6 +128,17 @@ def aws_elb_client() -> Iterator[mock.Mock]:
 
 
 @pytest.fixture
+def aws_s3_client() -> Iterator[mock.Mock]:
+    with mock.patch(
+        "platform_operator.handlers.S3Client", spec=S3Client
+    ) as client_class:
+        client_instance = mock.AsyncMock(S3Client)
+        client_instance.__aenter__.return_value = client_instance
+        client_class.return_value = client_instance
+        yield client_instance
+
+
+@pytest.fixture
 def traefik_service() -> Service:
     return Service(
         {
@@ -360,14 +371,9 @@ async def test_configure_cluster_with_ingress_controller_disabled(
     )
 
 
-@pytest.fixture
-def _create_bucket_mock(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(S3Client, "create_bucket", mock.AsyncMock())
-
-
-@pytest.mark.usefixtures("_create_bucket_mock")
 async def test_deploy(
     status_manager: mock.AsyncMock,
+    aws_s3_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -441,11 +447,11 @@ async def test_deploy(
         gcp_platform_config.cluster_name
     )
 
-    S3Client.create_bucket.assert_awaited_once()
+    aws_s3_client.create_bucket.assert_awaited_once()
 
 
-@pytest.mark.usefixtures("_create_bucket_mock")
 async def test_deploy_storage_configs_patched(
+    aws_s3_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
@@ -501,11 +507,11 @@ async def test_deploy_storage_configs_patched(
             ),
         ]
     )
-    S3Client.create_bucket.assert_awaited_once()
+    aws_s3_client.create_bucket.assert_awaited_once()
 
 
-@pytest.mark.usefixtures("_create_bucket_mock")
 async def test_deploy_with_ingress_controller_disabled(
+    aws_s3_client: mock.AsyncMock,
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -565,11 +571,11 @@ async def test_deploy_with_ingress_controller_disabled(
     status_manager.complete_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
     )
-    S3Client.create_bucket.assert_awaited_once()
+    aws_s3_client.create_bucket.assert_awaited_once()
 
 
-@pytest.mark.usefixtures("_create_bucket_mock")
 async def test_deploy_all_charts_deployed(
+    aws_s3_client: mock.AsyncMock,
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
@@ -618,7 +624,7 @@ async def test_deploy_all_charts_deployed(
     status_manager.transition.assert_any_call(
         gcp_platform_config.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
     )
-    S3Client.create_bucket.assert_awaited_once()
+    aws_s3_client.create_bucket.assert_awaited_once()
 
 
 async def test_deploy_with_retries_exceeded(
