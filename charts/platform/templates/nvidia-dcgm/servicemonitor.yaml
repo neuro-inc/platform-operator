@@ -5,6 +5,7 @@ metadata:
   name: nvidia-dcgm-exporter
   labels: {{ include "platform.labels.standard" . | nindent 4 }}
     service: nvidia-dcgm-exporter
+    platform.apolo.us/scrape-metrics: "true"
 spec:
   selector:
     matchLabels:

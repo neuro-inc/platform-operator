@@ -1,5 +1,4 @@
 {{- range .Values.storages }}
-{{- if ne .type "kubernetes" }}
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -40,14 +39,5 @@ spec:
     readOnly: false
   mountOptions:
   - mfsymlinks
-  {{- else if eq .type "gcs" }}
-  csi:
-    driver: obs.csi.neu.ro
-    volumeHandle: {{ .gcs.bucketName }}
-    volumeAttributes:
-      bucket: {{ .gcs.bucketName }}
-      key_file: /accounts/key.json
-      additional_args: --limit-ops-per-sec 0
   {{- end }}
-{{- end }}
 {{- end }}

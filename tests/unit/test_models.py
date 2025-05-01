@@ -12,6 +12,7 @@ from neuro_config_client import (
     Cluster,
     DNSConfig,
     DockerRegistryConfig,
+    PatchOrchestratorConfigRequest,
     ResourcePoolType,
 )
 from yarl import URL
@@ -20,6 +21,7 @@ from platform_operator.models import (
     BucketsConfig,
     BucketsProvider,
     Config,
+    DockerRegistryStorageDriver,
     HelmChartNames,
     HelmChartVersions,
     HelmReleaseNames,
@@ -46,6 +48,7 @@ class TestConfig:
             "NP_PLATFORM_CONFIG_WATCH_INTERVAL_S": "0.1",
             "NP_PLATFORM_ADMIN_URL": "http://platformadmin:8080",
             "NP_PLATFORM_API_URL": "http://platformapi:8080",
+            "NP_PLATFORM_NOTIFICATIONS_URL": "http://platformnotifications:8080",
             "NP_CONTROLLER_LOG_LEVEL": "debug",
             "NP_CONTROLLER_RETRIES": "5",
             "NP_CONTROLLER_BACKOFF": "120",
@@ -69,6 +72,7 @@ class TestConfig:
             "NP_ACME_CA_STAGING_PATH": "/ca.pem",
             "NP_STANDALONE": "true",
         }
+
         assert Config.load_from_env(env) == Config(
             node_name="minikube",
             log_level="DEBUG",
@@ -77,13 +81,11 @@ class TestConfig:
             kube_config=KubeConfig(
                 version="1.14.10",
                 url=URL("https://kubernetes.default"),
-                cert_authority_path=Path("/ca.crt"),
-                cert_authority_data_pem="cert-authority-data",
                 auth_type=KubeClientAuthType.CERTIFICATE,
+                cert_authority_path=Path("/ca.crt"),
                 auth_cert_path=Path("/client.crt"),
                 auth_cert_key_path=Path("/client.key"),
                 auth_token_path=Path("/token"),
-                auth_token="token",
                 conn_timeout_s=300,
                 read_timeout_s=100,
                 conn_pool_size=100,
@@ -97,6 +99,7 @@ class TestConfig:
             platform_config_watch_interval_s=0.1,
             platform_admin_url=URL("http://platformadmin:8080"),
             platform_api_url=URL("http://platformapi:8080"),
+            platform_notifications_url=URL("http://platformnotifications:8080"),
             platform_namespace="platform",
             platform_lock_secret_name="platform-operator-lock",
             acme_ca_staging_path="/ca.pem",
@@ -111,6 +114,7 @@ class TestConfig:
             "NP_PLATFORM_CONFIG_URL": "http://platformconfig:8080",
             "NP_PLATFORM_ADMIN_URL": "http://platformadmin:8080",
             "NP_PLATFORM_API_URL": "http://platformapi:8080",
+            "NP_PLATFORM_NOTIFICATIONS_URL": "http://platformnotifications:8080",
             "NP_KUBE_VERSION": "v1.14.10",
             "NP_KUBE_URL": "https://kubernetes.default",
             "NP_KUBE_AUTH_TYPE": "none",
@@ -146,6 +150,7 @@ class TestConfig:
             platform_config_watch_interval_s=15,
             platform_admin_url=URL("http://platformadmin:8080"),
             platform_api_url=URL("http://platformapi:8080"),
+            platform_notifications_url=URL("http://platformnotifications:8080"),
             platform_namespace="platform",
             platform_lock_secret_name="platform-operator-lock",
             acme_ca_staging_path="/ca.pem",
@@ -193,9 +198,9 @@ class TestPlatformConfig:
             name=gcp_platform_config.ingress_dns_name,
             a_records=[
                 ARecord(name=f"{dns_name}.", ips=["192.168.0.1"]),
+                ARecord(name=f"*.{dns_name}.", ips=["192.168.0.1"]),
                 ARecord(name=f"*.jobs.{dns_name}.", ips=["192.168.0.1"]),
-                ARecord(name=f"registry.{dns_name}.", ips=["192.168.0.1"]),
-                ARecord(name=f"metrics.{dns_name}.", ips=["192.168.0.1"]),
+                ARecord(name=f"*.apps.{dns_name}.", ips=["192.168.0.1"]),
             ],
         )
 
@@ -220,10 +225,9 @@ class TestPlatformConfig:
             name=on_prem_platform_config.ingress_dns_name,
             a_records=[
                 ARecord(name=f"{dns_name}.", ips=["192.168.0.3"]),
+                ARecord(name=f"*.{dns_name}.", ips=["192.168.0.3"]),
                 ARecord(name=f"*.jobs.{dns_name}.", ips=["192.168.0.3"]),
-                ARecord(name=f"registry.{dns_name}.", ips=["192.168.0.3"]),
-                ARecord(name=f"metrics.{dns_name}.", ips=["192.168.0.3"]),
-                ARecord(name=f"blob.{dns_name}.", ips=["192.168.0.3"]),
+                ARecord(name=f"*.apps.{dns_name}.", ips=["192.168.0.3"]),
             ],
         )
 
@@ -243,22 +247,22 @@ class TestPlatformConfig:
             a_records=[
                 ARecord(
                     name=f"{dns_name}.",
-                    dns_name="traefik",
+                    dns_name="traefik.",
+                    zone_id="/hostedzone/traefik",
+                ),
+                ARecord(
+                    name=f"*.{dns_name}.",
+                    dns_name="traefik.",
                     zone_id="/hostedzone/traefik",
                 ),
                 ARecord(
                     name=f"*.jobs.{dns_name}.",
-                    dns_name="traefik",
+                    dns_name="traefik.",
                     zone_id="/hostedzone/traefik",
                 ),
                 ARecord(
-                    name=f"registry.{dns_name}.",
-                    dns_name="traefik",
-                    zone_id="/hostedzone/traefik",
-                ),
-                ARecord(
-                    name=f"metrics.{dns_name}.",
-                    dns_name="traefik",
+                    name=f"*.apps.{dns_name}.",
+                    dns_name="traefik.",
                     zone_id="/hostedzone/traefik",
                 ),
             ],
@@ -272,24 +276,35 @@ class TestPlatformConfig:
 
         assert result is None
 
-    def test_create_orchestrator_config(
+    def test_create_patch_orchestrator_config_request(
         self,
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
         resource_pool_type_factory: Callable[..., ResourcePoolType],
     ) -> None:
-        result = gcp_platform_config.create_orchestrator_config(gcp_cluster)
         assert gcp_cluster.orchestrator
 
-        assert result == replace(
-            gcp_cluster.orchestrator,
-            job_internal_hostname_template=f"{{job_id}}.platform-jobs",
+        gcp_cluster = replace(
+            gcp_cluster,
+            orchestrator=replace(
+                gcp_cluster.orchestrator,
+                resource_pool_types=[
+                    resource_pool_type_factory("n1-highmem-8", "1.2.3.4/16")
+                ],
+            ),
+        )
+        result = gcp_platform_config.create_patch_orchestrator_config_request(
+            gcp_cluster
+        )
+
+        assert result == PatchOrchestratorConfigRequest(
+            job_internal_hostname_template="{job_id}.platform-jobs",
             resource_pool_types=[
                 resource_pool_type_factory("n1-highmem-8", "192.168.0.0/16")
             ],
         )
 
-    def test_create_orchestrator_config_none(
+    def test_create_patch_orchestrator_config_request_none(
         self,
         gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
@@ -300,11 +315,13 @@ class TestPlatformConfig:
             gcp_cluster,
             orchestrator=replace(
                 gcp_cluster.orchestrator,
-                job_internal_hostname_template=f"{{job_id}}.platform-jobs",
+                job_internal_hostname_template="{job_id}.platform-jobs",
             ),
         )
         gcp_platform_config = replace(gcp_platform_config, kubernetes_tpu_network=None)
-        result = gcp_platform_config.create_orchestrator_config(gcp_cluster)
+        result = gcp_platform_config.create_patch_orchestrator_config_request(
+            gcp_cluster
+        )
 
         assert result is None
 
@@ -382,58 +399,6 @@ class TestPlatformConfigFactory:
         result = factory.create(gcp_platform_body, gcp_cluster)
 
         assert result == replace(gcp_platform_config, standard_storage_class_name=None)
-
-    def test_gcp_platform_config_with_kubernetes_storage(
-        self,
-        factory: PlatformConfigFactory,
-        gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        gcp_platform_body["spec"]["storages"] = [
-            {
-                "kubernetes": {
-                    "persistence": {
-                        "storageClassName": "storage-class",
-                        "size": "100Gi",
-                    }
-                }
-            }
-        ]
-        result = factory.create(gcp_platform_body, gcp_cluster)
-
-        assert result == replace(
-            gcp_platform_config,
-            storages=[
-                StorageConfig(
-                    type=StorageType.KUBERNETES,
-                    storage_size="100Gi",
-                    storage_class_name="storage-class",
-                )
-            ],
-        )
-
-    def test_gcp_platform_config_with_gcs_storage(
-        self,
-        factory: PlatformConfigFactory,
-        gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        gcp_platform_body["spec"]["storages"] = [
-            {"gcs": {"bucket": "platform-storage"}}
-        ]
-        result = factory.create(gcp_platform_body, gcp_cluster)
-
-        assert result == replace(
-            gcp_platform_config,
-            storages=[
-                StorageConfig(
-                    type=StorageType.GCS,
-                    gcs_bucket_name="platform-storage",
-                )
-            ],
-        )
 
     def test_gcp_platform_config_with_ingress_controller_disabled(
         self,
@@ -541,20 +506,6 @@ class TestPlatformConfigFactory:
         assert result == replace(
             gcp_platform_config, ingress_load_balancer_source_ranges=["0.0.0.0/0"]
         )
-
-    def test_gcp_platform_config_with_ingress_controller_namespaces_unique(
-        self,
-        factory: PlatformConfigFactory,
-        gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        gcp_platform_body["spec"]["ingressController"] = {
-            "namespaces": [gcp_platform_config.namespace, "default"]
-        }
-        result = factory.create(gcp_platform_body, gcp_cluster)
-
-        assert result.ingress_namespaces == ["default", "platform", "platform-jobs"]
 
     def test_gcp_platform_config_with_docker_config_secret_without_credentials(
         self,
@@ -700,36 +651,6 @@ class TestPlatformConfigFactory:
         with pytest.raises(ValueError, match="Registry spec is empty"):
             factory.create(aws_platform_body, aws_cluster)
 
-    def test_aws_platform_config_with_kubernetes_storage(
-        self,
-        factory: PlatformConfigFactory,
-        aws_platform_body: kopf.Body,
-        aws_cluster: Cluster,
-        aws_platform_config: PlatformConfig,
-    ) -> None:
-        aws_platform_body["spec"]["storages"] = [
-            {
-                "kubernetes": {
-                    "persistence": {
-                        "storageClassName": "storage-class",
-                        "size": "100Gi",
-                    }
-                }
-            }
-        ]
-        result = factory.create(aws_platform_body, aws_cluster)
-
-        assert result == replace(
-            aws_platform_config,
-            storages=[
-                StorageConfig(
-                    type=StorageType.KUBERNETES,
-                    storage_size="100Gi",
-                    storage_class_name="storage-class",
-                )
-            ],
-        )
-
     def test_azure_platform_config(
         self,
         factory: PlatformConfigFactory,
@@ -751,36 +672,6 @@ class TestPlatformConfigFactory:
 
         with pytest.raises(ValueError, match="Registry spec is empty"):
             factory.create(azure_platform_body, azure_cluster)
-
-    def test_azure_platform_config_with_kubernetes_storage(
-        self,
-        factory: PlatformConfigFactory,
-        azure_platform_body: kopf.Body,
-        azure_cluster: Cluster,
-        azure_platform_config: PlatformConfig,
-    ) -> None:
-        azure_platform_body["spec"]["storages"] = [
-            {
-                "kubernetes": {
-                    "persistence": {
-                        "storageClassName": "storage-class",
-                        "size": "100Gi",
-                    }
-                }
-            }
-        ]
-        result = factory.create(azure_platform_body, azure_cluster)
-
-        assert result == replace(
-            azure_platform_config,
-            storages=[
-                StorageConfig(
-                    type=StorageType.KUBERNETES,
-                    storage_size="100Gi",
-                    storage_class_name="storage-class",
-                )
-            ],
-        )
 
     def test_azure_platform_config_with_nfs_storage(
         self,
@@ -908,7 +799,7 @@ class TestPlatformConfigFactory:
 
         assert result.monitoring.metrics_retention_time == "1d"
 
-    def test_on_prem_platform_config_with_docker_registry(
+    def test_on_prem_platform_config_with_docker_registry_filesystem(
         self,
         factory: PlatformConfigFactory,
         on_prem_platform_body: kopf.Body,
@@ -950,6 +841,34 @@ class TestPlatformConfigFactory:
             docker_registry_url=URL("http://docker-registry"),
             docker_registry_username="",
             docker_registry_password="",
+        )
+
+    def test_on_prem_platform_config_with_docker_registry__s3_minio(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: kopf.Body,
+        on_prem_cluster: Cluster,
+    ) -> None:
+        on_prem_platform_body["spec"]["registry"] = {
+            "blobStorage": {
+                "bucket": "job-images",
+            }
+        }
+
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result.registry == RegistryConfig(
+            provider=RegistryProvider.DOCKER,
+            docker_registry_install=True,
+            docker_registry_url=URL("http://platform-docker-registry:5000"),
+            docker_registry_storage_driver=DockerRegistryStorageDriver.S3,
+            docker_registry_s3_endpoint=URL("http://platform-minio:9000"),
+            docker_registry_s3_bucket="job-images",
+            docker_registry_s3_region="minio",
+            docker_registry_s3_access_key="username",
+            docker_registry_s3_secret_key="password",
+            docker_registry_s3_disable_redirect=True,
+            docker_registry_s3_force_path_style=True,
         )
 
     def test_on_prem_platform_config_with_minio_buckets(

@@ -1,0 +1,23 @@
+groups:
+- name: platform
+  rules:
+  - alert: KubePlatformNotReady
+    annotations:
+      description: Platform resource {{$labels.name}} has been in a {{$labels.phase | toLower}} state for more than 15 minutes.
+      summary: Platform resource has been in a {{$labels.phase | toLower}} state for more than 15 minutes.
+    expr: |
+      max by(name) (
+        kube_platform_status_phase{job="kube-state-metrics", phase=~"Pending|Deploying|Deleting"}
+      ) > 0
+    for: 15m
+    labels:
+      severity: warning
+  - alert: KubePlatformFailed
+    annotations:
+      description: Platform resource {{$labels.name}} has been in a failed state for more than 5 minutes.
+      summary: Platform resource has been in a failed state for more than 5 minutes.
+    expr: |
+      max by(name) (kube_platform_status_phase{job="kube-state-metrics", phase="Failed"}) > 0
+    for: 5m
+    labels:
+      severity: critical

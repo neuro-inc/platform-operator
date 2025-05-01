@@ -14,11 +14,11 @@ from neuro_config_client import (
     GoogleCloudProvider,
     GoogleFilestoreTier,
     GoogleStorage,
-    NotificationType,
+    PatchClusterRequest,
     StorageInstance,
 )
 
-from platform_operator.aws_client import AwsElbClient
+from platform_operator.aws_client import AwsElbClient, S3Client
 from platform_operator.helm_client import HelmClient, Release, ReleaseStatus
 from platform_operator.helm_values import HelmValuesFactory
 from platform_operator.kube_client import (
@@ -122,6 +122,17 @@ def aws_elb_client() -> Iterator[mock.Mock]:
         "platform_operator.handlers.AwsElbClient", spec=AwsElbClient
     ) as client_class:
         client_instance = mock.AsyncMock(AwsElbClient)
+        client_instance.__aenter__.return_value = client_instance
+        client_class.return_value = client_instance
+        yield client_instance
+
+
+@pytest.fixture
+def aws_s3_client() -> Iterator[mock.Mock]:
+    with mock.patch(
+        "platform_operator.handlers.S3Client", spec=S3Client
+    ) as client_class:
+        client_instance = mock.AsyncMock(S3Client)
         client_instance.__aenter__.return_value = client_instance
         client_class.return_value = client_instance
         yield client_instance
@@ -234,8 +245,7 @@ async def test_is_platform_deploy_required_on_values_update_true(
         name=config.helm_release_names.platform,
         namespace=config.platform_namespace,
         chart=(
-            f"{config.helm_chart_names.platform}"
-            f"-{config.helm_chart_versions.platform}"
+            f"{config.helm_chart_names.platform}-{config.helm_chart_versions.platform}"
         ),
         status=ReleaseStatus.DEPLOYED,
     )
@@ -261,8 +271,7 @@ async def test_is_platform_deploy_required_no_update_false(
         name=config.helm_release_names.platform,
         namespace=config.platform_namespace,
         chart=(
-            f"{config.helm_chart_names.platform}"
-            f"-{config.helm_chart_versions.platform}"
+            f"{config.helm_chart_names.platform}-{config.helm_chart_versions.platform}"
         ),
         status=ReleaseStatus.DEPLOYED,
     )
@@ -298,12 +307,16 @@ async def test_configure_aws_cluster(
     )
     config_client.patch_cluster.assert_awaited_with(
         aws_platform_config.cluster_name,
-        token=aws_platform_config.token,
-        orchestrator=aws_platform_config.create_orchestrator_config(aws_cluster),
-        dns=aws_platform_config.create_dns_config(
-            ingress_service=aws_traefik_service,
-            aws_ingress_lb=aws_traefik_lb,
+        PatchClusterRequest(
+            orchestrator=aws_platform_config.create_patch_orchestrator_config_request(
+                aws_cluster
+            ),
+            dns=aws_platform_config.create_dns_config(
+                ingress_service=aws_traefik_service,
+                aws_ingress_lb=aws_traefik_lb,
+            ),
         ),
+        token=aws_platform_config.token,
     )
 
 
@@ -325,9 +338,13 @@ async def test_configure_cluster(
     )
     config_client.patch_cluster.assert_awaited_with(
         gcp_platform_config.cluster_name,
+        PatchClusterRequest(
+            orchestrator=gcp_platform_config.create_patch_orchestrator_config_request(
+                gcp_cluster
+            ),
+            dns=gcp_platform_config.create_dns_config(ingress_service=traefik_service),
+        ),
         token=gcp_platform_config.token,
-        orchestrator=gcp_platform_config.create_orchestrator_config(gcp_cluster),
-        dns=gcp_platform_config.create_dns_config(ingress_service=traefik_service),
     )
 
 
@@ -344,14 +361,19 @@ async def test_configure_cluster_with_ingress_controller_disabled(
 
     config_client.patch_cluster.assert_awaited_with(
         gcp_platform_config.cluster_name,
+        PatchClusterRequest(
+            orchestrator=gcp_platform_config.create_patch_orchestrator_config_request(
+                gcp_cluster
+            ),
+            dns=gcp_platform_config.create_dns_config(),
+        ),
         token=gcp_platform_config.token,
-        orchestrator=gcp_platform_config.create_orchestrator_config(gcp_cluster),
-        dns=gcp_platform_config.create_dns_config(),
     )
 
 
 async def test_deploy(
     status_manager: mock.AsyncMock,
+    aws_s3_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -385,20 +407,6 @@ async def test_deploy(
         token=gcp_platform_body["spec"]["token"],
     )
     config_client.patch_storage.assert_not_awaited()
-    config_client.notify.assert_has_awaits(
-        [
-            mock.call(
-                gcp_platform_config.cluster_name,
-                NotificationType.CLUSTER_UPDATING,
-                token=gcp_platform_config.token,
-            ),
-            mock.call(
-                gcp_platform_config.cluster_name,
-                NotificationType.CLUSTER_UPDATE_SUCCEEDED,
-                token=gcp_platform_config.token,
-            ),
-        ]
-    )
 
     kube_client.update_service_account.assert_awaited_once_with(
         namespace=gcp_platform_config.namespace,
@@ -439,8 +447,11 @@ async def test_deploy(
         gcp_platform_config.cluster_name
     )
 
+    aws_s3_client.create_bucket.assert_awaited_once()
+
 
 async def test_deploy_storage_configs_patched(
+    aws_s3_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
     logger: logging.Logger,
     gcp_cluster: Cluster,
@@ -458,10 +469,9 @@ async def test_deploy_storage_configs_patched(
             credentials={},
             node_pools=[],
             storage=GoogleStorage(
-                id="standard",
                 tier=GoogleFilestoreTier.STANDARD,
                 instances=[
-                    StorageInstance(size=2**40),
+                    StorageInstance(name="default", size=2**40),
                     StorageInstance(name="org1", size=2 * 2**40),
                 ],
                 description="Standard Filestore",
@@ -485,7 +495,7 @@ async def test_deploy_storage_configs_patched(
         [
             mock.call(
                 cluster_name=gcp_platform_config.cluster_name,
-                storage_name=None,
+                storage_name="default",
                 ready=True,
                 token=gcp_platform_config.token,
             ),
@@ -497,9 +507,11 @@ async def test_deploy_storage_configs_patched(
             ),
         ]
     )
+    aws_s3_client.create_bucket.assert_awaited_once()
 
 
 async def test_deploy_with_ingress_controller_disabled(
+    aws_s3_client: mock.AsyncMock,
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -559,9 +571,11 @@ async def test_deploy_with_ingress_controller_disabled(
     status_manager.complete_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
     )
+    aws_s3_client.create_bucket.assert_awaited_once()
 
 
 async def test_deploy_all_charts_deployed(
+    aws_s3_client: mock.AsyncMock,
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
@@ -610,6 +624,7 @@ async def test_deploy_all_charts_deployed(
     status_manager.transition.assert_any_call(
         gcp_platform_config.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
     )
+    aws_s3_client.create_bucket.assert_awaited_once()
 
 
 async def test_deploy_with_retries_exceeded(
@@ -632,11 +647,6 @@ async def test_deploy_with_retries_exceeded(
 
     status_manager.fail_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
-    )
-    config_client.notify.assert_any_await(
-        gcp_platform_config.cluster_name,
-        NotificationType.CLUSTER_UPDATE_FAILED,
-        token=gcp_platform_config.token,
     )
 
 
@@ -774,29 +784,6 @@ async def test_delete(
     )
 
 
-async def test_delete_gcp_with_gcs_storage(
-    helm_client: mock.AsyncMock,
-    config_client: mock.AsyncMock,
-    logger: logging.Logger,
-    gcp_cluster: Cluster,
-    gcp_platform_body: kopf.Body,
-    gcp_platform_config: PlatformConfig,
-) -> None:
-    from platform_operator.handlers import delete
-
-    config_client.get_cluster.return_value = gcp_cluster
-    gcp_platform_body["spec"]["storages"] = [{"gcs": {"bucket": "storage"}}]
-
-    await delete(  # type: ignore
-        name=gcp_platform_config.cluster_name,
-        body=gcp_platform_body,
-        logger=logger,
-        retry=0,
-    )
-
-    helm_client.delete.assert_awaited_once_with("platform", wait=True)
-
-
 async def test_delete_on_prem(
     helm_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
@@ -874,20 +861,6 @@ async def test_watch_config(
         token=gcp_platform_config.token,
     )
     config_client.patch_storage.assert_not_awaited()
-    config_client.notify.assert_has_awaits(
-        [
-            mock.call(
-                gcp_platform_config.cluster_name,
-                NotificationType.CLUSTER_UPDATING,
-                token=gcp_platform_config.token,
-            ),
-            mock.call(
-                gcp_platform_config.cluster_name,
-                NotificationType.CLUSTER_UPDATE_SUCCEEDED,
-                token=gcp_platform_config.token,
-            ),
-        ]
-    )
 
     is_platform_deploy_failed.assert_awaited_once_with()
 
@@ -921,7 +894,7 @@ async def test_watch_config(
     config_client.patch_cluster.assert_awaited_once()
 
     status_manager.start_deployment.assert_awaited_once_with(
-        gcp_platform_config.cluster_name, 0
+        gcp_platform_config.cluster_name
     )
     status_manager.transition.assert_any_call(
         gcp_platform_config.cluster_name, PlatformConditionType.PLATFORM_DEPLOYED
@@ -973,7 +946,7 @@ async def test_watch_config_all_charts_deployed(
     config_client.patch_cluster.assert_awaited_once()
 
     status_manager.start_deployment.assert_awaited_once_with(
-        gcp_platform_config.cluster_name, 0
+        gcp_platform_config.cluster_name
     )
     status_manager.complete_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
@@ -1124,12 +1097,6 @@ async def test_watch_config_update_failed(
 
     status_manager.fail_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
-    )
-
-    config_client.notify.assert_awaited_with(
-        gcp_platform_config.cluster_name,
-        NotificationType.CLUSTER_UPDATE_FAILED,
-        token=gcp_platform_config.token,
     )
 
 

@@ -10,6 +10,7 @@ from yarl import URL
 
 from .models import (
     BucketsProvider,
+    DockerRegistryStorageDriver,
     HelmChartNames,
     IngressServiceType,
     LabelsConfig,
@@ -34,7 +35,12 @@ class HelmValuesFactory:
             "traefikEnabled": platform.ingress_controller_install,
             "acmeEnabled": platform.ingress_acme_enabled,
             "dockerRegistryEnabled": platform.registry.docker_registry_install,
+            "appsPostgresOperatorEnabled": (
+                platform.apps_operator_config.postgres_operator_enabled
+            ),
+            "appsKedaEnabled": platform.apps_operator_config.keda_enabled,
             "minioEnabled": platform.buckets.minio_install,
+            "minioGatewayEnabled": platform.minio_gateway is not None,
             "platformReportsEnabled": platform.monitoring.metrics_enabled,
             "alpineImage": {"repository": platform.get_image("alpine")},
             "pauseImage": {"repository": platform.get_image("pause")},
@@ -47,7 +53,7 @@ class HelmValuesFactory:
                     "name": rpt.name,
                     "idleSize": rpt.idle_size,
                     "cpu": rpt.available_cpu,
-                    "gpu": rpt.gpu or 0,
+                    "nvidiaGpu": rpt.nvidia_gpu or 0,
                 }
                 for rpt in platform.jobs_resource_pool_types
             ],
@@ -111,9 +117,17 @@ class HelmValuesFactory:
             self._chart_names.platform_buckets: self.create_platform_buckets_values(
                 platform
             ),
+            self._chart_names.platform_apps: self.create_platform_apps_values(platform),
+            self._chart_names.platform_metadata: self.create_platform_metadata_values(
+                platform
+            ),
+            self._chart_names.alloy: self.create_alloy_values(platform),
+            self._chart_names.loki: self.create_loki_values(platform),
         }
         if platform.ingress_acme_enabled:
             result["acme"] = self.create_acme_values(platform)
+        if platform.ingress_cors_origins:
+            result["ingress"]["cors"] = {"originList": platform.ingress_cors_origins}
         if platform.docker_config.create_secret:
             result["dockerConfigSecret"] = {
                 "create": True,
@@ -141,18 +155,83 @@ class HelmValuesFactory:
         else:
             result["dockerHubConfigSecret"] = {"create": False}
         if platform.registry.docker_registry_install:
-            result[
-                self._chart_names.docker_registry
-            ] = self.create_docker_registry_values(platform)
+            result[self._chart_names.docker_registry] = (
+                self.create_docker_registry_values(platform)
+            )
         if platform.buckets.minio_install:
             assert platform.buckets.minio_public_url
             result["ingress"]["minioHost"] = platform.buckets.minio_public_url.host
             result[self._chart_names.minio] = self.create_minio_values(platform)
+        if platform.minio_gateway is not None:
+            result[self._chart_names.minio_gateway] = self.create_minio_gateway_values(
+                platform
+            )
         if platform.monitoring.metrics_enabled:
-            result[
-                self._chart_names.platform_reports
-            ] = self.create_platform_reports_values(platform)
+            result[self._chart_names.platform_reports] = (
+                self.create_platform_reports_values(platform)
+            )
+            result["alertmanager"] = self._create_alert_manager_values(platform)
         return result
+
+    def _create_alert_manager_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        if platform.notifications_url == URL("-"):
+            return {}
+        return {
+            "config": {
+                "route": {
+                    "receiver": "platform-notifications",
+                    "group_wait": "30s",
+                    "group_interval": "5m",
+                    "repeat_interval": "4h",
+                    "group_by": ["alertname"],
+                    "routes": [
+                        {
+                            "receiver": "ignore",
+                            "matchers": [
+                                'exported_service="default-backend@kubernetes"'
+                            ],
+                            "continue": False,
+                        },
+                        {
+                            "receiver": "ignore",
+                            "matchers": [
+                                f'exported_service=~"{platform.jobs_namespace}-.+"'
+                            ],
+                            "continue": False,
+                        },
+                        {
+                            "receiver": "ignore",
+                            "matchers": [f'namespace="{platform.jobs_namespace}"'],
+                            "continue": False,
+                        },
+                    ],
+                },
+                "receivers": [
+                    {"name": "ignore"},
+                    {
+                        "name": "platform-notifications",
+                        "webhook_configs": [
+                            {
+                                "url": str(
+                                    platform.notifications_url
+                                    / "api/v1/notifications"
+                                    / "alert-manager-notification"
+                                ),
+                                "http_config": {
+                                    "authorization": {
+                                        "type": "Bearer",
+                                        "credentials_file": (
+                                            "/etc/alertmanager/secrets"
+                                            f"/{platform.release_name}-token/token"
+                                        ),
+                                    }
+                                },
+                            }
+                        ],
+                    },
+                ],
+            }
+        }
 
     def create_acme_values(self, platform: PlatformConfig) -> dict[str, Any]:
         return {
@@ -171,10 +250,9 @@ class HelmValuesFactory:
                     platform.ingress_url.host,
                     f"*.{platform.ingress_url.host}",
                     f"*.jobs.{platform.ingress_url.host}",
+                    f"*.apps.{platform.ingress_url.host}",
                 ],
-                "notifyHook": "neuro",
                 "sslCertSecretName": f"{platform.release_name}-ssl-cert",
-                "rolloutDeploymentName": "traefik",
             },
             "podLabels": {"service": "acme"},
             "env": [
@@ -182,12 +260,9 @@ class HelmValuesFactory:
                 {"name": "NEURO_CLUSTER", "value": platform.cluster_name},
                 {
                     "name": "NEURO_TOKEN",
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": f"{platform.release_name}-token",
-                            "key": "token",
-                        }
-                    },
+                    **self._create_value_from_secret(
+                        name=f"{platform.release_name}-token", key="token"
+                    ),
                 },
             ],
             "persistence": {"storageClassName": platform.standard_storage_class_name},
@@ -200,7 +275,7 @@ class HelmValuesFactory:
             "count": job.count,
             "image": job.image,
             "resources": {
-                "cpu": f"{job.resources.cpu_m}m",
+                "cpu": f"{round(job.resources.cpu * 1000)}m",
                 "memory": f"{job.resources.memory}",
             },
         }
@@ -210,8 +285,8 @@ class HelmValuesFactory:
             result["args"] = job.args
         if job.image_pull_secret:
             result["imagePullSecrets"] = [{"name": job.image_pull_secret}]
-        if job.resources.gpu:
-            result["resources"]["nvidia.com/gpu"] = job.resources.gpu
+        if job.resources.nvidia_gpu:
+            result["resources"]["nvidia.com/gpu"] = job.resources.nvidia_gpu
         if job.env:
             result["env"] = job.env
         if job.node_selector:
@@ -219,18 +294,11 @@ class HelmValuesFactory:
         return result
 
     def _create_storage_values(self, storage: StorageConfig) -> dict[str, Any]:
-        if storage.type == StorageType.KUBERNETES:
-            return {
-                "type": StorageType.KUBERNETES.value,
-                "path": storage.path,
-                "size": storage.storage_size,
-                "storageClassName": storage.storage_class_name,
-            }
         if storage.type == StorageType.NFS:
             return {
                 "type": StorageType.NFS.value,
                 "path": storage.path,
-                "size": storage.storage_size,
+                "size": storage.size,
                 "nfs": {
                     "server": storage.nfs_server,
                     "path": storage.nfs_export_path,
@@ -240,7 +308,7 @@ class HelmValuesFactory:
             return {
                 "type": StorageType.SMB.value,
                 "path": storage.path,
-                "size": storage.storage_size,
+                "size": storage.size,
                 "smb": {
                     "server": storage.smb_server,
                     "shareName": storage.smb_share_name,
@@ -252,20 +320,11 @@ class HelmValuesFactory:
             return {
                 "type": StorageType.AZURE_fILE.value,
                 "path": storage.path,
-                "size": storage.storage_size,
+                "size": storage.size,
                 "azureFile": {
                     "storageAccountName": storage.azure_storage_account_name,
                     "storageAccountKey": storage.azure_storage_account_key,
                     "shareName": storage.azure_share_name,
-                },
-            }
-        if storage.type == StorageType.GCS:
-            return {
-                "type": StorageType.GCS.value,
-                "path": storage.path,
-                "size": storage.storage_size,
-                "gcs": {
-                    "bucketName": storage.gcs_bucket_name,
                 },
             }
         raise ValueError(f"Storage type {storage.type.value!r} is not supported")
@@ -274,11 +333,6 @@ class HelmValuesFactory:
         result: dict[str, Any] = {
             "image": {"repository": platform.get_image("registry")},
             "ingress": {"enabled": False},
-            "persistence": {
-                "enabled": True,
-                "storageClass": platform.registry.docker_registry_storage_class_name,
-                "size": platform.registry.docker_registry_storage_size,
-            },
             "secrets": {
                 "haSharedSecret": sha256(platform.cluster_name.encode()).hexdigest()
             },
@@ -296,6 +350,44 @@ class HelmValuesFactory:
                 bcrypt.gensalt(rounds=10),
             ).decode()
             result["secrets"]["htpasswd"] = f"{username}:{password_hash}"
+        if (
+            platform.registry.docker_registry_storage_driver
+            == DockerRegistryStorageDriver.FILE_SYSTEM
+        ):
+            result["storage"] = "filesystem"
+            result["persistence"] = {
+                "enabled": True,
+                "storageClass": (
+                    platform.registry.docker_registry_file_system_storage_class_name
+                ),
+                "size": platform.registry.docker_registry_file_system_storage_size,
+            }
+        elif (
+            platform.registry.docker_registry_storage_driver
+            == DockerRegistryStorageDriver.S3
+        ):
+            assert platform.registry.docker_registry_s3_endpoint
+            result["replicaCount"] = 2
+            result["storage"] = "s3"
+            result["s3"] = {
+                "region": platform.registry.docker_registry_s3_region,
+                "regionEndpoint": self._get_url_authority(
+                    platform.registry.docker_registry_s3_endpoint
+                ),
+                "bucket": str(platform.registry.docker_registry_s3_bucket),
+            }
+            result["secrets"]["s3"] = {
+                "accessKey": platform.registry.docker_registry_s3_access_key,
+                "secretKey": platform.registry.docker_registry_s3_secret_key,
+            }
+            result["configData"]["storage"]["s3"] = {
+                "secure": platform.registry.docker_registry_s3_endpoint.scheme
+                == "https",
+                "forcepathstyle": platform.registry.docker_registry_s3_force_path_style,
+            }
+            result["configData"]["storage"]["redirect"] = {
+                "disable": platform.registry.docker_registry_s3_disable_redirect
+            }
         return result
 
     def create_minio_values(self, platform: PlatformConfig) -> dict[str, Any]:
@@ -332,10 +424,67 @@ class HelmValuesFactory:
             "priorityClassName": platform.services_priority_class_name,
         }
 
+    def create_minio_gateway_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        assert platform.minio_gateway
+        result = {
+            "nameOverride": "minio-gateway",
+            "fullnameOverride": "minio-gateway",
+            "replicaCount": 2,
+            "image": {"repository": platform.get_image("minio")},
+            "imagePullSecrets": [
+                {"name": name} for name in platform.image_pull_secret_names
+            ],
+            "rootUser": {
+                "user": platform.minio_gateway.root_user,
+                "password": platform.minio_gateway.root_user_password,
+            },
+        }
+        if platform.buckets.provider == BucketsProvider.GCP:
+            result["cloudStorage"] = {
+                "type": "gcs",
+                "gcs": {"project": platform.buckets.gcp_project},
+            }
+            result["env"] = [
+                {
+                    "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                    "value": "/etc/config/minio/gcs/key.json",
+                }
+            ]
+            result["secrets"] = [
+                {
+                    "name": "minio-gateway-gcs-key",
+                    "data": {"key.json": platform.gcp_service_account_key},
+                }
+            ]
+            result["volumes"] = [
+                {
+                    "name": "gcp-credentials",
+                    "secret": {
+                        "secretName": "minio-gateway-gcs-key",
+                        "optional": False,
+                    },
+                }
+            ]
+            result["volumeMounts"] = [
+                {
+                    "name": "gcp-credentials",
+                    "mountPath": "/etc/config/minio/gcs",
+                    "readOnly": True,
+                }
+            ]
+        elif platform.buckets.provider == BucketsProvider.AZURE:
+            result["cloudStorage"] = {"type": "azure"}
+        else:
+            raise ValueError(
+                f"Buckets provider {platform.buckets.provider} not supported"
+            )
+        return result
+
     def create_traefik_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {
             "nameOverride": "traefik",
             "fullnameOverride": "traefik",
+            "instanceLabelOverride": platform.release_name,
             "image": {"name": platform.get_image("traefik")},
             "deployment": {
                 "replicas": platform.ingress_controller_replicas,
@@ -354,42 +503,50 @@ class HelmValuesFactory:
                 "annotations": {},
             },
             "ports": {
-                "web": {"redirectTo": "websecure"},
+                "web": {"redirectTo": {"port": "websecure"}},
                 "websecure": {"tls": {"enabled": True}},
             },
             "additionalArguments": [
                 "--entryPoints.websecure.proxyProtocol.insecure=true",
                 "--entryPoints.websecure.forwardedHeaders.insecure=true",
-                "--providers.file.filename=/etc/traefik/dynamic/config.yaml",
-            ],
-            "volumes": [
-                {
-                    "name": f"{platform.release_name}-traefik-dynamic-config",
-                    "mountPath": "/etc/traefik/dynamic",
-                    "type": "configMap",
-                },
-                {
-                    "name": f"{platform.release_name}-ssl-cert",
-                    "mountPath": "/etc/certs",
-                    "type": "secret",
-                },
+                "--entryPoints.websecure.http.middlewares="
+                f"{platform.namespace}-{platform.release_name}-cors@kubernetescrd",
+                "--providers.kubernetesingress.ingressendpoint.ip=1.2.3.4",
             ],
             "providers": {
                 "kubernetesCRD": {
                     "enabled": True,
                     "allowCrossNamespace": True,
                     "allowExternalNameServices": True,
-                    "namespaces": platform.ingress_namespaces,
                 },
                 "kubernetesIngress": {
                     "enabled": True,
                     "allowExternalNameServices": True,
-                    "namespaces": platform.ingress_namespaces,
+                    # published service conflicts with ingressendpoint.ip arg
+                    "publishedService": {"enabled": False},
                 },
+            },
+            "tlsStore": {
+                "default": {
+                    "defaultCertificate": {
+                        "secretName": f"{platform.release_name}-ssl-cert"
+                    },
+                }
             },
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
             "priorityClassName": platform.services_priority_class_name,
+            "metrics": {
+                "prometheus": {
+                    "service": {"enabled": True},
+                    "serviceMonitor": {
+                        "jobLabel": "app.kubernetes.io/name",
+                        "additionalLabels": {
+                            "platform.apolo.us/scrape-metrics": "true"
+                        },
+                    },
+                }
+            },
         }
         if platform.kubernetes_version >= "1.19":
             result["ingressClass"] = {"enabled": True}
@@ -408,12 +565,14 @@ class HelmValuesFactory:
                 "loadBalancerSourceRanges"
             ] = platform.ingress_load_balancer_source_ranges
         if platform.ingress_service_type == IngressServiceType.NODE_PORT:
-            result["rollingUpdate"] = {"maxUnavailable": 1, "maxSurge": 0}
             ports = result["ports"]
             if platform.ingress_node_port_http and platform.ingress_node_port_https:
                 ports["web"]["nodePort"] = platform.ingress_node_port_http
                 ports["websecure"]["nodePort"] = platform.ingress_node_port_https
             if platform.ingress_host_port_http and platform.ingress_host_port_https:
+                result["updateStrategy"] = {
+                    "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0}
+                }
                 ports["web"]["hostPort"] = platform.ingress_host_port_http
                 ports["websecure"]["hostPort"] = platform.ingress_host_port_https
         result["service"]["annotations"].update(platform.ingress_service_annotations)
@@ -432,23 +591,14 @@ class HelmValuesFactory:
         if platform.token:
             return {
                 "token": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": f"{platform.release_name}-token",
-                            "key": "token",
-                        }
-                    }
+                    **self._create_value_from_secret(
+                        name=f"{platform.release_name}-token", key="token"
+                    ),
                 }
             }
         return {
             "token": {"value": ""},
         }
-
-    def _create_cors_values(self, platform: PlatformConfig) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        if platform.ingress_cors_origins:
-            result["cors"] = {"origins": platform.ingress_cors_origins}
-        return result
 
     def _create_tracing_values(self, platform: PlatformConfig) -> dict[str, Any]:
         if not platform.sentry_dsn:
@@ -462,16 +612,21 @@ class HelmValuesFactory:
         }
         return result
 
+    def _create_value_from_secret(self, *, name: str, key: str) -> dict[str, Any]:
+        result = {"valueFrom": {"secretKeyRef": {"name": name, "key": key}}}
+        return result
+
     def create_platform_storage_values(
         self, platform: PlatformConfig
     ) -> dict[str, Any]:
-        result = {
+        result: dict[str, Any] = {
             "nameOverride": f"{platform.release_name}-storage",
             "fullnameOverride": f"{platform.release_name}-storage",
             "image": {"repository": platform.get_image("platformstorageapi")},
             "platform": {
                 "clusterName": platform.cluster_name,
                 **self._create_platform_url_value("authUrl", platform.auth_url),
+                **self._create_platform_url_value("adminUrl", platform.admin_url),
                 **self._create_platform_token_value(platform),
             },
             "storages": [
@@ -496,11 +651,140 @@ class HelmValuesFactory:
                 "hosts": [platform.ingress_url.host],
             },
             "priorityClassName": platform.services_priority_class_name,
+            "storageUsageCollector": {
+                "resources": {
+                    "requests": {"cpu": "250m", "memory": "500Mi"},
+                    "limits": {"cpu": "1000m", "memory": "1Gi"},
+                }
+            },
+            "secrets": [],
         }
-        result.update(
-            **self._create_cors_values(platform),
-            **self._create_tracing_values(platform),
-        )
+        result.update(**self._create_tracing_values(platform))
+        s3_secret_name = f"{platform.release_name}-storage-s3"
+        if platform.buckets.provider == BucketsProvider.GCP:
+            assert platform.minio_gateway
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.minio_gateway.root_user,
+                        "secret_access_key": platform.minio_gateway.root_user_password,
+                    },
+                }
+            )
+            result["s3"] = {
+                "endpoint": "http://minio-gateway:9000",
+                "region": (
+                    platform.monitoring.logs_region or platform.buckets.gcp_location
+                ),
+                "accessKeyId": self._create_value_from_secret(
+                    name=s3_secret_name, key="access_key_id"
+                ),
+                "secretAccessKey": self._create_value_from_secret(
+                    name=s3_secret_name, key="secret_access_key"
+                ),
+                "bucket": platform.monitoring.metrics_bucket_name,
+                "keyPrefix": "storage/",
+            }
+        elif platform.buckets.provider == BucketsProvider.AZURE:
+            assert platform.minio_gateway
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.minio_gateway.root_user,
+                        "secret_access_key": platform.minio_gateway.root_user_password,
+                    },
+                }
+            )
+            result["s3"] = {
+                "endpoint": "http://minio-gateway:9000",
+                "region": "minio",
+                "accessKeyId": self._create_value_from_secret(
+                    name=s3_secret_name, key="access_key_id"
+                ),
+                "secretAccessKey": self._create_value_from_secret(
+                    name=s3_secret_name, key="secret_access_key"
+                ),
+                "bucket": platform.monitoring.metrics_bucket_name,
+                "keyPrefix": "storage/",
+            }
+        elif platform.buckets.provider == BucketsProvider.AWS:
+            result["s3"] = {
+                "region": platform.buckets.aws_region,
+                "bucket": platform.monitoring.metrics_bucket_name,
+                "keyPrefix": "storage/",
+            }
+        elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.buckets.emc_ecs_access_key_id,
+                        "secret_access_key": platform.buckets.emc_ecs_secret_access_key,
+                    },
+                }
+            )
+            result["s3"] = {
+                "endpoint": str(platform.buckets.emc_ecs_s3_endpoint),
+                "region": "emc-ecs",
+                "accessKeyId": self._create_value_from_secret(
+                    name=s3_secret_name, key="access_key_id"
+                ),
+                "secretAccessKey": self._create_value_from_secret(
+                    name=s3_secret_name, key="secret_access_key"
+                ),
+                "bucket": platform.monitoring.metrics_bucket_name,
+                "keyPrefix": "storage/",
+            }
+        elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.buckets.open_stack_username,
+                        "secret_access_key": platform.buckets.open_stack_password,
+                    },
+                }
+            )
+            result["s3"] = {
+                "endpoint": str(platform.buckets.open_stack_s3_endpoint),
+                "region": platform.buckets.open_stack_region_name,
+                "accessKeyId": self._create_value_from_secret(
+                    name=s3_secret_name, key="access_key_id"
+                ),
+                "secretAccessKey": self._create_value_from_secret(
+                    name=s3_secret_name, key="secret_access_key"
+                ),
+                "bucket": platform.monitoring.metrics_bucket_name,
+                "keyPrefix": "storage/",
+            }
+        elif platform.buckets.provider == BucketsProvider.MINIO:
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.buckets.minio_access_key,
+                        "secret_access_key": platform.buckets.minio_secret_key,
+                    },
+                }
+            )
+            result["s3"] = {
+                "endpoint": str(platform.buckets.minio_url),
+                "region": platform.buckets.minio_region,
+                "accessKeyId": self._create_value_from_secret(
+                    name=s3_secret_name, key="access_key_id"
+                ),
+                "secretAccessKey": self._create_value_from_secret(
+                    name=s3_secret_name, key="secret_access_key"
+                ),
+                "bucket": platform.monitoring.metrics_bucket_name,
+                "keyPrefix": "storage/",
+            }
+        else:
+            raise ValueError(
+                f"Bucket provider {platform.buckets.provider} not supported"
+            )
         return result
 
     def create_platform_registry_values(
@@ -531,10 +815,7 @@ class HelmValuesFactory:
             "secrets": [],
             "priorityClassName": platform.services_priority_class_name,
         }
-        result.update(
-            **self._create_cors_values(platform),
-            **self._create_tracing_values(platform),
-        )
+        result.update(**self._create_tracing_values(platform))
         if platform.registry.provider == RegistryProvider.GCP:
             gcp_key_secret_name = f"{platform.release_name}-registry-gcp-key"
             result["upstreamRegistry"] = {
@@ -543,20 +824,14 @@ class HelmValuesFactory:
                 "tokenUrl": "https://gcr.io/v2/token",
                 "tokenService": "gcr.io",
                 "tokenUsername": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": gcp_key_secret_name,
-                            "key": "username",
-                        }
-                    }
+                    **self._create_value_from_secret(
+                        name=gcp_key_secret_name, key="username"
+                    ),
                 },
                 "tokenPassword": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": gcp_key_secret_name,
-                            "key": "password",
-                        }
-                    }
+                    **self._create_value_from_secret(
+                        name=gcp_key_secret_name, key="password"
+                    ),
                 },
                 "project": platform.registry.gcp_project,
                 "maxCatalogEntries": 10000,
@@ -592,20 +867,14 @@ class HelmValuesFactory:
                 "tokenUrl": str(platform.registry.azure_url / "oauth2/token"),
                 "tokenService": platform.registry.azure_url.host,
                 "tokenUsername": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": azure_credentials_secret_name,
-                            "key": "username",
-                        }
-                    }
+                    **self._create_value_from_secret(
+                        name=azure_credentials_secret_name, key="username"
+                    ),
                 },
                 "tokenPassword": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": azure_credentials_secret_name,
-                            "key": "password",
-                        }
-                    }
+                    **self._create_value_from_secret(
+                        name=azure_credentials_secret_name, key="password"
+                    ),
                 },
                 "project": "neuro",
                 "maxCatalogEntries": 10000,
@@ -627,20 +896,14 @@ class HelmValuesFactory:
                 "type": "basic",
                 "url": str(platform.registry.docker_registry_url),
                 "basicUsername": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": docker_registry_credentials_secret_name,
-                            "key": "username",
-                        }
-                    }
+                    **self._create_value_from_secret(
+                        name=docker_registry_credentials_secret_name, key="username"
+                    ),
                 },
                 "basicPassword": {
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": docker_registry_credentials_secret_name,
-                            "key": "password",
-                        }
-                    }
+                    **self._create_value_from_secret(
+                        name=docker_registry_credentials_secret_name, key="password"
+                    ),
                 },
                 "project": "neuro",
                 "maxCatalogEntries": 10000,
@@ -669,14 +932,13 @@ class HelmValuesFactory:
             "kubeletPort": platform.kubelet_port,
             "nvidiaDCGMPort": platform.nvidia_dcgm_port,
             "nodeLabels": {
-                "job": platform.node_labels.job,
                 "nodePool": platform.node_labels.node_pool,
             },
             "platform": {
                 "clusterName": platform.cluster_name,
                 **self._create_platform_url_value("authUrl", platform.auth_url),
                 **self._create_platform_url_value("configUrl", platform.config_url),
-                **self._create_platform_url_value("apiUrl", platform.api_url, "api/v1"),
+                **self._create_platform_url_value("apiUrl", platform.api_url),
                 **self._create_platform_url_value(
                     "registryUrl", platform.ingress_registry_url
                 ),
@@ -697,30 +959,34 @@ class HelmValuesFactory:
             },
             "containerRuntime": {"name": self._container_runtime},
             "fluentbit": {"image": {"repository": platform.get_image("fluent-bit")}},
-            "fluentd": {
-                "image": {"repository": platform.get_image("fluentd")},
-                "persistence": {
-                    "enabled": True,
-                    "storageClassName": platform.standard_storage_class_name,
-                },
-            },
-            "minio": {"image": {"repository": platform.get_image("minio")}},
             "priorityClassName": platform.services_priority_class_name,
+            "secrets": [],
         }
-        result.update(
-            **self._create_cors_values(platform),
-            **self._create_tracing_values(platform),
-        )
+        result.update(**self._create_tracing_values(platform))
+        s3_secret_name = f"{platform.release_name}-monitoring-s3"
         if platform.buckets.provider == BucketsProvider.GCP:
+            assert platform.minio_gateway
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.minio_gateway.root_user,
+                        "secret_access_key": platform.minio_gateway.root_user_password,
+                    },
+                }
+            )
             result["logs"] = {
                 "persistence": {
-                    "type": "gcp",
-                    "gcp": {
-                        "serviceAccountKeyBase64": (
-                            platform.gcp_service_account_key_base64
+                    "type": "s3",
+                    "s3": {
+                        "endpoint": "http://minio-gateway:9000",
+                        "accessKeyId": self._create_value_from_secret(
+                            name=s3_secret_name, key="access_key_id"
                         ),
-                        "project": platform.buckets.gcp_project,
-                        "location": (
+                        "secretAccessKey": self._create_value_from_secret(
+                            name=s3_secret_name, key="secret_access_key"
+                        ),
+                        "region": (
                             platform.monitoring.logs_region
                             or platform.buckets.gcp_location
                         ),
@@ -731,68 +997,122 @@ class HelmValuesFactory:
         elif platform.buckets.provider == BucketsProvider.AWS:
             result["logs"] = {
                 "persistence": {
-                    "type": "aws",
-                    "aws": {
+                    "type": "s3",
+                    "s3": {
                         "region": platform.buckets.aws_region,
                         "bucket": platform.monitoring.logs_bucket_name,
                     },
                 }
             }
         elif platform.buckets.provider == BucketsProvider.AZURE:
+            assert platform.minio_gateway
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.minio_gateway.root_user,
+                        "secret_access_key": platform.minio_gateway.root_user_password,
+                    },
+                }
+            )
             result["logs"] = {
                 "persistence": {
-                    "type": "azure",
-                    "azure": {
-                        "storageAccountName": (
-                            platform.buckets.azure_storage_account_name
+                    "type": "s3",
+                    "s3": {
+                        "endpoint": "http://minio-gateway:9000",
+                        "accessKeyId": self._create_value_from_secret(
+                            name=s3_secret_name, key="access_key_id"
                         ),
-                        "storageAccountKey": platform.buckets.azure_storage_account_key,
+                        "secretAccessKey": self._create_value_from_secret(
+                            name=s3_secret_name, key="secret_access_key"
+                        ),
+                        "region": "minio",
                         "bucket": platform.monitoring.logs_bucket_name,
                     },
                 }
             }
         elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.buckets.emc_ecs_access_key_id,
+                        "secret_access_key": platform.buckets.emc_ecs_secret_access_key,
+                    },
+                }
+            )
             result["logs"] = {
                 "persistence": {
-                    "type": "aws",
-                    "aws": {
+                    "type": "s3",
+                    "s3": {
                         "endpoint": str(platform.buckets.emc_ecs_s3_endpoint),
-                        "accessKeyId": platform.buckets.emc_ecs_access_key_id,
-                        "secretAccessKey": platform.buckets.emc_ecs_secret_access_key,
+                        "accessKeyId": self._create_value_from_secret(
+                            name=s3_secret_name, key="access_key_id"
+                        ),
+                        "secretAccessKey": self._create_value_from_secret(
+                            name=s3_secret_name, key="secret_access_key"
+                        ),
+                        "region": "emc-ecs",
                         "bucket": platform.monitoring.logs_bucket_name,
-                        "forcePathStyle": True,
                     },
                 }
             }
         elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.buckets.open_stack_username,
+                        "secret_access_key": platform.buckets.open_stack_password,
+                    },
+                }
+            )
             result["logs"] = {
                 "persistence": {
-                    "type": "aws",
-                    "aws": {
+                    "type": "s3",
+                    "s3": {
                         "endpoint": str(platform.buckets.open_stack_s3_endpoint),
-                        "accessKeyId": platform.buckets.open_stack_username,
-                        "secretAccessKey": platform.buckets.open_stack_password,
+                        "accessKeyId": self._create_value_from_secret(
+                            name=s3_secret_name, key="access_key_id"
+                        ),
+                        "secretAccessKey": self._create_value_from_secret(
+                            name=s3_secret_name, key="secret_access_key"
+                        ),
                         "region": platform.buckets.open_stack_region_name,
                         "bucket": platform.monitoring.logs_bucket_name,
-                        "forcePathStyle": True,
                     },
                 }
             }
         elif platform.buckets.provider == BucketsProvider.MINIO:
+            result["secrets"].append(
+                {
+                    "name": s3_secret_name,
+                    "data": {
+                        "access_key_id": platform.buckets.minio_access_key,
+                        "secret_access_key": platform.buckets.minio_secret_key,
+                    },
+                }
+            )
             result["logs"] = {
                 "persistence": {
-                    "type": "minio",
-                    "minio": {
-                        "url": str(platform.buckets.minio_url),
-                        "accessKey": platform.buckets.minio_access_key,
-                        "secretKey": platform.buckets.minio_secret_key,
+                    "type": "s3",
+                    "s3": {
+                        "endpoint": str(platform.buckets.minio_url),
+                        "accessKeyId": self._create_value_from_secret(
+                            name=s3_secret_name, key="access_key_id"
+                        ),
+                        "secretAccessKey": self._create_value_from_secret(
+                            name=s3_secret_name, key="secret_access_key"
+                        ),
                         "region": platform.buckets.minio_region,
                         "bucket": platform.monitoring.logs_bucket_name,
                     },
                 }
             }
         else:
-            raise AssertionError("was unable to construct monitoring config")
+            raise ValueError(
+                f"Bucket provider {platform.buckets.provider} not supported"
+            )
         return result
 
     def create_platform_container_runtime_values(
@@ -850,16 +1170,12 @@ class HelmValuesFactory:
             },
             "priorityClassName": platform.services_priority_class_name,
         }
-        result.update(
-            **self._create_cors_values(platform),
-            **self._create_tracing_values(platform),
-        )
+        result.update(**self._create_tracing_values(platform))
         return result
 
     def create_platform_reports_values(
         self, platform: PlatformConfig
     ) -> dict[str, Any]:
-        object_store_config_map_name = "thanos-object-storage-config"
         relabelings = [
             self._relabel_reports_label(
                 platform.node_labels.job,
@@ -894,10 +1210,6 @@ class HelmValuesFactory:
                 "nodePool": platform.node_labels.node_pool,
                 "preemptible": platform.node_labels.preemptible,
             },
-            "objectStore": {
-                "supported": True,
-                "configMapName": object_store_config_map_name,
-            },
             "platform": {
                 "clusterName": platform.cluster_name,
                 **self._create_platform_url_value("authUrl", platform.auth_url),
@@ -905,16 +1217,26 @@ class HelmValuesFactory:
                     "ingressAuthUrl", platform.ingress_auth_url
                 ),
                 **self._create_platform_url_value("configUrl", platform.config_url),
-                **self._create_platform_url_value("apiUrl", platform.api_url, "api/v1"),
+                **self._create_platform_url_value("apiUrl", platform.api_url),
                 **self._create_platform_token_value(platform),
             },
             "secrets": [],
             "platformJobs": {"namespace": platform.jobs_namespace},
+            "metricsApi": {
+                "ingress": {
+                    "enabled": True,
+                    "ingressClassName": "traefik",
+                    "hosts": [platform.ingress_url.host],
+                }
+            },
             "grafanaProxy": {
                 "ingress": {
                     "enabled": True,
                     "ingressClassName": "traefik",
-                    "hosts": [platform.ingress_metrics_url.host],
+                    "hosts": [
+                        platform.ingress_grafana_url.host,
+                        platform.ingress_metrics_url.host,  # deprecated
+                    ],
                     "annotations": {
                         "traefik.ingress.kubernetes.io/router.middlewares": (
                             f"{platform.namespace}-{platform.release_name}-ingress-auth"
@@ -923,24 +1245,24 @@ class HelmValuesFactory:
                     },
                 }
             },
+            "prometheus": {
+                "url": "http://thanos-query-http:10902",
+                "remoteStorageEnabled": True,
+            },
             "kube-prometheus-stack": {
                 "global": {
+                    "imageRegistry": platform.image_registry,
                     "imagePullSecrets": [
                         {"name": name} for name in platform.image_pull_secret_names
-                    ]
+                    ],
                 },
                 "prometheus": {
                     "prometheusSpec": {
-                        "image": {"repository": platform.get_image("prometheus")},
-                        "retention": platform.monitoring.metrics_retention_time,
-                        "thanos": {
-                            "image": platform.get_image("thanos:v0.24.0"),
-                            "version": "v0.14.0",
-                            "objectStorageConfig": {
-                                "name": object_store_config_map_name,
-                                "key": "thanos-object-storage.yaml",
-                            },
+                        "image": {
+                            "registry": platform.image_registry,
+                            "repository": platform.get_image_repo("prometheus"),
                         },
+                        "retention": platform.monitoring.metrics_retention_time,
                         "storageSpec": {
                             "volumeClaimTemplate": {
                                 "spec": {
@@ -957,23 +1279,29 @@ class HelmValuesFactory:
                     }
                 },
                 "prometheusOperator": {
-                    "image": {"repository": platform.get_image("prometheus-operator")},
-                    "prometheusConfigReloaderImage": {
-                        "repository": platform.get_image("prometheus-config-reloader")
+                    "image": {
+                        "registry": platform.image_registry,
+                        "repository": platform.get_image_repo("prometheus-operator"),
                     },
-                    "configmapReloadImage": {
-                        "repository": platform.get_image("configmap-reload")
+                    "prometheusConfigReloader": {
+                        "image": {
+                            "registry": platform.image_registry,
+                            "repository": platform.get_image_repo(
+                                "prometheus-config-reloader"
+                            ),
+                        }
                     },
-                    "kubectlImage": {"repository": platform.get_image("kubectl")},
-                    "tlsProxy": {
-                        "image": {"repository": platform.get_image("ghostunnel")}
+                    "thanosImage": {
+                        "registry": platform.image_registry,
+                        "repository": platform.get_image_repo("thanos"),
                     },
                     "admissionWebhooks": {
                         "patch": {
                             "image": {
-                                "repository": platform.get_image(
-                                    "nginx-kube-webhook-certgen"
-                                )
+                                "registry": platform.image_registry,
+                                "repository": platform.get_image_repo(
+                                    "kube-webhook-certgen"
+                                ),
                             },
                             "priorityClassName": platform.services_priority_class_name,
                         }
@@ -986,21 +1314,89 @@ class HelmValuesFactory:
                     "serviceMonitor": {"metricRelabelings": relabelings}
                 },
                 "kube-state-metrics": {
-                    "image": {"repository": platform.get_image("kube-state-metrics")},
+                    "image": {
+                        "registry": platform.image_registry,
+                        "repository": platform.get_image_repo("kube-state-metrics"),
+                    },
                     "serviceAccount": {
                         "imagePullSecrets": [
                             {"name": name} for name in platform.image_pull_secret_names
                         ]
                     },
                     "priorityClassName": platform.services_priority_class_name,
+                    "rbac": {
+                        "extraRules": [
+                            {
+                                "apiGroups": ["neuromation.io"],
+                                "resources": ["platforms"],
+                                "verbs": ["list", "watch"],
+                            }
+                        ]
+                    },
+                    "customResourceState": {
+                        "enabled": True,
+                        "config": {
+                            "spec": {
+                                "resources": [
+                                    {
+                                        "groupVersionKind": {
+                                            "group": "neuromation.io",
+                                            "version": "*",
+                                            "kind": "Platform",
+                                        },
+                                        "labelsFromPath": {
+                                            "name": ["metadata", "name"],
+                                        },
+                                        "metricNamePrefix": "kube_platform",
+                                        "metrics": [
+                                            {
+                                                "name": "status_phase",
+                                                "help": "Platform status phase",
+                                                "each": {
+                                                    "type": "StateSet",
+                                                    "stateSet": {
+                                                        "labelName": "phase",
+                                                        "path": ["status", "phase"],
+                                                        "list": [
+                                                            "Pending",
+                                                            "Deploying",
+                                                            "Deleting",
+                                                            "Deployed",
+                                                            "Failed",
+                                                        ],
+                                                    },
+                                                },
+                                            }
+                                        ],
+                                    }
+                                ]
+                            }
+                        },
+                    },
+                },
+                "nodeExporter": {
+                    "enabled": platform.monitoring.metrics_node_exporter_enabled,
                 },
                 "prometheus-node-exporter": {
-                    "image": {"repository": platform.get_image("node-exporter")},
+                    "image": {
+                        "registry": platform.image_registry,
+                        "repository": platform.get_image_repo("node-exporter"),
+                    },
                     "serviceAccount": {
                         "imagePullSecrets": [
                             {"name": name} for name in platform.image_pull_secret_names
                         ]
                     },
+                },
+                "alertmanager": {
+                    "alertmanagerSpec": {
+                        "image": {
+                            "registry": platform.image_registry,
+                            "repository": platform.get_image_repo("alertmanager"),
+                        },
+                        "configSecret": f"{platform.release_name}-alertmanager-config",
+                        "secrets": [f"{platform.release_name}-token"],
+                    }
                 },
             },
             "thanos": {
@@ -1020,21 +1416,25 @@ class HelmValuesFactory:
                     },
                 },
                 "priorityClassName": platform.services_priority_class_name,
+                "sidecar": {"selector": {"app": None}},
             },
             "grafana": {
                 "image": {
-                    "repository": platform.get_image("grafana"),
+                    "registry": platform.image_registry,
+                    "repository": platform.get_image_repo("grafana"),
                     "pullSecrets": platform.image_pull_secret_names,
                 },
                 "initChownData": {
                     "image": {
-                        "repository": platform.get_image("busybox"),
+                        "registry": platform.image_registry,
+                        "repository": platform.get_image_repo("busybox"),
                         "pullSecrets": platform.image_pull_secret_names,
                     }
                 },
                 "sidecar": {
                     "image": {
-                        "repository": platform.get_image("k8s-sidecar"),
+                        "registry": platform.image_registry,
+                        "repository": platform.get_image_repo("k8s-sidecar"),
                         "pullSecrets": platform.image_pull_secret_names,
                     }
                 },
@@ -1049,7 +1449,8 @@ class HelmValuesFactory:
             "prometheusSpec"
         ]
         if platform.monitoring.metrics_storage_type == MetricsStorageType.KUBERNETES:
-            result["objectStore"] = {"supported": False}
+            result["prometheus"]["url"] = "http://prometheus-prometheus:9090"
+            result["prometheus"]["remoteStorageEnabled"] = False
             result["prometheusProxy"] = {
                 "prometheus": {"host": "prometheus-prometheus", "port": 9090}
             }
@@ -1063,9 +1464,6 @@ class HelmValuesFactory:
                     "requests": {"storage": platform.monitoring.metrics_storage_size}
                 },
             }
-            # Because of the bug in helm the only way to delete thanos values
-            # is to set it to empty string
-            prometheus_spec["thanos"] = ""
             del result["thanos"]
         elif platform.buckets.provider == BucketsProvider.GCP:
             result["thanos"]["objstore"] = {
@@ -1076,6 +1474,9 @@ class HelmValuesFactory:
                         platform.gcp_service_account_key_base64
                     ).decode(),
                 },
+            }
+            prometheus_spec["thanos"] = {
+                "objectStorageConfig": {"secret": result["thanos"]["objstore"]}
             }
             result["secrets"].append(
                 {
@@ -1091,6 +1492,9 @@ class HelmValuesFactory:
                     "endpoint": f"s3.{platform.buckets.aws_region}.amazonaws.com",
                 },
             }
+            prometheus_spec["thanos"] = {
+                "objectStorageConfig": {"secret": result["thanos"]["objstore"]}
+            }
         elif platform.buckets.provider == BucketsProvider.AZURE:
             result["thanos"]["objstore"] = {
                 "type": "AZURE",
@@ -1099,6 +1503,9 @@ class HelmValuesFactory:
                     "storage_account": platform.buckets.azure_storage_account_name,
                     "storage_account_key": platform.buckets.azure_storage_account_key,
                 },
+            }
+            prometheus_spec["thanos"] = {
+                "objectStorageConfig": {"secret": result["thanos"]["objstore"]}
             }
         elif platform.buckets.provider == BucketsProvider.MINIO:
             assert platform.buckets.minio_url
@@ -1110,7 +1517,11 @@ class HelmValuesFactory:
                     "region": platform.buckets.minio_region,
                     "access_key": platform.buckets.minio_access_key,
                     "secret_key": platform.buckets.minio_secret_key,
+                    "insecure": platform.buckets.minio_url.scheme == "http",
                 },
+            }
+            prometheus_spec["thanos"] = {
+                "objectStorageConfig": {"secret": result["thanos"]["objstore"]}
             }
         elif platform.buckets.provider == BucketsProvider.EMC_ECS:
             assert platform.buckets.emc_ecs_s3_endpoint
@@ -1125,6 +1536,9 @@ class HelmValuesFactory:
                     "secret_key": platform.buckets.emc_ecs_secret_access_key,
                 },
             }
+            prometheus_spec["thanos"] = {
+                "objectStorageConfig": {"secret": result["thanos"]["objstore"]}
+            }
         elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
             assert platform.buckets.open_stack_s3_endpoint
             result["thanos"]["objstore"] = {
@@ -1138,6 +1552,9 @@ class HelmValuesFactory:
                     "access_key": platform.buckets.open_stack_username,
                     "secret_key": platform.buckets.open_stack_password,
                 },
+            }
+            prometheus_spec["thanos"] = {
+                "objectStorageConfig": {"secret": result["thanos"]["objstore"]}
             }
         else:
             raise AssertionError("was unable to construct thanos object store config")
@@ -1211,10 +1628,7 @@ class HelmValuesFactory:
         }
         if platform.disks_storage_class_name:
             result["disks"]["storageClassName"] = platform.disks_storage_class_name
-        result.update(
-            **self._create_cors_values(platform),
-            **self._create_tracing_values(platform),
-        )
+        result.update(**self._create_tracing_values(platform))
         return result
 
     def create_platform_api_poller_values(
@@ -1256,7 +1670,6 @@ class HelmValuesFactory:
             },
             "nodeLabels": {
                 "job": platform.node_labels.job,
-                "gpu": platform.node_labels.accelerator,
                 "preemptible": platform.node_labels.preemptible,
                 "nodePool": platform.node_labels.node_pool,
             },
@@ -1314,10 +1727,7 @@ class HelmValuesFactory:
             "disableCreation": platform.buckets.disable_creation,
             "priorityClassName": platform.services_priority_class_name,
         }
-        result.update(
-            **self._create_cors_values(platform),
-            **self._create_tracing_values(platform),
-        )
+        result.update(**self._create_tracing_values(platform))
         if platform.buckets.provider == BucketsProvider.AWS:
             result["bucketProvider"] = {
                 "type": "aws",
@@ -1342,20 +1752,12 @@ class HelmValuesFactory:
                 "emc_ecs": {
                     "s3RoleUrn": platform.buckets.emc_ecs_s3_assumable_role,
                     "accessKeyId": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": secret_name,
-                                "key": "key",
-                            }
-                        }
+                        **self._create_value_from_secret(name=secret_name, key="key"),
                     },
                     "secretAccessKey": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": secret_name,
-                                "key": "secret",
-                            }
-                        }
+                        **self._create_value_from_secret(
+                            name=secret_name, key="secret"
+                        ),
                     },
                     "s3EndpointUrl": str(platform.buckets.emc_ecs_s3_endpoint),
                     "managementEndpointUrl": str(
@@ -1379,20 +1781,14 @@ class HelmValuesFactory:
                 "open_stack": {
                     "regionName": platform.buckets.open_stack_region_name,
                     "accountId": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": secret_name,
-                                "key": "accountId",
-                            }
-                        }
+                        **self._create_value_from_secret(
+                            name=secret_name, key="accountId"
+                        ),
                     },
                     "password": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": secret_name,
-                                "key": "password",
-                            }
-                        }
+                        **self._create_value_from_secret(
+                            name=secret_name, key="password"
+                        ),
                     },
                     "s3EndpointUrl": str(platform.buckets.open_stack_s3_endpoint),
                     "endpointUrl": str(platform.buckets.open_stack_endpoint),
@@ -1425,12 +1821,7 @@ class HelmValuesFactory:
                         f".blob.core.windows.net"
                     ),
                     "credential": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": secret_name,
-                                "key": "key",
-                            }
-                        }
+                        **self._create_value_from_secret(name=secret_name, key="key"),
                     },
                 },
             }
@@ -1446,15 +1837,529 @@ class HelmValuesFactory:
                 "type": "gcp",
                 "gcp": {
                     "SAKeyJsonB64": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": secret_name,
-                                "key": "SAKeyB64",
-                            }
-                        }
+                        **self._create_value_from_secret(
+                            name=secret_name, key="SAKeyB64"
+                        ),
                     }
                 },
             }
         else:
             raise AssertionError("was unable to construct bucket provider")
+        return result
+
+    def create_platform_apps_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "nameOverride": f"{platform.release_name}-apps",
+            "fullnameOverride": f"{platform.release_name}-apps",
+            "image": {"repository": platform.get_image("platform-apps")},
+            "platform": {
+                "clusterName": platform.cluster_name,
+                **self._create_platform_url_value("authUrl", platform.auth_url),
+                **self._create_platform_token_value(platform),
+            },
+            "ingress": {
+                "enabled": True,
+                "className": "traefik",
+                "hosts": [platform.ingress_url.host],
+            },
+            "priorityClassName": platform.services_priority_class_name,
+            "rbac": {"create": True},
+            "serviceAccount": {"create": True},
+        }
+        result.update(**self._create_tracing_values(platform))
+        return result
+
+    def create_loki_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        result = {
+            "nameOverride": "loki",
+            "fullnameOverride": "loki",
+            "deploymentMode": "SimpleScalable",
+            "loki": {
+                "commonConfig": {"replication_factor": 1},
+                "auth_enabled": False,
+            },
+            "test": {"enabled": False},
+            "lokiCanary": {"enabled": False},
+            "resultsCache": {"allocatedMemory": 512},
+            "chunksCache": {"allocatedMemory": 2048},
+            "ingester": {"chunk_encoding": "snappy"},
+            "table_manager": {
+                "retention_deletes_enabled": True,
+                "retention_period": "2160h",
+            },
+            "query_scheduler": {
+                "max_outstanding_requests_per_tenant": 32768,
+            },
+            "querier": {
+                "max_concurrent": 4,  # Default is 4, adjust based on memory and CPU
+            },
+            "pattern_ingester": {
+                "enabled": True,
+            },
+            "limits_config": {
+                "allow_structured_metadata": True,
+                "volume_enabled": True,
+                "retention_period": "90d",
+            },
+            "minio": {"enabled": False},
+            "gateway": {
+                "replicas": 1,
+                "resources": {
+                    "requests": {"memory": "100Mi", "cpu": "10m"},
+                    "limits": {"memory": "100Mi"},
+                },
+            },
+            "write": {
+                "replicas": 1,
+                "resources": {
+                    "requests": {"memory": "512Mi", "cpu": "100m"},
+                    "limits": {"memory": "1024Mi"},
+                },
+            },
+            "read": {
+                "replicas": 1,
+                "resources": {
+                    "requests": {"memory": "100Mi", "cpu": "100m"},
+                    "limits": {"memory": "2048Mi"},
+                },
+            },
+            "backend": {
+                "replicas": 1,
+                "resources": {
+                    "requests": {"memory": "100Mi", "cpu": "100m"},
+                    "limits": {"memory": "512Mi", "cpu": "100m"},
+                },
+            },
+        }
+
+        bucket_name = platform.monitoring.logs_bucket_name
+        if platform.buckets.provider == BucketsProvider.GCP:
+            gcp_loki_sa_access_secret_name = f"{platform.release_name}-loki-access-gcs"
+            result["extraObjects"] = [
+                f"apiVersion: v1"
+                f"data:"
+                f"  key.json: {platform.gcp_service_account_key_base64}"
+                f"kind: Secret"
+                f"metadata:"
+                f"  name: f{gcp_loki_sa_access_secret_name}"
+                f"  namespace: {platform.namespace}"
+                f"type: Opaque"
+            ]
+
+            extra_env = {
+                "extraEnv": [
+                    {
+                        "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                        "value": "/etc/secrets/key.json",
+                    }
+                ],
+                "extraVolumes": [
+                    {
+                        "name": "loki-access-gcs",
+                        "secret": {
+                            "secretName": gcp_loki_sa_access_secret_name,
+                        },
+                    }
+                ],
+                "extraVolumeMounts": [
+                    {
+                        "name": "loki-access-gcs",
+                        "mountPath": "/etc/secrets",
+                    }
+                ],
+            }
+
+            result["loki"].update(  # type: ignore
+                {
+                    "storage": {
+                        "bucketNames": {
+                            "chunks": bucket_name,
+                            "ruler": bucket_name,
+                            "admin": bucket_name,
+                        },
+                        "type": "gcs",
+                    },
+                    "schemaConfig": {
+                        "configs": [
+                            {
+                                "from": "2025-01-01",
+                                "object_store": "gcs",
+                                "store": "tsdb",
+                                "schema": "v13",
+                                "index": {"prefix": "index_", "period": "24h"},
+                            }
+                        ]
+                    },
+                }
+            )
+            result["write"].update(extra_env)  # type: ignore
+            result["read"].update(extra_env)  # type: ignore
+            result["backend"].update(extra_env)  # type: ignore
+
+        elif platform.buckets.provider == BucketsProvider.AZURE:
+            result["loki"].update(  # type: ignore
+                {
+                    "rulerConfig": {
+                        "storage": {
+                            "type": "azure",
+                            "azure": {
+                                "account_key": (
+                                    platform.buckets.azure_storage_account_key
+                                ),
+                                "account_name": (
+                                    platform.buckets.azure_storage_account_name
+                                ),
+                                "container_name": bucket_name,
+                                "use_managed_identity": False,
+                                "request_timeout": 0,
+                            },
+                        }
+                    },
+                    "schemaConfig": {
+                        "configs": [
+                            {
+                                "from": "2025-01-01",
+                                "object_store": "azure",
+                                "store": "tsdb",
+                                "schema": "v13",
+                                "index": {"prefix": "index_", "period": "24h"},
+                            }
+                        ]
+                    },
+                    "storage": {
+                        "bucketNames": {
+                            "chunks": bucket_name,
+                            "ruler": bucket_name,
+                            "admin": bucket_name,
+                        },
+                        "type": "azure",
+                    },
+                    "storage_config": {
+                        "azure": {
+                            "account_key": platform.buckets.azure_storage_account_key,
+                            "account_name": platform.buckets.azure_storage_account_name,
+                            "container_name": bucket_name,
+                            "use_managed_identity": False,
+                            "request_timeout": 0,
+                        }
+                    },
+                }
+            )
+
+        elif platform.buckets.provider == BucketsProvider.AWS:
+            result["loki"].update(  # type: ignore
+                {
+                    "rulerConfig": {
+                        "storage": {
+                            "type": "s3",
+                            "s3": {
+                                "bucketnames": bucket_name,
+                                "region": platform.buckets.aws_region,
+                                "insecure": False,
+                                "s3forcepathstyle": True,
+                            },
+                        }
+                    },
+                    "schemaConfig": {
+                        "configs": [
+                            {
+                                "from": "2025-01-01",
+                                "object_store": "s3",
+                                "store": "tsdb",
+                                "schema": "v13",
+                                "index": {"prefix": "index_", "period": "24h"},
+                            }
+                        ]
+                    },
+                    "storage": {
+                        "bucketNames": {
+                            "chunks": bucket_name,
+                            "ruler": bucket_name,
+                            "admin": bucket_name,
+                        },
+                        "type": "s3",
+                    },
+                    "storage_config": {
+                        "aws": {
+                            "bucketnames": bucket_name,
+                            "region": platform.buckets.aws_region,
+                            "insecure": False,
+                            "s3forcepathstyle": True,
+                        }
+                    },
+                }
+            )
+
+        elif platform.buckets.provider in [
+            BucketsProvider.MINIO,
+            BucketsProvider.EMC_ECS,
+            BucketsProvider.OPEN_STACK,
+        ]:
+            s3_region = platform.buckets.minio_region
+
+            if platform.buckets.provider == BucketsProvider.MINIO:
+                s3_endpoint_url = str(platform.buckets.minio_url)
+                s3_secret_name = f"{platform.release_name}-monitoring-s3"
+                s3_access_key_id = self._create_value_from_secret(
+                    name=s3_secret_name, key="access_key_id"
+                )
+                s3_secret_access_key = self._create_value_from_secret(
+                    name=s3_secret_name, key="secret_access_key"
+                )
+            elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+                s3_endpoint_url = str(platform.buckets.emc_ecs_s3_endpoint)
+                s3_access_key_id = (
+                    platform.buckets.emc_ecs_access_key_id  # type: ignore
+                )
+                s3_secret_access_key = (
+                    platform.buckets.emc_ecs_secret_access_key  # type: ignore
+                )
+            elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+                s3_endpoint_url = str(platform.buckets.open_stack_s3_endpoint)
+                s3_access_key_id = platform.buckets.open_stack_username  # type: ignore
+                s3_secret_access_key = (
+                    platform.buckets.open_stack_password  # type: ignore
+                )
+
+            result["loki"].update(  # type: ignore
+                {
+                    "rulerConfig": {
+                        "storage": {
+                            "type": "s3",
+                            "s3": {
+                                "endpoint": s3_endpoint_url,
+                                "bucketnames": bucket_name,
+                                "region": s3_region,
+                                "access_key_id": s3_access_key_id,
+                                "secret_access_key": s3_secret_access_key,
+                                "insecure": False,
+                                "s3forcepathstyle": True,
+                            },
+                        }
+                    },
+                    "schemaConfig": {
+                        "configs": [
+                            {
+                                "from": "2025-01-01",
+                                "object_store": "s3",
+                                "store": "tsdb",
+                                "schema": "v13",
+                                "index": {"prefix": "index_", "period": "24h"},
+                            }
+                        ]
+                    },
+                    "storage": {
+                        "bucketNames": {
+                            "chunks": bucket_name,
+                            "ruler": bucket_name,
+                            "admin": bucket_name,
+                        },
+                        "type": "s3",
+                    },
+                    "storage_config": {
+                        "aws": {
+                            "endpoint": s3_endpoint_url,
+                            "bucketnames": bucket_name,
+                            "region": s3_region,
+                            "access_key_id": s3_access_key_id,
+                            "secret_access_key": s3_secret_access_key,
+                            "insecure": False,
+                            "s3forcepathstyle": True,
+                        }
+                    },
+                }
+            )
+
+        else:
+            raise ValueError("Bucket provider is not supported")
+
+        return result
+
+    def create_alloy_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "nameOverride": "loki",
+            "fullnameOverride": "loki",
+            "alloy": {
+                "configMap": {
+                    "create": True,
+                    "content": """
+                        loki.write "default" {
+                          endpoint {
+                            url = "http://loki-gateway.{$namespace}.svc.cluster.local/loki/api/v1/push"
+                          }
+                        }
+
+                        discovery.kubernetes "kubernetes_pods" {
+                          role = "pod"
+
+                          selectors {
+                            role = "pod"
+                            field = "spec.nodeName=" + coalesce(env("HOSTNAME"), constants.hostname)
+                          }
+                        }
+
+                        discovery.relabel "kubernetes_pods" {
+                          targets = discovery.kubernetes.kubernetes_pods.targets
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_controller_name"]
+                            regex         = "([0-9a-z-.]+?)(-[0-9a-f]{8,10})?"
+                            target_label  = "__tmp_controller_name"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name", "__meta_kubernetes_pod_label_app", "__tmp_controller_name", "__meta_kubernetes_pod_name"]
+                            regex         = "^;*([^;]+)(;.*)?$"
+                            target_label  = "app"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_instance", "__meta_kubernetes_pod_label_instance"]
+                            regex         = "^;*([^;]+)(;.*)?$"
+                            target_label  = "instance"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_component", "__meta_kubernetes_pod_label_component"]
+                            regex         = "^;*([^;]+)(;.*)?$"
+                            target_label  = "component"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_node_name"]
+                            target_label  = "node_name"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_namespace"]
+                            target_label  = "namespace"
+                          }
+
+                          rule {
+                            source_labels = ["namespace", "app"]
+                            separator     = "/"
+                            target_label  = "job"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_name"]
+                            target_label  = "pod"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_container_name"]
+                            target_label  = "container"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+                            separator     = "/"
+                            target_label  = "__path__"
+                            replacement   = "/var/log/pods/*$1/*.log"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_annotationpresent_kubernetes_io_config_hash", "__meta_kubernetes_pod_annotation_kubernetes_io_config_hash", "__meta_kubernetes_pod_container_name"]
+                            separator     = "/"
+                            regex         = "true/(.*)"
+                            target_label  = "__path__"
+                            replacement   = "/var/log/pods/*$1/*.log"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_org"]
+                            target_label  = "apolo_org_name"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_project"]
+                            target_label  = "apolo_project_name"
+                          }
+
+                          rule {
+                            source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_app"]
+                            target_label  = "apolo_app_id"
+                          }
+                        }
+
+                        loki.process "kubernetes_pods" {
+                          forward_to = [loki.write.default.receiver]
+
+                          stage.cri { }
+
+                          stage.replace {
+                            expression = "(\\n)"
+                          }
+
+                          stage.decolorize {}
+
+                          stage.multiline {
+                            firstline = "^\\S+.*"
+                            max_lines = 0
+                          }
+
+                          stage.match {
+                            selector = "{pod=~\".+\"} |~ \"^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}(?:\\\\.\\\\d+)?Z?\\\\s+\\\\S+\\\\s+\\\\S+\\\\s+(?:\\\\[[^\\\\]]*\\\\])?\\\\s+.*\""
+
+                            stage.regex {
+                              expression = "(?s)(?P<timestamp>\\S+)\\s+(?P<level>\\S+)\\s+(?P<logger>\\S+)\\s+(?:\\[(?P<context>[^\\]]*)\\])?\\s+(?P<message>.*)"
+                            }
+
+                            stage.timestamp {
+                              source = "timestamp"
+                              format = "RFC3339"
+                            }
+
+                            stage.labels {
+                              values = {
+                                context = "",
+                                level   = "",
+                                logger  = "",
+                              }
+                            }
+
+                            stage.structured_metadata {
+                              values = {
+                                level   = "",
+                              }
+                            }
+
+                            stage.output {
+                              source = "message"
+                            }
+                          }
+
+                          stage.pack {
+                            labels           = ["stream", "node_name", "level", "logger", "context"]
+                            ingest_timestamp = False
+                          }
+
+                          stage.label_keep {
+                            values = ["app", "instance", "namespace", "pod", "container", "apolo_org_name", "apolo_project_name", "apolo_app_id"]
+                          }
+                        }
+
+                        loki.source.kubernetes "kubernetes_pods" {
+                          targets    = discovery.relabel.kubernetes_pods.output
+                          forward_to = [loki.process.kubernetes_pods.receiver]
+                        }
+                    """,  # noqa: E501
+                }
+            },
+        }
+        result["alloy"]["configMap"]["content"] = result["alloy"]["configMap"][
+            "content"
+        ].replace("{$namespace}", platform.namespace)
+        return result
+
+    def create_platform_metadata_values(
+        self, platform: PlatformConfig
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "nameOverride": f"{platform.release_name}-metadata",
+            "fullnameOverride": f"{platform.release_name}-metadata",
+            "image": {"repository": platform.get_image("platform-metadata")},
+            "priorityClassName": platform.services_priority_class_name,
+        }
+        result.update(**self._create_tracing_values(platform))
         return result

@@ -28,7 +28,11 @@ nodeLabels:
   nodePool: platform.neuromation.io/nodepool
   job: platform.neuromation.io/job
 
+alertmanager:
+  config: {}
+
 inotify:
+  maxInstances: 65536
   maxWatchers: 65536
 
 nvidiaGpuDriver:
@@ -64,12 +68,16 @@ dockerHubConfigSecret:
   #   username: username
   #   password: password
 
-ingress: {}
+ingress:
   # host: default.org.neu.ro
   # jobFallbackHost: default.jobs-dev.neu.ro
   # registryHost: registry.default.org.neu.ro
   # ingressAuthHost: staging.neu.ro
   # minioHost: staging.neu.ro
+
+  cors:
+    originList: []
+    originListRegex: []
 
 jobs:
   namespace:
@@ -107,6 +115,10 @@ acmeEnabled: false
 dockerRegistryEnabled: false
 minioEnabled: false
 platformReportsEnabled: true
+appsPostgresOperatorEnabled: false
+appsKedaEnabled: false
+lokiEnabled: true
+alloyEnabled: true
 
 tags:
   gcp: false

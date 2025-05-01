@@ -6,7 +6,7 @@ from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv4Network
-from typing import Any
+from unittest import mock
 
 import kopf
 import pytest
@@ -52,6 +52,7 @@ from platform_operator.models import (
     KubeConfig,
     LabelsConfig,
     MetricsStorageType,
+    MinioGatewayConfig,
     MonitoringConfig,
     PlatformConfig,
     RegistryConfig,
@@ -84,6 +85,7 @@ def config() -> Config:
         platform_config_watch_interval_s=0.1,
         platform_admin_url=URL("https://dev.neu.ro"),
         platform_api_url=URL("https://dev.neu.ro"),
+        platform_notifications_url=URL("https://dev.neu.ro"),
         platform_namespace="platform",
         platform_lock_secret_name="platform-operator-lock",
         acme_ca_staging_path="/ca.pem",
@@ -108,11 +110,13 @@ def resource_pool_type_factory() -> Callable[..., ResourcePoolType]:
             available_cpu=1,
             memory=2**30,
             available_memory=2**30,
-            gpu=1,
-            gpu_model="nvidia-tesla-k80",
-            tpu=TPUResource(ipv4_cidr_block=tpu_ipv4_cidr_block)
-            if tpu_ipv4_cidr_block
-            else None,
+            nvidia_gpu=1,
+            nvidia_gpu_model="nvidia-tesla-k80",
+            tpu=(
+                TPUResource(ipv4_cidr_block=tpu_ipv4_cidr_block)
+                if tpu_ipv4_cidr_block
+                else None
+            ),
         )
 
     return _factory
@@ -165,9 +169,10 @@ def cluster_factory(
                         credits_per_hour=Decimal(10),
                         cpu=1,
                         memory=2**30,
-                        gpu=1,
-                        gpu_model="nvidia-tesla-k80",
-                        resource_affinity=[resource_pool_name],
+                        nvidia_gpu=1,
+                        nvidia_gpu_model="nvidia-tesla-k80",
+                        resource_pool_names=[resource_pool_name],
+                        available_resource_pool_names=[resource_pool_name],
                     )
                 ],
                 job_fallback_hostname="default.jobs-dev.neu.ro",
@@ -180,7 +185,7 @@ def cluster_factory(
                         name="miner",
                         count=1,
                         image="miner",
-                        resources=Resources(cpu_m=1000, memory=2**30),
+                        resources=Resources(cpu=1, memory=2**30),
                     )
                 ],
             ),
@@ -204,10 +209,8 @@ def cluster_factory(
             dns=DNSConfig(name=f"{name}.org.neu.ro"),
             ingress=IngressConfig(
                 acme_environment=ACMEEnvironment.PRODUCTION,
-                cors_origins=[
-                    "https://release--neuro-web.netlify.app",
-                    "https://app.neu.ro",
-                ],
+                default_cors_origins=["https://console.apolo.us"],
+                additional_cors_origins=["https://custom.app"],
             ),
             created_at=datetime.now(),
         )
@@ -426,11 +429,9 @@ def on_prem_platform_body(cluster_name: str) -> kopf.Body:
             },
             "storages": [
                 {
-                    "kubernetes": {
-                        "persistence": {
-                            "storageClassName": "storage-standard",
-                            "size": "1000Gi",
-                        }
+                    "nfs": {
+                        "server": "192.168.0.3",
+                        "path": "/",
                     }
                 }
             ],
@@ -481,6 +482,7 @@ def gcp_platform_config(
         config_url=URL("https://dev.neu.ro"),
         admin_url=URL("https://dev.neu.ro"),
         api_url=URL("https://dev.neu.ro"),
+        notifications_url=URL("https://dev.neu.ro"),
         token="token",
         cluster_name=cluster_name,
         namespace="platform",
@@ -515,13 +517,14 @@ def gcp_platform_config(
                 name="miner",
                 count=1,
                 image="miner",
-                resources=Resources(cpu_m=1000, memory=2**30),
+                resources=Resources(cpu=1, memory=2**30),
             )
         ],
         ingress_dns_name=f"{cluster_name}.org.neu.ro",
         ingress_url=URL(f"https://{cluster_name}.org.neu.ro"),
         ingress_auth_url=URL("https://platformingressauth"),
         ingress_registry_url=URL(f"https://registry.{cluster_name}.org.neu.ro"),
+        ingress_grafana_url=URL(f"https://grafana.{cluster_name}.org.neu.ro"),
         ingress_metrics_url=URL(f"https://metrics.{cluster_name}.org.neu.ro"),
         ingress_acme_enabled=True,
         ingress_acme_environment=ACMEEnvironment.PRODUCTION,
@@ -529,8 +532,8 @@ def gcp_platform_config(
         ingress_controller_replicas=2,
         ingress_public_ips=[],
         ingress_cors_origins=[
-            "https://release--neuro-web.netlify.app",
-            "https://app.neu.ro",
+            "https://console.apolo.us",
+            "https://custom.app",
         ],
         ingress_service_type=IngressServiceType.LOAD_BALANCER,
         ingress_service_name="traefik",
@@ -540,7 +543,6 @@ def gcp_platform_config(
         ingress_node_port_https=None,
         ingress_host_port_http=None,
         ingress_host_port_https=None,
-        ingress_namespaces=["platform", "platform-jobs"],
         ingress_ssl_cert_data="",
         ingress_ssl_cert_key_data="",
         storages=[
@@ -555,6 +557,10 @@ def gcp_platform_config(
             provider=BucketsProvider.GCP,
             gcp_location="us",
             gcp_project="project",
+        ),
+        minio_gateway=MinioGatewayConfig(
+            root_user="admin",
+            root_user_password=mock.ANY,
         ),
         monitoring=MonitoringConfig(
             logs_bucket_name="job-logs",
@@ -598,7 +604,7 @@ def gcp_platform_config(
 @pytest.fixture
 def aws_platform_config(
     gcp_platform_config: PlatformConfig,
-    resource_pool_type_factory: Callable[..., dict[str, Any]],
+    resource_pool_type_factory: Callable[..., ResourcePoolType],
 ) -> PlatformConfig:
     return replace(
         gcp_platform_config,
@@ -616,6 +622,7 @@ def aws_platform_config(
             provider=BucketsProvider.AWS,
             aws_region="us-east-1",
         ),
+        minio_gateway=None,
         monitoring=MonitoringConfig(
             logs_bucket_name="job-logs",
             metrics_storage_type=MetricsStorageType.BUCKETS,
@@ -628,7 +635,7 @@ def aws_platform_config(
 @pytest.fixture
 def azure_platform_config(
     gcp_platform_config: PlatformConfig,
-    resource_pool_type_factory: Callable[..., dict[str, Any]],
+    resource_pool_type_factory: Callable[..., ResourcePoolType],
 ) -> PlatformConfig:
     return replace(
         gcp_platform_config,
@@ -656,6 +663,10 @@ def azure_platform_config(
             azure_storage_account_name="accountName2",
             azure_storage_account_key="accountKey2",
         ),
+        minio_gateway=MinioGatewayConfig(
+            root_user="accountName2",
+            root_user_password="accountKey2",
+        ),
         monitoring=MonitoringConfig(
             logs_bucket_name="job-logs",
             metrics_storage_type=MetricsStorageType.BUCKETS,
@@ -668,7 +679,7 @@ def azure_platform_config(
 @pytest.fixture
 def on_prem_platform_config(
     gcp_platform_config: PlatformConfig,
-    resource_pool_type_factory: Callable[..., dict[str, Any]],
+    resource_pool_type_factory: Callable[..., ResourcePoolType],
     cluster_name: str,
 ) -> PlatformConfig:
     return replace(
@@ -683,9 +694,9 @@ def on_prem_platform_config(
         disks_storage_class_name="openebs-cstor",
         storages=[
             StorageConfig(
-                type=StorageType.KUBERNETES,
-                storage_size="1000Gi",
-                storage_class_name="storage-standard",
+                type=StorageType.NFS,
+                nfs_server="192.168.0.3",
+                nfs_export_path="/",
             )
         ],
         registry=RegistryConfig(
@@ -694,8 +705,8 @@ def on_prem_platform_config(
             docker_registry_url=URL("http://platform-docker-registry:5000"),
             docker_registry_username="",
             docker_registry_password="",
-            docker_registry_storage_class_name="registry-standard",
-            docker_registry_storage_size="100Gi",
+            docker_registry_file_system_storage_class_name="registry-standard",
+            docker_registry_file_system_storage_size="100Gi",
         ),
         buckets=BucketsConfig(
             provider=BucketsProvider.MINIO,
@@ -708,6 +719,7 @@ def on_prem_platform_config(
             minio_storage_class_name="blob-storage-standard",
             minio_storage_size="10Gi",
         ),
+        minio_gateway=None,
         monitoring=MonitoringConfig(
             logs_bucket_name="job-logs",
             metrics_storage_type=MetricsStorageType.KUBERNETES,
