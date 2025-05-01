@@ -2110,8 +2110,10 @@ class HelmValuesFactory:
                 )
             elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
                 s3_endpoint_url = str(platform.buckets.open_stack_s3_endpoint)
-                s3_access_key_id = platform.buckets.open_stack_username
-                s3_secret_access_key = platform.buckets.open_stack_password
+                s3_access_key_id = platform.buckets.open_stack_username  # type: ignore
+                s3_secret_access_key = (
+                    platform.buckets.open_stack_password  # type: ignore
+                )
 
             result["loki"].update(  # type: ignore
                 {

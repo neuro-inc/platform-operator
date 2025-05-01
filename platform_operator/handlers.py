@@ -382,14 +382,18 @@ async def create_storage_buckets(platform: PlatformConfig) -> None:
     if platform.monitoring.logs_bucket_name:
         if platform.buckets.provider == BucketsProvider.GCP:
             region = platform.monitoring.logs_region or platform.buckets.gcp_location
-            access_key_id = platform.minio_gateway.root_user
-            secret_access_key = platform.minio_gateway.root_user_password
-            endpoint_url = platform.minio_gateway.endpoint_url
+            access_key_id = platform.minio_gateway.root_user  # type: ignore
+            secret_access_key = (
+                platform.minio_gateway.root_user_password  # type: ignore
+            )
+            endpoint_url = platform.minio_gateway.endpoint_url  # type: ignore
         elif platform.buckets.provider == BucketsProvider.AZURE:
             region = platform.buckets.azure_minio_gateway_region
-            access_key_id = platform.minio_gateway.root_user
-            secret_access_key = platform.minio_gateway.root_user_password
-            endpoint_url = platform.minio_gateway.endpoint_url
+            access_key_id = platform.minio_gateway.root_user  # type: ignore
+            secret_access_key = (
+                platform.minio_gateway.root_user_password  # type: ignore
+            )
+            endpoint_url = platform.minio_gateway.endpoint_url  # type: ignore
         elif platform.buckets.provider == BucketsProvider.AWS:
             region = platform.buckets.aws_region
             access_key_id = None
@@ -416,7 +420,7 @@ async def create_storage_buckets(platform: PlatformConfig) -> None:
             region=region,
             access_key_id=access_key_id,
             secret_access_key=secret_access_key,
-            endpoint_url=endpoint_url,
+            endpoint_url=endpoint_url,  # type: ignore
         ) as s3_client:
             await s3_client.create_bucket(
                 bucket_name=platform.monitoring.logs_bucket_name
