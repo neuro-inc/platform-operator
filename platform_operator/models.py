@@ -483,6 +483,10 @@ class MonitoringSpec(dict[str, Any]):
     def metrics_storage_class_name(self) -> str:
         return self["metrics"]["kubernetes"]["persistence"].get("storageClassName", "")
 
+    @property
+    def metrics_node_exporter_enabled(self) -> bool:
+        return self["metrics"].get("nodeExporter", {}).get("enabled", True)
+
 
 class DisksSpec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
@@ -773,6 +777,7 @@ class MonitoringConfig:
     metrics_storage_size: str = ""
     metrics_retention_time: str = "3d"
     metrics_region: str = ""
+    metrics_node_exporter_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -1377,6 +1382,7 @@ class PlatformConfigFactory:
                     spec.metrics_retention_time
                     or MonitoringConfig.metrics_retention_time
                 ),
+                metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
             )
         elif "kubernetes" in spec.metrics:
             return MonitoringConfig(
@@ -1390,6 +1396,7 @@ class PlatformConfigFactory:
                     or MonitoringConfig.metrics_retention_time
                 ),
                 metrics_region=spec.metrics_region,
+                metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
             )
         else:
             raise ValueError("Metrics storage type is not supported")

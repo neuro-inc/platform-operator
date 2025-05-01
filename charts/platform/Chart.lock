@@ -4,7 +4,7 @@ dependencies:
   version: 25.0.0
 - name: acme
   repository: https://neuro-inc.github.io/helm-charts
-  version: 1.2.0
+  version: 1.3.2
 - name: docker-registry
   repository: https://charts.helm.sh/stable
   version: 1.9.2
@@ -59,5 +59,5 @@ dependencies:
 - name: alloy
   repository: https://grafana.github.io/helm-charts
   version: 1.0.1
-digest: sha256:d84af095905aeea72bf2204c1e367dbba8601671ab53d7254929eb627aca2442
-generated: "2025-04-23T18:23:19.637498306+03:00"
+digest: sha256:2b2264fb2212abb6a4253d5c221e27b87c6f2cb057d648082f4f0161bf29e6d3
+generated: "2025-05-01T10:35:42.468800119+02:00"
