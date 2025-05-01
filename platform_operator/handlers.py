@@ -6,8 +6,7 @@ import ssl
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from logging import Logger
-from typing import Any
+from typing import Any, Optional
 
 import aiohttp
 import kopf
@@ -105,15 +104,17 @@ def login(**_: Any) -> kopf.ConnectionInfo:
     )
 
 
-@kopf.on.create(  # type: ignore
+@kopf.on.create(
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 @kopf.on.update(
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def deploy(
-    name: str, body: kopf.Body, logger: Logger, retry: int, **_: Any
+    name: Optional[str], body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
 ) -> None:
+    assert name, "Platform resource name is required"
+
     if retry > config.retries:
         await app.status_manager.fail_deployment(name)
         raise kopf.HandlerRetriesError(
@@ -130,7 +131,7 @@ async def deploy(
         await _deploy(name, body, logger, retry)
 
 
-async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> None:
+async def _deploy(name: str, body: kopf.Body, logger: kopf.Logger, retry: int) -> None:
     try:
         cluster = await get_cluster(name, body)
         platform = app.platform_config_factory.create(body, cluster)
@@ -175,12 +176,14 @@ async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> Non
     logger.info("Platform deployment succeeded")
 
 
-@kopf.on.delete(  # type: ignore
+@kopf.on.delete(
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def delete(
-    name: str, body: kopf.Body, logger: Logger, retry: int, **_: Any
+    name: Optional[str], body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
 ) -> None:
+    assert name, "Platform resource name is required"
+
     if retry == 0:
         await app.status_manager.start_deletion(name)
 
@@ -194,7 +197,7 @@ async def delete(
         await _delete(name, body, logger)
 
 
-async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
+async def _delete(name: str, body: kopf.Body, logger: kopf.Logger) -> None:
     try:
         cluster = await get_cluster(name, body)
         platform = app.platform_config_factory.create(body, cluster)
@@ -238,13 +241,17 @@ async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
         raise kopf.TemporaryError(message)
 
 
-@kopf.on.daemon(  # type: ignore
+@kopf.on.daemon(
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def watch_config(
-    name: str, body: kopf.Body, stopped: kopf.DaemonStopped, **_: Any
+    name: Optional[str],
+    body: kopf.Body,
+    stopped: kopf.DaemonStopped,
+    logger: kopf.Logger,
+    **_: Any,
 ) -> None:
-    logger = logging.getLogger("watch_config")
+    assert name, "Platform resource name is required"
 
     logger.info("Started watching platform config")
 
@@ -277,7 +284,7 @@ async def watch_config(
             logger.warning("Watch iteration failed", exc_info=exc)
 
 
-async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
+async def _update(name: str, body: kopf.Body, logger: kopf.Logger) -> None:
     phase = await app.status_manager.get_phase(name)
 
     if phase == PlatformPhase.PENDING:
