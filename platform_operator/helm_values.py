@@ -53,7 +53,7 @@ class HelmValuesFactory:
                     "name": rpt.name,
                     "idleSize": rpt.idle_size,
                     "cpu": rpt.available_cpu,
-                    "gpu": rpt.gpu or 0,
+                    "nvidiaGpu": rpt.nvidia_gpu or 0,
                 }
                 for rpt in platform.jobs_resource_pool_types
             ],

@@ -52,7 +52,7 @@ class TestHelmValuesFactory:
             "clusterName": cluster_name,
             "serviceToken": "token",
             "nodePools": [
-                {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "gpu": 1}
+                {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "nvidiaGpu": 1}
             ],
             "nodeLabels": {
                 "nodePool": "platform.neuromation.io/nodepool",

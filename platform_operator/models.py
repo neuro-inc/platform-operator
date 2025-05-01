@@ -5,7 +5,7 @@ import os
 from base64 import b64decode, urlsafe_b64decode
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from hashlib import sha256
 from ipaddress import IPv4Address, IPv4Network
@@ -936,23 +936,29 @@ class PlatformConfig:
         self, cluster: Cluster
     ) -> PatchOrchestratorConfigRequest | None:
         assert cluster.orchestrator
-        request = PatchOrchestratorConfigRequest()
+        orchestrator = PatchOrchestratorConfigRequest()
+
         if (
-            cluster.orchestrator.job_internal_hostname_template
-            != self.jobs_internal_host_template
+            self.jobs_internal_host_template
+            != cluster.orchestrator.job_internal_hostname_template
         ):
-            request = replace(
-                request, job_internal_hostname_template=self.jobs_internal_host_template
+            orchestrator = replace(
+                orchestrator,
+                job_internal_hostname_template=self.jobs_internal_host_template,
             )
+
         if self.kubernetes_tpu_network:
-            resource_pool_types = self._update_tpu_network(
+            new_resource_pool_types = self._update_tpu_network(
                 cluster.orchestrator.resource_pool_types, self.kubernetes_tpu_network
             )
-            if cluster.orchestrator.resource_pool_types != resource_pool_types:
-                request = replace(request, resource_pool_types=resource_pool_types)
-        if all(value is None for value in asdict(request).values()):
-            return None
-        return request
+            if new_resource_pool_types != cluster.orchestrator.resource_pool_types:
+                orchestrator = replace(
+                    orchestrator, resource_pool_types=new_resource_pool_types
+                )
+
+        return (
+            None if orchestrator == PatchOrchestratorConfigRequest() else orchestrator
+        )
 
     @classmethod
     def _update_tpu_network(
