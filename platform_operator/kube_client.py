@@ -153,9 +153,9 @@ class KubeClient:
     def _is_ssl(self) -> bool:
         return self._config.url.scheme == "https"
 
-    def _create_ssl_context(self) -> ssl.SSLContext | None:
+    def _create_ssl_context(self) -> ssl.SSLContext | bool:
         if not self._is_ssl:
-            return None
+            return True
         assert self._config.cert_authority_path
         ssl_context = ssl.create_default_context(
             cafile=self._config.cert_authority_path

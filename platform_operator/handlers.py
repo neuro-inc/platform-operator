@@ -6,8 +6,7 @@ import ssl
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from logging import Logger
-from typing import Any
+from typing import Any, Optional
 
 import aiohttp
 import kopf
@@ -19,7 +18,7 @@ from neuro_config_client import (
     PatchClusterRequest,
 )
 
-from .aws_client import AwsElbClient
+from .aws_client import AwsElbClient, S3Client
 from .helm_client import HelmClient, ReleaseStatus
 from .helm_values import HelmValuesFactory
 from .kube_client import (
@@ -31,7 +30,7 @@ from .kube_client import (
     PlatformPhase,
     PlatformStatusManager,
 )
-from .models import Config, PlatformConfig, PlatformConfigFactory
+from .models import BucketsProvider, Config, PlatformConfig, PlatformConfigFactory
 
 logger = logging.getLogger(__name__)
 
@@ -105,15 +104,17 @@ def login(**_: Any) -> kopf.ConnectionInfo:
     )
 
 
-@kopf.on.create(  # type: ignore
+@kopf.on.create(
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 @kopf.on.update(
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def deploy(
-    name: str, body: kopf.Body, logger: Logger, retry: int, **_: Any
+    name: Optional[str], body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
 ) -> None:
+    assert name, "Platform resource name is required"
+
     if retry > config.retries:
         await app.status_manager.fail_deployment(name)
         raise kopf.HandlerRetriesError(
@@ -130,7 +131,7 @@ async def deploy(
         await _deploy(name, body, logger, retry)
 
 
-async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> None:
+async def _deploy(name: str, body: kopf.Body, logger: kopf.Logger, retry: int) -> None:
     try:
         cluster = await get_cluster(name, body)
         platform = app.platform_config_factory.create(body, cluster)
@@ -175,12 +176,14 @@ async def _deploy(name: str, body: kopf.Body, logger: Logger, retry: int) -> Non
     logger.info("Platform deployment succeeded")
 
 
-@kopf.on.delete(  # type: ignore
+@kopf.on.delete(
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def delete(
-    name: str, body: kopf.Body, logger: Logger, retry: int, **_: Any
+    name: Optional[str], body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
 ) -> None:
+    assert name, "Platform resource name is required"
+
     if retry == 0:
         await app.status_manager.start_deletion(name)
 
@@ -194,7 +197,7 @@ async def delete(
         await _delete(name, body, logger)
 
 
-async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
+async def _delete(name: str, body: kopf.Body, logger: kopf.Logger) -> None:
     try:
         cluster = await get_cluster(name, body)
         platform = app.platform_config_factory.create(body, cluster)
@@ -238,13 +241,17 @@ async def _delete(name: str, body: kopf.Body, logger: Logger) -> None:
         raise kopf.TemporaryError(message)
 
 
-@kopf.on.daemon(  # type: ignore
+@kopf.on.daemon(
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def watch_config(
-    name: str, body: kopf.Body, stopped: kopf.DaemonStopped, **_: Any
+    name: Optional[str],
+    body: kopf.Body,
+    stopped: kopf.DaemonStopped,
+    logger: kopf.Logger,
+    **_: Any,
 ) -> None:
-    logger = logging.getLogger("watch_config")
+    assert name, "Platform resource name is required"
 
     logger.info("Started watching platform config")
 
@@ -277,7 +284,7 @@ async def watch_config(
             logger.warning("Watch iteration failed", exc_info=exc)
 
 
-async def _update(name: str, body: kopf.Body, logger: Logger) -> None:
+async def _update(name: str, body: kopf.Body, logger: kopf.Logger) -> None:
     phase = await app.status_manager.get_phase(name)
 
     if phase == PlatformPhase.PENDING:
@@ -378,6 +385,55 @@ async def is_helm_deploy_failed(release_name: str) -> bool:
     return release.status == ReleaseStatus.FAILED
 
 
+async def create_storage_buckets(platform: PlatformConfig) -> None:
+    if platform.monitoring.logs_bucket_name:
+        if platform.buckets.provider == BucketsProvider.GCP:
+            region = platform.monitoring.logs_region or platform.buckets.gcp_location
+            access_key_id = platform.minio_gateway.root_user  # type: ignore
+            secret_access_key = (
+                platform.minio_gateway.root_user_password  # type: ignore
+            )
+            endpoint_url = platform.minio_gateway.endpoint_url  # type: ignore
+        elif platform.buckets.provider == BucketsProvider.AZURE:
+            region = platform.buckets.azure_minio_gateway_region
+            access_key_id = platform.minio_gateway.root_user  # type: ignore
+            secret_access_key = (
+                platform.minio_gateway.root_user_password  # type: ignore
+            )
+            endpoint_url = platform.minio_gateway.endpoint_url  # type: ignore
+        elif platform.buckets.provider == BucketsProvider.AWS:
+            region = platform.buckets.aws_region
+            access_key_id = None
+            secret_access_key = None
+            endpoint_url = None
+        elif platform.buckets.provider == BucketsProvider.MINIO:
+            region = platform.buckets.minio_region
+            access_key_id = platform.buckets.minio_access_key
+            secret_access_key = platform.buckets.minio_secret_key
+            endpoint_url = platform.buckets.minio_url
+        elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+            region = platform.buckets.emc_ecs_region
+            access_key_id = platform.buckets.emc_ecs_access_key_id
+            secret_access_key = platform.buckets.emc_ecs_secret_access_key
+            endpoint_url = platform.buckets.emc_ecs_s3_endpoint
+        elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+            region = platform.buckets.open_stack_region_name
+            access_key_id = platform.buckets.open_stack_username
+            secret_access_key = platform.buckets.open_stack_password
+            endpoint_url = platform.buckets.open_stack_s3_endpoint
+        else:
+            raise ValueError(f"Unknown buckets provider: {platform.buckets.provider}")
+        async with S3Client(
+            region=region,
+            access_key_id=access_key_id,
+            secret_access_key=secret_access_key,
+            endpoint_url=endpoint_url,  # type: ignore
+        ) as s3_client:
+            await s3_client.create_bucket(
+                bucket_name=platform.monitoring.logs_bucket_name
+            )
+
+
 async def complete_deployment(cluster: Cluster, platform: PlatformConfig) -> None:
     await app.status_manager.complete_deployment(cluster.name)
     if cluster.cloud_provider and cluster.cloud_provider.storage:
@@ -394,6 +450,8 @@ async def complete_deployment(cluster: Cluster, platform: PlatformConfig) -> Non
             ready=True,
             token=platform.token,
         )
+
+    await create_storage_buckets(platform)
 
 
 async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
@@ -478,6 +536,9 @@ async def _configure_cluster(cluster: Cluster, platform: PlatformConfig) -> None
     )
     await app.config_client.patch_cluster(
         platform.cluster_name,
+        PatchClusterRequest(
+            orchestrator=orchestrator,
+            dns=dns,
+        ),
         token=platform.token,
-        request=PatchClusterRequest(orchestrator=orchestrator, dns=dns),
     )
