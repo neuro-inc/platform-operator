@@ -41,6 +41,7 @@ class TestHelmValuesFactory:
             "acmeEnabled": True,
             "dockerRegistryEnabled": False,
             "appsPostgresOperatorEnabled": False,
+            "appsSparkOperatorEnabled": False,
             "appsKedaEnabled": False,
             "minioEnabled": False,
             "minioGatewayEnabled": True,
@@ -192,6 +193,7 @@ class TestHelmValuesFactory:
             "platform-metadata": mock.ANY,
             "loki": mock.ANY,
             "alloy": mock.ANY,
+            "spark-operator": mock.ANY,
         }
 
     def test_create_gcp_platform_with_ssl_cert(
