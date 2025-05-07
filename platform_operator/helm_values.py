@@ -38,6 +38,9 @@ class HelmValuesFactory:
             "appsPostgresOperatorEnabled": (
                 platform.apps_operator_config.postgres_operator_enabled
             ),
+            "appsSparkOperatorEnabled": (
+                platform.apps_operator_config.spark_operator_enabled
+            ),
             "appsKedaEnabled": platform.apps_operator_config.keda_enabled,
             "minioEnabled": platform.buckets.minio_install,
             "minioGatewayEnabled": platform.minio_gateway is not None,

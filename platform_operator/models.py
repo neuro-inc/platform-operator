@@ -752,6 +752,7 @@ class BucketsConfig:
 @dataclass(frozen=True)
 class AppsOperatorsConfig:
     postgres_operator_enabled: bool = False
+    spark_operator_enabled: bool = False
     keda_enabled: bool = False
 
 
