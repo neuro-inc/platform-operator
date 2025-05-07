@@ -132,6 +132,7 @@ class HelmChartNames:
     keda: str = "keda"
     alloy: str = "alloy"
     loki: str = "loki"
+    spark_operator: str = "spark-operator"
 
 
 @dataclass(frozen=True)
