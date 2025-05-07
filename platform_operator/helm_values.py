@@ -126,7 +126,9 @@ class HelmValuesFactory:
             ),
             self._chart_names.alloy: self.create_alloy_values(platform),
             self._chart_names.loki: self.create_loki_values(platform),
-            self._chart_names.spark_operator: self.create_spark_operator_values(),
+            self._chart_names.spark_operator: self.create_spark_operator_values(
+                platform
+            ),
         }
         if platform.ingress_acme_enabled:
             result["acme"] = self.create_acme_values(platform)
