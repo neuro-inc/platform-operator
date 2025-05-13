@@ -53,6 +53,9 @@ dependencies:
 - name: pgo
   repository: oci://ghcr.io/neuro-inc/helm-charts
   version: 5.6.1
+- name: spark-operator
+  repository: https://kubeflow.github.io/spark-operator
+  version: 2.1.0
 - name: keda
   repository: https://kedacore.github.io/charts
   version: 2.16.1
@@ -62,5 +65,5 @@ dependencies:
 - name: alloy
   repository: https://grafana.github.io/helm-charts
   version: 1.0.1
-digest: sha256:5a75d46eb7e5e31fe03dfe22bed9d1379556fb18da5a7a24e0c12ce956567f2e
-generated: "2025-05-02T10:00:12.75289455+02:00"
+digest: sha256:c110d6b363e24a8630d490b457a1ad7af6d0b86232b765c1ed0c064ed5d219fc
+generated: "2025-05-13T09:26:08.719326792-03:00"
