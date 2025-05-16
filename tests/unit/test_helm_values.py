@@ -41,6 +41,7 @@ class TestHelmValuesFactory:
             "acmeEnabled": True,
             "dockerRegistryEnabled": False,
             "appsPostgresOperatorEnabled": True,
+            "appsSparkOperatorEnabled": False,
             "appsKedaEnabled": False,
             "minioEnabled": False,
             "minioGatewayEnabled": True,
@@ -192,6 +193,7 @@ class TestHelmValuesFactory:
             "platform-metadata": mock.ANY,
             "loki": mock.ANY,
             "alloy": mock.ANY,
+            "spark-operator": mock.ANY,
         }
 
     def test_create_gcp_platform_with_ssl_cert(
@@ -372,6 +374,7 @@ class TestHelmValuesFactory:
         assert result["dockerRegistryEnabled"] is True
         assert result["appsKedaEnabled"] is False
         assert result["appsPostgresOperatorEnabled"] is True
+        assert result["appsSparkOperatorEnabled"] is False
         assert "docker-registry" in result
         assert result["minioEnabled"] is True
         assert (

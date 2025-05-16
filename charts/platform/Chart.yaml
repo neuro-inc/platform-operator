@@ -67,6 +67,10 @@ dependencies:
     version: "5.6.1"
     repository: oci://ghcr.io/neuro-inc/helm-charts
     condition: appsPostgresOperatorEnabled
+  - name: spark-operator
+    version: "2.1.0"
+    repository: "https://kubeflow.github.io/spark-operator"
+    condition: appsSparkOperatorEnabled
   - name: keda
     version: "2.16.1"
     repository: https://kedacore.github.io/charts
