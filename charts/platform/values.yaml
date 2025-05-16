@@ -115,7 +115,7 @@ acmeEnabled: false
 dockerRegistryEnabled: false
 minioEnabled: false
 platformReportsEnabled: true
-appsPostgresOperatorEnabled: false
+appsPostgresOperatorEnabled: true
 appsKedaEnabled: false
 lokiEnabled: true
 alloyEnabled: true
