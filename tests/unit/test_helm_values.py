@@ -40,7 +40,7 @@ class TestHelmValuesFactory:
             "traefikEnabled": True,
             "acmeEnabled": True,
             "dockerRegistryEnabled": False,
-            "appsPostgresOperatorEnabled": False,
+            "appsPostgresOperatorEnabled": True,
             "appsSparkOperatorEnabled": False,
             "appsKedaEnabled": False,
             "minioEnabled": False,
@@ -373,7 +373,7 @@ class TestHelmValuesFactory:
         ]
         assert result["dockerRegistryEnabled"] is True
         assert result["appsKedaEnabled"] is False
-        assert result["appsPostgresOperatorEnabled"] is False
+        assert result["appsPostgresOperatorEnabled"] is True
         assert result["appsSparkOperatorEnabled"] is False
         assert "docker-registry" in result
         assert result["minioEnabled"] is True

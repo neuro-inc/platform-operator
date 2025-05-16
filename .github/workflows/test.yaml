@@ -83,7 +83,13 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y conntrack
         sudo install minikube-linux-amd64 /usr/local/bin/minikube
+
+        sudo modprobe bridge
+        sudo modprobe br_netfilter
+        sudo sysctl -w net.bridge.bridge-nf-call-iptables=1
+
         minikube start --driver="none" --wait=true
+
         sudo chown -R $USER $HOME/.kube /root/.minikube
         sudo chmod -R a+r $HOME/.kube /root/.minikube
         sudo find /root/.minikube -name id_rsa -exec chmod 600 {} \;
