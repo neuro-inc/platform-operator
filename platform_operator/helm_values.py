@@ -2183,8 +2183,8 @@ class HelmValuesFactory:
 
     def create_alloy_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {
-            "nameOverride": "loki",
-            "fullnameOverride": "loki",
+            "nameOverride": "alloy",
+            "fullnameOverride": "alloy",
             "alloy": {
                 "configMap": {
                     "create": True,
