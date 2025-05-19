@@ -26,7 +26,7 @@ dependencies:
     repository: https://neuro-inc.github.io/helm-charts
     condition: minioGatewayEnabled
   - name: platform-storage
-    version: "24.11.0"
+    version: "25.5.1"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-registry
     version: "24.11.1"
