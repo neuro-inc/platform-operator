@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import textwrap
 from base64 import b64decode
 from hashlib import sha256
 from typing import Any
@@ -2190,7 +2191,8 @@ class HelmValuesFactory:
             "alloy": {
                 "configMap": {
                     "create": True,
-                    "content": """
+                    "content": textwrap.dedent(
+                        r"""
                         loki.write "default" {
                           endpoint {
                             url = "http://loki-gateway.{$namespace}.svc.cluster.local/loki/api/v1/push"
@@ -2339,7 +2341,7 @@ class HelmValuesFactory:
 
                           stage.pack {
                             labels           = ["stream", "node_name", "level", "logger", "context"]
-                            ingest_timestamp = False
+                            ingest_timestamp = false
                           }
 
                           stage.label_keep {
@@ -2351,7 +2353,8 @@ class HelmValuesFactory:
                           targets    = discovery.relabel.kubernetes_pods.output
                           forward_to = [loki.process.kubernetes_pods.receiver]
                         }
-                    """,  # noqa: E501
+                    """  # noqa: E501
+                    ),
                 }
             },
         }
