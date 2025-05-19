@@ -10,13 +10,15 @@ from dataclasses import dataclass
 from typing import Any
 
 import yaml
+from yaml import Node
+from yaml.representer import SafeRepresenter
 
 from .models import HelmRepo
 
 logger = logging.getLogger(__name__)
 
 
-def _str_presenter(dumper, data):
+def _str_presenter(dumper: SafeRepresenter, data: str) -> Node:
     """
     Preserve multiline strings when dumping yaml.
     https://github.com/yaml/pyyaml/issues/240
