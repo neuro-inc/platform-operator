@@ -2177,172 +2177,172 @@ class HelmValuesFactory:
 
     def create_alloy_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {
-            "nameOverride": "loki",
-            "fullnameOverride": "loki",
+            "nameOverride": "alloy",
+            "fullnameOverride": "alloy",
             "alloy": {
                 "configMap": {
                     "create": True,
-                    "content": """
-                        loki.write "default" {
-                          endpoint {
-                            url = "http://loki-gateway.{$namespace}.svc.cluster.local/loki/api/v1/push"
-                          }
-                        }
+                    "content": r"""
+loki.write "default" {
+  endpoint {
+    url = "http://loki-gateway.{$namespace}.svc.cluster.local/loki/api/v1/push"
+  }
+}
 
-                        discovery.kubernetes "kubernetes_pods" {
-                          role = "pod"
+discovery.kubernetes "kubernetes_pods" {
+  role = "pod"
 
-                          selectors {
-                            role = "pod"
-                            field = "spec.nodeName=" + coalesce(env("HOSTNAME"), constants.hostname)
-                          }
-                        }
+  selectors {
+    role = "pod"
+    field = "spec.nodeName=" + coalesce(env("HOSTNAME"), constants.hostname)
+  }
+}
 
-                        discovery.relabel "kubernetes_pods" {
-                          targets = discovery.kubernetes.kubernetes_pods.targets
+discovery.relabel "kubernetes_pods" {
+  targets = discovery.kubernetes.kubernetes_pods.targets
 
-                          rule {
-                            source_labels = ["__meta_kubernetes_pod_controller_name"]
-                            regex         = "([0-9a-z-.]+?)(-[0-9a-f]{8,10})?"
-                            target_label  = "__tmp_controller_name"
-                          }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_controller_name"]
+    regex         = "([0-9a-z-.]+?)(-[0-9a-f]{8,10})?"
+    target_label  = "__tmp_controller_name"
+  }
 
-                          rule {
-                            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name", "__meta_kubernetes_pod_label_app", "__tmp_controller_name", "__meta_kubernetes_pod_name"]
-                            regex         = "^;*([^;]+)(;.*)?$"
-                            target_label  = "app"
-                          }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name", "__meta_kubernetes_pod_label_app", "__tmp_controller_name", "__meta_kubernetes_pod_name"]
+    regex         = "^;*([^;]+)(;.*)?$"
+    target_label  = "app"
+  }
 
-                          rule {
-                            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_instance", "__meta_kubernetes_pod_label_instance"]
-                            regex         = "^;*([^;]+)(;.*)?$"
-                            target_label  = "instance"
-                          }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_instance", "__meta_kubernetes_pod_label_instance"]
+    regex         = "^;*([^;]+)(;.*)?$"
+    target_label  = "instance"
+  }
 
-                          rule {
-                            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_component", "__meta_kubernetes_pod_label_component"]
-                            regex         = "^;*([^;]+)(;.*)?$"
-                            target_label  = "component"
-                          }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_component", "__meta_kubernetes_pod_label_component"]
+    regex         = "^;*([^;]+)(;.*)?$"
+    target_label  = "component"
+  }
 
-                          rule {
-                            source_labels = ["__meta_kubernetes_pod_node_name"]
-                            target_label  = "node_name"
-                          }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_node_name"]
+    target_label  = "node_name"
+  }
 
-                          rule {
-                            source_labels = ["__meta_kubernetes_namespace"]
-                            target_label  = "namespace"
-                          }
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    target_label  = "namespace"
+  }
 
-                          rule {
-                            source_labels = ["namespace", "app"]
-                            separator     = "/"
-                            target_label  = "job"
-                          }
+  rule {
+    source_labels = ["namespace", "app"]
+    separator     = "/"
+    target_label  = "job"
+  }
 
-                          rule {
-                            source_labels = ["__meta_kubernetes_pod_name"]
-                            target_label  = "pod"
-                          }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    target_label  = "pod"
+  }
 
-                          rule {
-                            source_labels = ["__meta_kubernetes_pod_container_name"]
-                            target_label  = "container"
-                          }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_name"]
+    target_label  = "container"
+  }
 
-                          rule {
-                            source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
-                            separator     = "/"
-                            target_label  = "__path__"
-                            replacement   = "/var/log/pods/*$1/*.log"
-                          }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+    separator     = "/"
+    target_label  = "__path__"
+    replacement   = "/var/log/pods/*$1/*.log"
+  }
 
-                          rule {
-                            source_labels = ["__meta_kubernetes_pod_annotationpresent_kubernetes_io_config_hash", "__meta_kubernetes_pod_annotation_kubernetes_io_config_hash", "__meta_kubernetes_pod_container_name"]
-                            separator     = "/"
-                            regex         = "true/(.*)"
-                            target_label  = "__path__"
-                            replacement   = "/var/log/pods/*$1/*.log"
-                          }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_annotationpresent_kubernetes_io_config_hash", "__meta_kubernetes_pod_annotation_kubernetes_io_config_hash", "__meta_kubernetes_pod_container_name"]
+    separator     = "/"
+    regex         = "true/(.*)"
+    target_label  = "__path__"
+    replacement   = "/var/log/pods/*$1/*.log"
+  }
 
-                          rule {
-                            source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_org"]
-                            target_label  = "apolo_org_name"
-                          }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_org"]
+    target_label  = "apolo_org_name"
+  }
 
-                          rule {
-                            source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_project"]
-                            target_label  = "apolo_project_name"
-                          }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_project"]
+    target_label  = "apolo_project_name"
+  }
 
-                          rule {
-                            source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_app"]
-                            target_label  = "apolo_app_id"
-                          }
-                        }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_app"]
+    target_label  = "apolo_app_id"
+  }
+}
 
-                        loki.process "kubernetes_pods" {
-                          forward_to = [loki.write.default.receiver]
+loki.process "kubernetes_pods" {
+  forward_to = [loki.write.default.receiver]
 
-                          stage.cri { }
+  stage.cri { }
 
-                          stage.replace {
-                            expression = "(\\n)"
-                          }
+  stage.replace {
+    expression = "(\\n)"
+  }
 
-                          stage.decolorize {}
+  stage.decolorize {}
 
-                          stage.multiline {
-                            firstline = "^\\S+.*"
-                            max_lines = 0
-                          }
+  stage.multiline {
+    firstline = "^\\S+.*"
+    max_lines = 0
+  }
 
-                          stage.match {
-                            selector = "{pod=~\".+\"} |~ \"^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}(?:\\\\.\\\\d+)?Z?\\\\s+\\\\S+\\\\s+\\\\S+\\\\s+(?:\\\\[[^\\\\]]*\\\\])?\\\\s+.*\""
+  stage.match {
+    selector = "{pod=~\".+\"} |~ \"^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}(?:\\\\.\\\\d+)?Z?\\\\s+\\\\S+\\\\s+\\\\S+\\\\s+(?:\\\\[[^\\\\]]*\\\\])?\\\\s+.*\""
 
-                            stage.regex {
-                              expression = "(?s)(?P<timestamp>\\S+)\\s+(?P<level>\\S+)\\s+(?P<logger>\\S+)\\s+(?:\\[(?P<context>[^\\]]*)\\])?\\s+(?P<message>.*)"
-                            }
+    stage.regex {
+      expression = "(?s)(?P<timestamp>\\S+)\\s+(?P<level>\\S+)\\s+(?P<logger>\\S+)\\s+(?:\\[(?P<context>[^\\]]*)\\])?\\s+(?P<message>.*)"
+    }
 
-                            stage.timestamp {
-                              source = "timestamp"
-                              format = "RFC3339"
-                            }
+    stage.timestamp {
+      source = "timestamp"
+      format = "RFC3339"
+    }
 
-                            stage.labels {
-                              values = {
-                                context = "",
-                                level   = "",
-                                logger  = "",
-                              }
-                            }
+    stage.labels {
+      values = {
+        context = "",
+        level   = "",
+        logger  = "",
+      }
+    }
 
-                            stage.structured_metadata {
-                              values = {
-                                level   = "",
-                              }
-                            }
+    stage.structured_metadata {
+      values = {
+        level   = "",
+      }
+    }
 
-                            stage.output {
-                              source = "message"
-                            }
-                          }
+    stage.output {
+      source = "message"
+    }
+  }
 
-                          stage.pack {
-                            labels           = ["stream", "node_name", "level", "logger", "context"]
-                            ingest_timestamp = False
-                          }
+  stage.pack {
+    labels           = ["stream", "node_name", "level", "logger", "context"]
+    ingest_timestamp = false
+  }
 
-                          stage.label_keep {
-                            values = ["app", "instance", "namespace", "pod", "container", "apolo_org_name", "apolo_project_name", "apolo_app_id"]
-                          }
-                        }
+  stage.label_keep {
+    values = ["app", "instance", "namespace", "pod", "container", "apolo_org_name", "apolo_project_name", "apolo_app_id"]
+  }
+}
 
-                        loki.source.kubernetes "kubernetes_pods" {
-                          targets    = discovery.relabel.kubernetes_pods.output
-                          forward_to = [loki.process.kubernetes_pods.receiver]
-                        }
+loki.source.kubernetes "kubernetes_pods" {
+  targets    = discovery.relabel.kubernetes_pods.output
+  forward_to = [loki.process.kubernetes_pods.receiver]
+}
                     """,  # noqa: E501
                 }
             },
