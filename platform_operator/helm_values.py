@@ -2053,6 +2053,10 @@ class HelmValuesFactory:
             )
 
         elif platform.buckets.provider == BucketsProvider.AWS:
+            result["serviceAccount"] = {
+                "create": False,
+                "name": platform.service_account_name,
+            }
             result["loki"].update(  # type: ignore
                 {
                     "rulerConfig": {
@@ -2062,7 +2066,6 @@ class HelmValuesFactory:
                                 "bucketnames": bucket_name,
                                 "region": platform.buckets.aws_region,
                                 "insecure": False,
-                                "s3forcepathstyle": True,
                             },
                         }
                     },
@@ -2090,7 +2093,6 @@ class HelmValuesFactory:
                             "bucketnames": bucket_name,
                             "region": platform.buckets.aws_region,
                             "insecure": False,
-                            "s3forcepathstyle": True,
                         }
                     },
                 }
