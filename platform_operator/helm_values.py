@@ -38,6 +38,9 @@ class HelmValuesFactory:
             "appsPostgresOperatorEnabled": (
                 platform.apps_operator_config.postgres_operator_enabled
             ),
+            "appsSparkOperatorEnabled": (
+                platform.apps_operator_config.spark_operator_enabled
+            ),
             "appsKedaEnabled": platform.apps_operator_config.keda_enabled,
             "minioEnabled": platform.buckets.minio_install,
             "minioGatewayEnabled": platform.minio_gateway is not None,
@@ -123,6 +126,9 @@ class HelmValuesFactory:
             ),
             self._chart_names.alloy: self.create_alloy_values(platform),
             self._chart_names.loki: self.create_loki_values(platform),
+            self._chart_names.spark_operator: self.create_spark_operator_values(
+                platform
+            ),
         }
         if platform.ingress_acme_enabled:
             result["acme"] = self.create_acme_values(platform)
@@ -2362,4 +2368,8 @@ class HelmValuesFactory:
             "priorityClassName": platform.services_priority_class_name,
         }
         result.update(**self._create_tracing_values(platform))
+        return result
+
+    def create_spark_operator_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        result: dict[str, Any] = {"spark": {"jobNamespaces": None}}
         return result

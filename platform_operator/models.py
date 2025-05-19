@@ -132,6 +132,7 @@ class HelmChartNames:
     keda: str = "keda"
     alloy: str = "alloy"
     loki: str = "loki"
+    spark_operator: str = "spark-operator"
 
 
 @dataclass(frozen=True)
@@ -752,6 +753,7 @@ class BucketsConfig:
 @dataclass(frozen=True)
 class AppsOperatorsConfig:
     postgres_operator_enabled: bool = True
+    spark_operator_enabled: bool = False
     keda_enabled: bool = False
 
 
