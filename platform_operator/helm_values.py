@@ -1877,7 +1877,7 @@ class HelmValuesFactory:
         return result
 
     def create_loki_values(self, platform: PlatformConfig) -> dict[str, Any]:
-        result = {
+        result: dict[str, Any] = {
             "nameOverride": "loki",
             "fullnameOverride": "loki",
             "deploymentMode": "SimpleScalable",
@@ -1941,16 +1941,20 @@ class HelmValuesFactory:
 
         bucket_name = platform.monitoring.logs_bucket_name
         if platform.buckets.provider == BucketsProvider.GCP:
-            gcp_loki_sa_access_secret_name = f"{platform.release_name}-loki-access-gcs"
+            loki_gcs_key_secret_name = "loki-gcs-key"
             result["extraObjects"] = [
-                f"apiVersion: v1"
-                f"data:"
-                f"  key.json: {platform.gcp_service_account_key_base64}"
-                f"kind: Secret"
-                f"metadata:"
-                f"  name: f{gcp_loki_sa_access_secret_name}"
-                f"  namespace: {platform.namespace}"
-                f"type: Opaque"
+                textwrap.dedent(
+                    f"""
+                    apiVersion: v1
+                    kind: Secret
+                    type: Opaque
+                    metadata:
+                      name: {loki_gcs_key_secret_name}
+                      namespace: {platform.namespace}
+                    data:
+                      key.json: {platform.gcp_service_account_key_base64}
+                    """
+                )
             ]
 
             extra_env = {
@@ -1964,7 +1968,7 @@ class HelmValuesFactory:
                     {
                         "name": "loki-access-gcs",
                         "secret": {
-                            "secretName": gcp_loki_sa_access_secret_name,
+                            "secretName": loki_gcs_key_secret_name,
                         },
                     }
                 ],
@@ -1976,7 +1980,7 @@ class HelmValuesFactory:
                 ],
             }
 
-            result["loki"].update(  # type: ignore
+            result["loki"].update(
                 {
                     "storage": {
                         "bucketNames": {
@@ -1999,12 +2003,12 @@ class HelmValuesFactory:
                     },
                 }
             )
-            result["write"].update(extra_env)  # type: ignore
-            result["read"].update(extra_env)  # type: ignore
-            result["backend"].update(extra_env)  # type: ignore
+            result["write"].update(extra_env)
+            result["read"].update(extra_env)
+            result["backend"].update(extra_env)
 
         elif platform.buckets.provider == BucketsProvider.AZURE:
-            result["loki"].update(  # type: ignore
+            result["loki"].update(
                 {
                     "rulerConfig": {
                         "storage": {
@@ -2058,7 +2062,7 @@ class HelmValuesFactory:
                 "create": False,
                 "name": platform.service_account_name,
             }
-            result["loki"].update(  # type: ignore
+            result["loki"].update(
                 {
                     "rulerConfig": {
                         "storage": {
@@ -2104,33 +2108,60 @@ class HelmValuesFactory:
             BucketsProvider.EMC_ECS,
             BucketsProvider.OPEN_STACK,
         ]:
-            s3_region = platform.buckets.minio_region
-
             if platform.buckets.provider == BucketsProvider.MINIO:
                 s3_endpoint_url = str(platform.buckets.minio_url)
-                s3_secret_name = f"{platform.release_name}-monitoring-s3"
-                s3_access_key_id = self._create_value_from_secret(
-                    name=s3_secret_name, key="access_key_id"
-                )
-                s3_secret_access_key = self._create_value_from_secret(
-                    name=s3_secret_name, key="secret_access_key"
-                )
+                s3_region = platform.buckets.minio_region
+                s3_access_key_id = platform.buckets.minio_access_key
+                s3_secret_access_key = platform.buckets.minio_secret_key
             elif platform.buckets.provider == BucketsProvider.EMC_ECS:
                 s3_endpoint_url = str(platform.buckets.emc_ecs_s3_endpoint)
-                s3_access_key_id = (
-                    platform.buckets.emc_ecs_access_key_id  # type: ignore
-                )
-                s3_secret_access_key = (
-                    platform.buckets.emc_ecs_secret_access_key  # type: ignore
-                )
+                s3_region = platform.buckets.emc_ecs_region
+                s3_access_key_id = platform.buckets.emc_ecs_access_key_id
+                s3_secret_access_key = platform.buckets.emc_ecs_secret_access_key
             elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
                 s3_endpoint_url = str(platform.buckets.open_stack_s3_endpoint)
-                s3_access_key_id = platform.buckets.open_stack_username  # type: ignore
-                s3_secret_access_key = (
-                    platform.buckets.open_stack_password  # type: ignore
-                )
+                s3_region = platform.buckets.open_stack_region_name
+                s3_access_key_id = platform.buckets.open_stack_username
+                s3_secret_access_key = platform.buckets.open_stack_password
 
-            result["loki"].update(  # type: ignore
+            loki_s3_key_secret_name = "loki-s3-key"
+            result["extraObjects"] = [
+                textwrap.dedent(
+                    f"""
+                    apiVersion: v1
+                    kind: Secret
+                    type: Opaque
+                    metadata:
+                      name: {loki_s3_key_secret_name}
+                      namespace: {platform.namespace}
+                    data:
+                      access_key_id: {s3_access_key_id}
+                      secret_access_key: {s3_secret_access_key}
+                    """
+                )
+            ]
+            extra_env = {
+                "extraArgs": ["-config.expand-env=true"],
+                "extraEnv": [
+                    {
+                        "name": "LOKI_S3_ACCESS_KEY_ID",
+                        **self._create_value_from_secret(
+                            name=loki_s3_key_secret_name, key="access_key_id"
+                        ),
+                    },
+                    {
+                        "name": "LOKI_S3_SECRET_ACCESS_KEY",
+                        **self._create_value_from_secret(
+                            name=loki_s3_key_secret_name, key="secret_access_key"
+                        ),
+                    },
+                ],
+            }
+            result["write"].update(extra_env)
+            result["read"].update(extra_env)
+            result["backend"].update(extra_env)
+
+            result["loki"].update(
                 {
                     "rulerConfig": {
                         "storage": {
@@ -2139,8 +2170,8 @@ class HelmValuesFactory:
                                 "endpoint": s3_endpoint_url,
                                 "bucketnames": bucket_name,
                                 "region": s3_region,
-                                "access_key_id": s3_access_key_id,
-                                "secret_access_key": s3_secret_access_key,
+                                "access_key_id": "${LOKI_S3_ACCESS_KEY_ID}",
+                                "secret_access_key": "${LOKI_S3_SECRET_ACCESS_KEY}",
                                 "insecure": False,
                                 "s3forcepathstyle": True,
                             },
@@ -2170,8 +2201,8 @@ class HelmValuesFactory:
                             "endpoint": s3_endpoint_url,
                             "bucketnames": bucket_name,
                             "region": s3_region,
-                            "access_key_id": s3_access_key_id,
-                            "secret_access_key": s3_secret_access_key,
+                            "access_key_id": "${LOKI_S3_ACCESS_KEY_ID}",
+                            "secret_access_key": "${LOKI_S3_SECRET_ACCESS_KEY}",
                             "insecure": False,
                             "s3forcepathstyle": True,
                         }
