@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import base64
 import textwrap
-from base64 import b64decode
 from hashlib import sha256
 from typing import Any
 
@@ -21,6 +21,10 @@ from .models import (
     StorageConfig,
     StorageType,
 )
+
+
+def b64encode(value: str) -> str:
+    return base64.b64encode(value.encode()).decode()
 
 
 class HelmValuesFactory:
@@ -1477,9 +1481,7 @@ class HelmValuesFactory:
                 "type": "GCS",
                 "config": {
                     "bucket": platform.monitoring.metrics_bucket_name,
-                    "service_account": b64decode(
-                        platform.gcp_service_account_key_base64
-                    ).decode(),
+                    "service_account": platform.gcp_service_account_key,
                 },
             }
             prometheus_spec["thanos"] = {
@@ -2135,8 +2137,8 @@ class HelmValuesFactory:
                       name: {loki_s3_key_secret_name}
                       namespace: {platform.namespace}
                     data:
-                      access_key_id: {s3_access_key_id}
-                      secret_access_key: {s3_secret_access_key}
+                      access_key_id: {b64encode(s3_access_key_id)}
+                      secret_access_key: {b64encode(s3_secret_access_key)}
                     """
                 )
             ]
