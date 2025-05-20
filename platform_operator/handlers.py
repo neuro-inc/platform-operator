@@ -399,18 +399,20 @@ async def create_storage_buckets(platform: PlatformConfig) -> None:
 async def _create_buckets_s3_client(
     platform: PlatformConfig,
 ) -> AsyncIterator[S3Client]:
+    endpoint_url: URL | str | None
+
     if platform.buckets.provider == BucketsProvider.GCP:
         assert platform.minio_gateway
         region = platform.monitoring.logs_region or platform.buckets.gcp_location
         access_key_id = platform.minio_gateway.root_user
         secret_access_key = platform.minio_gateway.root_user_password
-        endpoint_url = URL(platform.minio_gateway.endpoint_url)
+        endpoint_url = platform.minio_gateway.endpoint_url
     elif platform.buckets.provider == BucketsProvider.AZURE:
         assert platform.minio_gateway
         region = platform.buckets.azure_minio_gateway_region
         access_key_id = platform.minio_gateway.root_user
         secret_access_key = platform.minio_gateway.root_user_password
-        endpoint_url = URL(platform.minio_gateway.endpoint_url)
+        endpoint_url = platform.minio_gateway.endpoint_url
     elif platform.buckets.provider == BucketsProvider.AWS:
         region = platform.buckets.aws_region
         access_key_id = None
@@ -438,7 +440,7 @@ async def _create_buckets_s3_client(
         region=region,
         access_key_id=access_key_id,
         secret_access_key=secret_access_key,
-        endpoint_url=endpoint_url,  # type: ignore
+        endpoint_url=endpoint_url,
     ) as s3_client:
         yield s3_client
 

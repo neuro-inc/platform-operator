@@ -35,7 +35,7 @@ class BaseAwsClient:
         region: str,
         access_key_id: str | None = None,
         secret_access_key: str | None = None,
-        endpoint_url: URL | None = None,
+        endpoint_url: URL | str | None = None,
     ) -> None:
         self._region = region
         self._access_key_id = access_key_id
