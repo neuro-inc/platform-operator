@@ -83,7 +83,7 @@ class AwsElbClient(BaseAwsClient):
 
 class S3Client(BaseAwsClient):
     async def __aenter__(self, *args: Any, **kwargs: Any) -> S3Client:
-        context = self._session.create_client(
+        context = self._create_client(
             "s3",
             config=AioConfig(retries={"mode": "standard"}),
         )
