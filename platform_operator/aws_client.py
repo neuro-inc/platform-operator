@@ -35,7 +35,7 @@ class BaseAwsClient:
         region: str,
         access_key_id: str | None = None,
         secret_access_key: str | None = None,
-        endpoint_url: URL | None = None,
+        endpoint_url: URL | str | None = None,
     ) -> None:
         self._region = region
         self._access_key_id = access_key_id
@@ -83,7 +83,7 @@ class AwsElbClient(BaseAwsClient):
 
 class S3Client(BaseAwsClient):
     async def __aenter__(self, *args: Any, **kwargs: Any) -> S3Client:
-        context = self._session.create_client(
+        context = self._create_client(
             "s3",
             config=AioConfig(retries={"mode": "standard"}),
         )

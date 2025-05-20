@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import ssl
-from contextlib import AsyncExitStack
+from collections.abc import AsyncIterator
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -17,6 +18,7 @@ from neuro_config_client import (
     ConfigClient,
     PatchClusterRequest,
 )
+from yarl import URL
 
 from .aws_client import AwsElbClient, S3Client
 from .helm_client import HelmClient, ReleaseStatus
@@ -386,52 +388,61 @@ async def is_helm_deploy_failed(release_name: str) -> bool:
 
 
 async def create_storage_buckets(platform: PlatformConfig) -> None:
-    if platform.monitoring.logs_bucket_name:
-        if platform.buckets.provider == BucketsProvider.GCP:
-            region = platform.monitoring.logs_region or platform.buckets.gcp_location
-            access_key_id = platform.minio_gateway.root_user  # type: ignore
-            secret_access_key = (
-                platform.minio_gateway.root_user_password  # type: ignore
-            )
-            endpoint_url = platform.minio_gateway.endpoint_url  # type: ignore
-        elif platform.buckets.provider == BucketsProvider.AZURE:
-            region = platform.buckets.azure_minio_gateway_region
-            access_key_id = platform.minio_gateway.root_user  # type: ignore
-            secret_access_key = (
-                platform.minio_gateway.root_user_password  # type: ignore
-            )
-            endpoint_url = platform.minio_gateway.endpoint_url  # type: ignore
-        elif platform.buckets.provider == BucketsProvider.AWS:
-            region = platform.buckets.aws_region
-            access_key_id = None
-            secret_access_key = None
-            endpoint_url = None
-        elif platform.buckets.provider == BucketsProvider.MINIO:
-            region = platform.buckets.minio_region
-            access_key_id = platform.buckets.minio_access_key
-            secret_access_key = platform.buckets.minio_secret_key
-            endpoint_url = platform.buckets.minio_url
-        elif platform.buckets.provider == BucketsProvider.EMC_ECS:
-            region = platform.buckets.emc_ecs_region
-            access_key_id = platform.buckets.emc_ecs_access_key_id
-            secret_access_key = platform.buckets.emc_ecs_secret_access_key
-            endpoint_url = platform.buckets.emc_ecs_s3_endpoint
-        elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
-            region = platform.buckets.open_stack_region_name
-            access_key_id = platform.buckets.open_stack_username
-            secret_access_key = platform.buckets.open_stack_password
-            endpoint_url = platform.buckets.open_stack_s3_endpoint
-        else:
-            raise ValueError(f"Unknown buckets provider: {platform.buckets.provider}")
-        async with S3Client(
-            region=region,
-            access_key_id=access_key_id,
-            secret_access_key=secret_access_key,
-            endpoint_url=endpoint_url,  # type: ignore
-        ) as s3_client:
-            await s3_client.create_bucket(
-                bucket_name=platform.monitoring.logs_bucket_name
-            )
+    if not platform.monitoring.logs_bucket_name:
+        return
+
+    async with _create_buckets_s3_client(platform) as s3_client:
+        await s3_client.create_bucket(bucket_name=platform.monitoring.logs_bucket_name)
+
+
+@asynccontextmanager
+async def _create_buckets_s3_client(
+    platform: PlatformConfig,
+) -> AsyncIterator[S3Client]:
+    endpoint_url: URL | str | None
+
+    if platform.buckets.provider == BucketsProvider.GCP:
+        assert platform.minio_gateway
+        region = platform.monitoring.logs_region or platform.buckets.gcp_location
+        access_key_id = platform.minio_gateway.root_user
+        secret_access_key = platform.minio_gateway.root_user_password
+        endpoint_url = platform.minio_gateway.endpoint_url
+    elif platform.buckets.provider == BucketsProvider.AZURE:
+        assert platform.minio_gateway
+        region = platform.buckets.azure_minio_gateway_region
+        access_key_id = platform.minio_gateway.root_user
+        secret_access_key = platform.minio_gateway.root_user_password
+        endpoint_url = platform.minio_gateway.endpoint_url
+    elif platform.buckets.provider == BucketsProvider.AWS:
+        region = platform.buckets.aws_region
+        access_key_id = None
+        secret_access_key = None
+        endpoint_url = None
+    elif platform.buckets.provider == BucketsProvider.MINIO:
+        region = platform.buckets.minio_region
+        access_key_id = platform.buckets.minio_access_key
+        secret_access_key = platform.buckets.minio_secret_key
+        endpoint_url = platform.buckets.minio_url
+    elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+        region = platform.buckets.emc_ecs_region
+        access_key_id = platform.buckets.emc_ecs_access_key_id
+        secret_access_key = platform.buckets.emc_ecs_secret_access_key
+        endpoint_url = platform.buckets.emc_ecs_s3_endpoint
+    elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+        region = platform.buckets.open_stack_region_name
+        access_key_id = platform.buckets.open_stack_username
+        secret_access_key = platform.buckets.open_stack_password
+        endpoint_url = platform.buckets.open_stack_s3_endpoint
+    else:
+        raise ValueError(f"Unknown buckets provider: {platform.buckets.provider}")
+
+    async with S3Client(
+        region=region,
+        access_key_id=access_key_id,
+        secret_access_key=secret_access_key,
+        endpoint_url=endpoint_url,
+    ) as s3_client:
+        yield s3_client
 
 
 async def complete_deployment(cluster: Cluster, platform: PlatformConfig) -> None:
