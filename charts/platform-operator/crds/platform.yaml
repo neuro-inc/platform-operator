@@ -394,6 +394,11 @@ spec:
                             type: string
                           bucket:
                             type: string
+                      loki:
+                        type: object
+                        properties:
+                          dnsService:
+                            type: string
                   metrics:
                     type: object
                     properties:

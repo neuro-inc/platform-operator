@@ -1882,6 +1882,9 @@ class HelmValuesFactory:
         result: dict[str, Any] = {
             "nameOverride": "loki",
             "fullnameOverride": "loki",
+            "global": {
+                "dnsService": platform.monitoring.loki_dns_service,
+            },
             "deploymentMode": "SimpleScalable",
             "loki": {
                 "commonConfig": {"replication_factor": 1},
