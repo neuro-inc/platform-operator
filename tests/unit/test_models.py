@@ -953,6 +953,20 @@ class TestPlatformConfigFactory:
             open_stack_region_name="region",
         )
 
+    def test_on_prem_platform_config_with_custom_loki_dns_service(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: kopf.Body,
+        on_prem_cluster: Cluster,
+    ) -> None:
+        on_prem_platform_body["spec"]["monitoring"]["logs"]["loki"] = {
+            "dnsService": "custom-dns"
+        }
+
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert result.monitoring.loki_dns_service == "custom-dns"
+
     def test_vcd_platform_config(
         self,
         factory: PlatformConfigFactory,
