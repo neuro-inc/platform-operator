@@ -32,7 +32,7 @@ dependencies:
     version: "24.11.1"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-monitoring
-    version: "24.12.0"
+    version: "25.5.1"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-container-runtime
     version: "23.7.0"
