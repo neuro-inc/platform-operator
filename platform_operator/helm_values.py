@@ -24,6 +24,8 @@ from .models import (
 
 PLATFORM_NEURO_JOB_TAINT_KEY = "platform.neuromation.io/job"
 PLATFORM_APOLO_WORKER_TAINT_KEY = "platform.apolo.us/worker"
+NVIDIA_GPU_TAINT_KEY = "nvidia.com/gpu"
+AMD_GPU_TAINT_KEY = "amd.com/gpu"
 
 
 def b64encode(value: str) -> str:
@@ -2274,6 +2276,16 @@ class HelmValuesFactory:
                     },
                     {
                         "key": PLATFORM_NEURO_JOB_TAINT_KEY,
+                        "effect": "NoSchedule",
+                        "operator": "Exists",
+                    },
+                    {
+                        "key": NVIDIA_GPU_TAINT_KEY,
+                        "effect": "NoSchedule",
+                        "operator": "Exists",
+                    },
+                    {
+                        "key": AMD_GPU_TAINT_KEY,
                         "effect": "NoSchedule",
                         "operator": "Exists",
                     },
