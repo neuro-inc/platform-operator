@@ -22,6 +22,9 @@ from .models import (
     StorageType,
 )
 
+PLATFORM_NEURO_JOB_TAINT_KEY = "platform.neuromation.io/job"
+PLATFORM_APOLO_WORKER_TAINT_KEY = "platform.apolo.us/worker"
+
 
 def b64encode(value: str) -> str:
     return base64.b64encode(value.encode()).decode()
@@ -2261,6 +2264,20 @@ class HelmValuesFactory:
                     """  # noqa: E501
                     ),
                 }
+            },
+            "controller": {
+                "tolerations": [
+                    {
+                        "key": PLATFORM_APOLO_WORKER_TAINT_KEY,
+                        "effect": "NoSchedule",
+                        "operator": "Exists",
+                    },
+                    {
+                        "key": PLATFORM_NEURO_JOB_TAINT_KEY,
+                        "effect": "NoSchedule",
+                        "operator": "Exists",
+                    },
+                ]
             },
         }
         result["alloy"]["configMap"]["content"] = result["alloy"]["configMap"][
