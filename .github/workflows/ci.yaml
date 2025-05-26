@@ -40,8 +40,21 @@ jobs:
   release:
     name: Create release
     needs: test
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))
     uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v25.4.0
     with:
       image: platform-operator-controller
       helm_charts: platform platform-operator
+
+  deploy:
+    name: Deploy
+    needs: release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    uses: neuro-inc/reuse/.github/workflows/deploy-service.yaml@v25.4.0
+    secrets:
+      tf_api_token: ${{ secrets.TF_API_TOKEN }}
+    with:
+      environment: dev
+      dev_workspace: ${{ vars.DEV_TFC_WORKSPACE_JSON }}
+      variables: |
+        platform_operator_version=${{ needs.release.outputs.version }}
