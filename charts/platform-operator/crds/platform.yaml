@@ -397,8 +397,19 @@ spec:
                       loki:
                         type: object
                         properties:
+                          enabled:
+                            type: boolean
+                            default: true
                           dnsService:
                             type: string
+                          endpoint:
+                            type: string
+                      alloy:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                            default: true
                   metrics:
                     type: object
                     properties:

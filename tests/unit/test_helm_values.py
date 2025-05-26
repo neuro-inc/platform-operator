@@ -46,6 +46,8 @@ class TestHelmValuesFactory:
             "minioEnabled": False,
             "minioGatewayEnabled": True,
             "platformReportsEnabled": True,
+            "lokiEnabled": True,
+            "alloyEnabled": True,
             "alpineImage": {"repository": "ghcr.io/neuro-inc/alpine"},
             "pauseImage": {"repository": "ghcr.io/neuro-inc/pause"},
             "crictlImage": {"repository": "ghcr.io/neuro-inc/crictl"},
@@ -1851,7 +1853,7 @@ class TestHelmValuesFactory:
             "priorityClassName": "platform-services",
         }
 
-    def test_create_platform_monitoring_values__gcp(
+    def test_create_platform_monitoring_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_platform_monitoring_values(gcp_platform_config)
@@ -1869,6 +1871,7 @@ class TestHelmValuesFactory:
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
                 "apiUrl": "https://dev.neu.ro",
+                "appsUrl": "https://dev.neu.ro",
                 "authUrl": "https://dev.neu.ro",
                 "configUrl": "https://dev.neu.ro",
                 "registryUrl": (
@@ -1900,38 +1903,13 @@ class TestHelmValuesFactory:
             "fluentbit": {
                 "image": {"repository": "ghcr.io/neuro-inc/fluent-bit"},
             },
-            "secrets": [
-                {
-                    "name": "platform-monitoring-s3",
-                    "data": {
-                        "access_key_id": "admin",
-                        "secret_access_key": mock.ANY,
-                    },
-                }
-            ],
             "logs": {
                 "persistence": {
-                    "type": "s3",
-                    "s3": {
-                        "endpoint": "http://minio-gateway:9000",
-                        "region": "us",
-                        "accessKeyId": {
-                            "valueFrom": {
-                                "secretKeyRef": {
-                                    "name": "platform-monitoring-s3",
-                                    "key": "access_key_id",
-                                }
-                            }
-                        },
-                        "secretAccessKey": {
-                            "valueFrom": {
-                                "secretKeyRef": {
-                                    "name": "platform-monitoring-s3",
-                                    "key": "secret_access_key",
-                                }
-                            }
-                        },
-                        "bucket": "job-logs",
+                    "type": "loki",
+                    "loki": {
+                        "endpoint": "http://loki-gateway.platform",
+                        "archiveDelay": "5",
+                        "retentionPeriodS": "2592000",
                     },
                 }
             },
@@ -1952,254 +1930,6 @@ class TestHelmValuesFactory:
 
         assert result["platform"]["apiUrl"] == "-"
         assert result["platform"]["token"] == {"value": ""}
-
-    def test_create_platform_monitoring_values__gcp__custom_logs_region(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_monitoring_values(
-            replace(
-                gcp_platform_config,
-                monitoring=replace(
-                    gcp_platform_config.monitoring, logs_region="us-central1"
-                ),
-            )
-        )
-
-        assert result["secrets"] == [
-            {
-                "name": "platform-monitoring-s3",
-                "data": {
-                    "access_key_id": "admin",
-                    "secret_access_key": mock.ANY,
-                },
-            }
-        ]
-        assert result["logs"] == {
-            "persistence": {
-                "type": "s3",
-                "s3": {
-                    "endpoint": "http://minio-gateway:9000",
-                    "region": "us-central1",
-                    "accessKeyId": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": "platform-monitoring-s3",
-                                "key": "access_key_id",
-                            }
-                        }
-                    },
-                    "secretAccessKey": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": "platform-monitoring-s3",
-                                "key": "secret_access_key",
-                            }
-                        }
-                    },
-                    "bucket": "job-logs",
-                },
-            }
-        }
-
-    def test_create_platform_monitoring_values__aws(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_monitoring_values(aws_platform_config)
-
-        assert result["logs"] == {
-            "persistence": {
-                "type": "s3",
-                "s3": {"bucket": "job-logs", "region": "us-east-1"},
-            },
-        }
-
-    def test_create_platform_monitoring_values__azure(
-        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_monitoring_values(azure_platform_config)
-
-        assert result["secrets"] == [
-            {
-                "name": "platform-monitoring-s3",
-                "data": {
-                    "access_key_id": "accountName2",
-                    "secret_access_key": "accountKey2",
-                },
-            }
-        ]
-        assert result["logs"] == {
-            "persistence": {
-                "type": "s3",
-                "s3": {
-                    "endpoint": "http://minio-gateway:9000",
-                    "accessKeyId": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": "platform-monitoring-s3",
-                                "key": "access_key_id",
-                            }
-                        }
-                    },
-                    "secretAccessKey": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": "platform-monitoring-s3",
-                                "key": "secret_access_key",
-                            }
-                        }
-                    },
-                    "region": "minio",
-                    "bucket": "job-logs",
-                },
-            },
-        }
-
-    def test_create_platform_monitoring_values__minio(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_monitoring_values(on_prem_platform_config)
-
-        assert result["secrets"] == [
-            {
-                "name": "platform-monitoring-s3",
-                "data": {
-                    "access_key_id": "username",
-                    "secret_access_key": "password",
-                },
-            }
-        ]
-        assert result["logs"] == {
-            "persistence": {
-                "type": "s3",
-                "s3": {
-                    "endpoint": "http://platform-minio:9000",
-                    "accessKeyId": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": "platform-monitoring-s3",
-                                "key": "access_key_id",
-                            }
-                        }
-                    },
-                    "secretAccessKey": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": "platform-monitoring-s3",
-                                "key": "secret_access_key",
-                            }
-                        }
-                    },
-                    "region": "minio",
-                    "bucket": "job-logs",
-                },
-            },
-        }
-
-    def test_create_platform_monitoring_values__emc_ecs(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_monitoring_values(
-            replace(
-                on_prem_platform_config,
-                buckets=BucketsConfig(
-                    provider=BucketsProvider.EMC_ECS,
-                    emc_ecs_access_key_id="emc_ecs_access_key",
-                    emc_ecs_secret_access_key="emc_ecs_secret_key",
-                    emc_ecs_s3_endpoint=URL("https://emc-ecs.s3"),
-                    emc_ecs_management_endpoint=URL("https://emc-ecs.management"),
-                    emc_ecs_s3_assumable_role="s3-role",
-                ),
-            )
-        )
-
-        assert result["secrets"] == [
-            {
-                "name": "platform-monitoring-s3",
-                "data": {
-                    "access_key_id": "emc_ecs_access_key",
-                    "secret_access_key": "emc_ecs_secret_key",
-                },
-            }
-        ]
-        assert result["logs"] == {
-            "persistence": {
-                "type": "s3",
-                "s3": {
-                    "endpoint": "https://emc-ecs.s3",
-                    "region": "emc-ecs",
-                    "accessKeyId": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": "platform-monitoring-s3",
-                                "key": "access_key_id",
-                            }
-                        }
-                    },
-                    "secretAccessKey": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": "platform-monitoring-s3",
-                                "key": "secret_access_key",
-                            }
-                        }
-                    },
-                    "bucket": "job-logs",
-                },
-            },
-        }
-
-    def test_create_platform_monitoring_values__open_stack(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_monitoring_values(
-            replace(
-                on_prem_platform_config,
-                buckets=BucketsConfig(
-                    provider=BucketsProvider.OPEN_STACK,
-                    open_stack_username="os_user",
-                    open_stack_password="os_password",
-                    open_stack_s3_endpoint=URL("https://os.s3"),
-                    open_stack_endpoint=URL("https://os.management"),
-                    open_stack_region_name="os_region",
-                ),
-            )
-        )
-
-        assert result["secrets"] == [
-            {
-                "name": "platform-monitoring-s3",
-                "data": {
-                    "access_key_id": "os_user",
-                    "secret_access_key": "os_password",
-                },
-            }
-        ]
-        assert result["logs"] == {
-            "persistence": {
-                "type": "s3",
-                "s3": {
-                    "endpoint": "https://os.s3",
-                    "accessKeyId": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": "platform-monitoring-s3",
-                                "key": "access_key_id",
-                            }
-                        }
-                    },
-                    "secretAccessKey": {
-                        "valueFrom": {
-                            "secretKeyRef": {
-                                "name": "platform-monitoring-s3",
-                                "key": "secret_access_key",
-                            }
-                        }
-                    },
-                    "region": "os_region",
-                    "bucket": "job-logs",
-                },
-            },
-        }
 
     def test_create_gcp_platform_container_runtime_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
