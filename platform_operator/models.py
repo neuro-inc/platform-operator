@@ -490,8 +490,20 @@ class MonitoringSpec(dict[str, Any]):
         return self["metrics"].get("nodeExporter", {}).get("enabled", True)
 
     @property
+    def loki_enabled(self) -> bool:
+        return self["logs"].get("loki", {}).get("enabled", True)
+
+    @property
     def loki_dns_service(self) -> str | None:
         return self["logs"].get("loki", {}).get("dnsService")
+
+    @property
+    def loki_endpoint(self) -> str | None:
+        return self["logs"].get("loki", {}).get("endpoint")
+
+    @property
+    def alloy_enabled(self) -> bool:
+        return self["logs"].get("alloy", {}).get("enabled", True)
 
 
 class DisksSpec(dict[str, Any]):
@@ -785,7 +797,10 @@ class MonitoringConfig:
     metrics_retention_time: str = "3d"
     metrics_region: str = ""
     metrics_node_exporter_enabled: bool = True
+    loki_enabled: bool = True
     loki_dns_service: str = "kube-dns"
+    loki_endpoint: str = ""
+    alloy_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -1377,14 +1392,22 @@ class PlatformConfigFactory:
             raise ValueError("Monitoring spec is empty")
 
         metrics_enabled = not self._config.is_standalone
+        loki_enabled = spec.loki_enabled
         loki_dns_service = spec.loki_dns_service or MonitoringConfig.loki_dns_service
+        loki_endpoint = spec.loki_endpoint or MonitoringConfig.loki_endpoint
+
+        if not loki_enabled and not loki_endpoint:
+            raise ValueError("Loki endpoint is required")
 
         if not metrics_enabled:
             return MonitoringConfig(
                 logs_region=spec.logs_region,
                 logs_bucket_name=spec.logs_bucket,
                 metrics_enabled=False,
+                loki_enabled=loki_enabled,
                 loki_dns_service=loki_dns_service,
+                loki_endpoint=loki_endpoint,
+                alloy_enabled=spec.alloy_enabled,
             )
         elif "blobStorage" in spec.metrics:
             return MonitoringConfig(
@@ -1399,7 +1422,10 @@ class PlatformConfigFactory:
                     or MonitoringConfig.metrics_retention_time
                 ),
                 metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
+                loki_enabled=loki_enabled,
                 loki_dns_service=loki_dns_service,
+                loki_endpoint=loki_endpoint,
+                alloy_enabled=spec.alloy_enabled,
             )
         elif "kubernetes" in spec.metrics:
             return MonitoringConfig(
@@ -1414,7 +1440,10 @@ class PlatformConfigFactory:
                 ),
                 metrics_region=spec.metrics_region,
                 metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
+                loki_enabled=loki_enabled,
                 loki_dns_service=loki_dns_service,
+                loki_endpoint=loki_endpoint,
+                alloy_enabled=spec.alloy_enabled,
             )
         else:
             raise ValueError("Metrics storage type is not supported")

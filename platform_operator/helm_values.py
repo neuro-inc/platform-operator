@@ -50,6 +50,8 @@ class HelmValuesFactory:
             "minioEnabled": platform.buckets.minio_install,
             "minioGatewayEnabled": platform.minio_gateway is not None,
             "platformReportsEnabled": platform.monitoring.metrics_enabled,
+            "lokiEnabled": platform.monitoring.loki_enabled,
+            "alloyEnabled": platform.monitoring.alloy_enabled,
             "alpineImage": {"repository": platform.get_image("alpine")},
             "pauseImage": {"repository": platform.get_image("pause")},
             "crictlImage": {"repository": platform.get_image("crictl")},
@@ -129,8 +131,6 @@ class HelmValuesFactory:
             self._chart_names.platform_metadata: self.create_platform_metadata_values(
                 platform
             ),
-            self._chart_names.alloy: self.create_alloy_values(platform),
-            self._chart_names.loki: self.create_loki_values(platform),
             self._chart_names.spark_operator: self.create_spark_operator_values(
                 platform
             ),
@@ -182,6 +182,10 @@ class HelmValuesFactory:
                 self.create_platform_reports_values(platform)
             )
             result["alertmanager"] = self._create_alert_manager_values(platform)
+        if platform.monitoring.loki_enabled:
+            result[self._chart_names.loki] = self.create_loki_values(platform)
+        if platform.monitoring.alloy_enabled:
+            result[self._chart_names.alloy] = self.create_alloy_values(platform)
         return result
 
     def _create_alert_manager_values(self, platform: PlatformConfig) -> dict[str, Any]:
@@ -950,6 +954,7 @@ class HelmValuesFactory:
                 **self._create_platform_url_value("authUrl", platform.auth_url),
                 **self._create_platform_url_value("configUrl", platform.config_url),
                 **self._create_platform_url_value("apiUrl", platform.api_url),
+                **self._create_platform_url_value("appsUrl", platform.api_url),
                 **self._create_platform_url_value(
                     "registryUrl", platform.ingress_registry_url
                 ),
@@ -971,159 +976,18 @@ class HelmValuesFactory:
             "containerRuntime": {"name": self._container_runtime},
             "fluentbit": {"image": {"repository": platform.get_image("fluent-bit")}},
             "priorityClassName": platform.services_priority_class_name,
-            "secrets": [],
+            "logs": {
+                "persistence": {
+                    "type": "loki",
+                    "loki": {
+                        "endpoint": self._create_loki_endpoint(platform),
+                        "archiveDelay": "5",
+                        "retentionPeriodS": "2592000",  # 30 days
+                    },
+                },
+            },
         }
         result.update(**self._create_tracing_values(platform))
-        s3_secret_name = f"{platform.release_name}-monitoring-s3"
-        if platform.buckets.provider == BucketsProvider.GCP:
-            assert platform.minio_gateway
-            result["secrets"].append(
-                {
-                    "name": s3_secret_name,
-                    "data": {
-                        "access_key_id": platform.minio_gateway.root_user,
-                        "secret_access_key": platform.minio_gateway.root_user_password,
-                    },
-                }
-            )
-            result["logs"] = {
-                "persistence": {
-                    "type": "s3",
-                    "s3": {
-                        "endpoint": "http://minio-gateway:9000",
-                        "accessKeyId": self._create_value_from_secret(
-                            name=s3_secret_name, key="access_key_id"
-                        ),
-                        "secretAccessKey": self._create_value_from_secret(
-                            name=s3_secret_name, key="secret_access_key"
-                        ),
-                        "region": (
-                            platform.monitoring.logs_region
-                            or platform.buckets.gcp_location
-                        ),
-                        "bucket": platform.monitoring.logs_bucket_name,
-                    },
-                }
-            }
-        elif platform.buckets.provider == BucketsProvider.AWS:
-            result["logs"] = {
-                "persistence": {
-                    "type": "s3",
-                    "s3": {
-                        "region": platform.buckets.aws_region,
-                        "bucket": platform.monitoring.logs_bucket_name,
-                    },
-                }
-            }
-        elif platform.buckets.provider == BucketsProvider.AZURE:
-            assert platform.minio_gateway
-            result["secrets"].append(
-                {
-                    "name": s3_secret_name,
-                    "data": {
-                        "access_key_id": platform.minio_gateway.root_user,
-                        "secret_access_key": platform.minio_gateway.root_user_password,
-                    },
-                }
-            )
-            result["logs"] = {
-                "persistence": {
-                    "type": "s3",
-                    "s3": {
-                        "endpoint": "http://minio-gateway:9000",
-                        "accessKeyId": self._create_value_from_secret(
-                            name=s3_secret_name, key="access_key_id"
-                        ),
-                        "secretAccessKey": self._create_value_from_secret(
-                            name=s3_secret_name, key="secret_access_key"
-                        ),
-                        "region": "minio",
-                        "bucket": platform.monitoring.logs_bucket_name,
-                    },
-                }
-            }
-        elif platform.buckets.provider == BucketsProvider.EMC_ECS:
-            result["secrets"].append(
-                {
-                    "name": s3_secret_name,
-                    "data": {
-                        "access_key_id": platform.buckets.emc_ecs_access_key_id,
-                        "secret_access_key": platform.buckets.emc_ecs_secret_access_key,
-                    },
-                }
-            )
-            result["logs"] = {
-                "persistence": {
-                    "type": "s3",
-                    "s3": {
-                        "endpoint": str(platform.buckets.emc_ecs_s3_endpoint),
-                        "accessKeyId": self._create_value_from_secret(
-                            name=s3_secret_name, key="access_key_id"
-                        ),
-                        "secretAccessKey": self._create_value_from_secret(
-                            name=s3_secret_name, key="secret_access_key"
-                        ),
-                        "region": "emc-ecs",
-                        "bucket": platform.monitoring.logs_bucket_name,
-                    },
-                }
-            }
-        elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
-            result["secrets"].append(
-                {
-                    "name": s3_secret_name,
-                    "data": {
-                        "access_key_id": platform.buckets.open_stack_username,
-                        "secret_access_key": platform.buckets.open_stack_password,
-                    },
-                }
-            )
-            result["logs"] = {
-                "persistence": {
-                    "type": "s3",
-                    "s3": {
-                        "endpoint": str(platform.buckets.open_stack_s3_endpoint),
-                        "accessKeyId": self._create_value_from_secret(
-                            name=s3_secret_name, key="access_key_id"
-                        ),
-                        "secretAccessKey": self._create_value_from_secret(
-                            name=s3_secret_name, key="secret_access_key"
-                        ),
-                        "region": platform.buckets.open_stack_region_name,
-                        "bucket": platform.monitoring.logs_bucket_name,
-                    },
-                }
-            }
-        elif platform.buckets.provider == BucketsProvider.MINIO:
-            result["secrets"].append(
-                {
-                    "name": s3_secret_name,
-                    "data": {
-                        "access_key_id": platform.buckets.minio_access_key,
-                        "secret_access_key": platform.buckets.minio_secret_key,
-                    },
-                }
-            )
-            result["logs"] = {
-                "persistence": {
-                    "type": "s3",
-                    "s3": {
-                        "endpoint": str(platform.buckets.minio_url),
-                        "accessKeyId": self._create_value_from_secret(
-                            name=s3_secret_name, key="access_key_id"
-                        ),
-                        "secretAccessKey": self._create_value_from_secret(
-                            name=s3_secret_name, key="secret_access_key"
-                        ),
-                        "region": platform.buckets.minio_region,
-                        "bucket": platform.monitoring.logs_bucket_name,
-                    },
-                }
-            }
-        else:
-            raise ValueError(
-                f"Bucket provider {platform.buckets.provider} not supported"
-            )
         return result
 
     def create_platform_container_runtime_values(
@@ -2219,6 +2083,11 @@ class HelmValuesFactory:
             raise ValueError("Bucket provider is not supported")
 
         return result
+
+    def _create_loki_endpoint(self, platform: PlatformConfig) -> str:
+        if platform.monitoring.loki_enabled:
+            return f"http://loki-gateway.{platform.namespace}"
+        return platform.monitoring.loki_endpoint
 
     def create_alloy_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {

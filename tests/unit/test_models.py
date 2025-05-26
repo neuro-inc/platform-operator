@@ -967,6 +967,22 @@ class TestPlatformConfigFactory:
 
         assert result.monitoring.loki_dns_service == "custom-dns"
 
+    def test_on_prem_platform_config_with_custom_loki_endpoint(
+        self,
+        factory: PlatformConfigFactory,
+        on_prem_platform_body: kopf.Body,
+        on_prem_cluster: Cluster,
+    ) -> None:
+        on_prem_platform_body["spec"]["monitoring"]["logs"]["loki"] = {
+            "enabled": False,
+            "endpoint": "http://custom-loki-gateway.platform",
+        }
+
+        result = factory.create(on_prem_platform_body, on_prem_cluster)
+
+        assert not result.monitoring.loki_enabled
+        assert result.monitoring.loki_endpoint == "http://custom-loki-gateway.platform"
+
     def test_vcd_platform_config(
         self,
         factory: PlatformConfigFactory,
