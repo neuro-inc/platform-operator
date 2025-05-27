@@ -132,7 +132,6 @@ class HelmValuesFactory:
             self._chart_names.platform_buckets: self.create_platform_buckets_values(
                 platform
             ),
-            self._chart_names.platform_apps: self.create_platform_apps_values(platform),
             self._chart_names.platform_metadata: self.create_platform_metadata_values(
                 platform
             ),
@@ -1723,28 +1722,6 @@ class HelmValuesFactory:
             }
         else:
             raise AssertionError("was unable to construct bucket provider")
-        return result
-
-    def create_platform_apps_values(self, platform: PlatformConfig) -> dict[str, Any]:
-        result: dict[str, Any] = {
-            "nameOverride": f"{platform.release_name}-apps",
-            "fullnameOverride": f"{platform.release_name}-apps",
-            "image": {"repository": platform.get_image("platform-apps")},
-            "platform": {
-                "clusterName": platform.cluster_name,
-                **self._create_platform_url_value("authUrl", platform.auth_url),
-                **self._create_platform_token_value(platform),
-            },
-            "ingress": {
-                "enabled": True,
-                "className": "traefik",
-                "hosts": [platform.ingress_url.host],
-            },
-            "priorityClassName": platform.services_priority_class_name,
-            "rbac": {"create": True},
-            "serviceAccount": {"create": True},
-        }
-        result.update(**self._create_tracing_values(platform))
         return result
 
     def create_loki_values(self, platform: PlatformConfig) -> dict[str, Any]:
