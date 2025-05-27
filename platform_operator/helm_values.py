@@ -580,9 +580,9 @@ class HelmValuesFactory:
                 ),
             }
         if platform.ingress_load_balancer_source_ranges:
-            result["service"][
-                "loadBalancerSourceRanges"
-            ] = platform.ingress_load_balancer_source_ranges
+            result["service"]["loadBalancerSourceRanges"] = (
+                platform.ingress_load_balancer_source_ranges
+            )
         if platform.ingress_service_type == IngressServiceType.NODE_PORT:
             ports = result["ports"]
             if platform.ingress_node_port_http and platform.ingress_node_port_https:
@@ -1567,9 +1567,9 @@ class HelmValuesFactory:
         }
         result.update(**self._create_tracing_values(platform))
         if platform.kubernetes_provider == CloudProviderType.AZURE:
-            result["jobs"][
-                "preemptibleTolerationKey"
-            ] = "kubernetes.azure.com/scalesetpriority"
+            result["jobs"]["preemptibleTolerationKey"] = (
+                "kubernetes.azure.com/scalesetpriority"
+            )
         if platform.docker_hub_config:
             result["jobs"]["imagePullSecret"] = platform.docker_hub_config.secret_name
         return result
