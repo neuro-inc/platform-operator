@@ -25,9 +25,9 @@ lint: format
 
 format:
 ifdef CI_LINT_RUN
-	pre-commit run --all-files --show-diff-on-failure
+	poetry run pre-commit run --all-files --show-diff-on-failure
 else
-	pre-commit run --all-files
+	poetry run pre-commit run --all-files
 endif
 
 .PHONY: test_unit
