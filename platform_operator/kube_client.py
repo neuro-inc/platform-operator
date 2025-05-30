@@ -7,7 +7,7 @@ import ssl
 from base64 import b64decode, b64encode
 from collections.abc import AsyncIterator, Iterable, Sequence
 from contextlib import asynccontextmanager, suppress
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from time import time
 from typing import Any
@@ -16,6 +16,7 @@ import aiohttp
 from yarl import URL
 
 from .models import KubeClientAuthType, KubeConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +201,7 @@ class KubeClient:
             except Exception as exc:
                 logger.exception("Failed to update kube token: %s", exc)
 
-    async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
+    async def __aexit__(self, *args: object, **kwargs: Any) -> None:
         await self.close()
 
     async def close(self) -> None:
@@ -403,14 +404,14 @@ class KubeClient:
         while True:
             try:
                 resource = await self.get_secret(namespace, name)
-                expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_s)
+                expires_at = datetime.now(UTC) + timedelta(seconds=ttl_s)
                 annotations = resource.metadata.annotations
                 old_lock_key = annotations.get(LOCK_KEY)
                 if (
                     old_lock_key is None
                     or old_lock_key == lock_key
                     or datetime.fromisoformat(annotations[LOCK_EXPIRES_AT])
-                    <= datetime.now(timezone.utc)
+                    <= datetime.now(UTC)
                 ):
                     annotations[LOCK_KEY] = lock_key
                     annotations[LOCK_EXPIRES_AT] = expires_at.isoformat()
@@ -591,7 +592,7 @@ class PlatformStatusManager:
         return result
 
     def _now(self) -> str:
-        return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        return datetime.now(UTC).replace(microsecond=0).isoformat()
 
     async def start_deployment(self, name: str, retry: int | None = None) -> None:
         await self._load(name)

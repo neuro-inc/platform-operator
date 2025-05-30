@@ -10,6 +10,7 @@ from aiobotocore.session import ClientCreatorContext
 from botocore.exceptions import ClientError as S3ClientError
 from yarl import URL
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,7 +62,7 @@ class AwsElbClient(BaseAwsClient):
         self._client = await context.__aenter__()
         return self
 
-    async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
+    async def __aexit__(self, *args: object, **kwargs: Any) -> None:
         await self._client.__aexit__(*args, **kwargs)
 
     async def create_load_balancer(self, **kwargs: Any) -> dict[str, str]:
@@ -90,7 +91,7 @@ class S3Client(BaseAwsClient):
         self._client = await context.__aenter__()
         return self
 
-    async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
+    async def __aexit__(self, *args: object, **kwargs: Any) -> None:
         await self._client.__aexit__(*args, **kwargs)
 
     async def create_bucket(self, bucket_name: str) -> None:

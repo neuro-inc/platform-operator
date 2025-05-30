@@ -6,8 +6,8 @@ import ssl
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import aiohttp
 import kopf
@@ -33,6 +33,7 @@ from .kube_client import (
     PlatformStatusManager,
 )
 from .models import BucketsProvider, Config, PlatformConfig, PlatformConfigFactory
+
 
 logger = logging.getLogger(__name__)
 
@@ -100,9 +101,7 @@ def login(**_: Any) -> kopf.ConnectionInfo:
         ca_path=str(config.kube_config.cert_authority_path),
         token=config.kube_config.read_auth_token_from_path(),
         default_namespace=config.platform_namespace,
-        expiration=datetime.fromtimestamp(
-            config.kube_config.auth_token_exp_ts, tz=timezone.utc
-        ),
+        expiration=datetime.fromtimestamp(config.kube_config.auth_token_exp_ts, tz=UTC),
     )
 
 
@@ -113,7 +112,7 @@ def login(**_: Any) -> kopf.ConnectionInfo:
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def deploy(
-    name: Optional[str], body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
+    name: str | None, body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
 ) -> None:
     assert name, "Platform resource name is required"
 
@@ -182,7 +181,7 @@ async def _deploy(name: str, body: kopf.Body, logger: kopf.Logger, retry: int) -
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def delete(
-    name: Optional[str], body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
+    name: str | None, body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
 ) -> None:
     assert name, "Platform resource name is required"
 
@@ -237,7 +236,7 @@ async def _delete(name: str, body: kopf.Body, logger: kopf.Logger) -> None:
             600,
         )
         logger.info("Platform storage pods deleted")
-    except asyncio.TimeoutError:
+    except TimeoutError:
         message = "Timeout error while wating for pods to be deleted"
         logger.error(message)
         raise kopf.TemporaryError(message)
@@ -247,7 +246,7 @@ async def _delete(name: str, body: kopf.Body, logger: kopf.Logger) -> None:
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def watch_config(
-    name: Optional[str],
+    name: str | None,
     body: kopf.Body,
     stopped: kopf.DaemonStopped,
     logger: kopf.Logger,

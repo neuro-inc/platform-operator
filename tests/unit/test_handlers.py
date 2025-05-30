@@ -35,6 +35,7 @@ from platform_operator.models import (
     PlatformConfigFactory,
 )
 
+
 pytestmark = [pytest.mark.asyncio, pytest.mark.usefixtures("setup_app")]
 
 

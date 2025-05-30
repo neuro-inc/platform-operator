@@ -22,6 +22,7 @@ from .models import (
     StorageType,
 )
 
+
 PLATFORM_NEURO_JOB_TAINT_KEY = "platform.neuromation.io/job"
 PLATFORM_APOLO_WORKER_TAINT_KEY = "platform.apolo.us/worker"
 NVIDIA_GPU_TAINT_KEY = "nvidia.com/gpu"

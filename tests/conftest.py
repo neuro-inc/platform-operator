@@ -61,6 +61,7 @@ from platform_operator.models import (
     StorageType,
 )
 
+
 pytest_plugins = ["tests.integration.kube", "tests.integration.aws"]
 
 
