@@ -1,12 +1,59 @@
 [build-system]
-requires = [
-    "setuptools>=45",
-    "wheel",
-    "setuptools_scm>=6.2",
-]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
 
-[tool.setuptools_scm]
+[project]
+name = "platform-operator"
+version = "0.0.0"
+description = "Apolo platform operator"
+readme = "README.md"
+license = "Proprietary"
+authors = [
+    { name = "Apolo.us", email = "support@apolo.us" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+]
+dynamic = ["version"]
+requires-python = ">=3.9,<4.0"
+dependencies = [
+    "kopf==1.38.0",
+    "aiohttp==3.12.4",
+    "pyyaml==6.0.2",
+    "aiobotocore==2.22.0",
+    "bcrypt==4.3.0",
+    "neuro-config-client==25.2.0"
+]
+
+# Remove this section when poetry-dynamic-versioning drops [tool.poetry] support in favor of [project].
+[tool.poetry]
+name = "platform-operator"
+version = "0.0.0"
+description = "Apolo platform operator"
+readme = "README.md"
+
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = "git"
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+moto = { version = "5.1.5", extras = ["server"] }
+mypy = "1.16.0"
+pre-commit = "4.2.0"
+pytest = "8.3.5"
+pytest-aiohttp = "1.1.0"
+pytest-asyncio = "0.26.0"
+types-PyYAML = "*"
+types-Werkzeug = "*"
+pytest-cov = "6.1.1"
+
+[tool.poetry.requires-plugins]
+poetry-plugin-export = ">=1.8"
+poetry-dynamic-versioning = { version = ">=1.0.0,<2.0.0", extras = ["plugin"] }
 
 [tool.black]
 exclude = '''
@@ -23,3 +70,76 @@ line_length = 88
 include_trailing_comma = true
 multi_line_output = 3
 combine_as_imports = true
+
+[tool.ruff]
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "I", "C90", "UP", "B", "ASYNC", "N", "FBT", "A", "C4", "EM", "FA", "ICN",
+    "G", "PIE", "T20", "PYI", "PT", "RET", "PTH"
+]
+ignore = [
+    "A001", #Variable `type` is shadowing a Python builtin
+    "A002", #Function argument `type` is shadowing a Python builtin
+    "A003",
+    "N818",
+    "C901",   #is too complex
+    "EM101",  #Exception must not use a string literal, assign to variable first
+    "EM102",  #Exception must not use an f-string literal, assign to variable first
+    "FBT001", #Boolean-typed positional argument in function definition
+    "FBT002", #Boolean default positional argument in function definition
+    "FBT003", #Boolean positional value in function call
+    "B904" #Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+lines-after-imports = 2
+known-first-party = ["platform_operator", "tests"]
+known-third-party = []
+
+[tool.ruff.lint.pyupgrade]
+keep-runtime-typing = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+branch = true
+source = ["platform_operator"]
+
+[tool.mypy]
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_untyped_defs = true
+follow_imports = "silent"
+strict_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = "pytest"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "setuptools"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "kopf.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "aiobotocore.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "botocore.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "moto.*"
+ignore_missing_imports = true

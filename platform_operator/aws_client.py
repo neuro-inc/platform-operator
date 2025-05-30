@@ -8,7 +8,9 @@ import aiobotocore.session
 from aiobotocore.config import AioConfig
 from aiobotocore.session import ClientCreatorContext
 from botocore.exceptions import ClientError as S3ClientError
+from typing_extensions import Self
 from yarl import URL
+
 
 logger = logging.getLogger(__name__)
 
@@ -54,14 +56,14 @@ class BaseAwsClient:
 
 
 class AwsElbClient(BaseAwsClient):
-    async def __aenter__(self, *args: Any, **kwargs: Any) -> AwsElbClient:
+    async def __aenter__(self, *args: Any, **kwargs: Any) -> Self:
         # On AWS the nodes will be configured to assume the correct role and no
         # credentials need to be passed.
         context = self._create_client("elbv2", **kwargs)
         self._client = await context.__aenter__()
         return self
 
-    async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
+    async def __aexit__(self, *args: object, **kwargs: Any) -> None:
         await self._client.__aexit__(*args, **kwargs)
 
     async def create_load_balancer(self, **kwargs: Any) -> dict[str, str]:
@@ -82,7 +84,7 @@ class AwsElbClient(BaseAwsClient):
 
 
 class S3Client(BaseAwsClient):
-    async def __aenter__(self, *args: Any, **kwargs: Any) -> S3Client:
+    async def __aenter__(self, *args: Any, **kwargs: Any) -> Self:
         context = self._create_client(
             "s3",
             config=AioConfig(retries={"mode": "standard"}),
@@ -90,7 +92,7 @@ class S3Client(BaseAwsClient):
         self._client = await context.__aenter__()
         return self
 
-    async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
+    async def __aexit__(self, *args: object, **kwargs: Any) -> None:
         await self._client.__aexit__(*args, **kwargs)
 
     async def create_bucket(self, bucket_name: str) -> None:

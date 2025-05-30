@@ -133,3 +133,5 @@ dmypy.json
 
 # Helm chart releaser
 .cr-release-packages
+
+requirements.txt

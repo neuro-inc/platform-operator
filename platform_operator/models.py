@@ -1215,7 +1215,7 @@ class PlatformConfigFactory:
                 nfs_server=spec.nfs_server,
                 nfs_export_path=spec.nfs_export_path,
             )
-        elif StorageType.SMB in spec:
+        if StorageType.SMB in spec:
             return StorageConfig(
                 type=StorageType.SMB,
                 path=spec.path,
@@ -1224,7 +1224,7 @@ class PlatformConfigFactory:
                 smb_username=spec.smb_username,
                 smb_password=spec.smb_password,
             )
-        elif StorageType.AZURE_fILE in spec:
+        if StorageType.AZURE_fILE in spec:
             return StorageConfig(
                 type=StorageType.AZURE_fILE,
                 path=spec.path,
@@ -1232,8 +1232,7 @@ class PlatformConfigFactory:
                 azure_storage_account_key=spec.azure_storage_account_key,
                 azure_share_name=spec.azure_share_name,
             )
-        else:
-            raise ValueError("Storage type is not supported")
+        raise ValueError("Storage type is not supported")
 
     def _create_buckets(self, spec: BlobStorageSpec, cluster: Cluster) -> BucketsConfig:
         if not spec:
@@ -1249,20 +1248,20 @@ class PlatformConfigFactory:
                 disable_creation=cluster.buckets.disable_creation,
                 aws_region=spec.aws_region,
             )
-        elif BucketsProvider.GCP in spec:
+        if BucketsProvider.GCP in spec:
             return BucketsConfig(
                 provider=BucketsProvider.GCP,
                 gcp_project=spec.gcp_project,
                 disable_creation=cluster.buckets.disable_creation,
             )
-        elif BucketsProvider.AZURE in spec:
+        if BucketsProvider.AZURE in spec:
             return BucketsConfig(
                 provider=BucketsProvider.AZURE,
                 disable_creation=cluster.buckets.disable_creation,
                 azure_storage_account_name=spec.azure_storrage_account_name,
                 azure_storage_account_key=spec.azure_storrage_account_key,
             )
-        elif BucketsProvider.EMC_ECS in spec:
+        if BucketsProvider.EMC_ECS in spec:
             return BucketsConfig(
                 provider=BucketsProvider.EMC_ECS,
                 disable_creation=cluster.buckets.disable_creation,
@@ -1272,7 +1271,7 @@ class PlatformConfigFactory:
                 emc_ecs_s3_endpoint=URL(spec.emc_ecs_s3_endpoint),
                 emc_ecs_management_endpoint=URL(spec.emc_ecs_management_endpoint),
             )
-        elif BucketsProvider.OPEN_STACK in spec:
+        if BucketsProvider.OPEN_STACK in spec:
             return BucketsConfig(
                 provider=BucketsProvider.OPEN_STACK,
                 disable_creation=cluster.buckets.disable_creation,
@@ -1282,7 +1281,7 @@ class PlatformConfigFactory:
                 open_stack_endpoint=URL(spec.open_stack_endpoint),
                 open_stack_s3_endpoint=URL(spec.open_stack_s3_endpoint),
             )
-        elif BucketsProvider.MINIO in spec:
+        if BucketsProvider.MINIO in spec:
             return BucketsConfig(
                 provider=BucketsProvider.MINIO,
                 disable_creation=cluster.buckets.disable_creation,
@@ -1293,7 +1292,7 @@ class PlatformConfigFactory:
                 minio_access_key=spec.minio_access_key,
                 minio_secret_key=spec.minio_secret_key,
             )
-        elif "kubernetes" in spec:
+        if "kubernetes" in spec:
             assert cluster.credentials.minio
             return BucketsConfig(
                 provider=BucketsProvider.MINIO,
@@ -1312,8 +1311,7 @@ class PlatformConfigFactory:
                 minio_storage_class_name=spec.kubernetes_storage_class_name,
                 minio_storage_size=spec.kubernetes_storage_size or "10Gi",
             )
-        else:
-            raise ValueError("Bucket provider is not supported")
+        raise ValueError("Bucket provider is not supported")
 
     def _create_registry(
         self, spec: RegistrySpec, *, buckets_config: BucketsConfig
@@ -1327,12 +1325,12 @@ class PlatformConfigFactory:
                 aws_account_id=spec.aws_account_id,
                 aws_region=spec.aws_region,
             )
-        elif RegistryProvider.GCP in spec:
+        if RegistryProvider.GCP in spec:
             return RegistryConfig(
                 provider=RegistryProvider.GCP,
                 gcp_project=spec.gcp_project,
             )
-        elif RegistryProvider.AZURE in spec:
+        if RegistryProvider.AZURE in spec:
             url = URL(spec.azure_url)
             if not url.scheme:
                 url = URL(f"https://{url!s}")
@@ -1342,14 +1340,14 @@ class PlatformConfigFactory:
                 azure_username=spec.azure_username,
                 azure_password=spec.azure_password,
             )
-        elif RegistryProvider.DOCKER in spec:
+        if RegistryProvider.DOCKER in spec:
             return RegistryConfig(
                 provider=RegistryProvider.DOCKER,
                 docker_registry_url=URL(spec.docker_url),
                 docker_registry_username=spec.docker_username,
                 docker_registry_password=spec.docker_password,
             )
-        elif "kubernetes" in spec:
+        if "kubernetes" in spec:
             return RegistryConfig(
                 provider=RegistryProvider.DOCKER,
                 docker_registry_install=True,
@@ -1365,7 +1363,7 @@ class PlatformConfigFactory:
                 docker_registry_file_system_storage_size=spec.kubernetes_storage_size
                 or "10Gi",
             )
-        elif "blobStorage" in spec and buckets_config.provider == BucketsProvider.MINIO:
+        if "blobStorage" in spec and buckets_config.provider == BucketsProvider.MINIO:
             return RegistryConfig(
                 provider=RegistryProvider.DOCKER,
                 docker_registry_install=True,
@@ -1383,8 +1381,7 @@ class PlatformConfigFactory:
                 docker_registry_s3_disable_redirect=True,
                 docker_registry_s3_force_path_style=True,
             )
-        else:
-            raise ValueError("Registry provider is not supported")
+        raise ValueError("Registry provider is not supported")
 
     def _create_monitoring(self, spec: MonitoringSpec) -> MonitoringConfig:
         if not spec:
@@ -1408,7 +1405,7 @@ class PlatformConfigFactory:
                 loki_endpoint=loki_endpoint,
                 alloy_enabled=spec.alloy_enabled,
             )
-        elif "blobStorage" in spec.metrics:
+        if "blobStorage" in spec.metrics:
             return MonitoringConfig(
                 logs_region=spec.logs_region,
                 logs_bucket_name=spec.logs_bucket,
@@ -1426,7 +1423,7 @@ class PlatformConfigFactory:
                 loki_endpoint=loki_endpoint,
                 alloy_enabled=spec.alloy_enabled,
             )
-        elif "kubernetes" in spec.metrics:
+        if "kubernetes" in spec.metrics:
             return MonitoringConfig(
                 logs_bucket_name=spec.logs_bucket,
                 metrics_enabled=True,
@@ -1444,8 +1441,7 @@ class PlatformConfigFactory:
                 loki_endpoint=loki_endpoint,
                 alloy_enabled=spec.alloy_enabled,
             )
-        else:
-            raise ValueError("Metrics storage type is not supported")
+        raise ValueError("Metrics storage type is not supported")
 
     def _create_minio_gateway(self, spec: Spec) -> MinioGatewayConfig | None:
         if BucketsProvider.GCP in spec.blob_storage:

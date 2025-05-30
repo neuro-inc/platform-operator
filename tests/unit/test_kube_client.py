@@ -13,6 +13,7 @@ from platform_operator.kube_client import (
     PlatformStatusManager,
 )
 
+
 pytestmark = pytest.mark.asyncio
 
 

@@ -13,9 +13,11 @@ from time import time
 from typing import Any
 
 import aiohttp
+from typing_extensions import Self
 from yarl import URL
 
 from .models import KubeClientAuthType, KubeConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +170,7 @@ class KubeClient:
             )
         return ssl_context
 
-    async def __aenter__(self) -> KubeClient:
+    async def __aenter__(self) -> Self:
         await self._init()
         return self
 
@@ -200,7 +202,7 @@ class KubeClient:
             except Exception as exc:
                 logger.exception("Failed to update kube token: %s", exc)
 
-    async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
+    async def __aexit__(self, *args: object, **kwargs: Any) -> None:
         await self.close()
 
     async def close(self) -> None:
@@ -224,8 +226,7 @@ class KubeClient:
         assert self._session, "client is not initialized"
         async with self._session.request(*args, headers=headers, **kwargs) as response:
             response.raise_for_status()
-            payload = await response.json()
-            return payload
+            return await response.json()
 
     async def get_node(self, name: str) -> Node:
         payload = await self._request(method="get", url=self._endpoints.node(name))
@@ -378,8 +379,7 @@ class KubeClient:
         )
         if "status" not in payload:
             return None
-        status_payload = payload["status"]
-        return status_payload
+        return payload["status"]
 
     async def update_platform_status(
         self, namespace: str, name: str, payload: dict[str, Any]
@@ -547,11 +547,11 @@ class PlatformStatusManager:
                 }
             )
 
-    def _deserialize(cls, payload: dict[str, Any]) -> PlatformStatus:
+    def _deserialize(self, payload: dict[str, Any]) -> PlatformStatus:
         status = {
             "phase": payload["phase"],
             "retries": payload["retries"],
-            "conditions": cls._deserialize_conditions(payload["conditions"]),
+            "conditions": self._deserialize_conditions(payload["conditions"]),
         }
         return PlatformStatus(status)
 

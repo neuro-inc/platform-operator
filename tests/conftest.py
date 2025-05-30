@@ -61,6 +61,7 @@ from platform_operator.models import (
     StorageType,
 )
 
+
 pytest_plugins = ["tests.integration.kube", "tests.integration.aws"]
 
 
@@ -226,7 +227,7 @@ def gcp_cluster(
 ) -> Cluster:
     cluster = cluster_factory(cluster_name, "n1-highmem-8")
     assert cluster.orchestrator
-    cluster = replace(
+    return replace(
         cluster,
         orchestrator=replace(
             cluster.orchestrator,
@@ -235,7 +236,6 @@ def gcp_cluster(
             ],
         ),
     )
-    return cluster
 
 
 @pytest.fixture
@@ -256,14 +256,13 @@ def on_prem_cluster(
 ) -> Cluster:
     cluster = cluster_factory(cluster_name, "gpu")
     assert cluster.credentials
-    cluster = replace(
+    return replace(
         cluster,
         credentials=replace(
             cluster.credentials,
             minio=MinioCredentials(username="username", password="password"),
         ),
     )
-    return cluster
 
 
 @pytest.fixture
@@ -271,14 +270,13 @@ def vcd_cluster(cluster_name: str, cluster_factory: Callable[..., Cluster]) -> C
     cluster = cluster_factory(cluster_name, "gpu")
     assert cluster.credentials
 
-    cluster = replace(
+    return replace(
         cluster,
         credentials=replace(
             cluster.credentials,
             minio=MinioCredentials(username="username", password="password"),
         ),
     )
-    return cluster
 
 
 @pytest.fixture

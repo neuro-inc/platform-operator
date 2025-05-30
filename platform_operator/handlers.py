@@ -34,6 +34,7 @@ from .kube_client import (
 )
 from .models import BucketsProvider, Config, PlatformConfig, PlatformConfigFactory
 
+
 logger = logging.getLogger(__name__)
 
 

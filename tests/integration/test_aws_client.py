@@ -29,10 +29,10 @@ class TestAwsElbClient:
         load_balancer = response["LoadBalancers"][0]
         yield {
             "LoadBalancerName": name,
-            "DNSName": load_balancer["DNSName"],
+            "DNSName": load_balancer["DNSName"],  # type: ignore
         }
         await elb_client.delete_load_balancer(
-            LoadBalancerArn=load_balancer["LoadBalancerArn"]
+            LoadBalancerArn=load_balancer["LoadBalancerArn"]  # type: ignore
         )
 
     async def test_get_load_balancer_by_dns_name(
