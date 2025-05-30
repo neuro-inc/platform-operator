@@ -623,18 +623,16 @@ class HelmValuesFactory:
     def _create_tracing_values(self, platform: PlatformConfig) -> dict[str, Any]:
         if not platform.sentry_dsn:
             return {}
-        result = {
+        return {
             "sentry": {
                 "dsn": str(platform.sentry_dsn),
                 "clusterName": platform.cluster_name,
                 "sampleRate": platform.sentry_sample_rate,
             }
         }
-        return result
 
     def _create_value_from_secret(self, *, name: str, key: str) -> dict[str, Any]:
-        result = {"valueFrom": {"secretKeyRef": {"name": name, "key": key}}}
-        return result
+        return {"valueFrom": {"secretKeyRef": {"name": name, "key": key}}}
 
     def create_platform_storage_values(
         self, platform: PlatformConfig

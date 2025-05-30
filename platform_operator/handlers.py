@@ -6,8 +6,8 @@ import ssl
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from typing import Any
+from datetime import datetime, timezone
+from typing import Any, Optional
 
 import aiohttp
 import kopf
@@ -101,7 +101,9 @@ def login(**_: Any) -> kopf.ConnectionInfo:
         ca_path=str(config.kube_config.cert_authority_path),
         token=config.kube_config.read_auth_token_from_path(),
         default_namespace=config.platform_namespace,
-        expiration=datetime.fromtimestamp(config.kube_config.auth_token_exp_ts, tz=UTC),
+        expiration=datetime.fromtimestamp(
+            config.kube_config.auth_token_exp_ts, tz=timezone.utc
+        ),
     )
 
 
@@ -112,7 +114,7 @@ def login(**_: Any) -> kopf.ConnectionInfo:
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def deploy(
-    name: str | None, body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
+    name: Optional[str], body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
 ) -> None:
     assert name, "Platform resource name is required"
 
@@ -181,7 +183,7 @@ async def _deploy(name: str, body: kopf.Body, logger: kopf.Logger, retry: int) -
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def delete(
-    name: str | None, body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
+    name: Optional[str], body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
 ) -> None:
     assert name, "Platform resource name is required"
 
@@ -236,7 +238,7 @@ async def _delete(name: str, body: kopf.Body, logger: kopf.Logger) -> None:
             600,
         )
         logger.info("Platform storage pods deleted")
-    except TimeoutError:
+    except asyncio.TimeoutError:
         message = "Timeout error while wating for pods to be deleted"
         logger.error(message)
         raise kopf.TemporaryError(message)
@@ -246,7 +248,7 @@ async def _delete(name: str, body: kopf.Body, logger: kopf.Logger) -> None:
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def watch_config(
-    name: str | None,
+    name: Optional[str],
     body: kopf.Body,
     stopped: kopf.DaemonStopped,
     logger: kopf.Logger,

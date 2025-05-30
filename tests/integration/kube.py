@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import tempfile
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
@@ -22,8 +21,8 @@ def kube_context() -> str:
 
 @pytest.fixture(scope="session")
 def _kube_config_payload() -> dict[str, Any]:
-    kube_config_path = os.path.expanduser("~/.kube/config")
-    with open(kube_config_path) as kube_config:
+    kube_config_path = Path("~/.kube/config").expanduser()
+    with kube_config_path.open() as kube_config:
         return yaml.safe_load(kube_config)
 
 
@@ -54,9 +53,10 @@ def _cert_authority_path(
         yield Path(_kube_config_cluster_payload["certificate-authority"])
         return
     _, path = tempfile.mkstemp()
-    Path(path).write_text(_kube_config_cluster_payload["certificate-authority-data"])
-    yield Path(path)
-    os.remove(path)
+    cert_path = Path(path)
+    cert_path.write_text(_kube_config_cluster_payload["certificate-authority-data"])
+    yield cert_path
+    cert_path.unlink()
 
 
 @pytest.fixture(scope="session")

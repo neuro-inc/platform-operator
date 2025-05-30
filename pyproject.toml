@@ -68,7 +68,7 @@ multi_line_output = 3
 combine_as_imports = true
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py39"
 
 [tool.ruff.lint]
 select = [
@@ -76,8 +76,17 @@ select = [
     "G", "PIE", "T20", "PYI", "PT", "RET", "PTH"
 ]
 ignore = [
+    "A001", #Variable `type` is shadowing a Python builtin
+    "A002", #Function argument `type` is shadowing a Python builtin
     "A003",
-    "N818"
+    "N818",
+    "C901",   #is too complex
+    "EM101",  #Exception must not use a string literal, assign to variable first
+    "EM102",  #Exception must not use an f-string literal, assign to variable first
+    "FBT001", #Boolean-typed positional argument in function definition
+    "FBT002", #Boolean default positional argument in function definition
+    "FBT003", #Boolean positional value in function call
+    "B904" #Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
 ]
 
 [tool.ruff.lint.isort]
