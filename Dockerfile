@@ -16,7 +16,7 @@ RUN pip install --user --no-cache-dir --find-links /tmp/dist platform-operator \
 
 FROM python:${PY_VERSION}-slim-bookworm AS runtime
 
-LABEL org.opencontainers.image.source = "https://github.com/neuro-inc/platform-operator"
+LABEL org.opencontainers.image.source="https://github.com/neuro-inc/platform-operator"
 
 RUN apt-get update && apt-get install -y curl \
     && rm -rf /var/lib/apt/lists/*
