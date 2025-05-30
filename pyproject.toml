@@ -51,6 +51,10 @@ types-PyYAML = "*"
 types-Werkzeug = "*"
 pytest-cov = "6.1.1"
 
+[tool.poetry.requires-plugins]
+poetry-plugin-export = ">=1.8"
+poetry-dynamic-versioning = { version = ">=1.0.0,<2.0.0", extras = ["plugin"] }
+
 [tool.black]
 exclude = '''
 /(
