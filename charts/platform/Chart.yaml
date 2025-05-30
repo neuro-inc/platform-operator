@@ -41,7 +41,7 @@ dependencies:
     version: "25.5.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-reports
-    version: "25.2.0"
+    version: "25.5.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
     condition: platformReportsEnabled
   - name: platform-disks
