@@ -16,7 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
 ]
 dynamic = ["version"]
-requires-python = ">=3.9,<4.0"
+requires-python = ">=3.13,<4.0"
 dependencies = [
     "kopf==1.38.0",
     "aiohttp==3.12.4",
@@ -72,7 +72,7 @@ multi_line_output = 3
 combine_as_imports = true
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = [
