@@ -6,8 +6,8 @@ import ssl
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import aiohttp
 import kopf
@@ -101,9 +101,7 @@ def login(**_: Any) -> kopf.ConnectionInfo:
         ca_path=str(config.kube_config.cert_authority_path),
         token=config.kube_config.read_auth_token_from_path(),
         default_namespace=config.platform_namespace,
-        expiration=datetime.fromtimestamp(
-            config.kube_config.auth_token_exp_ts, tz=timezone.utc
-        ),
+        expiration=datetime.fromtimestamp(config.kube_config.auth_token_exp_ts, tz=UTC),
     )
 
 
@@ -114,7 +112,7 @@ def login(**_: Any) -> kopf.ConnectionInfo:
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def deploy(
-    name: Optional[str], body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
+    name: str | None, body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
 ) -> None:
     assert name, "Platform resource name is required"
 
@@ -183,7 +181,7 @@ async def _deploy(name: str, body: kopf.Body, logger: kopf.Logger, retry: int) -
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def delete(
-    name: Optional[str], body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
+    name: str | None, body: kopf.Body, logger: kopf.Logger, retry: int, **_: Any
 ) -> None:
     assert name, "Platform resource name is required"
 
@@ -238,7 +236,7 @@ async def _delete(name: str, body: kopf.Body, logger: kopf.Logger) -> None:
             600,
         )
         logger.info("Platform storage pods deleted")
-    except asyncio.TimeoutError:
+    except TimeoutError:
         message = "Timeout error while wating for pods to be deleted"
         logger.error(message)
         raise kopf.TemporaryError(message)
@@ -248,7 +246,7 @@ async def _delete(name: str, body: kopf.Body, logger: kopf.Logger) -> None:
     PLATFORM_GROUP, PLATFORM_API_VERSION, PLATFORM_PLURAL, backoff=config.backoff
 )
 async def watch_config(
-    name: Optional[str],
+    name: str | None,
     body: kopf.Body,
     stopped: kopf.DaemonStopped,
     logger: kopf.Logger,
@@ -502,17 +500,15 @@ async def wait_for_certificate_created(
 
 
 async def _wait_for_certificate_created(platform: PlatformConfig) -> None:
-    ssl_context: ssl.SSLContext | None
+    ssl_context: ssl.SSLContext | bool
     if platform.ingress_acme_environment == ACMEEnvironment.STAGING:
         ssl_context = ssl.create_default_context(cafile=config.acme_ca_staging_path)
     else:
-        ssl_context = None
+        ssl_context = False
 
     while True:
         try:
-            async with app.raw_client.get(
-                platform.ingress_url, ssl_context=ssl_context
-            ):
+            async with app.raw_client.get(platform.ingress_url, ssl=ssl_context):
                 return
         except ssl.SSLError:
             pass

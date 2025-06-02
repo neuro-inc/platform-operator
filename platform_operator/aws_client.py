@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import logging
 import sys
-from typing import Any
+from typing import Any, Self
 
 import aiobotocore.session
 from aiobotocore.config import AioConfig
 from aiobotocore.session import ClientCreatorContext
 from botocore.exceptions import ClientError as S3ClientError
-from typing_extensions import Self
 from yarl import URL
 
 
