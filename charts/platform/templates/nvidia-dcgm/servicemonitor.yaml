@@ -1,4 +1,4 @@
-{{- if .Values.nvidiaDCGMExporter.serviceMonitor.enabled }}
+{{- if and .Values.nvidiaDCGMExporter.enabled .Values.nvidiaDCGMExporter.serviceMonitor.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:

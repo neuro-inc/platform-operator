@@ -1,4 +1,4 @@
-{{- if ne .Values.kubernetesProvider "gcp" }}
+{{- if and .Values.nvidiaGpuDriver.enabled (not .Values.nvidiaGpuDriver.isGcp) }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:

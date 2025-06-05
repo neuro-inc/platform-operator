@@ -35,7 +35,6 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(gcp_platform_config)
 
         assert result == {
-            "kubernetesProvider": "gcp",
             "traefikEnabled": True,
             "acmeEnabled": True,
             "dockerRegistryEnabled": False,
@@ -62,9 +61,12 @@ class TestHelmValuesFactory:
                 "gpu": "platform.neuromation.io/accelerator",
             },
             "nvidiaGpuDriver": {
+                "enabled": True,
+                "isGcp": True,
                 "image": {"repository": "ghcr.io/neuro-inc/k8s-device-plugin"},
             },
             "nvidiaDCGMExporter": {
+                "enabled": True,
                 "image": {"repository": "ghcr.io/neuro-inc/dcgm-exporter"},
                 "serviceMonitor": {"enabled": True},
             },
@@ -300,7 +302,11 @@ class TestHelmValuesFactory:
     def test_create_aws_platform_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        assert factory.create_platform_values(aws_platform_config)
+        result = factory.create_platform_values(aws_platform_config)
+
+        assert result["nvidiaGpuDriver"]["enabled"]
+        assert not result["nvidiaGpuDriver"]["isGcp"]
+        assert result["nvidiaDCGMExporter"]["enabled"]
 
     def test_create_aws_platform_values_with_role(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -332,6 +338,9 @@ class TestHelmValuesFactory:
                 },
             }
         ]
+        assert result["nvidiaGpuDriver"]["enabled"]
+        assert not result["nvidiaGpuDriver"]["isGcp"]
+        assert result["nvidiaDCGMExporter"]["enabled"]
 
     def test_create_azure_platform_values_with_nfs_storage(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -363,6 +372,8 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_values(on_prem_platform_config)
 
+        assert not result["nvidiaGpuDriver"]["enabled"]
+        assert not result["nvidiaDCGMExporter"]["enabled"]
         assert result["storages"] == [
             {
                 "type": "nfs",
@@ -464,9 +475,7 @@ class TestHelmValuesFactory:
     def test_create_vcd_platform_values(
         self, vcd_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_values(vcd_platform_config)
-
-        assert result["kubernetesProvider"] == "kubeadm"
+        factory.create_platform_values(vcd_platform_config)
 
     def test_create_platform_values_without_notifications_url(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory

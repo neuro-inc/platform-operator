@@ -12,6 +12,10 @@ import kopf
 import pytest
 from neuro_config_client import (
     ACMEEnvironment,
+    AWSCloudProvider,
+    AWSCredentials,
+    AzureCloudProvider,
+    AzureCredentials,
     BucketsConfig as ClusterBucketsConfig,
     CloudProviderType,
     Cluster,
@@ -20,6 +24,7 @@ from neuro_config_client import (
     DisksConfig,
     DNSConfig,
     DockerRegistryConfig,
+    GoogleCloudProvider,
     GrafanaCredentials,
     HelmRegistryConfig,
     IdleJobConfig,
@@ -27,6 +32,7 @@ from neuro_config_client import (
     MinioCredentials,
     MonitoringConfig as ClusterMonitoringConfig,
     NeuroAuthConfig,
+    OnPremCloudProvider,
     OrchestratorConfig,
     RegistryConfig as ClusterRegistryConfig,
     ResourcePoolType,
@@ -35,7 +41,10 @@ from neuro_config_client import (
     SentryCredentials,
     StorageConfig as ClusterStorageConfig,
     TPUResource,
+    VCDCloudProvider,
+    VCDCredentials,
 )
+from neuro_config_client.entities import KubernetesCredentials
 from yarl import URL
 
 from platform_operator.models import (
@@ -227,6 +236,14 @@ def gcp_cluster(
     assert cluster.orchestrator
     return replace(
         cluster,
+        cloud_provider=GoogleCloudProvider(
+            region="us-east-1",
+            zones=["us-east-1a"],
+            project="test-project",
+            credentials={},
+            node_pools=[],
+            storage=None,
+        ),
         orchestrator=replace(
             cluster.orchestrator,
             resource_pool_types=[
@@ -238,14 +255,41 @@ def gcp_cluster(
 
 @pytest.fixture
 def aws_cluster(cluster_name: str, cluster_factory: Callable[..., Cluster]) -> Cluster:
-    return cluster_factory(cluster_name, "p2.xlarge")
+    cluster = cluster_factory(cluster_name, "p2.xlarge")
+    return replace(
+        cluster,
+        cloud_provider=AWSCloudProvider(
+            region="us-east1",
+            zones=["us-east1-a"],
+            credentials=AWSCredentials(
+                access_key_id="test-access-key", secret_access_key="test-secret-key"
+            ),
+            node_pools=[],
+            storage=None,
+        ),
+    )
 
 
 @pytest.fixture
 def azure_cluster(
     cluster_name: str, cluster_factory: Callable[..., Cluster]
 ) -> Cluster:
-    return cluster_factory(cluster_name, "Standard_NC6")
+    cluster = cluster_factory(cluster_name, "Standard_NC6")
+    return replace(
+        cluster,
+        cloud_provider=AzureCloudProvider(
+            region="us-east-1",
+            resource_group="test-resource-group",
+            credentials=AzureCredentials(
+                subscription_id="test-subscription-id",
+                tenant_id="test-tenant-id",
+                client_id="test-client-id",
+                client_secret="test-client-secret",
+            ),
+            node_pools=[],
+            storage=None,
+        ),
+    )
 
 
 @pytest.fixture
@@ -259,6 +303,14 @@ def on_prem_cluster(
         credentials=replace(
             cluster.credentials,
             minio=MinioCredentials(username="username", password="password"),
+        ),
+        cloud_provider=OnPremCloudProvider(
+            kubernetes_url=URL("https://kubernetes.svc"),
+            credentials=KubernetesCredentials(
+                ca_data="test-ca-data", token="test-token"
+            ),
+            node_pools=[],
+            storage=None,
         ),
     )
 
@@ -274,6 +326,23 @@ def vcd_cluster(cluster_name: str, cluster_factory: Callable[..., Cluster]) -> C
             cluster.credentials,
             minio=MinioCredentials(username="username", password="password"),
         ),
+        cloud_provider=VCDCloudProvider(
+            _type=CloudProviderType.VCD_SELECTEL,
+            url=URL("https://vcd.url"),
+            organization="test-org",
+            virtual_data_center="test-virtual-data-center",
+            edge_external_network_name="test-edge-network",
+            edge_public_ip="1.2.3.4",
+            edge_name="test-edge",
+            catalog_name="test-catalog",
+            credentials=VCDCredentials(
+                user="test-user",
+                password="test-password",
+                ssh_password="test-ssh-password",
+            ),
+            node_pools=[],
+            storage=None,
+        ),
     )
 
 
@@ -286,7 +355,6 @@ def gcp_platform_body(cluster_name: str) -> kopf.Body:
         "spec": {
             "token": "token",
             "kubernetes": {
-                "provider": "gcp",
                 "standardStorageClassName": "platform-standard-topology-aware",
                 "tpuIPv4CIDR": "192.168.0.0/16",
             },
@@ -322,7 +390,6 @@ def aws_platform_body(cluster_name: str) -> kopf.Body:
         "spec": {
             "token": "token",
             "kubernetes": {
-                "provider": "aws",
                 "standardStorageClassName": "platform-standard-topology-aware",
             },
             "registry": {"aws": {"accountId": "platform", "region": "us-east-1"}},
@@ -356,7 +423,6 @@ def azure_platform_body(cluster_name: str) -> kopf.Body:
         "spec": {
             "token": "token",
             "kubernetes": {
-                "provider": "azure",
                 "standardStorageClassName": "platform-standard-topology-aware",
             },
             "registry": {
@@ -409,7 +475,6 @@ def on_prem_platform_body(cluster_name: str) -> kopf.Body:
         "spec": {
             "token": "token",
             "kubernetes": {
-                "provider": "kubeadm",
                 "standardStorageClassName": "standard",
             },
             "ingressController": {
@@ -481,6 +546,7 @@ def gcp_platform_config(
         notifications_url=URL("https://dev.neu.ro"),
         token="token",
         cluster_name=cluster_name,
+        cluster_cloud_provider_type=CloudProviderType.GCP,
         namespace="platform",
         service_account_name="default",
         service_account_annotations={},
@@ -490,7 +556,6 @@ def gcp_platform_config(
         ],
         pre_pull_images=["neuromation/base"],
         standard_storage_class_name="platform-standard-topology-aware",
-        kubernetes_provider=CloudProviderType.GCP,
         kubernetes_version="1.16.10",
         kubernetes_tpu_network=IPv4Network("192.168.0.0/16"),
         kubelet_port=10250,
@@ -606,7 +671,7 @@ def aws_platform_config(
         gcp_platform_config,
         gcp_service_account_key="",
         gcp_service_account_key_base64="",
-        kubernetes_provider=CloudProviderType.AWS,
+        cluster_cloud_provider_type=CloudProviderType.AWS,
         kubernetes_tpu_network=None,
         jobs_resource_pool_types=[resource_pool_type_factory("p2.xlarge")],
         registry=RegistryConfig(
@@ -637,7 +702,7 @@ def azure_platform_config(
         gcp_platform_config,
         gcp_service_account_key="",
         gcp_service_account_key_base64="",
-        kubernetes_provider=CloudProviderType.AZURE,
+        cluster_cloud_provider_type=CloudProviderType.AZURE,
         kubernetes_tpu_network=None,
         jobs_resource_pool_types=[resource_pool_type_factory("Standard_NC6")],
         storages=[
@@ -684,7 +749,7 @@ def on_prem_platform_config(
         gcp_service_account_key_base64="",
         ingress_public_ips=[IPv4Address("192.168.0.3")],
         standard_storage_class_name="standard",
-        kubernetes_provider="kubeadm",
+        cluster_cloud_provider_type=CloudProviderType.ON_PREM,
         kubernetes_tpu_network=None,
         jobs_resource_pool_types=[resource_pool_type_factory("gpu")],
         disks_storage_class_name="openebs-cstor",
@@ -729,6 +794,6 @@ def on_prem_platform_config(
 def vcd_platform_config(on_prem_platform_config: PlatformConfig) -> PlatformConfig:
     return replace(
         on_prem_platform_config,
-        kubernetes_provider="kubeadm",
+        cluster_cloud_provider_type=CloudProviderType.VCD_SELECTEL,
         kubernetes_tpu_network=None,
     )
