@@ -64,11 +64,7 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
     app.kube_client = await app.exit_stack.enter_async_context(
         KubeClient(config.kube_config),
     )
-    node = await app.kube_client.get_node(config.node_name)
-    app.helm_values_factory = HelmValuesFactory(
-        config.helm_chart_names,
-        container_runtime=node.container_runtime,
-    )
+    app.helm_values_factory = HelmValuesFactory(config.helm_chart_names)
     app.status_manager = PlatformStatusManager(
         app.kube_client, namespace=config.platform_namespace
     )

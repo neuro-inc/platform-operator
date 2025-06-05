@@ -107,7 +107,6 @@ class HelmReleaseNames:
     platform: str
 
 
-@dataclass(frozen=True)
 class HelmChartNames:
     docker_registry: str = "docker-registry"
     minio: str = "minio"

@@ -9,7 +9,6 @@ from platform_operator.helm_values import HelmValuesFactory
 from platform_operator.models import (
     BucketsConfig,
     BucketsProvider,
-    Config,
     DockerConfig,
     DockerRegistryStorageDriver,
     IngressServiceType,
@@ -24,8 +23,8 @@ from platform_operator.models import (
 
 class TestHelmValuesFactory:
     @pytest.fixture
-    def factory(self, config: Config) -> HelmValuesFactory:
-        return HelmValuesFactory(config.helm_chart_names, container_runtime="docker")
+    def factory(self) -> HelmValuesFactory:
+        return HelmValuesFactory()
 
     def test_create_gcp_platform_values_with_nfs_storage(
         self,
