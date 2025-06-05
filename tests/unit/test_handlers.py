@@ -31,6 +31,7 @@ from platform_operator.kube_client import (
 from platform_operator.models import (
     Cluster,
     Config,
+    HelmChartNames,
     PlatformConfig,
     PlatformConfigFactory,
 )
@@ -218,10 +219,7 @@ async def test_is_platform_deploy_required_on_version_update_true(
     helm_client.get_release.return_value = Release(
         name=config.helm_release_names.platform,
         namespace=config.platform_namespace,
-        chart=(
-            f"{config.helm_chart_names.platform}"
-            f"-{config.helm_chart_versions.platform}-0"
-        ),
+        chart=f"{HelmChartNames.platform}-{config.helm_chart_versions.platform}-0",
         status=ReleaseStatus.DEPLOYED,
     )
     helm_client.get_release_values.return_value = {}
@@ -245,9 +243,7 @@ async def test_is_platform_deploy_required_on_values_update_true(
     helm_client.get_release.return_value = Release(
         name=config.helm_release_names.platform,
         namespace=config.platform_namespace,
-        chart=(
-            f"{config.helm_chart_names.platform}-{config.helm_chart_versions.platform}"
-        ),
+        chart=f"{HelmChartNames.platform}-{config.helm_chart_versions.platform}",
         status=ReleaseStatus.DEPLOYED,
     )
     helm_client.get_release_values.return_value = {}
@@ -271,9 +267,7 @@ async def test_is_platform_deploy_required_no_update_false(
     helm_client.get_release.return_value = Release(
         name=config.helm_release_names.platform,
         namespace=config.platform_namespace,
-        chart=(
-            f"{config.helm_chart_names.platform}-{config.helm_chart_versions.platform}"
-        ),
+        chart=f"{HelmChartNames.platform}-{config.helm_chart_versions.platform}",
         status=ReleaseStatus.DEPLOYED,
     )
     helm_client.get_release_values.return_value = {}

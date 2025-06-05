@@ -1897,7 +1897,6 @@ class TestHelmValuesFactory:
                 "ingressClassName": "traefik",
                 "hosts": [f"{gcp_platform_config.cluster_name}.org.neu.ro"],
             },
-            "containerRuntime": {"name": "docker"},
             "fluentbit": {
                 "image": {"repository": "ghcr.io/neuro-inc/fluent-bit"},
             },

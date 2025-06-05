@@ -32,7 +32,13 @@ from .kube_client import (
     PlatformPhase,
     PlatformStatusManager,
 )
-from .models import BucketsProvider, Config, PlatformConfig, PlatformConfigFactory
+from .models import (
+    BucketsProvider,
+    Config,
+    HelmChartNames,
+    PlatformConfig,
+    PlatformConfigFactory,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -64,7 +70,7 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
     app.kube_client = await app.exit_stack.enter_async_context(
         KubeClient(config.kube_config),
     )
-    app.helm_values_factory = HelmValuesFactory(config.helm_chart_names)
+    app.helm_values_factory = HelmValuesFactory()
     app.status_manager = PlatformStatusManager(
         app.kube_client, namespace=config.platform_namespace
     )
@@ -343,7 +349,7 @@ async def is_platform_deploy_required(
 ) -> bool:
     return await is_helm_deploy_required(
         release_name=config.helm_release_names.platform,
-        chart_name=config.helm_chart_names.platform,
+        chart_name=HelmChartNames.platform,
         chart_version=config.helm_chart_versions.platform,
         values=app.helm_values_factory.create_platform_values(platform),
         install=install,
@@ -472,7 +478,7 @@ async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
         )
         await app.helm_client.upgrade(
             config.helm_release_names.platform,
-            str(platform.helm_repo.url / config.helm_chart_names.platform),
+            str(platform.helm_repo.url / HelmChartNames.platform),
             values=app.helm_values_factory.create_platform_values(platform),
             version=config.helm_chart_versions.platform,
             install=True,
