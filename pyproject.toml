@@ -55,21 +55,6 @@ pytest-cov = "6.1.1"
 poetry-plugin-export = ">=1.8"
 poetry-dynamic-versioning = { version = ">=1.0.0,<2.0.0", extras = ["plugin"] }
 
-[tool.black]
-exclude = '''
-/(
-      \.git
-    | venv
-    | __pycache__
-    | \.tox
-)/
-'''
-
-[tool.isort]
-line_length = 88
-include_trailing_comma = true
-multi_line_output = 3
-combine_as_imports = true
 
 [tool.ruff]
 target-version = "py313"

@@ -107,7 +107,6 @@ class HelmReleaseNames:
     platform: str
 
 
-@dataclass(frozen=True)
 class HelmChartNames:
     docker_registry: str = "docker-registry"
     minio: str = "minio"
@@ -147,7 +146,6 @@ class Config:
     backoff: int
     kube_config: KubeConfig
     helm_release_names: HelmReleaseNames
-    helm_chart_names: HelmChartNames
     helm_chart_versions: HelmChartVersions
     platform_auth_url: URL
     platform_ingress_auth_url: URL
@@ -171,7 +169,6 @@ class Config:
             backoff=int(env.get("NP_CONTROLLER_BACKOFF") or "60"),
             kube_config=KubeConfig.load_from_env(env),
             helm_release_names=HelmReleaseNames(platform="platform"),
-            helm_chart_names=HelmChartNames(),
             helm_chart_versions=HelmChartVersions(
                 platform=env["NP_HELM_PLATFORM_CHART_VERSION"],
             ),
