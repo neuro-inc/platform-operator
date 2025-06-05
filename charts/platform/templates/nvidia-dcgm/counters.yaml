@@ -1,3 +1,4 @@
+{{- if .Values.nvidiaDCGMExporter.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -70,3 +71,4 @@ data:
     # DCGM_FI_DEV_VGPU_LICENSE_STATUS,, License status of the vGPU instance.
     # DCGM_FI_DEV_VGPU_MEMORY_USAGE,, Memory usage of the vGPU instance.
     # DCGM_FI_DEV_VGPU_UTILIZATIONS,, Utilization values for vGPUs running on the device.
+{{- end }}

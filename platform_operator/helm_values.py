@@ -36,7 +36,6 @@ def b64encode(value: str) -> str:
 class HelmValuesFactory:
     def create_platform_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {
-            "kubernetesProvider": platform.kubernetes_provider,
             "traefikEnabled": platform.ingress_controller_install,
             "acmeEnabled": platform.ingress_acme_enabled,
             "dockerRegistryEnabled": platform.registry.docker_registry_install,
@@ -73,9 +72,16 @@ class HelmValuesFactory:
                 "gpu": platform.node_labels.accelerator,
             },
             "nvidiaGpuDriver": {
+                "enabled": (
+                    platform.cluster_cloud_provider_type != CloudProviderType.ON_PREM
+                ),
+                "isGcp": platform.cluster_cloud_provider_type == CloudProviderType.GCP,
                 "image": {"repository": platform.get_image("k8s-device-plugin")},
             },
             "nvidiaDCGMExporter": {
+                "enabled": (
+                    platform.cluster_cloud_provider_type != CloudProviderType.ON_PREM
+                ),
                 "image": {"repository": platform.get_image("dcgm-exporter")},
                 "serviceMonitor": {"enabled": platform.monitoring.metrics_enabled},
             },
@@ -560,7 +566,7 @@ class HelmValuesFactory:
         }
         if platform.kubernetes_version >= "1.19":
             result["ingressClass"] = {"enabled": True}
-        if platform.kubernetes_provider == CloudProviderType.AWS:
+        if platform.cluster_cloud_provider_type == CloudProviderType.AWS:
             result["service"]["annotations"] = {
                 "service.beta.kubernetes.io/aws-load-balancer-type": "external",
                 "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": (
@@ -1423,7 +1429,7 @@ class HelmValuesFactory:
             }
         else:
             raise AssertionError("was unable to construct thanos object store config")
-        if platform.kubernetes_provider == CloudProviderType.GCP:
+        if platform.cluster_cloud_provider_type == CloudProviderType.GCP:
             result["cloudProvider"] = {
                 "type": "gcp",
                 "region": platform.monitoring.metrics_region,
@@ -1432,12 +1438,12 @@ class HelmValuesFactory:
                     "key": "key.json",
                 },
             }
-        if platform.kubernetes_provider == CloudProviderType.AWS:
+        if platform.cluster_cloud_provider_type == CloudProviderType.AWS:
             result["cloudProvider"] = {
                 "type": "aws",
                 "region": platform.monitoring.metrics_region,
             }
-        if platform.kubernetes_provider == CloudProviderType.AZURE:
+        if platform.cluster_cloud_provider_type == CloudProviderType.AZURE:
             result["cloudProvider"] = {
                 "type": "azure",
                 "region": platform.monitoring.metrics_region,
@@ -1554,7 +1560,7 @@ class HelmValuesFactory:
             "priorityClassName": platform.services_priority_class_name,
         }
         result.update(**self._create_tracing_values(platform))
-        if platform.kubernetes_provider == CloudProviderType.AZURE:
+        if platform.cluster_cloud_provider_type == CloudProviderType.AZURE:
             result["jobs"]["preemptibleTolerationKey"] = (
                 "kubernetes.azure.com/scalesetpriority"
             )

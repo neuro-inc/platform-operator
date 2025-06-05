@@ -532,7 +532,7 @@ async def _configure_cluster(cluster: Cluster, platform: PlatformConfig) -> None
         ingress_service = await app.kube_client.get_service(
             namespace=platform.namespace, name=platform.ingress_service_name
         )
-        if platform.kubernetes_provider == CloudProviderType.AWS:
+        if platform.cluster_cloud_provider_type == CloudProviderType.AWS:
             async with AwsElbClient(region=platform.aws_region) as client:
                 aws_ingress_lb = await client.get_load_balancer_by_dns_name(
                     ingress_service.load_balancer_host
