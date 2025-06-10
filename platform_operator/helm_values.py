@@ -34,15 +34,8 @@ def b64encode(value: str) -> str:
 
 
 class HelmValuesFactory:
-    def __init__(
-        self, helm_chart_names: HelmChartNames, container_runtime: str
-    ) -> None:
-        self._chart_names = helm_chart_names
-        self._container_runtime = container_runtime
-
     def create_platform_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {
-            "kubernetesProvider": platform.kubernetes_provider,
             "traefikEnabled": platform.ingress_controller_install,
             "acmeEnabled": platform.ingress_acme_enabled,
             "dockerRegistryEnabled": platform.registry.docker_registry_install,
@@ -79,9 +72,16 @@ class HelmValuesFactory:
                 "gpu": platform.node_labels.accelerator,
             },
             "nvidiaGpuDriver": {
+                "enabled": (
+                    platform.cluster_cloud_provider_type != CloudProviderType.ON_PREM
+                ),
+                "isGcp": platform.cluster_cloud_provider_type == CloudProviderType.GCP,
                 "image": {"repository": platform.get_image("k8s-device-plugin")},
             },
             "nvidiaDCGMExporter": {
+                "enabled": (
+                    platform.cluster_cloud_provider_type != CloudProviderType.ON_PREM
+                ),
                 "image": {"repository": platform.get_image("dcgm-exporter")},
                 "serviceMonitor": {"enabled": platform.monitoring.metrics_enabled},
             },
@@ -108,37 +108,33 @@ class HelmValuesFactory:
             },
             "idleJobs": [self._create_idle_job(job) for job in platform.idle_jobs],
             "storages": [self._create_storage_values(s) for s in platform.storages],
-            self._chart_names.traefik: self.create_traefik_values(platform),
-            self._chart_names.platform_storage: self.create_platform_storage_values(
+            HelmChartNames.traefik: self.create_traefik_values(platform),
+            HelmChartNames.platform_storage: self.create_platform_storage_values(
                 platform
             ),
-            self._chart_names.platform_registry: self.create_platform_registry_values(
+            HelmChartNames.platform_registry: self.create_platform_registry_values(
                 platform
             ),
-            self._chart_names.platform_monitoring: self.create_platform_monitoring_values(  # noqa
+            HelmChartNames.platform_monitoring: self.create_platform_monitoring_values(  # noqa
                 platform
             ),
-            self._chart_names.platform_container_runtime: self.create_platform_container_runtime_values(  # noqa
+            HelmChartNames.platform_container_runtime: self.create_platform_container_runtime_values(  # noqa
                 platform
             ),
-            self._chart_names.platform_secrets: self.create_platform_secrets_values(
+            HelmChartNames.platform_secrets: self.create_platform_secrets_values(
                 platform
             ),
-            self._chart_names.platform_disks: self.create_platform_disks_values(
+            HelmChartNames.platform_disks: self.create_platform_disks_values(platform),
+            HelmChartNames.platform_api_poller: self.create_platform_api_poller_values(  # noqa
                 platform
             ),
-            self._chart_names.platform_api_poller: self.create_platform_api_poller_values(  # noqa
+            HelmChartNames.platform_buckets: self.create_platform_buckets_values(
                 platform
             ),
-            self._chart_names.platform_buckets: self.create_platform_buckets_values(
+            HelmChartNames.platform_metadata: self.create_platform_metadata_values(
                 platform
             ),
-            self._chart_names.platform_metadata: self.create_platform_metadata_values(
-                platform
-            ),
-            self._chart_names.spark_operator: self.create_spark_operator_values(
-                platform
-            ),
+            HelmChartNames.spark_operator: self.create_spark_operator_values(platform),
         }
         if platform.ingress_acme_enabled:
             result["acme"] = self.create_acme_values(platform)
@@ -171,26 +167,26 @@ class HelmValuesFactory:
         else:
             result["dockerHubConfigSecret"] = {"create": False}
         if platform.registry.docker_registry_install:
-            result[self._chart_names.docker_registry] = (
-                self.create_docker_registry_values(platform)
+            result[HelmChartNames.docker_registry] = self.create_docker_registry_values(
+                platform
             )
         if platform.buckets.minio_install:
             assert platform.buckets.minio_public_url
             result["ingress"]["minioHost"] = platform.buckets.minio_public_url.host
-            result[self._chart_names.minio] = self.create_minio_values(platform)
+            result[HelmChartNames.minio] = self.create_minio_values(platform)
         if platform.minio_gateway is not None:
-            result[self._chart_names.minio_gateway] = self.create_minio_gateway_values(
+            result[HelmChartNames.minio_gateway] = self.create_minio_gateway_values(
                 platform
             )
         if platform.monitoring.metrics_enabled:
-            result[self._chart_names.platform_reports] = (
+            result[HelmChartNames.platform_reports] = (
                 self.create_platform_reports_values(platform)
             )
             result["alertmanager"] = self._create_alert_manager_values(platform)
         if platform.monitoring.loki_enabled:
-            result[self._chart_names.loki] = self.create_loki_values(platform)
+            result[HelmChartNames.loki] = self.create_loki_values(platform)
         if platform.monitoring.alloy_enabled:
-            result[self._chart_names.alloy] = self.create_alloy_values(platform)
+            result[HelmChartNames.alloy] = self.create_alloy_values(platform)
         return result
 
     def _create_alert_manager_values(self, platform: PlatformConfig) -> dict[str, Any]:
@@ -570,7 +566,7 @@ class HelmValuesFactory:
         }
         if platform.kubernetes_version >= "1.19":
             result["ingressClass"] = {"enabled": True}
-        if platform.kubernetes_provider == CloudProviderType.AWS:
+        if platform.cluster_cloud_provider_type == CloudProviderType.AWS:
             result["service"]["annotations"] = {
                 "service.beta.kubernetes.io/aws-load-balancer-type": "external",
                 "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": (
@@ -976,7 +972,6 @@ class HelmValuesFactory:
                 "ingressClassName": "traefik",
                 "hosts": [platform.ingress_url.host],
             },
-            "containerRuntime": {"name": self._container_runtime},
             "fluentbit": {"image": {"repository": platform.get_image("fluent-bit")}},
             "priorityClassName": platform.services_priority_class_name,
             "logs": {
@@ -1434,7 +1429,7 @@ class HelmValuesFactory:
             }
         else:
             raise AssertionError("was unable to construct thanos object store config")
-        if platform.kubernetes_provider == CloudProviderType.GCP:
+        if platform.cluster_cloud_provider_type == CloudProviderType.GCP:
             result["cloudProvider"] = {
                 "type": "gcp",
                 "region": platform.monitoring.metrics_region,
@@ -1443,12 +1438,12 @@ class HelmValuesFactory:
                     "key": "key.json",
                 },
             }
-        if platform.kubernetes_provider == CloudProviderType.AWS:
+        if platform.cluster_cloud_provider_type == CloudProviderType.AWS:
             result["cloudProvider"] = {
                 "type": "aws",
                 "region": platform.monitoring.metrics_region,
             }
-        if platform.kubernetes_provider == CloudProviderType.AZURE:
+        if platform.cluster_cloud_provider_type == CloudProviderType.AZURE:
             result["cloudProvider"] = {
                 "type": "azure",
                 "region": platform.monitoring.metrics_region,
@@ -1565,7 +1560,7 @@ class HelmValuesFactory:
             "priorityClassName": platform.services_priority_class_name,
         }
         result.update(**self._create_tracing_values(platform))
-        if platform.kubernetes_provider == CloudProviderType.AZURE:
+        if platform.cluster_cloud_provider_type == CloudProviderType.AZURE:
             result["jobs"]["preemptibleTolerationKey"] = (
                 "kubernetes.azure.com/scalesetpriority"
             )

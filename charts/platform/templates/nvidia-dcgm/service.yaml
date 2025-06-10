@@ -1,3 +1,4 @@
+{{- if .Values.nvidiaDCGMExporter.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -14,3 +15,4 @@ spec:
     port: 9400
     protocol: TCP
     targetPort: metrics
+{{- end }}

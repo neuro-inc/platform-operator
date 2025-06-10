@@ -16,6 +16,7 @@ import kopf
 from neuro_config_client import (
     ACMEEnvironment,
     ARecord,
+    CloudProviderType,
     Cluster,
     DNSConfig,
     DockerRegistryConfig,
@@ -107,7 +108,6 @@ class HelmReleaseNames:
     platform: str
 
 
-@dataclass(frozen=True)
 class HelmChartNames:
     docker_registry: str = "docker-registry"
     minio: str = "minio"
@@ -147,7 +147,6 @@ class Config:
     backoff: int
     kube_config: KubeConfig
     helm_release_names: HelmReleaseNames
-    helm_chart_names: HelmChartNames
     helm_chart_versions: HelmChartVersions
     platform_auth_url: URL
     platform_ingress_auth_url: URL
@@ -171,7 +170,6 @@ class Config:
             backoff=int(env.get("NP_CONTROLLER_BACKOFF") or "60"),
             kube_config=KubeConfig.load_from_env(env),
             helm_release_names=HelmReleaseNames(platform="platform"),
-            helm_chart_names=HelmChartNames(),
             helm_chart_versions=HelmChartVersions(
                 platform=env["NP_HELM_PLATFORM_CHART_VERSION"],
             ),
@@ -223,10 +221,6 @@ class KubernetesSpec(dict[str, Any]):
         super().__init__(spec)
 
         self._spec = defaultdict(_spec_default_factory, spec)
-
-    @property
-    def provider(self) -> str:
-        return self["provider"]
 
     @property
     def standard_storage_class_name(self) -> str:
@@ -813,12 +807,12 @@ class PlatformConfig:
     notifications_url: URL
     token: str
     cluster_name: str
+    cluster_cloud_provider_type: CloudProviderType
     service_account_name: str
     service_account_annotations: dict[str, str]
     image_pull_secret_names: Sequence[str]
     pre_pull_images: Sequence[str]
     standard_storage_class_name: str | None
-    kubernetes_provider: str
     kubernetes_version: str
     kubernetes_tpu_network: IPv4Network | None
     node_labels: LabelsConfig
@@ -1008,6 +1002,7 @@ class PlatformConfigFactory:
         self._config = config
 
     def create(self, platform_body: kopf.Body, cluster: Cluster) -> PlatformConfig:
+        assert cluster.cloud_provider
         assert cluster.credentials
         assert cluster.orchestrator
         assert cluster.disks
@@ -1044,6 +1039,7 @@ class PlatformConfigFactory:
             notifications_url=self._config.platform_notifications_url,
             token=spec.token,
             cluster_name=metadata.name,
+            cluster_cloud_provider_type=cluster.cloud_provider.type,
             namespace=self._config.platform_namespace,
             service_account_name="default",
             service_account_annotations=service_account_annotations,
@@ -1054,7 +1050,6 @@ class PlatformConfigFactory:
             standard_storage_class_name=(
                 spec.kubernetes.standard_storage_class_name or None
             ),
-            kubernetes_provider=spec.kubernetes.provider,
             kubernetes_version=self._config.kube_config.version,
             kubernetes_tpu_network=spec.kubernetes.tpu_network,
             kubelet_port=int(spec.kubernetes.kubelet_port or 10250),
