@@ -2168,8 +2168,8 @@ class HelmValuesFactory:
                           }
 
                           rule {
-                            source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_app"]
-                            target_label  = "apolo_app_id"
+                            source_labels = ["__meta_kubernetes_pod_label_platform_apolo_us_app_instance_name"]
+                            target_label  = "apolo_app_instance_name"
                           }
                         }
 
@@ -2226,7 +2226,7 @@ class HelmValuesFactory:
                           }
 
                           stage.label_keep {
-                            values = ["app", "instance", "namespace", "pod", "container", "apolo_org_name", "apolo_project_name", "apolo_app_id"]
+                            values = ["app", "instance", "namespace", "pod", "container", "apolo_org_name", "apolo_project_name", "apolo_app_instance_name"]
                           }
                         }
 
