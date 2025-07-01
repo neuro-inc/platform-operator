@@ -70,6 +70,8 @@ spec:
           value: {{ .Values.platform.adminUrl | quote }}
         - name: NP_PLATFORM_API_URL
           value: {{ .Values.platform.apiUrl | quote }}
+        - name: NP_PLATFORM_APPS_URL
+          value: {{ .Values.platform.appsUrl | quote }}
         - name: NP_PLATFORM_NOTIFICATIONS_URL
           value: {{ .Values.platform.notificationsUrl | quote }}
         - name: NP_PLATFORM_NAMESPACE

@@ -953,7 +953,7 @@ class HelmValuesFactory:
                 **self._create_platform_url_value("authUrl", platform.auth_url),
                 **self._create_platform_url_value("configUrl", platform.config_url),
                 **self._create_platform_url_value("apiUrl", platform.api_url),
-                **self._create_platform_url_value("appsUrl", platform.api_url),
+                **self._create_platform_url_value("appsUrl", platform.apps_url),
                 **self._create_platform_url_value(
                     "registryUrl", platform.ingress_registry_url
                 ),
