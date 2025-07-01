@@ -6,14 +6,16 @@ metadata:
 aggregationRule:
   clusterRoleSelectors:
   - matchLabels:
-      platform.neuromation.io/aggregate: "true"
+      platform.apolo.us/aggregate: "true"
 rules:
 - apiGroups:
   - ""
   resources:
+  - nodes
   - nodes/proxy
+  - nodes/metrics
+  - nodes/status
   verbs:
-  - create
   - get
   - list
   - watch
@@ -22,14 +24,59 @@ rules:
   resources:
   - nodes
   verbs:
-  - get
-  - list
-  - watch
   - patch
 - apiGroups:
   - ""
   resources:
+  - nodes/proxy
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - networkpolicies
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  - persistentvolumes
+  - secrets
   - pods
+  - pods/log
+  - pods/exec
+  - pods/attach
+  - pods/portforward
+  - pods/proxy
+  - pods/status
+  - endpoints
+  - services
+  verbs:
+  - "*"
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs:
+  - "*"
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
   verbs:
   - get
   - list
@@ -47,19 +94,4 @@ subjects:
 roleRef:
   kind: ClusterRole
   name: {{ .Release.Name }}
-  apiGroup: rbac.authorization.k8s.io
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ .Release.Name }}-admin
-  namespace: {{ include "platform.jobs.namespace.name" . }}
-  labels: {{ include "platform.labels.standard" . | nindent 4 }}
-subjects:
-- kind: ServiceAccount
-  name: default
-  namespace: {{ .Release.Namespace }}
-roleRef:
-  kind: ClusterRole
-  name: admin
   apiGroup: rbac.authorization.k8s.io
