@@ -43,7 +43,6 @@ rules:
   - ""
   resources:
   - namespaces
-  - networkpolicies
   verbs:
   - get
   - list
@@ -70,9 +69,14 @@ rules:
 - apiGroups:
   - networking.k8s.io
   resources:
+  - networkpolicies
   - ingresses
   verbs:
-  - "*"
+  - get
+  - list
+  - watch
+  - create
+  - delete
 - apiGroups:
   - storage.k8s.io
   resources:
