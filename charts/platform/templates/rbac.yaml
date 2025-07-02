@@ -76,6 +76,8 @@ rules:
   - list
   - watch
   - create
+  - update
+  - patch
   - delete
 - apiGroups:
   - storage.k8s.io
