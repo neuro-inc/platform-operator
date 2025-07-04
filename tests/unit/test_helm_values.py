@@ -1,3 +1,4 @@
+import re
 from dataclasses import replace
 from unittest import mock
 
@@ -103,7 +104,11 @@ class TestHelmValuesFactory:
                     "originList": [
                         "https://console.apolo.us",
                         "https://custom.app",
-                    ]
+                    ],
+                    "originListRegex": [
+                        f"https:\\/\\/[a-zA-Z0-9_-]+\\.jobs\\.{re.escape(cluster_name)}\\.org\\.neu\\.ro",
+                        f"https:\\/\\/[a-zA-Z0-9_-]+\\.apps\\.{re.escape(cluster_name)}\\.org\\.neu\\.ro",
+                    ],
                 },
             },
             "jobs": {

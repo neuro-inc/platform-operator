@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import re
 import textwrap
 from hashlib import sha256
 from typing import Any
@@ -94,6 +95,18 @@ class HelmValuesFactory:
                 "jobFallbackHost": str(platform.jobs_fallback_host),
                 "registryHost": platform.ingress_registry_url.host,
                 "ingressAuthHost": platform.ingress_auth_url.host,
+                "cors": {
+                    "originListRegex": [
+                        (
+                            r"https:\/\/[a-zA-Z0-9_-]+"
+                            + re.escape(f".jobs.{platform.ingress_url.host}")
+                        ),
+                        (
+                            r"https:\/\/[a-zA-Z0-9_-]+"
+                            + re.escape(f".apps.{platform.ingress_url.host}")
+                        ),
+                    ]
+                },
             },
             "ssl": {
                 "cert": platform.ingress_ssl_cert_data,
@@ -139,7 +152,7 @@ class HelmValuesFactory:
         if platform.ingress_acme_enabled:
             result["acme"] = self.create_acme_values(platform)
         if platform.ingress_cors_origins:
-            result["ingress"]["cors"] = {"originList": platform.ingress_cors_origins}
+            result["ingress"]["cors"]["originList"] = platform.ingress_cors_origins
         if platform.docker_config.create_secret:
             result["dockerConfigSecret"] = {
                 "create": True,
