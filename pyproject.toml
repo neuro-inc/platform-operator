@@ -41,7 +41,7 @@ vcs = "git"
 optional = true
 
 [tool.poetry.group.dev.dependencies]
-moto = { version = "5.1.6", extras = ["server"] }
+moto = { version = "5.1.8", extras = ["server"] }
 mypy = "1.16.1"
 pre-commit = "4.2.0"
 pytest = "8.4.1"
