@@ -32,29 +32,29 @@ dependencies:
     version: "24.11.1"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-monitoring
-    version: "25.5.2"
+    version: "25.6.2"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-container-runtime
     version: "23.7.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-secrets
-    version: "25.5.0"
+    version: "25.7.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-reports
-    version: "25.5.0"
+    version: "25.7.1"
     repository: oci://ghcr.io/neuro-inc/helm-charts
     condition: platformReportsEnabled
   - name: platform-disks
-    version: "23.7.0"
+    version: "25.7.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-api-poller
-    version: "25.2.0"
+    version: "25.7.1"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-buckets
-    version: "23.7.0"
+    version: "25.7.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-metadata
-    version: "25.5.0"
+    version: "25.7.3"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: k8s-resources
     version: "1.0.1"
