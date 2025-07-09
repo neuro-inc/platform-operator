@@ -1104,6 +1104,7 @@ class HelmValuesFactory:
                 ),
                 **self._create_platform_url_value("configUrl", platform.config_url),
                 **self._create_platform_url_value("apiUrl", platform.api_url),
+                **self._create_platform_url_value("appsUrl", platform.apps_url),
                 **self._create_platform_token_value(platform),
             },
             "secrets": [],
