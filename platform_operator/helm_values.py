@@ -1104,6 +1104,7 @@ class HelmValuesFactory:
                 ),
                 **self._create_platform_url_value("configUrl", platform.config_url),
                 **self._create_platform_url_value("apiUrl", platform.api_url),
+                **self._create_platform_url_value("appsUrl", platform.apps_url),
                 **self._create_platform_token_value(platform),
             },
             "secrets": [],
@@ -2289,6 +2290,10 @@ class HelmValuesFactory:
             "fullnameOverride": f"{platform.release_name}-metadata",
             "image": {"repository": platform.get_image("platform-metadata")},
             "priorityClassName": platform.services_priority_class_name,
+            "platform": {
+                **self._create_platform_url_value("appsUrl", platform.apps_url),
+                **self._create_platform_token_value(platform),
+            },
         }
         result.update(**self._create_tracing_values(platform))
         return result

@@ -2037,6 +2037,7 @@ class TestHelmValuesFactory:
                 "ingressAuthUrl": "https://platformingressauth",
                 "configUrl": "https://dev.neu.ro",
                 "apiUrl": "https://dev.neu.ro",
+                "appsUrl": "https://dev.neu.ro",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
@@ -2753,4 +2754,15 @@ class TestHelmValuesFactory:
                 "sampleRate": 0.1,
             },
             "priorityClassName": "platform-services",
+            "platform": {
+                "appsUrl": "https://dev.neu.ro",
+                "token": {
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "key": "token",
+                            "name": "platform-token",
+                        },
+                    },
+                },
+            },
         }
