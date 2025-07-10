@@ -29,6 +29,8 @@ PLATFORM_APOLO_WORKER_TAINT_KEY = "platform.apolo.us/worker"
 NVIDIA_GPU_TAINT_KEY = "nvidia.com/gpu"
 AMD_GPU_TAINT_KEY = "amd.com/gpu"
 
+PLATFORM_APOLO_COMPONENT_LABEL_KEY = "platform.apolo.us/component"
+
 
 def b64encode(value: str) -> str:
     return base64.b64encode(value.encode()).decode()
@@ -517,8 +519,14 @@ class HelmValuesFactory:
             "image": {"name": platform.get_image("traefik")},
             "deployment": {
                 "replicas": platform.ingress_controller_replicas,
-                "labels": {"service": "traefik"},
-                "podLabels": {"service": "traefik"},
+                "labels": {
+                    "service": "traefik",
+                    PLATFORM_APOLO_COMPONENT_LABEL_KEY: "ingress-gateway",
+                },
+                "podLabels": {
+                    "service": "traefik",
+                    PLATFORM_APOLO_COMPONENT_LABEL_KEY: "ingress-gateway",
+                },
                 "imagePullSecrets": [
                     {"name": name} for name in platform.image_pull_secret_names
                 ],
