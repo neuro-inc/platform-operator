@@ -3,10 +3,6 @@ kind: ClusterRole
 metadata:
   name: {{ .Release.Name }}
   labels: {{ include "platform.labels.standard" . | nindent 4 }}
-aggregationRule:
-  clusterRoleSelectors:
-  - matchLabels:
-      platform.apolo.us/aggregate: "true"
 rules:
 - apiGroups:
   - ""
@@ -84,6 +80,33 @@ rules:
   resources:
   - storageclasses
   verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - neuromation.io
+  resources:
+  - userbuckets
+  - persistentbucketcredentials
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - patch
+  - update
+  - get
+  - list
+  - watch
+- apiGroups:
+  - neuromation.io
+  resources:
+  - disknamings
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - patch
+  - update
   - get
   - list
   - watch

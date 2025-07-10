@@ -734,8 +734,14 @@ class TestHelmValuesFactory:
             "image": {"name": "ghcr.io/neuro-inc/traefik"},
             "deployment": {
                 "replicas": 2,
-                "labels": {"service": "traefik"},
-                "podLabels": {"service": "traefik"},
+                "labels": {
+                    "service": "traefik",
+                    "platform.apolo.us/component": "ingress-gateway",
+                },
+                "podLabels": {
+                    "service": "traefik",
+                    "platform.apolo.us/component": "ingress-gateway",
+                },
                 "imagePullSecrets": [
                     {"name": "platform-docker-config"},
                     {"name": "platform-docker-hub-config"},
