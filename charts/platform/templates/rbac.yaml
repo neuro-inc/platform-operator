@@ -59,6 +59,7 @@ rules:
   - pods/proxy
   - pods/status
   - endpoints
+  - endpointslices
   - services
   verbs:
   - "*"
