@@ -59,10 +59,17 @@ rules:
   - pods/proxy
   - pods/status
   - endpoints
-  - endpointslices
   - services
   verbs:
   - "*"
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - networking.k8s.io
   resources:
