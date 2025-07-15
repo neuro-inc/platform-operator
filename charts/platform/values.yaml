@@ -106,6 +106,16 @@ storages: []
 #   gcs:
 #     bucketName: bucket
 
+# keda http addon config
+keda-add-ons-http:
+  interceptor:
+    replicas:
+      min: 1
+      waitTimeout: 360s
+
+  scaler:
+    replicas: 1
+
 ssl:
   cert: ""
   key: ""
@@ -116,7 +126,7 @@ dockerRegistryEnabled: false
 minioEnabled: false
 platformReportsEnabled: true
 appsPostgresOperatorEnabled: true
-appsKedaEnabled: false
+appsKedaEnabled: true
 lokiEnabled: true
 alloyEnabled: true
 appsSparkOperatorEnabled: false
