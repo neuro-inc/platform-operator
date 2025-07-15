@@ -75,6 +75,7 @@ dependencies:
   - name: keda-add-ons-http
     version: 0.10.0
     repository: https://kedacore.github.io/charts
+    condition: appsKedaEnabled
   - name: loki
     version: "6.29.0"
     repository: https://grafana.github.io/helm-charts

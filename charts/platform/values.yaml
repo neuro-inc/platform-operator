@@ -121,7 +121,7 @@ keda-add-ons-http:
   interceptor:
     replicas:
       min: 1
-      waitTimeout: 360s
+      waitTimeout: 600s
 
   scaler:
     replicas: 1
