@@ -135,7 +135,7 @@ appsPostgresOperatorEnabled: true
 appsKedaEnabled: true
 lokiEnabled: true
 alloyEnabled: true
-appsSparkOperatorEnabled: false
+appsSparkOperatorEnabled: true
 
 tags:
   gcp: false
