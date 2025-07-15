@@ -113,6 +113,10 @@ storages: []
 #     bucketName: bucket
 
 # keda config
+keda:
+  operator:
+    replicaCount: 1
+
 keda-add-ons-http:
   interceptor:
     replicas:
@@ -121,6 +125,10 @@ keda-add-ons-http:
 
   scaler:
     replicas: 1
+# spark
+
+spark-operator:
+  replicas: 1
 
 ssl:
   cert: ""
