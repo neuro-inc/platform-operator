@@ -112,6 +112,24 @@ storages: []
 #   gcs:
 #     bucketName: bucket
 
+# keda config
+keda:
+  operator:
+    replicaCount: 1
+
+keda-add-ons-http:
+  interceptor:
+    replicas:
+      min: 1
+      waitTimeout: 600s
+
+  scaler:
+    replicas: 1
+# spark
+
+spark-operator:
+  replicas: 1
+
 ssl:
   cert: ""
   key: ""
@@ -122,10 +140,10 @@ dockerRegistryEnabled: false
 minioEnabled: false
 platformReportsEnabled: true
 appsPostgresOperatorEnabled: true
-appsKedaEnabled: false
+appsKedaEnabled: true
 lokiEnabled: true
 alloyEnabled: true
-appsSparkOperatorEnabled: false
+appsSparkOperatorEnabled: true
 
 tags:
   gcp: false

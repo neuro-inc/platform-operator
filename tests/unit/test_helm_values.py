@@ -40,8 +40,8 @@ class TestHelmValuesFactory:
             "acmeEnabled": True,
             "dockerRegistryEnabled": False,
             "appsPostgresOperatorEnabled": True,
-            "appsSparkOperatorEnabled": False,
-            "appsKedaEnabled": False,
+            "appsSparkOperatorEnabled": True,
+            "appsKedaEnabled": True,
             "minioEnabled": False,
             "minioGatewayEnabled": True,
             "platformReportsEnabled": True,
@@ -388,9 +388,9 @@ class TestHelmValuesFactory:
             }
         ]
         assert result["dockerRegistryEnabled"] is True
-        assert result["appsKedaEnabled"] is False
+        assert result["appsKedaEnabled"] is True
         assert result["appsPostgresOperatorEnabled"] is True
-        assert result["appsSparkOperatorEnabled"] is False
+        assert result["appsSparkOperatorEnabled"] is True
         assert "docker-registry" in result
         assert result["minioEnabled"] is True
         assert (
