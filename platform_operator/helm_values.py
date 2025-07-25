@@ -1751,57 +1751,73 @@ class HelmValuesFactory:
             "loki": {
                 "commonConfig": {"replication_factor": 1},
                 "auth_enabled": False,
+                "pattern_ingester": {
+                    "enabled": True,
+                },
+                "ingester": {"chunk_encoding": "snappy"},
+                "querier": {
+                    "max_concurrent": 8,
+                },
+                "query_range": {
+                    "align_queries_with_step": True,
+                },
+                "frontend": {
+                    "log_queries_longer_than": "5s",
+                },
+                "limits_config": {
+                    "allow_structured_metadata": True,
+                    "volume_enabled": True,
+                    "retention_period": "90d",
+                    "split_queries_by_interval": "1h",
+                },
             },
             "test": {"enabled": False},
             "lokiCanary": {"enabled": False},
             "resultsCache": {"allocatedMemory": 512},
             "chunksCache": {"allocatedMemory": 2048},
-            "ingester": {"chunk_encoding": "snappy"},
-            "table_manager": {
+            "tableManager": {
                 "retention_deletes_enabled": True,
                 "retention_period": "2160h",
-            },
-            "query_scheduler": {
-                "max_outstanding_requests_per_tenant": 32768,
-            },
-            "querier": {
-                "max_concurrent": 4,  # Default is 4, adjust based on memory and CPU
-            },
-            "pattern_ingester": {
-                "enabled": True,
-            },
-            "limits_config": {
-                "allow_structured_metadata": True,
-                "volume_enabled": True,
-                "retention_period": "90d",
             },
             "minio": {"enabled": False},
             "gateway": {
                 "replicas": 1,
                 "resources": {
-                    "requests": {"memory": "100Mi", "cpu": "10m"},
-                    "limits": {"memory": "100Mi"},
+                    "requests": {"memory": "200Mi", "cpu": "100m"},
+                    "limits": {"memory": "200Mi", "cpu": "100m"},
+                },
+                "podLabels": {
+                    "service": "loki-gateway",
                 },
             },
             "write": {
                 "replicas": 1,
                 "resources": {
-                    "requests": {"memory": "512Mi", "cpu": "100m"},
-                    "limits": {"memory": "1024Mi"},
+                    "requests": {"memory": "2Gi", "cpu": "1"},
+                    "limits": {"memory": "2Gi", "cpu": "1"},
+                },
+                "podLabels": {
+                    "service": "loki-write",
                 },
             },
             "read": {
                 "replicas": 1,
                 "resources": {
-                    "requests": {"memory": "100Mi", "cpu": "100m"},
-                    "limits": {"memory": "2048Mi"},
+                    "requests": {"memory": "2Gi", "cpu": "1"},
+                    "limits": {"memory": "2Gi", "cpu": "1"},
+                },
+                "podLabels": {
+                    "service": "loki-read",
                 },
             },
             "backend": {
                 "replicas": 1,
                 "resources": {
-                    "requests": {"memory": "100Mi", "cpu": "100m"},
-                    "limits": {"memory": "512Mi", "cpu": "100m"},
+                    "requests": {"memory": "2Gi", "cpu": "1"},
+                    "limits": {"memory": "2Gi", "cpu": "1"},
+                },
+                "podLabels": {
+                    "service": "loki-backend",
                 },
             },
         }
@@ -2084,7 +2100,7 @@ class HelmValuesFactory:
 
     def _create_loki_endpoint(self, platform: PlatformConfig) -> str:
         if platform.monitoring.loki_enabled:
-            return f"http://loki-gateway.{platform.namespace}"
+            return f"http://loki-read.{platform.namespace}:3100"
         return platform.monitoring.loki_endpoint
 
     def create_alloy_values(self, platform: PlatformConfig) -> dict[str, Any]:
@@ -2127,13 +2143,7 @@ class HelmValuesFactory:
                           }
 
                           rule {
-                            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_instance", "__meta_kubernetes_pod_label_instance"]
-                            regex         = "^;*([^;]+)(;.*)?$"
-                            target_label  = "instance"
-                          }
-
-                          rule {
-                            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_component", "__meta_kubernetes_pod_label_component"]
+                            source_labels = ["__meta_kubernetes_pod_label_service", "__meta_kubernetes_pod_label_app_kubernetes_io_component", "__meta_kubernetes_pod_label_component"]
                             regex         = "^;*([^;]+)(;.*)?$"
                             target_label  = "component"
                           }
@@ -2146,12 +2156,6 @@ class HelmValuesFactory:
                           rule {
                             source_labels = ["__meta_kubernetes_namespace"]
                             target_label  = "namespace"
-                          }
-
-                          rule {
-                            source_labels = ["namespace", "app"]
-                            separator     = "/"
-                            target_label  = "job"
                           }
 
                           rule {
@@ -2243,12 +2247,12 @@ class HelmValuesFactory:
                           }
 
                           stage.pack {
-                            labels           = ["stream", "node_name", "level", "logger", "context"]
+                            labels           = ["stream", "level", "logger", "context", "pod", "component"]
                             ingest_timestamp = false
                           }
 
                           stage.label_keep {
-                            values = ["app", "instance", "namespace", "pod", "container", "apolo_org_name", "apolo_project_name", "apolo_app_instance_name"]
+                            values = ["app", "namespace", "container", "apolo_org_name", "apolo_project_name", "apolo_app_instance_name"]
                           }
                         }
 
