@@ -1924,7 +1924,7 @@ class TestHelmValuesFactory:
                 "persistence": {
                     "type": "loki",
                     "loki": {
-                        "endpoint": "http://loki-gateway.platform",
+                        "endpoint": "http://loki-read.platform:3100",
                         "archiveDelay": "5",
                         "retentionPeriodS": "2592000",
                     },
