@@ -633,8 +633,8 @@ class TestHelmValuesFactory:
             },
             "resources": {
                 "requests": {
-                    "cpu": "100m",
-                    "memory": "1Gi",
+                    "cpu": "1",
+                    "memory": "2Gi",
                 }
             },
             "podLabels": {"service": "minio"},
