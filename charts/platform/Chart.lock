@@ -31,7 +31,7 @@ dependencies:
   version: 25.7.4
 - name: platform-reports
   repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 25.7.2
+  version: 25.7.3
 - name: platform-disks
   repository: oci://ghcr.io/neuro-inc/helm-charts
   version: 25.7.2
@@ -65,5 +65,5 @@ dependencies:
 - name: alloy
   repository: https://grafana.github.io/helm-charts
   version: 1.0.1
-digest: sha256:aefdede63ea292cb4857a696e4e2fd06ff2871656a0733daae7e68933fad8bc6
-generated: "2025-07-25T10:06:48.518970659+02:00"
+digest: sha256:321cd404efe1127ef66e1c249627051134b460492178b350ea23f0781867d2bd
+generated: "2025-07-29T17:23:32.312043862+03:00"
