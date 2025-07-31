@@ -2646,6 +2646,7 @@ class TestHelmValuesFactory:
                 "configUrl": "https://dev.neu.ro/api/v1",
                 "adminUrl": "https://dev.neu.ro/apis/admin/v1",
                 "apiUrl": "https://dev.neu.ro/api/v1",
+                "eventsUrl": "https://platform-events",
                 "registryUrl": (
                     f"https://registry.{gcp_platform_config.cluster_name}.org.neu.ro"
                 ),

@@ -156,6 +156,7 @@ class Config:
     platform_api_url: URL
     platform_apps_url: URL
     platform_notifications_url: URL
+    platform_events_url: URL
     platform_namespace: str
     platform_lock_secret_name: str
     acme_ca_staging_path: str
@@ -184,6 +185,7 @@ class Config:
             platform_api_url=URL(env["NP_PLATFORM_API_URL"]),
             platform_apps_url=URL(env["NP_PLATFORM_APPS_URL"]),
             platform_notifications_url=URL(env["NP_PLATFORM_NOTIFICATIONS_URL"]),
+            platform_events_url=URL(env["NP_PLATFORM_EVENTS_URL"]),
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
             platform_lock_secret_name=env["NP_PLATFORM_LOCK_SECRET_NAME"],
             acme_ca_staging_path=env["NP_ACME_CA_STAGING_PATH"],
@@ -808,6 +810,7 @@ class PlatformConfig:
     api_url: URL
     apps_url: URL
     notifications_url: URL
+    events_url: URL
     token: str
     cluster_name: str
     cluster_cloud_provider_type: CloudProviderType
@@ -1041,6 +1044,7 @@ class PlatformConfigFactory:
             api_url=self._config.platform_api_url,
             apps_url=self._config.platform_apps_url,
             notifications_url=self._config.platform_notifications_url,
+            events_url=self._config.platform_events_url,
             token=spec.token,
             cluster_name=metadata.name,
             cluster_cloud_provider_type=cluster.cloud_provider.type,
