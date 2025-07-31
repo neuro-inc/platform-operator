@@ -1541,6 +1541,7 @@ class HelmValuesFactory:
                     "adminUrl", platform.admin_url, "apis/admin/v1"
                 ),
                 **self._create_platform_url_value("apiUrl", platform.api_url, "api/v1"),
+                **self._create_platform_url_value("eventsUrl", platform.events_url),
                 **self._create_platform_url_value(
                     "registryUrl", platform.ingress_registry_url
                 ),
