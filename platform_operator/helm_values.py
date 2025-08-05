@@ -469,6 +469,12 @@ class HelmValuesFactory:
                 "user": platform.minio_gateway.root_user,
                 "password": platform.minio_gateway.root_user_password,
             },
+            "securityContext": {
+                "enabled": True,
+                "runAsUser": 1000,
+                "runAsGroup": 1000,
+                "fsGroup": 1000,
+            },
         }
         if platform.buckets.provider == BucketsProvider.GCP:
             result["cloudStorage"] = {
