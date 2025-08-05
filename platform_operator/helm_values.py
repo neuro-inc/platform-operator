@@ -2114,7 +2114,18 @@ class HelmValuesFactory:
         result: dict[str, Any] = {
             "nameOverride": "alloy",
             "fullnameOverride": "alloy",
+            "global": {
+                "podSecurityContext": {
+                    "runAsUser": 473,
+                    "runAsGroup": 473,
+                    "runAsNonRoot": True,
+                }
+            },
             "alloy": {
+                "securityContext": {
+                    "runAsUser": 473,
+                    "runAsGroup": 473,
+                },
                 "configMap": {
                     "create": True,
                     "content": textwrap.dedent(
@@ -2269,7 +2280,7 @@ class HelmValuesFactory:
                         }
                     """  # noqa: E501
                     ),
-                }
+                },
             },
             "controller": {
                 "tolerations": [
@@ -2294,6 +2305,14 @@ class HelmValuesFactory:
                         "operator": "Exists",
                     },
                 ]
+            },
+            "configReloader": {
+                "securityContext": {
+                    # This is the UID of the "nobody" user that the configReloader
+                    # image runs as.
+                    "runAsUser": 65534,
+                    "runAsGroup": 65534,
+                }
             },
         }
         result["alloy"]["configMap"]["content"] = result["alloy"]["configMap"][
