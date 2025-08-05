@@ -698,6 +698,12 @@ class TestHelmValuesFactory:
                 }
             ],
             "cloudStorage": {"type": "gcs", "gcs": {"project": "project"}},
+            "securityContext": {
+                "enabled": True,
+                "runAsGroup": 1000,
+                "runAsUser": 1000,
+                "fsGroup": 1000,
+            },
         }
 
     def test_create_minio_gateway_values__azure(
@@ -720,6 +726,12 @@ class TestHelmValuesFactory:
                 "password": azure_platform_config.minio_gateway.root_user_password,
             },
             "cloudStorage": {"type": "azure"},
+            "securityContext": {
+                "enabled": True,
+                "runAsGroup": 1000,
+                "runAsUser": 1000,
+                "fsGroup": 1000,
+            },
         }
 
     def test_create_gcp_traefik_values(
