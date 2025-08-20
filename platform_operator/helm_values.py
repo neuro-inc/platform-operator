@@ -1150,6 +1150,7 @@ class HelmValuesFactory:
                 "url": "http://thanos-query-http:10902",
                 "remoteStorageEnabled": True,
             },
+            "federatedAggregatesClusterName": platform.cluster_name,
             "kube-prometheus-stack": {
                 "global": {
                     "imageRegistry": platform.image_registry,
