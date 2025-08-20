@@ -1183,11 +1183,12 @@ class HelmValuesFactory:
                         "enabled": True,
                         "ingressClassName": "traefik",
                         "annotations": {
-                            "traefik.ingress.kubernetes.io/router.middlewares": "platform-federated-prom-auth@kubernetescrd",
+                            "traefik.ingress.kubernetes.io/router.middlewares":
+                                "platform-federated-prom-auth@kubernetescrd",
                             "traefik.ingress.kubernetes.io/router.priority": "1000",
                         },
                         "hosts": [platform.ingress_url.host],
-                        "paths": ["/federate"]
+                        "paths": ["/federate"],
                     }
                 },
                 "prometheusOperator": {
