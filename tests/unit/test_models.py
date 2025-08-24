@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -12,8 +11,6 @@ from neuro_config_client import (
     Cluster,
     DNSConfig,
     DockerRegistryConfig,
-    PatchOrchestratorConfigRequest,
-    ResourcePoolType,
 )
 from yarl import URL
 
@@ -281,55 +278,6 @@ class TestPlatformConfig:
 
         assert result is None
 
-    def test_create_patch_orchestrator_config_request(
-        self,
-        gcp_cluster: Cluster,
-        gcp_platform_config: PlatformConfig,
-        resource_pool_type_factory: Callable[..., ResourcePoolType],
-    ) -> None:
-        assert gcp_cluster.orchestrator
-
-        gcp_cluster = replace(
-            gcp_cluster,
-            orchestrator=replace(
-                gcp_cluster.orchestrator,
-                resource_pool_types=[
-                    resource_pool_type_factory("n1-highmem-8", "1.2.3.4/16")
-                ],
-            ),
-        )
-        result = gcp_platform_config.create_patch_orchestrator_config_request(
-            gcp_cluster
-        )
-
-        assert result == PatchOrchestratorConfigRequest(
-            job_internal_hostname_template="{job_id}.platform-jobs",
-            resource_pool_types=[
-                resource_pool_type_factory("n1-highmem-8", "192.168.0.0/16")
-            ],
-        )
-
-    def test_create_patch_orchestrator_config_request_none(
-        self,
-        gcp_cluster: Cluster,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        assert gcp_cluster.orchestrator
-
-        gcp_cluster = replace(
-            gcp_cluster,
-            orchestrator=replace(
-                gcp_cluster.orchestrator,
-                job_internal_hostname_template="{job_id}.platform-jobs",
-            ),
-        )
-        gcp_platform_config = replace(gcp_platform_config, kubernetes_tpu_network=None)
-        result = gcp_platform_config.create_patch_orchestrator_config_request(
-            gcp_cluster
-        )
-
-        assert result is None
-
 
 class TestPlatformConfigFactory:
     @pytest.fixture
@@ -339,8 +287,8 @@ class TestPlatformConfigFactory:
     def test_platform_config_with_custom_labels(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
     ) -> None:
         gcp_platform_body["spec"]["kubernetes"]["nodeLabels"] = {
             "job": "job",
@@ -349,7 +297,7 @@ class TestPlatformConfigFactory:
             "preemptible": "preemptible",
         }
 
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result.node_labels == LabelsConfig(
             job="job",
@@ -361,79 +309,79 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result == gcp_platform_config
 
     def test_gcp_platform_config_without_token(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
         del gcp_platform_body["spec"]["token"]
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result == replace(gcp_platform_config, token="")
 
     def test_gcp_platform_config_with_empty_storage_class(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
         gcp_platform_body["spec"]["kubernetes"]["standardStorageClassName"] = ""
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result == replace(gcp_platform_config, standard_storage_class_name=None)
 
     def test_gcp_platform_config_without_storage_class(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
         del gcp_platform_body["spec"]["kubernetes"]["standardStorageClassName"]
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result == replace(gcp_platform_config, standard_storage_class_name=None)
 
     def test_gcp_platform_config_with_ingress_controller_disabled(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
         gcp_platform_body["spec"]["ingressController"] = {"enabled": False}
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result == replace(gcp_platform_config, ingress_controller_install=False)
 
     def test_gcp_platform_config_with_custom_ingress_controller_replicas(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
         gcp_platform_body["spec"]["ingressController"] = {"replicas": 3}
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result == replace(gcp_platform_config, ingress_controller_replicas=3)
 
     def test_gcp_platform_config_with_ingress_ssl_cert(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
         gcp_platform_body["spec"]["ingressController"] = {
@@ -442,7 +390,7 @@ class TestPlatformConfigFactory:
                 "certificateKeyData": "cert-key-data",
             }
         }
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result == replace(
             gcp_platform_config,
@@ -454,8 +402,8 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_with_ingress_service_type_node_port(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
         gcp_platform_body["spec"]["ingressController"] = {
@@ -469,7 +417,7 @@ class TestPlatformConfigFactory:
                 "https": 443,
             },
         }
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result == replace(
             gcp_platform_config,
@@ -483,14 +431,14 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_with_ingress_service_annotations(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
         gcp_platform_body["spec"]["ingressController"] = {
             "serviceAnnotations": {"key": "value"}
         }
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result == replace(
             gcp_platform_config, ingress_service_annotations={"key": "value"}
@@ -499,14 +447,14 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_with_ingress_load_balancer_source_ranges(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
         gcp_platform_config: PlatformConfig,
     ) -> None:
         gcp_platform_body["spec"]["ingressController"] = {
             "loadBalancerSourceRanges": ["0.0.0.0/0"]
         }
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result == replace(
             gcp_platform_config, ingress_load_balancer_source_ranges=["0.0.0.0/0"]
@@ -515,22 +463,22 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_with_docker_config_secret_without_credentials(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
     ) -> None:
-        assert gcp_cluster.credentials
+        assert cluster.credentials
 
-        gcp_cluster = replace(
-            gcp_cluster,
+        cluster = replace(
+            cluster,
             credentials=replace(
-                gcp_cluster.credentials,
+                cluster.credentials,
                 neuro_registry=DockerRegistryConfig(
                     url=URL("https://ghcr.io/neuro-inc")
                 ),
                 docker_hub=None,
             ),
         )
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result.docker_config.create_secret is False
         assert not result.docker_config.secret_name
@@ -539,14 +487,14 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_with_custom_docker_config_secret(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
     ) -> None:
         gcp_platform_body["spec"]["kubernetes"]["dockerConfigSecret"] = {
             "create": False,
             "name": "secret",
         }
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result.docker_config.create_secret is False
         assert result.docker_config.secret_name == "secret"
@@ -555,28 +503,28 @@ class TestPlatformConfigFactory:
     def test_on_prem_platform_config_without_disks_storage_class_name(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
     ) -> None:
         del gcp_platform_body["spec"]["disks"]
 
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result.disks_storage_class_name is None
 
     def test_gcp_platform_config_without_grafana_credentials(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
     ) -> None:
-        assert gcp_cluster.credentials
+        assert cluster.credentials
 
-        gcp_cluster = replace(
-            gcp_cluster,
-            credentials=replace(gcp_cluster.credentials, grafana=None),
+        cluster = replace(
+            cluster,
+            credentials=replace(cluster.credentials, grafana=None),
         )
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result.grafana_username is None
         assert result.grafana_password is None
@@ -584,16 +532,16 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_without_tracing(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
     ) -> None:
-        assert gcp_cluster.credentials
+        assert cluster.credentials
 
-        gcp_cluster = replace(
-            gcp_cluster,
-            credentials=replace(gcp_cluster.credentials, sentry=None),
+        cluster = replace(
+            cluster,
+            credentials=replace(cluster.credentials, sentry=None),
         )
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result.sentry_dsn is None
         assert result.sentry_sample_rate is None
@@ -601,16 +549,16 @@ class TestPlatformConfigFactory:
     def test_gcp_platform_config_without_docker_hub(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         gcp_platform_body: kopf.Body,
-        gcp_cluster: Cluster,
     ) -> None:
-        assert gcp_cluster.credentials
+        assert cluster.credentials
 
-        gcp_cluster = replace(
-            gcp_cluster,
-            credentials=replace(gcp_cluster.credentials, docker_hub=None),
+        cluster = replace(
+            cluster,
+            credentials=replace(cluster.credentials, docker_hub=None),
         )
-        result = factory.create(gcp_platform_body, gcp_cluster)
+        result = factory.create(gcp_platform_body, cluster)
 
         assert result.image_pull_secret_names == ["platform-docker-config"]
         assert result.docker_hub_config is None
@@ -618,29 +566,34 @@ class TestPlatformConfigFactory:
     def test_aws_platform_config(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         aws_platform_body: kopf.Body,
-        aws_cluster: Cluster,
         aws_platform_config: PlatformConfig,
     ) -> None:
-        result = factory.create(aws_platform_body, aws_cluster)
+        result = factory.create(aws_platform_body, cluster)
 
         assert result == aws_platform_config
 
     def test_aws_platform_config_with_roles(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         aws_platform_body: kopf.Body,
-        aws_cluster: Cluster,
         aws_platform_config: PlatformConfig,
     ) -> None:
         aws_platform_body["spec"]["iam"] = {
-            "aws": {"roleArn": "role-arn", "s3RoleArn": "s3-role-arn"}
+            "aws": {
+                "region": "us-west-1",
+                "roleArn": "role-arn",
+                "s3RoleArn": "s3-role-arn",
+            }
         }
-        result = factory.create(aws_platform_body, aws_cluster)
+        result = factory.create(aws_platform_body, cluster)
 
         assert result == replace(
             aws_platform_config,
             service_account_annotations={"eks.amazonaws.com/role-arn": "role-arn"},
+            aws_region="us-west-1",
             aws_role_arn="role-arn",
             aws_s3_role_arn="s3-role-arn",
         )
@@ -648,47 +601,47 @@ class TestPlatformConfigFactory:
     def test_aws_platform_config_without_registry__fails(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         aws_platform_body: kopf.Body,
-        aws_cluster: Cluster,
     ) -> None:
         del aws_platform_body["spec"]["registry"]
 
         with pytest.raises(ValueError, match="Registry spec is empty"):
-            factory.create(aws_platform_body, aws_cluster)
+            factory.create(aws_platform_body, cluster)
 
     def test_azure_platform_config(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         azure_platform_body: kopf.Body,
-        azure_cluster: Cluster,
         azure_platform_config: PlatformConfig,
     ) -> None:
-        result = factory.create(azure_platform_body, azure_cluster)
+        result = factory.create(azure_platform_body, cluster)
 
         assert result == azure_platform_config
 
     def test_azure_platform_config_without_registry__fails(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         azure_platform_body: kopf.Body,
-        azure_cluster: Cluster,
     ) -> None:
         azure_platform_body["spec"]["registry"] = {}
 
         with pytest.raises(ValueError, match="Registry spec is empty"):
-            factory.create(azure_platform_body, azure_cluster)
+            factory.create(azure_platform_body, cluster)
 
     def test_azure_platform_config_with_nfs_storage(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         azure_platform_body: kopf.Body,
-        azure_cluster: Cluster,
         azure_platform_config: PlatformConfig,
     ) -> None:
         azure_platform_body["spec"]["storages"] = [
             {"nfs": {"server": "nfs-server", "path": "/path"}}
         ]
-        result = factory.create(azure_platform_body, azure_cluster)
+        result = factory.create(azure_platform_body, cluster)
 
         assert result == replace(
             azure_platform_config,
@@ -704,36 +657,36 @@ class TestPlatformConfigFactory:
     def test_azure_platform_config_without_blob_storage__fails(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         azure_platform_body: kopf.Body,
-        azure_cluster: Cluster,
     ) -> None:
         azure_platform_body["spec"]["blobStorage"] = {}
 
         with pytest.raises(ValueError, match="Blob storage spec is empty"):
-            factory.create(azure_platform_body, azure_cluster)
+            factory.create(azure_platform_body, cluster)
 
     def test_on_prem_platform_config(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
         on_prem_platform_config: PlatformConfig,
     ) -> None:
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
+        result = factory.create(on_prem_platform_body, cluster)
 
         assert result == on_prem_platform_config
 
     def test_on_prem_platform_config_with_nfs_storage(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
         on_prem_platform_config: PlatformConfig,
     ) -> None:
         on_prem_platform_body["spec"]["storages"] = [
             {"nfs": {"server": "nfs-server", "path": "/path"}}
         ]
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
+        result = factory.create(on_prem_platform_body, cluster)
 
         assert result == replace(
             on_prem_platform_config,
@@ -749,8 +702,8 @@ class TestPlatformConfigFactory:
     def test_on_prem_platform_config_with_smb_storage(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
         on_prem_platform_config: PlatformConfig,
     ) -> None:
         on_prem_platform_body["spec"]["storages"] = [
@@ -763,7 +716,7 @@ class TestPlatformConfigFactory:
                 }
             }
         ]
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
+        result = factory.create(on_prem_platform_body, cluster)
 
         assert result == replace(
             on_prem_platform_config,
@@ -781,34 +734,34 @@ class TestPlatformConfigFactory:
     def test_on_prem_platform_config_without_metrics(
         self,
         config: Config,
+        cluster: Cluster,
         on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
     ) -> None:
         config = replace(config, is_standalone=True)
         del on_prem_platform_body["spec"]["monitoring"]["metrics"]
         factory = PlatformConfigFactory(config)
 
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
+        result = factory.create(on_prem_platform_body, cluster)
 
         assert result.monitoring.metrics_enabled is False
 
     def test_on_prem_platform_config_with_metrics_retention_time(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
     ) -> None:
         on_prem_platform_body["spec"]["monitoring"]["metrics"]["retentionTime"] = "1d"
 
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
+        result = factory.create(on_prem_platform_body, cluster)
 
         assert result.monitoring.metrics_retention_time == "1d"
 
     def test_on_prem_platform_config_with_docker_registry_filesystem(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
     ) -> None:
         on_prem_platform_body["spec"]["registry"] = {
             "docker": {
@@ -818,7 +771,7 @@ class TestPlatformConfigFactory:
             }
         }
 
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
+        result = factory.create(on_prem_platform_body, cluster)
 
         assert result.registry == RegistryConfig(
             provider=RegistryProvider.DOCKER,
@@ -831,14 +784,14 @@ class TestPlatformConfigFactory:
     def test_on_prem_platform_config_with_unprotected_docker_registry(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
     ) -> None:
         on_prem_platform_body["spec"]["registry"] = {
             "docker": {"url": "http://docker-registry"}
         }
 
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
+        result = factory.create(on_prem_platform_body, cluster)
 
         assert result.registry == RegistryConfig(
             provider=RegistryProvider.DOCKER,
@@ -851,8 +804,8 @@ class TestPlatformConfigFactory:
     def test_on_prem_platform_config_with_docker_registry__s3_minio(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
     ) -> None:
         on_prem_platform_body["spec"]["registry"] = {
             "blobStorage": {
@@ -860,7 +813,7 @@ class TestPlatformConfigFactory:
             }
         }
 
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
+        result = factory.create(on_prem_platform_body, cluster)
 
         assert result.registry == RegistryConfig(
             provider=RegistryProvider.DOCKER,
@@ -879,9 +832,8 @@ class TestPlatformConfigFactory:
     def test_on_prem_platform_config_with_minio_buckets(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
-        cluster_name: str,
     ) -> None:
         on_prem_platform_body["spec"]["blobStorage"] = {
             "minio": {
@@ -892,13 +844,13 @@ class TestPlatformConfigFactory:
             }
         }
 
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
+        result = factory.create(on_prem_platform_body, cluster)
 
         assert result.buckets == BucketsConfig(
             provider=BucketsProvider.MINIO,
             minio_install=False,
             minio_url=URL("http://minio"),
-            minio_public_url=URL(f"https://blob.{cluster_name}.org.neu.ro"),
+            minio_public_url=URL(f"https://blob.{cluster.name}.org.neu.ro"),
             minio_region="minio_region",
             minio_access_key="minio_access_key",
             minio_secret_key="minio_secret_key",
@@ -907,8 +859,8 @@ class TestPlatformConfigFactory:
     def test_on_prem_platform_config_with_emc_ecs_buckets(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
     ) -> None:
         on_prem_platform_body["spec"]["blobStorage"] = {
             "emcEcs": {
@@ -920,7 +872,7 @@ class TestPlatformConfigFactory:
             }
         }
 
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
+        result = factory.create(on_prem_platform_body, cluster)
 
         assert result.buckets == BucketsConfig(
             provider=BucketsProvider.EMC_ECS,
@@ -934,8 +886,8 @@ class TestPlatformConfigFactory:
     def test_on_prem_platform_config_with_open_stack_buckets(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
     ) -> None:
         on_prem_platform_body["spec"]["blobStorage"] = {
             "openStack": {
@@ -947,7 +899,7 @@ class TestPlatformConfigFactory:
             }
         }
 
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
+        result = factory.create(on_prem_platform_body, cluster)
 
         assert result.buckets == BucketsConfig(
             provider=BucketsProvider.OPEN_STACK,
@@ -961,40 +913,29 @@ class TestPlatformConfigFactory:
     def test_on_prem_platform_config_with_custom_loki_dns_service(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
     ) -> None:
         on_prem_platform_body["spec"]["monitoring"]["logs"]["loki"] = {
             "dnsService": "custom-dns"
         }
 
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
+        result = factory.create(on_prem_platform_body, cluster)
 
         assert result.monitoring.loki_dns_service == "custom-dns"
 
     def test_on_prem_platform_config_with_custom_loki_endpoint(
         self,
         factory: PlatformConfigFactory,
+        cluster: Cluster,
         on_prem_platform_body: kopf.Body,
-        on_prem_cluster: Cluster,
     ) -> None:
         on_prem_platform_body["spec"]["monitoring"]["logs"]["loki"] = {
             "enabled": False,
             "endpoint": "http://custom-loki-gateway.platform",
         }
 
-        result = factory.create(on_prem_platform_body, on_prem_cluster)
+        result = factory.create(on_prem_platform_body, cluster)
 
         assert not result.monitoring.loki_enabled
         assert result.monitoring.loki_endpoint == "http://custom-loki-gateway.platform"
-
-    def test_vcd_platform_config(
-        self,
-        factory: PlatformConfigFactory,
-        vcd_platform_body: kopf.Body,
-        vcd_cluster: Cluster,
-        vcd_platform_config: PlatformConfig,
-    ) -> None:
-        result = factory.create(vcd_platform_body, vcd_cluster)
-
-        assert result == vcd_platform_config

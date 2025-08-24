@@ -7,7 +7,7 @@ from hashlib import sha256
 from typing import Any
 
 import bcrypt
-from neuro_config_client import ACMEEnvironment, CloudProviderType, IdleJobConfig
+from neuro_config_client import ACMEEnvironment, IdleJobConfig
 from yarl import URL
 
 from .models import (
@@ -65,7 +65,7 @@ class HelmValuesFactory:
                     "name": rpt.name,
                     "idleSize": rpt.idle_size,
                     "cpu": rpt.available_cpu,
-                    "nvidiaGpu": rpt.nvidia_gpu or 0,
+                    "nvidiaGpu": rpt.nvidia_gpu.count if rpt.nvidia_gpu else 0,
                 }
                 for rpt in platform.jobs_resource_pool_types
             ],
@@ -73,20 +73,6 @@ class HelmValuesFactory:
                 "nodePool": platform.node_labels.node_pool,
                 "job": platform.node_labels.job,
                 "gpu": platform.node_labels.accelerator,
-            },
-            "nvidiaGpuDriver": {
-                "enabled": (
-                    platform.cluster_cloud_provider_type != CloudProviderType.ON_PREM
-                ),
-                "isGcp": platform.cluster_cloud_provider_type == CloudProviderType.GCP,
-                "image": {"repository": platform.get_image("k8s-device-plugin")},
-            },
-            "nvidiaDCGMExporter": {
-                "enabled": (
-                    platform.cluster_cloud_provider_type != CloudProviderType.ON_PREM
-                ),
-                "image": {"repository": platform.get_image("dcgm-exporter")},
-                "serviceMonitor": {"enabled": platform.monitoring.metrics_enabled},
             },
             "imagesPrepull": {
                 "refreshInterval": "1h",
@@ -590,19 +576,8 @@ class HelmValuesFactory:
                     },
                 }
             },
+            "ingressClass": {"enabled": True},
         }
-        if platform.kubernetes_version >= "1.19":
-            result["ingressClass"] = {"enabled": True}
-        if platform.cluster_cloud_provider_type == CloudProviderType.AWS:
-            result["service"]["annotations"] = {
-                "service.beta.kubernetes.io/aws-load-balancer-type": "external",
-                "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": (
-                    "instance"
-                ),
-                "service.beta.kubernetes.io/aws-load-balancer-scheme": (
-                    "internet-facing"
-                ),
-            }
         if platform.ingress_load_balancer_source_ranges:
             result["service"]["loadBalancerSourceRanges"] = (
                 platform.ingress_load_balancer_source_ranges
@@ -1095,13 +1070,6 @@ class HelmValuesFactory:
             ),
         ]
         relabelings = [r for r in relabelings if r]
-        if platform.kubernetes_version < "1.17":
-            relabelings.append(
-                self._relabel_reports_label(
-                    "beta.kubernetes.io/instance-type",
-                    "node.kubernetes.io/instance-type",
-                )
-            )
         result: dict[str, Any] = {
             "image": {"repository": platform.get_image("platform-reports")},
             "nodePoolLabels": {
@@ -1457,7 +1425,7 @@ class HelmValuesFactory:
             }
         else:
             raise AssertionError("was unable to construct thanos object store config")
-        if platform.cluster_cloud_provider_type == CloudProviderType.GCP:
+        if platform.buckets.provider == BucketsProvider.GCP:
             result["cloudProvider"] = {
                 "type": "gcp",
                 "region": platform.monitoring.metrics_region,
@@ -1466,12 +1434,12 @@ class HelmValuesFactory:
                     "key": "key.json",
                 },
             }
-        if platform.cluster_cloud_provider_type == CloudProviderType.AWS:
+        if platform.buckets.provider == BucketsProvider.AWS:
             result["cloudProvider"] = {
                 "type": "aws",
                 "region": platform.monitoring.metrics_region,
             }
-        if platform.cluster_cloud_provider_type == CloudProviderType.AZURE:
+        if platform.buckets.provider == BucketsProvider.AZURE:
             result["cloudProvider"] = {
                 "type": "azure",
                 "region": platform.monitoring.metrics_region,
@@ -1540,9 +1508,7 @@ class HelmValuesFactory:
             "platform": {
                 "clusterName": platform.cluster_name,
                 **self._create_platform_url_value("authUrl", platform.auth_url),
-                **self._create_platform_url_value(
-                    "configUrl", platform.config_url, "api/v1"
-                ),
+                **self._create_platform_url_value("configUrl", platform.config_url),
                 **self._create_platform_url_value(
                     "adminUrl", platform.admin_url, "apis/admin/v1"
                 ),
@@ -1589,10 +1555,6 @@ class HelmValuesFactory:
             "priorityClassName": platform.services_priority_class_name,
         }
         result.update(**self._create_tracing_values(platform))
-        if platform.cluster_cloud_provider_type == CloudProviderType.AZURE:
-            result["jobs"]["preemptibleTolerationKey"] = (
-                "kubernetes.azure.com/scalesetpriority"
-            )
         if platform.docker_hub_config:
             result["jobs"]["imagePullSecret"] = platform.docker_hub_config.secret_name
         return result

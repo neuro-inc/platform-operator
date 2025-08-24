@@ -54,22 +54,12 @@ class TestHelmValuesFactory:
             "clusterName": cluster_name,
             "serviceToken": "token",
             "nodePools": [
-                {"name": "n1-highmem-8", "idleSize": 0, "cpu": 1.0, "nvidiaGpu": 1}
+                {"name": "test-node-pool", "idleSize": 0, "cpu": 1.0, "nvidiaGpu": 1}
             ],
             "nodeLabels": {
                 "nodePool": "platform.neuromation.io/nodepool",
                 "job": "platform.neuromation.io/job",
                 "gpu": "platform.neuromation.io/accelerator",
-            },
-            "nvidiaGpuDriver": {
-                "enabled": True,
-                "isGcp": True,
-                "image": {"repository": "ghcr.io/neuro-inc/k8s-device-plugin"},
-            },
-            "nvidiaDCGMExporter": {
-                "enabled": True,
-                "image": {"repository": "ghcr.io/neuro-inc/dcgm-exporter"},
-                "serviceMonitor": {"enabled": True},
             },
             "imagesPrepull": {
                 "refreshInterval": "1h",
@@ -304,15 +294,6 @@ class TestHelmValuesFactory:
 
         assert result["dockerHubConfigSecret"] == {"create": False}
 
-    def test_create_aws_platform_values(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(aws_platform_config)
-
-        assert result["nvidiaGpuDriver"]["enabled"]
-        assert not result["nvidiaGpuDriver"]["isGcp"]
-        assert result["nvidiaDCGMExporter"]["enabled"]
-
     def test_create_aws_platform_values_with_role(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -343,9 +324,6 @@ class TestHelmValuesFactory:
                 },
             }
         ]
-        assert result["nvidiaGpuDriver"]["enabled"]
-        assert not result["nvidiaGpuDriver"]["isGcp"]
-        assert result["nvidiaDCGMExporter"]["enabled"]
 
     def test_create_azure_platform_values_with_nfs_storage(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -377,8 +355,6 @@ class TestHelmValuesFactory:
     ) -> None:
         result = factory.create_platform_values(on_prem_platform_config)
 
-        assert not result["nvidiaGpuDriver"]["enabled"]
-        assert not result["nvidiaDCGMExporter"]["enabled"]
         assert result["storages"] == [
             {
                 "type": "nfs",
@@ -472,15 +448,9 @@ class TestHelmValuesFactory:
             )
         )
 
-        assert result["nvidiaDCGMExporter"]["serviceMonitor"]["enabled"] is False
         assert result["platformReportsEnabled"] is False
         assert "alertmanager" not in result
         assert "platform-reports" not in result
-
-    def test_create_vcd_platform_values(
-        self, vcd_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        factory.create_platform_values(vcd_platform_config)
 
     def test_create_platform_values_without_notifications_url(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -797,6 +767,7 @@ class TestHelmValuesFactory:
                     },
                 },
             },
+            "ingressClass": {"enabled": True},
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
             "priorityClassName": "platform-services",
@@ -813,15 +784,6 @@ class TestHelmValuesFactory:
             },
         }
 
-    def test_create_gcp_traefik_values_with_ingress_class(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_traefik_values(
-            replace(gcp_platform_config, kubernetes_version="1.19.0")
-        )
-
-        assert result["ingressClass"]["enabled"] is True
-
     def test_create_gcp_traefik_values_with_ingress_load_balancer_source_ranges(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -832,42 +794,6 @@ class TestHelmValuesFactory:
         )
 
         assert result["service"]["loadBalancerSourceRanges"] == ["0.0.0.0/0"]
-
-    def test_create_aws_traefik_values(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_traefik_values(aws_platform_config)
-
-        assert result["service"]["annotations"] == {
-            "service.beta.kubernetes.io/aws-load-balancer-type": "external",
-            "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": (
-                "instance"
-            ),
-            "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
-        }
-
-    def test_create_aws_traefik_values_with_service_annotations(
-        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        aws_platform_config = replace(
-            aws_platform_config,
-            ingress_service_annotations={
-                "service.beta.kubernetes.io/aws-load-balancer-scheme": "internal",
-                "service.beta.kubernetes.io/"
-                "aws-load-balancer-manage-backend-security-group-rules": "false",
-            },
-        )
-        result = factory.create_traefik_values(aws_platform_config)
-
-        assert result["service"]["annotations"] == {
-            "service.beta.kubernetes.io/aws-load-balancer-type": "external",
-            "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": (
-                "instance"
-            ),
-            "service.beta.kubernetes.io/aws-load-balancer-scheme": "internal",
-            "service.beta.kubernetes.io/"
-            "aws-load-balancer-manage-backend-security-group-rules": "false",
-        }
 
     def test_create_on_prem_traefik_values_with_custom_ports(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -2172,18 +2098,7 @@ class TestHelmValuesFactory:
                     "priorityClassName": "platform-services",
                 },
                 "kubelet": {"namespace": "platform"},
-                "kubeStateMetrics": {
-                    "serviceMonitor": {
-                        "metricRelabelings": [
-                            {
-                                "sourceLabels": [
-                                    "label_beta_kubernetes_io_instance_type"
-                                ],
-                                "targetLabel": "label_node_kubernetes_io_instance_type",
-                            }
-                        ]
-                    }
-                },
+                "kubeStateMetrics": {"serviceMonitor": {"metricRelabelings": []}},
                 "kube-state-metrics": {
                     "image": {
                         "registry": "ghcr.io",
@@ -2382,10 +2297,6 @@ class TestHelmValuesFactory:
             {
                 "sourceLabels": ["label_other_io_preemptible"],
                 "targetLabel": "label_platform_neuromation_io_preemptible",
-            },
-            {
-                "sourceLabels": ["label_beta_kubernetes_io_instance_type"],
-                "targetLabel": "label_node_kubernetes_io_instance_type",
             },
         ]
 
@@ -2655,7 +2566,7 @@ class TestHelmValuesFactory:
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
-                "configUrl": "https://dev.neu.ro/api/v1",
+                "configUrl": "https://dev.neu.ro",
                 "adminUrl": "https://dev.neu.ro/apis/admin/v1",
                 "apiUrl": "https://dev.neu.ro/api/v1",
                 "eventsUrl": "https://platform-events",
@@ -2739,16 +2650,6 @@ class TestHelmValuesFactory:
                 "claimName": "platform-storage-storage2",
             },
         ]
-
-    def test_create_azure_platform_api_poller_values(
-        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_api_poller_values(azure_platform_config)
-
-        assert (
-            result["jobs"]["preemptibleTolerationKey"]
-            == "kubernetes.azure.com/scalesetpriority"
-        )
 
     def test_create_prometheus_external_cluster_label(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory

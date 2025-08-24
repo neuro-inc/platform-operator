@@ -13,7 +13,6 @@ import aiohttp
 import kopf
 from neuro_config_client import (
     ACMEEnvironment,
-    CloudProviderType,
     Cluster,
     ConfigClient,
     PatchClusterRequest,
@@ -167,7 +166,7 @@ async def _deploy(name: str, body: kopf.Body, logger: kopf.Logger, retry: int) -
         await upgrade_platform_helm_release(platform)
 
     logger.info("Configuring cluster")
-    await configure_cluster(cluster, platform)
+    await configure_cluster(platform)
     logger.info("Cluster configured")
 
     logger.info("Waiting for certificate")
@@ -322,7 +321,7 @@ async def _update(name: str, body: kopf.Body, logger: kopf.Logger) -> None:
             await upgrade_platform_helm_release(platform)
 
         logger.info("Configuring cluster")
-        await configure_cluster(cluster, platform)
+        await configure_cluster(platform)
         logger.info("Cluster configured")
 
         logger.info("Waiting for certificate")
@@ -448,21 +447,6 @@ async def _create_buckets_s3_client(
 
 async def complete_deployment(cluster: Cluster, platform: PlatformConfig) -> None:
     await app.status_manager.complete_deployment(cluster.name)
-    if cluster.cloud_provider and cluster.cloud_provider.storage:
-        storage_names = [s.name for s in cluster.cloud_provider.storage.instances]
-    else:
-        storage_names = []
-    for storage in platform.storages:
-        storage_name = storage.path.lstrip("/") if storage.path else "default"
-        if storage_name not in storage_names:
-            continue
-        await app.config_client.patch_storage(
-            cluster_name=cluster.name,
-            storage_name=storage_name,
-            ready=True,
-            token=platform.token,
-        )
-
     await create_storage_buckets(platform)
 
 
@@ -517,14 +501,14 @@ async def _wait_for_certificate_created(platform: PlatformConfig) -> None:
         await asyncio.sleep(5)
 
 
-async def configure_cluster(cluster: Cluster, platform: PlatformConfig) -> None:
+async def configure_cluster(platform: PlatformConfig) -> None:
     async with app.status_manager.transition(
         platform.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
     ):
-        await _configure_cluster(cluster, platform)
+        await _configure_cluster(platform)
 
 
-async def _configure_cluster(cluster: Cluster, platform: PlatformConfig) -> None:
+async def _configure_cluster(platform: PlatformConfig) -> None:
     ingress_service: dict[str, Any] | None = None
     aws_ingress_lb: dict[str, Any] | None = None
 
@@ -532,21 +516,15 @@ async def _configure_cluster(cluster: Cluster, platform: PlatformConfig) -> None
         ingress_service = await app.kube_client.get_service(
             namespace=platform.namespace, name=platform.ingress_service_name
         )
-        if platform.cluster_cloud_provider_type == CloudProviderType.AWS:
+        if platform.aws_region:
             async with AwsElbClient(region=platform.aws_region) as client:
                 aws_ingress_lb = await client.get_load_balancer_by_dns_name(
                     ingress_service.load_balancer_host
                 )
 
-    orchestrator = platform.create_patch_orchestrator_config_request(cluster)
     dns = platform.create_dns_config(
         ingress_service=ingress_service, aws_ingress_lb=aws_ingress_lb
     )
     await app.config_client.patch_cluster(
-        platform.cluster_name,
-        PatchClusterRequest(
-            orchestrator=orchestrator,
-            dns=dns,
-        ),
-        token=platform.token,
+        platform.cluster_name, PatchClusterRequest(dns=dns), token=platform.token
     )

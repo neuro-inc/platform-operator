@@ -16,12 +16,10 @@ import kopf
 from neuro_config_client import (
     ACMEEnvironment,
     ARecord,
-    CloudProviderType,
     Cluster,
     DNSConfig,
     DockerRegistryConfig,
     IdleJobConfig,
-    PatchOrchestratorConfigRequest,
     ResourcePoolType,
 )
 from yarl import URL
@@ -813,7 +811,6 @@ class PlatformConfig:
     events_url: URL
     token: str
     cluster_name: str
-    cluster_cloud_provider_type: CloudProviderType
     service_account_name: str
     service_account_annotations: dict[str, str]
     image_pull_secret_names: Sequence[str]
@@ -958,34 +955,6 @@ class PlatformConfig:
             return None
         return DNSConfig(name=self.ingress_dns_name, a_records=a_records)
 
-    def create_patch_orchestrator_config_request(
-        self, cluster: Cluster
-    ) -> PatchOrchestratorConfigRequest | None:
-        assert cluster.orchestrator
-        orchestrator = PatchOrchestratorConfigRequest()
-
-        if (
-            self.jobs_internal_host_template
-            != cluster.orchestrator.job_internal_hostname_template
-        ):
-            orchestrator = replace(
-                orchestrator,
-                job_internal_hostname_template=self.jobs_internal_host_template,
-            )
-
-        if self.kubernetes_tpu_network:
-            new_resource_pool_types = self._update_tpu_network(
-                cluster.orchestrator.resource_pool_types, self.kubernetes_tpu_network
-            )
-            if new_resource_pool_types != cluster.orchestrator.resource_pool_types:
-                orchestrator = replace(
-                    orchestrator, resource_pool_types=new_resource_pool_types
-                )
-
-        return (
-            None if orchestrator == PatchOrchestratorConfigRequest() else orchestrator
-        )
-
     @classmethod
     def _update_tpu_network(
         cls,
@@ -1008,12 +977,7 @@ class PlatformConfigFactory:
         self._config = config
 
     def create(self, platform_body: kopf.Body, cluster: Cluster) -> PlatformConfig:
-        assert cluster.cloud_provider
         assert cluster.credentials
-        assert cluster.orchestrator
-        assert cluster.disks
-        assert cluster.dns
-        assert cluster.ingress
         metadata = Metadata(platform_body["metadata"])
         spec = Spec(platform_body["spec"])
         release_name = self._config.helm_release_names.platform
@@ -1047,7 +1011,6 @@ class PlatformConfigFactory:
             events_url=self._config.platform_events_url,
             token=spec.token,
             cluster_name=metadata.name,
-            cluster_cloud_provider_type=cluster.cloud_provider.type,
             namespace=self._config.platform_namespace,
             service_account_name="default",
             service_account_annotations=service_account_annotations,
@@ -1157,7 +1120,6 @@ class PlatformConfigFactory:
 
     def _create_helm_repo(self, cluster: Cluster) -> HelmRepo:
         assert cluster.credentials
-        assert cluster.credentials.neuro_helm
         return HelmRepo(
             url=cluster.credentials.neuro_helm.url,
             username=cluster.credentials.neuro_helm.username or "",
@@ -1168,7 +1130,6 @@ class PlatformConfigFactory:
         self, cluster: Cluster, secret_name: str, create_secret: bool
     ) -> DockerConfig:
         assert cluster.credentials
-        assert cluster.credentials.neuro_registry
         return self._create_docker_config(
             cluster.credentials.neuro_registry, secret_name, create_secret
         )
@@ -1242,8 +1203,6 @@ class PlatformConfigFactory:
             raise ValueError("Blob storage spec is empty")
 
         assert cluster.credentials
-        assert cluster.buckets
-        assert cluster.dns
 
         if BucketsProvider.AWS in spec:
             return BucketsConfig(
