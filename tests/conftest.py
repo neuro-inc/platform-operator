@@ -12,39 +12,34 @@ import kopf
 import pytest
 from neuro_config_client import (
     ACMEEnvironment,
-    AWSCloudProvider,
-    AWSCredentials,
-    AzureCloudProvider,
-    AzureCredentials,
+    AppsConfig,
     BucketsConfig as ClusterBucketsConfig,
-    CloudProviderType,
     Cluster,
     ClusterStatus,
     CredentialsConfig,
     DisksConfig,
     DNSConfig,
     DockerRegistryConfig,
-    GoogleCloudProvider,
+    EnergyConfig,
     GrafanaCredentials,
     HelmRegistryConfig,
     IdleJobConfig,
     IngressConfig,
+    MetricsConfig,
     MinioCredentials,
     MonitoringConfig as ClusterMonitoringConfig,
     NeuroAuthConfig,
-    OnPremCloudProvider,
+    NvidiaGPU,
+    NvidiaGPUPreset,
     OrchestratorConfig,
     RegistryConfig as ClusterRegistryConfig,
     ResourcePoolType,
     ResourcePreset,
     Resources,
+    SecretsConfig,
     SentryCredentials,
     StorageConfig as ClusterStorageConfig,
-    TPUResource,
-    VCDCloudProvider,
-    VCDCredentials,
 )
-from neuro_config_client.entities import KubernetesCredentials
 from yarl import URL
 
 from platform_operator.models import (
@@ -81,7 +76,7 @@ def config() -> Config:
         retries=3,
         backoff=60,
         kube_config=KubeConfig(
-            version="1.16.10",
+            version="1.29.0",
             url=URL("https://kubernetes.default"),
             auth_type=KubeClientAuthType.NONE,
         ),
@@ -110,7 +105,7 @@ def cluster_name() -> str:
 
 @pytest.fixture
 def resource_pool_type_factory() -> Callable[..., ResourcePoolType]:
-    def _factory(name: str, tpu_ipv4_cidr_block: str = "") -> ResourcePoolType:
+    def _factory(name: str = "test-node-pool") -> ResourcePoolType:
         return ResourcePoolType(
             name=name,
             is_preemptible=False,
@@ -120,13 +115,7 @@ def resource_pool_type_factory() -> Callable[..., ResourcePoolType]:
             available_cpu=1,
             memory=2**30,
             available_memory=2**30,
-            nvidia_gpu=1,
-            nvidia_gpu_model="nvidia-tesla-k80",
-            tpu=(
-                TPUResource(ipv4_cidr_block=tpu_ipv4_cidr_block)
-                if tpu_ipv4_cidr_block
-                else None
-            ),
+            nvidia_gpu=NvidiaGPU(count=1, model="nvidia-tesla-k80"),
         )
 
     return _factory
@@ -136,7 +125,8 @@ def resource_pool_type_factory() -> Callable[..., ResourcePoolType]:
 def cluster_factory(
     resource_pool_type_factory: Callable[..., ResourcePoolType],
 ) -> Callable[..., Cluster]:
-    def _factory(name: str, resource_pool_name: str) -> Cluster:
+    def _factory(name: str) -> Cluster:
+        resource_pool_type = resource_pool_type_factory()
         return Cluster(
             name=name,
             status=ClusterStatus.DEPLOYED,
@@ -167,22 +157,21 @@ def cluster_factory(
                     password="password",
                     email=f"{name}@neu.ro",
                 ),
+                minio=MinioCredentials(username="username", password="password"),
             ),
             orchestrator=OrchestratorConfig(
                 job_hostname_template=f"{{job_id}}.jobs.{name}.org.neu.ro",
-                job_internal_hostname_template=None,
                 is_http_ingress_secure=True,
-                resource_pool_types=[resource_pool_type_factory(resource_pool_name)],
+                resource_pool_types=[resource_pool_type],
                 resource_presets=[
                     ResourcePreset(
                         name="gpu-small",
                         credits_per_hour=Decimal(10),
                         cpu=1,
                         memory=2**30,
-                        nvidia_gpu=1,
-                        nvidia_gpu_model="nvidia-tesla-k80",
-                        resource_pool_names=[resource_pool_name],
-                        available_resource_pool_names=[resource_pool_name],
+                        nvidia_gpu=NvidiaGPUPreset(1, model="nvidia-tesla-k80"),
+                        resource_pool_names=[resource_pool_type.name],
+                        available_resource_pool_names=[resource_pool_type.name],
                     )
                 ],
                 job_fallback_hostname="default.jobs-dev.neu.ro",
@@ -222,6 +211,17 @@ def cluster_factory(
                 default_cors_origins=["https://console.apolo.us"],
                 additional_cors_origins=["https://custom.app"],
             ),
+            secrets=SecretsConfig(
+                url=URL(f"https://{name}.org.neu.ro/api/v1/secrets"),
+            ),
+            metrics=MetricsConfig(
+                url=URL(f"https://{name}.org.neu.ro/api/v1/metrics"),
+            ),
+            apps=AppsConfig(
+                apps_hostname_templates=[f"{{app_name}}.apps.{name}.org.neu.ro"],
+                app_proxy_url=URL(f"https://proxy.apps.{name}.org.neu.ro"),
+            ),
+            energy=EnergyConfig(),
             created_at=datetime.now(),
         )
 
@@ -229,123 +229,8 @@ def cluster_factory(
 
 
 @pytest.fixture
-def gcp_cluster(
-    cluster_name: str,
-    cluster_factory: Callable[..., Cluster],
-    resource_pool_type_factory: Callable[..., ResourcePoolType],
-) -> Cluster:
-    cluster = cluster_factory(cluster_name, "n1-highmem-8")
-    assert cluster.orchestrator
-    return replace(
-        cluster,
-        cloud_provider=GoogleCloudProvider(
-            region="us-east-1",
-            zones=["us-east-1a"],
-            project="test-project",
-            credentials={},
-            node_pools=[],
-            storage=None,
-        ),
-        orchestrator=replace(
-            cluster.orchestrator,
-            resource_pool_types=[
-                resource_pool_type_factory("n1-highmem-8", "192.168.0.0/16")
-            ],
-        ),
-    )
-
-
-@pytest.fixture
-def aws_cluster(cluster_name: str, cluster_factory: Callable[..., Cluster]) -> Cluster:
-    cluster = cluster_factory(cluster_name, "p2.xlarge")
-    return replace(
-        cluster,
-        cloud_provider=AWSCloudProvider(
-            region="us-east1",
-            zones=["us-east1-a"],
-            credentials=AWSCredentials(
-                access_key_id="test-access-key", secret_access_key="test-secret-key"
-            ),
-            node_pools=[],
-            storage=None,
-        ),
-    )
-
-
-@pytest.fixture
-def azure_cluster(
-    cluster_name: str, cluster_factory: Callable[..., Cluster]
-) -> Cluster:
-    cluster = cluster_factory(cluster_name, "Standard_NC6")
-    return replace(
-        cluster,
-        cloud_provider=AzureCloudProvider(
-            region="us-east-1",
-            resource_group="test-resource-group",
-            credentials=AzureCredentials(
-                subscription_id="test-subscription-id",
-                tenant_id="test-tenant-id",
-                client_id="test-client-id",
-                client_secret="test-client-secret",
-            ),
-            node_pools=[],
-            storage=None,
-        ),
-    )
-
-
-@pytest.fixture
-def on_prem_cluster(
-    cluster_name: str, cluster_factory: Callable[..., Cluster]
-) -> Cluster:
-    cluster = cluster_factory(cluster_name, "gpu")
-    assert cluster.credentials
-    return replace(
-        cluster,
-        credentials=replace(
-            cluster.credentials,
-            minio=MinioCredentials(username="username", password="password"),
-        ),
-        cloud_provider=OnPremCloudProvider(
-            kubernetes_url=URL("https://kubernetes.svc"),
-            credentials=KubernetesCredentials(
-                ca_data="test-ca-data", token="test-token"
-            ),
-            node_pools=[],
-            storage=None,
-        ),
-    )
-
-
-@pytest.fixture
-def vcd_cluster(cluster_name: str, cluster_factory: Callable[..., Cluster]) -> Cluster:
-    cluster = cluster_factory(cluster_name, "gpu")
-    assert cluster.credentials
-
-    return replace(
-        cluster,
-        credentials=replace(
-            cluster.credentials,
-            minio=MinioCredentials(username="username", password="password"),
-        ),
-        cloud_provider=VCDCloudProvider(
-            _type=CloudProviderType.VCD_SELECTEL,
-            url=URL("https://vcd.url"),
-            organization="test-org",
-            virtual_data_center="test-virtual-data-center",
-            edge_external_network_name="test-edge-network",
-            edge_public_ip="1.2.3.4",
-            edge_name="test-edge",
-            catalog_name="test-catalog",
-            credentials=VCDCredentials(
-                user="test-user",
-                password="test-password",
-                ssh_password="test-ssh-password",
-            ),
-            node_pools=[],
-            storage=None,
-        ),
-    )
+def cluster(cluster_factory: Callable[..., Cluster], cluster_name: str) -> Cluster:
+    return cluster_factory(cluster_name)
 
 
 @pytest.fixture
@@ -391,6 +276,7 @@ def aws_platform_body(cluster_name: str) -> kopf.Body:
         "metadata": {"name": cluster_name},
         "spec": {
             "token": "token",
+            "iam": {"aws": {"region": "us-east-1"}},
             "kubernetes": {
                 "standardStorageClassName": "platform-standard-topology-aware",
             },
@@ -530,11 +416,6 @@ def on_prem_platform_body(cluster_name: str) -> kopf.Body:
 
 
 @pytest.fixture
-def vcd_platform_body(on_prem_platform_body: kopf.Body) -> kopf.Body:
-    return on_prem_platform_body
-
-
-@pytest.fixture
 def gcp_platform_config(
     cluster_name: str,
     resource_pool_type_factory: Callable[..., ResourcePoolType],
@@ -550,7 +431,6 @@ def gcp_platform_config(
         events_url=URL("https://platform-events"),
         token="token",
         cluster_name=cluster_name,
-        cluster_cloud_provider_type=CloudProviderType.GCP,
         namespace="platform",
         service_account_name="default",
         service_account_annotations={},
@@ -560,7 +440,7 @@ def gcp_platform_config(
         ],
         pre_pull_images=["neuromation/base"],
         standard_storage_class_name="platform-standard-topology-aware",
-        kubernetes_version="1.16.10",
+        kubernetes_version="1.29.0",
         kubernetes_tpu_network=IPv4Network("192.168.0.0/16"),
         kubelet_port=10250,
         nvidia_dcgm_port=9400,
@@ -571,9 +451,7 @@ def gcp_platform_config(
             preemptible="platform.neuromation.io/preemptible",
         ),
         jobs_namespace="platform-jobs",
-        jobs_resource_pool_types=[
-            resource_pool_type_factory("n1-highmem-8", "192.168.0.0/16")
-        ],
+        jobs_resource_pool_types=[resource_pool_type_factory()],
         jobs_fallback_host="default.jobs-dev.neu.ro",
         jobs_internal_host_template="{job_id}.platform-jobs",
         jobs_priority_class_name="platform-job",
@@ -675,9 +553,9 @@ def aws_platform_config(
         gcp_platform_config,
         gcp_service_account_key="",
         gcp_service_account_key_base64="",
-        cluster_cloud_provider_type=CloudProviderType.AWS,
+        aws_region="us-east-1",
         kubernetes_tpu_network=None,
-        jobs_resource_pool_types=[resource_pool_type_factory("p2.xlarge")],
+        jobs_resource_pool_types=[resource_pool_type_factory()],
         registry=RegistryConfig(
             provider=RegistryProvider.AWS,
             aws_account_id="platform",
@@ -706,9 +584,8 @@ def azure_platform_config(
         gcp_platform_config,
         gcp_service_account_key="",
         gcp_service_account_key_base64="",
-        cluster_cloud_provider_type=CloudProviderType.AZURE,
         kubernetes_tpu_network=None,
-        jobs_resource_pool_types=[resource_pool_type_factory("Standard_NC6")],
+        jobs_resource_pool_types=[resource_pool_type_factory()],
         storages=[
             StorageConfig(
                 type=StorageType.AZURE_fILE,
@@ -753,9 +630,8 @@ def on_prem_platform_config(
         gcp_service_account_key_base64="",
         ingress_public_ips=[IPv4Address("192.168.0.3")],
         standard_storage_class_name="standard",
-        cluster_cloud_provider_type=CloudProviderType.ON_PREM,
         kubernetes_tpu_network=None,
-        jobs_resource_pool_types=[resource_pool_type_factory("gpu")],
+        jobs_resource_pool_types=[resource_pool_type_factory()],
         disks_storage_class_name="openebs-cstor",
         storages=[
             StorageConfig(
@@ -791,13 +667,4 @@ def on_prem_platform_config(
             metrics_storage_class_name="metrics-standard",
             metrics_storage_size="100Gi",
         ),
-    )
-
-
-@pytest.fixture
-def vcd_platform_config(on_prem_platform_config: PlatformConfig) -> PlatformConfig:
-    return replace(
-        on_prem_platform_config,
-        cluster_cloud_provider_type=CloudProviderType.VCD_SELECTEL,
-        kubernetes_tpu_network=None,
     )
