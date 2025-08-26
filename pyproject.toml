@@ -50,7 +50,7 @@ pytest-asyncio = "1.1.0"
 types-PyYAML = "*"
 types-Werkzeug = "*"
 pytest-cov = "6.2.1"
-ruff = "^0.12.8"
+ruff = "^0.12.10"
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
