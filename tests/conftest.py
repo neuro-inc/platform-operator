@@ -32,6 +32,7 @@ from neuro_config_client import (
     NvidiaGPU,
     NvidiaGPUPreset,
     OrchestratorConfig,
+    PrometheusCredentials,
     RegistryConfig as ClusterRegistryConfig,
     ResourcePoolType,
     ResourcePreset,
@@ -58,6 +59,7 @@ from platform_operator.models import (
     MinioGatewayConfig,
     MonitoringConfig,
     PlatformConfig,
+    PrometheusConfig,
     RegistryConfig,
     RegistryProvider,
     StorageConfig,
@@ -145,6 +147,9 @@ def cluster_factory(
                 ),
                 grafana=GrafanaCredentials(
                     username="admin", password="grafana_password"
+                ),
+                prometheus=PrometheusCredentials(
+                    username="prometheus-admin", password="prometheus-password"
                 ),
                 sentry=SentryCredentials(
                     client_key_id="sentry",
@@ -469,6 +474,7 @@ def gcp_platform_config(
         ingress_registry_url=URL(f"https://registry.{cluster_name}.org.neu.ro"),
         ingress_grafana_url=URL(f"https://grafana.{cluster_name}.org.neu.ro"),
         ingress_metrics_url=URL(f"https://metrics.{cluster_name}.org.neu.ro"),
+        ingress_prometheus_url=URL(f"https://prometheus.{cluster_name}.org.neu.ro"),
         ingress_acme_enabled=True,
         ingress_acme_environment=ACMEEnvironment.PRODUCTION,
         ingress_controller_install=True,
@@ -541,6 +547,14 @@ def gcp_platform_config(
             create_secret=True,
         ),
         services_priority_class_name="platform-services",
+        prometheus=PrometheusConfig(
+            federation=PrometheusConfig.Federation(
+                auth=PrometheusConfig.Federation.Auth(
+                    username="prometheus-admin",
+                    password="prometheus-password",
+                )
+            )
+        ),
     )
 
 

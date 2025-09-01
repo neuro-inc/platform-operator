@@ -799,6 +799,20 @@ class MonitoringConfig:
 
 
 @dataclass(frozen=True)
+class PrometheusConfig:
+    @dataclass(frozen=True)
+    class Federation:
+        @dataclass(frozen=True)
+        class Auth:
+            username: str
+            password: str = field(repr=False)
+
+        auth: Auth
+
+    federation: Federation
+
+
+@dataclass(frozen=True)
 class PlatformConfig:
     release_name: str
     auth_url: URL
@@ -827,6 +841,7 @@ class PlatformConfig:
     ingress_registry_url: URL
     ingress_metrics_url: URL
     ingress_grafana_url: URL
+    ingress_prometheus_url: URL
     ingress_acme_enabled: bool
     ingress_acme_environment: ACMEEnvironment
     ingress_controller_install: bool
@@ -857,6 +872,7 @@ class PlatformConfig:
     monitoring: MonitoringConfig
     helm_repo: HelmRepo
     docker_config: DockerConfig
+    prometheus: PrometheusConfig
     grafana_username: str | None = None
     grafana_password: str | None = None
     sentry_dsn: URL | None = None
@@ -1042,6 +1058,7 @@ class PlatformConfigFactory:
             ingress_registry_url=URL(f"https://registry.{cluster.dns.name}"),
             ingress_grafana_url=URL(f"https://grafana.{cluster.dns.name}"),
             ingress_metrics_url=URL(f"https://metrics.{cluster.dns.name}"),
+            ingress_prometheus_url=URL(f"https://prometheus.{cluster.dns.name}"),
             ingress_acme_enabled=(
                 not spec.ingress_controller.ssl_cert_data
                 or not spec.ingress_controller.ssl_cert_key_data
@@ -1116,6 +1133,7 @@ class PlatformConfigFactory:
             gcp_service_account_key_base64=spec.iam.gcp_service_account_key_base64,
             services_priority_class_name=f"{self._config.platform_namespace}-services",
             minio_gateway=self._create_minio_gateway(spec),
+            prometheus=self._create_prometheus(cluster),
         )
 
     def _create_helm_repo(self, cluster: Cluster) -> HelmRepo:
@@ -1425,3 +1443,15 @@ class PlatformConfigFactory:
         if not value:
             return ""
         return b64decode(value.encode("utf-8")).decode("utf-8")
+
+    def _create_prometheus(self, cluster: Cluster) -> PrometheusConfig:
+        assert cluster.credentials, "cluster credentials required"
+        assert cluster.credentials.prometheus, "cluster Prometheus credentials required"
+        return PrometheusConfig(
+            federation=PrometheusConfig.Federation(
+                auth=PrometheusConfig.Federation.Auth(
+                    username=cluster.credentials.prometheus.username,
+                    password=cluster.credentials.prometheus.password,
+                )
+            )
+        )
