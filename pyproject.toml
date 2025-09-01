@@ -23,7 +23,7 @@ dependencies = [
     "pyyaml==6.0.2",
     "aiobotocore==2.22.0",
     "bcrypt==4.3.0",
-    "neuro-config-client==25.2.0"
+    "neuro-config-client==25.8.7"
 ]
 
 # Remove this section when poetry-dynamic-versioning drops [tool.poetry] support in favor of [project].
@@ -41,7 +41,7 @@ vcs = "git"
 optional = true
 
 [tool.poetry.group.dev.dependencies]
-moto = { version = "5.1.10", extras = ["server"] }
+moto = { version = "5.1.11", extras = ["server"] }
 mypy = "1.17.1"
 pre-commit = "4.3.0"
 pytest = "8.4.1"
@@ -50,6 +50,7 @@ pytest-asyncio = "1.1.0"
 types-PyYAML = "*"
 types-Werkzeug = "*"
 pytest-cov = "6.2.1"
+ruff = "^0.12.11"
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
