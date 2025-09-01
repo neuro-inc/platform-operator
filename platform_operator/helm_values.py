@@ -109,6 +109,7 @@ class HelmValuesFactory:
             },
             "idleJobs": [self._create_idle_job(job) for job in platform.idle_jobs],
             "storages": [self._create_storage_values(s) for s in platform.storages],
+            "federatedPrometheus": self.create_federated_prometheus(platform),
             HelmChartNames.traefik: self.create_traefik_values(platform),
             HelmChartNames.platform_storage: self.create_platform_storage_values(
                 platform
@@ -1145,7 +1146,20 @@ class HelmValuesFactory:
                             "cluster": platform.cluster_name,
                         },
                         "priorityClassName": platform.services_priority_class_name,
-                    }
+                    },
+                    "ingress": {
+                        "enabled": True,
+                        "ingressClassName": "traefik",
+                        "annotations": {
+                            "traefik.ingress.kubernetes.io/router.middlewares": (
+                                f"{platform.namespace}-{platform.release_name}-federated-"
+                                "prometheus-auth@kubernetescrd"
+                            ),
+                            "traefik.ingress.kubernetes.io/router.priority": "1000",
+                        },
+                        "hosts": [platform.ingress_prometheus_url.host],
+                        "paths": ["/federate"],
+                    },
                 },
                 "prometheusOperator": {
                     "image": {
@@ -1463,6 +1477,15 @@ class HelmValuesFactory:
         assert url.is_absolute(), "Absolute url is required"
         assert url.host
         return url.host if url.is_default_port() else f"{url.host}:{url.port}"
+
+    def create_federated_prometheus(self, platform: PlatformConfig) -> dict[str, Any]:
+        auth = platform.prometheus.federation.auth
+        return {
+            "auth": {
+                "username": auth.username,
+                "password": auth.password,
+            }
+        }
 
     def create_platform_disks_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {

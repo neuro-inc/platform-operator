@@ -27,7 +27,7 @@ class TestHelmValuesFactory:
     def factory(self) -> HelmValuesFactory:
         return HelmValuesFactory()
 
-    def test_create_gcp_platform_values_with_nfs_storage(
+    def test_create_gcp_platform_values(
         self,
         cluster_name: str,
         gcp_platform_config: PlatformConfig,
@@ -172,6 +172,12 @@ class TestHelmValuesFactory:
                             ],
                         },
                     ],
+                }
+            },
+            "federatedPrometheus": {
+                "auth": {
+                    "username": "prometheus-admin",
+                    "password": "prometheus-password",
                 }
             },
             "ssl": {"cert": "", "key": ""},
@@ -2038,6 +2044,22 @@ class TestHelmValuesFactory:
                     ],
                 },
                 "prometheus": {
+                    "ingress": {
+                        "enabled": True,
+                        "annotations": {
+                            "traefik.ingress.kubernetes.io/router.middlewares": (
+                                "platform-platform-federated-prometheus-auth@kubernetescrd"
+                            ),
+                            "traefik.ingress.kubernetes.io/router.priority": "1000",
+                        },
+                        "hosts": [
+                            f"prometheus.{gcp_platform_config.cluster_name}.org.neu.ro",
+                        ],
+                        "ingressClassName": "traefik",
+                        "paths": [
+                            "/federate",
+                        ],
+                    },
                     "prometheusSpec": {
                         "image": {
                             "registry": "ghcr.io",
@@ -2068,7 +2090,7 @@ class TestHelmValuesFactory:
                             "cluster": gcp_platform_config.cluster_name,
                         },
                         "priorityClassName": "platform-services",
-                    }
+                    },
                 },
                 "prometheusOperator": {
                     "image": {
