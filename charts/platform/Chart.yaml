@@ -32,7 +32,7 @@ dependencies:
     version: "24.11.1"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-monitoring
-    version: "25.7.2"
+    version: "25.9.3"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-container-runtime
     version: "23.7.0"
@@ -41,14 +41,14 @@ dependencies:
     version: "25.7.4"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-reports
-    version: "25.8.0"
+    version: "25.9.0"
     repository: oci://ghcr.io/neuro-inc/helm-charts
     condition: platformReportsEnabled
   - name: platform-disks
     version: "25.7.2"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-api-poller
-    version: "25.8.0"
+    version: "25.9.1"
     repository: oci://ghcr.io/neuro-inc/helm-charts
   - name: platform-buckets
     version: "25.7.2"
