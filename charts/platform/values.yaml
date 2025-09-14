@@ -118,6 +118,11 @@ ssl:
   cert: ""
   key: ""
 
+federatedPrometheus:
+  auth:
+    username: ""
+    password: ""
+
 traefikEnabled: true
 acmeEnabled: false
 dockerRegistryEnabled: false
