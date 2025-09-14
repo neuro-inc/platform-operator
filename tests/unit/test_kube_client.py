@@ -8,7 +8,6 @@ import pytest
 
 from platform_operator.kube_client import (
     KubeClient,
-    PlatformConditionType,
     PlatformPhase,
     PlatformStatusManager,
 )
@@ -31,13 +30,6 @@ class TestPlatformStatusManager:
         return {
             "phase": "Deployed",
             "retries": 0,
-            "conditions": [
-                {
-                    "type": "PlatformDeployed",
-                    "status": "True",
-                    "lastTransitionTime": "2020-05-24T22:13:39",
-                }
-            ],
         }
 
     async def test_get_pending_phase(
@@ -63,7 +55,7 @@ class TestPlatformStatusManager:
         kube_client.update_platform_status.assert_awaited_with(
             namespace="default",
             name="neuro",
-            payload={"phase": "Deploying", "retries": 0, "conditions": []},
+            payload={"phase": "Deploying", "retries": 0},
         )
 
     async def test_start_existing_deployment(
@@ -82,99 +74,6 @@ class TestPlatformStatusManager:
             namespace="default",
             name="neuro",
             payload=status,
-        )
-
-    async def test_transition(
-        self,
-        kube_client: mock.AsyncMock,
-        manager: PlatformStatusManager,
-    ) -> None:
-        kube_client.get_platform_status.return_value = None
-
-        await manager.start_deployment("neuro", retry=0)
-
-        kube_client.update_platform_status.assert_awaited_with(
-            namespace="default",
-            name="neuro",
-            payload={"phase": "Deploying", "retries": 0, "conditions": []},
-        )
-
-        async with manager.transition(
-            "neuro", PlatformConditionType.CLUSTER_CONFIGURED
-        ):
-            kube_client.update_platform_status.assert_awaited_with(
-                namespace="default",
-                name="neuro",
-                payload={
-                    "phase": "Deploying",
-                    "retries": 0,
-                    "conditions": [
-                        {
-                            "type": "ClusterConfigured",
-                            "status": "False",
-                            "lastTransitionTime": mock.ANY,
-                        }
-                    ],
-                },
-            )
-
-        kube_client.update_platform_status.assert_awaited_with(
-            namespace="default",
-            name="neuro",
-            payload={
-                "phase": "Deploying",
-                "retries": 0,
-                "conditions": [
-                    {
-                        "type": "ClusterConfigured",
-                        "status": "True",
-                        "lastTransitionTime": mock.ANY,
-                    }
-                ],
-            },
-        )
-
-        async with manager.transition("neuro", PlatformConditionType.PLATFORM_DEPLOYED):
-            kube_client.update_platform_status.assert_awaited_with(
-                namespace="default",
-                name="neuro",
-                payload={
-                    "phase": "Deploying",
-                    "retries": 0,
-                    "conditions": [
-                        {
-                            "type": "PlatformDeployed",
-                            "status": "False",
-                            "lastTransitionTime": mock.ANY,
-                        },
-                        {
-                            "type": "ClusterConfigured",
-                            "status": "True",
-                            "lastTransitionTime": mock.ANY,
-                        },
-                    ],
-                },
-            )
-
-        kube_client.update_platform_status.assert_awaited_with(
-            namespace="default",
-            name="neuro",
-            payload={
-                "phase": "Deploying",
-                "retries": 0,
-                "conditions": [
-                    {
-                        "type": "PlatformDeployed",
-                        "status": "True",
-                        "lastTransitionTime": mock.ANY,
-                    },
-                    {
-                        "type": "ClusterConfigured",
-                        "status": "True",
-                        "lastTransitionTime": mock.ANY,
-                    },
-                ],
-            },
         )
 
     async def test_complete_deployment(

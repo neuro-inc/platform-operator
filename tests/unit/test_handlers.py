@@ -19,7 +19,6 @@ from platform_operator.helm_client import HelmClient, Release, ReleaseStatus
 from platform_operator.helm_values import HelmValuesFactory
 from platform_operator.kube_client import (
     KubeClient,
-    PlatformConditionType,
     PlatformPhase,
     PlatformStatusManager,
     Service,
@@ -43,7 +42,6 @@ def setup_app(
     status_manager: PlatformStatusManager,
     config_client: ConfigClient,
     helm_client: HelmClient,
-    raw_client: aiohttp.ClientSession,
     helm_values_factory: HelmValuesFactory,
 ) -> Iterator[None]:
     with mock.patch.object(Config, "load_from_env") as method:
@@ -56,7 +54,6 @@ def setup_app(
             app.status_manager = status_manager
             app.config_client = config_client
             app.helm_client = helm_client
-            app.raw_client = raw_client
             app.platform_config_factory = PlatformConfigFactory(config)
             app.helm_values_factory = helm_values_factory
             yield
@@ -356,7 +353,6 @@ async def test_deploy(
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    raw_client: mock.AsyncMock,
     is_platform_deploy_failed: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
@@ -406,21 +402,10 @@ async def test_deploy(
         password=gcp_platform_config.helm_repo.password,
     )
 
-    raw_client.get.assert_called()
-
     config_client.patch_cluster.assert_awaited_once()
 
     status_manager.start_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name, 0
-    )
-    status_manager.transition.assert_any_call(
-        gcp_platform_config.cluster_name, PlatformConditionType.PLATFORM_DEPLOYED
-    )
-    status_manager.transition.assert_any_call(
-        gcp_platform_config.cluster_name, PlatformConditionType.CERTIFICATE_CREATED
-    )
-    status_manager.transition.assert_any_call(
-        gcp_platform_config.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
     )
     status_manager.complete_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
@@ -434,7 +419,6 @@ async def test_deploy_with_ingress_controller_disabled(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    raw_client: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     cluster: Cluster,
@@ -473,20 +457,11 @@ async def test_deploy_with_ingress_controller_disabled(
         password=gcp_platform_config.helm_repo.password,
     )
 
-    raw_client.get.assert_not_called()
-
     config_client.patch_cluster.assert_awaited_once()
 
     status_manager.start_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name, 0
     )
-    status_manager.transition.assert_any_call(
-        gcp_platform_config.cluster_name, PlatformConditionType.PLATFORM_DEPLOYED
-    )
-    status_manager.transition.assert_any_call(
-        gcp_platform_config.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
-    )
-    assert status_manager.transition.call_count == 2
     status_manager.complete_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
     )
@@ -499,7 +474,6 @@ async def test_deploy_all_charts_deployed(
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    raw_client: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     cluster: Cluster,
@@ -527,8 +501,6 @@ async def test_deploy_all_charts_deployed(
 
     helm_client.upgrade.assert_not_awaited()
 
-    raw_client.get.assert_called()
-
     config_client.patch_cluster.assert_awaited_once()
 
     status_manager.start_deployment.assert_awaited_once_with(
@@ -536,12 +508,6 @@ async def test_deploy_all_charts_deployed(
     )
     status_manager.complete_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
-    )
-    status_manager.transition.assert_any_call(
-        gcp_platform_config.cluster_name, PlatformConditionType.CERTIFICATE_CREATED
-    )
-    status_manager.transition.assert_any_call(
-        gcp_platform_config.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
     )
     aws_s3_client.create_bucket.assert_awaited_once()
 
@@ -600,7 +566,6 @@ async def test_deploy_no_changes(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    raw_client: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
     cluster: Cluster,
@@ -626,8 +591,6 @@ async def test_deploy_no_changes(
     )
 
     helm_client.upgrade.assert_not_awaited()
-
-    raw_client.get.assert_not_called()
 
     config_client.patch_cluster.assert_not_awaited()
 
@@ -670,7 +633,6 @@ async def test_delete(
     status_manager: mock.AsyncMock,
     helm_client: mock.AsyncMock,
     config_client: mock.AsyncMock,
-    kube_client: mock.AsyncMock,
     logger: logging.Logger,
     cluster: Cluster,
     gcp_platform_body: kopf.Body,
@@ -688,15 +650,6 @@ async def test_delete(
     )
 
     helm_client.delete.assert_awaited_once_with("platform", wait=True)
-
-    kube_client.wait_till_pods_deleted.assert_has_awaits(
-        [
-            mock.call(namespace="platform-jobs"),
-            mock.call(
-                namespace="platform", label_selector={"service": "platform-storage"}
-            ),
-        ]
-    )
 
     status_manager.start_deletion.assert_awaited_once_with(
         gcp_platform_config.cluster_name
@@ -749,12 +702,11 @@ async def test_delete_with_invalid_configuration(
     helm_client.add_repo.assert_not_awaited()
 
 
-async def test_watch_config(
+async def test_watch(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     kube_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    raw_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
     is_platform_deploy_failed: mock.AsyncMock,
     is_platform_deploy_required: mock.AsyncMock,
@@ -763,12 +715,12 @@ async def test_watch_config(
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
-    from platform_operator.handlers import watch_config
+    from platform_operator.handlers import watch
 
     is_platform_deploy_required.return_value = True
     config_client.get_cluster.return_value = cluster
 
-    await watch_config(  # type: ignore
+    await watch(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -808,32 +760,20 @@ async def test_watch_config(
         ]
     )
 
-    raw_client.get.assert_called()
-
     config_client.patch_cluster.assert_awaited_once()
 
     status_manager.start_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
-    )
-    status_manager.transition.assert_any_call(
-        gcp_platform_config.cluster_name, PlatformConditionType.PLATFORM_DEPLOYED
-    )
-    status_manager.transition.assert_any_call(
-        gcp_platform_config.cluster_name, PlatformConditionType.CERTIFICATE_CREATED
-    )
-    status_manager.transition.assert_any_call(
-        gcp_platform_config.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
     )
     status_manager.complete_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
     )
 
 
-async def test_watch_config_all_charts_deployed(
+async def test_watch_all_charts_deployed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
-    raw_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
     is_platform_deploy_required: mock.AsyncMock,
     logger: logging.Logger,
@@ -841,12 +781,12 @@ async def test_watch_config_all_charts_deployed(
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
-    from platform_operator.handlers import watch_config
+    from platform_operator.handlers import watch
 
     is_platform_deploy_required.return_value = False
     config_client.get_cluster.return_value = cluster
 
-    await watch_config(  # type: ignore
+    await watch(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -860,8 +800,6 @@ async def test_watch_config_all_charts_deployed(
 
     helm_client.upgrade.assert_not_awaited()
 
-    raw_client.get.assert_called()
-
     config_client.patch_cluster.assert_awaited_once()
 
     status_manager.start_deployment.assert_awaited_once_with(
@@ -870,15 +808,9 @@ async def test_watch_config_all_charts_deployed(
     status_manager.complete_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
     )
-    status_manager.transition.assert_any_call(
-        gcp_platform_config.cluster_name, PlatformConditionType.CERTIFICATE_CREATED
-    )
-    status_manager.transition.assert_any_call(
-        gcp_platform_config.cluster_name, PlatformConditionType.CLUSTER_CONFIGURED
-    )
 
 
-async def test_watch_config_no_changes(
+async def test_watch_no_changes(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
@@ -888,13 +820,13 @@ async def test_watch_config_no_changes(
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
-    from platform_operator.handlers import watch_config
+    from platform_operator.handlers import watch
 
     status_manager.get_phase.return_value = PlatformPhase.DEPLOYED
     is_platform_deploy_required.return_value = False
     config_client.get_cluster.return_value = cluster
 
-    await watch_config(  # type: ignore
+    await watch(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -913,7 +845,7 @@ async def test_watch_config_no_changes(
     "platform_phase",
     [PlatformPhase.PENDING, PlatformPhase.DEPLOYING, PlatformPhase.DELETING],
 )
-async def test_watch_config_platform_deploying_deleting(
+async def test_watch_platform_deploying_deleting(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -924,12 +856,12 @@ async def test_watch_config_platform_deploying_deleting(
     gcp_platform_config: PlatformConfig,
     platform_phase: PlatformPhase,
 ) -> None:
-    from platform_operator.handlers import watch_config
+    from platform_operator.handlers import watch
 
     status_manager.get_phase.return_value = platform_phase
     config_client.get_cluster.return_value = cluster
 
-    await watch_config(  # type: ignore
+    await watch(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -940,7 +872,7 @@ async def test_watch_config_platform_deploying_deleting(
     status_manager.start_deployment.assert_not_awaited()
 
 
-async def test_watch_config_platform_helm_release_failed(
+async def test_watch_platform_helm_release_failed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     stopped: kopf.DaemonStopped,
@@ -950,13 +882,13 @@ async def test_watch_config_platform_helm_release_failed(
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
-    from platform_operator.handlers import watch_config
+    from platform_operator.handlers import watch
 
     status_manager.get_phase.return_value = PlatformPhase.DEPLOYED
     is_platform_deploy_failed.return_value = True
     config_client.get_cluster.return_value = cluster
 
-    await watch_config(  # type: ignore
+    await watch(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -971,18 +903,18 @@ async def test_watch_config_platform_helm_release_failed(
     status_manager.start_deployment.assert_not_awaited()
 
 
-async def test_watch_config_ignores_error(
+async def test_watch_ignores_error(
     config_client: mock.AsyncMock,
     logger: logging.Logger,
     stopped: kopf.DaemonStopped,
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
-    from platform_operator.handlers import watch_config
+    from platform_operator.handlers import watch
 
     config_client.get_cluster.side_effect = Exception
 
-    await watch_config(  # type: ignore
+    await watch(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -990,7 +922,7 @@ async def test_watch_config_ignores_error(
     )
 
 
-async def test_watch_config_update_failed(
+async def test_watch_update_failed(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
     helm_client: mock.AsyncMock,
@@ -1001,13 +933,13 @@ async def test_watch_config_update_failed(
     gcp_platform_body: kopf.Body,
     gcp_platform_config: PlatformConfig,
 ) -> None:
-    from platform_operator.handlers import watch_config
+    from platform_operator.handlers import watch
 
     config_client.get_cluster.return_value = cluster
     is_platform_deploy_required.return_value = True
     helm_client.upgrade.side_effect = Exception
 
-    await watch_config(  # type: ignore
+    await watch(  # type: ignore
         name=gcp_platform_config.cluster_name,
         body=gcp_platform_body,
         logger=logger,
@@ -1017,37 +949,3 @@ async def test_watch_config_update_failed(
     status_manager.fail_deployment.assert_awaited_once_with(
         gcp_platform_config.cluster_name
     )
-
-
-async def test_wait_for_certificate_created_without_ingress_controller(
-    raw_client: mock.AsyncMock,
-    gcp_platform_config: PlatformConfig,
-) -> None:
-    from platform_operator.handlers import wait_for_certificate_created
-
-    await wait_for_certificate_created(
-        replace(
-            gcp_platform_config,
-            ingress_controller_install=False,
-        )
-    )
-
-    raw_client.get.assert_not_called()
-
-
-async def test_wait_for_certificate_created_with_manual_certs(
-    raw_client: mock.AsyncMock,
-    gcp_platform_config: PlatformConfig,
-) -> None:
-    from platform_operator.handlers import wait_for_certificate_created
-
-    await wait_for_certificate_created(
-        replace(
-            gcp_platform_config,
-            ingress_acme_enabled=False,
-            ingress_ssl_cert_data="ssl-cert",
-            ingress_ssl_cert_key_data="ssl-cert-key",
-        )
-    )
-
-    raw_client.get.assert_not_called()

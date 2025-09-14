@@ -36,25 +36,9 @@ spec:
             properties:
               phase:
                 type: string
+                default: Pending
               retries:
                 type: integer
-              conditions:
-                type: array
-                items:
-                  type: object
-                  required: [type, status, lastTransitionTime]
-                  properties:
-                    type:
-                      type: string
-                    status:
-                      type: string
-                      enum:
-                      - "True"
-                      - "False"
-                      - "Unknown"
-                    lastTransitionTime:
-                      type: string
-                      format: date-time
           spec:
             type: object
             required: [storages, monitoring]

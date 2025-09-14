@@ -36,20 +36,6 @@ class PlatformPhase(str, Enum):
     FAILED = "Failed"
 
 
-class PlatformConditionType(str, Enum):
-    PLATFORM_DEPLOYED = "PlatformDeployed"
-    CERTIFICATE_CREATED = "CertificateCreated"
-    CLUSTER_CONFIGURED = "ClusterConfigured"
-
-
-class PlatformConditionStatus(str, Enum):
-    TRUE = "True"
-    FALSE = "False"
-    # The state is unknown, platform deployment might have succeeded
-    # or failed but we don't know because timeout have occurred
-    UNKNOWN = "Unknown"
-
-
 class Endpoints:
     def __init__(self, url: URL) -> None:
         self._url = url
@@ -518,10 +504,6 @@ class PlatformStatus(dict[str, Any]):
     def retries(self, value: int) -> None:
         self["retries"] = value
 
-    @property
-    def conditions(self) -> dict[str, PlatformCondition]:
-        return self["conditions"]
-
 
 class PlatformStatusManager:
     def __init__(self, kube_client: KubeClient, namespace: str) -> None:
@@ -542,7 +524,6 @@ class PlatformStatusManager:
                 {
                     "phase": PlatformPhase.PENDING.value,
                     "retries": 0,
-                    "conditions": {},
                 }
             )
 
@@ -550,7 +531,6 @@ class PlatformStatusManager:
         status = {
             "phase": payload["phase"],
             "retries": payload["retries"],
-            "conditions": self._deserialize_conditions(payload["conditions"]),
         }
         return PlatformStatus(status)
 
@@ -575,19 +555,7 @@ class PlatformStatusManager:
         return {
             "phase": status.phase,
             "retries": status.retries,
-            "conditions": self._serialize_conditions(status.conditions),
         }
-
-    def _serialize_conditions(
-        self, conditions: dict[str, PlatformCondition]
-    ) -> list[PlatformCondition]:
-        result: list[PlatformCondition] = []
-
-        for type in PlatformConditionType:
-            if type in conditions:
-                result.append(conditions[type])
-
-        return result
 
     def _now(self) -> str:
         return datetime.now(UTC).replace(microsecond=0).isoformat()
@@ -612,33 +580,6 @@ class PlatformStatusManager:
         await self._load(name)
         self._status[name].phase = PlatformPhase.DELETING.value
         await self._save(name)
-
-    @asynccontextmanager
-    async def transition(
-        self, name: str, type: PlatformConditionType
-    ) -> AsyncIterator[None]:
-        try:
-            logger.info("Started transition to %s condition", type.value)
-            condition = PlatformCondition({})
-            condition.type = type
-            condition.status = PlatformConditionStatus.FALSE
-            condition.last_transition_time = self._now()
-            self._status[name].conditions[type] = condition
-            await self._save(name)
-            yield
-            condition.status = PlatformConditionStatus.TRUE
-            logger.info("Transition to %s succeeded", type.value)
-        except asyncio.CancelledError:
-            condition.status = PlatformConditionStatus.UNKNOWN
-            logger.info("Transition to %s was cancelled", type.value)
-            raise
-        except Exception:
-            condition.status = PlatformConditionStatus.FALSE
-            logger.exception("Transition to %s failed", type.value)
-            raise
-        finally:
-            condition.last_transition_time = self._now()
-            await self._save(name)
 
     async def get_phase(self, name: str) -> PlatformPhase:
         await self._load(name)
