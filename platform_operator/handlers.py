@@ -73,7 +73,10 @@ async def startup(settings: kopf.OperatorSettings, **_: Any) -> None:
         ConfigClient(config.platform_config_url)
     )
 
-    settings.posting.level = logging.getLevelName(config.log_level)
+    settings.posting.level = getattr(logging, config.log_level)
+    settings.posting.reporting_component = "apolo"
+    settings.posting.reporting_instance = "apolo"
+    settings.posting.event_name_prefix = "apolo-event-"
     settings.persistence.progress_storage = kopf.AnnotationsProgressStorage()
     settings.persistence.diffbase_storage = kopf.AnnotationsDiffBaseStorage()
 

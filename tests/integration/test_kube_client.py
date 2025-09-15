@@ -81,7 +81,6 @@ class TestKubeClientTokenUpdater:
     ) -> AsyncIterator[KubeClient]:
         async with KubeClient(
             config=KubeConfig(
-                version="1.25",
                 url=URL(kube_server),
                 auth_type=KubeClientAuthType.TOKEN,
                 auth_token_path=kube_auth_token_path,
@@ -91,7 +90,6 @@ class TestKubeClientTokenUpdater:
 
     async def test_auth_token_exp_ts_value_error(self, kube_server: str) -> None:
         kube_config = KubeConfig(
-            version="1.25",
             url=URL(kube_server),
             auth_type=KubeClientAuthType.TOKEN,
             auth_token_path=None,

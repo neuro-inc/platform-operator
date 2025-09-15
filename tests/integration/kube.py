@@ -66,7 +66,6 @@ def kube_config(
     _cert_authority_path: Path | None,
 ) -> KubeConfig:
     return KubeConfig(
-        version="1.14.10",
         url=URL(_kube_config_cluster_payload["server"]),
         auth_type=KubeClientAuthType.CERTIFICATE,
         cert_authority_path=_cert_authority_path,

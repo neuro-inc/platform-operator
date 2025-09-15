@@ -37,7 +37,6 @@ from platform_operator.models import (
 class TestConfig:
     def test_config(self) -> None:
         env = {
-            "NP_NODE_NAME": "minikube",
             "NP_PLATFORM_AUTH_URL": "http://platformauthapi:8080",
             "NP_PLATFORM_INGRESS_AUTH_URL": "http://platformingressauth:8080",
             "NP_PLATFORM_CONFIG_URL": "http://platformconfig:8080",
@@ -50,7 +49,6 @@ class TestConfig:
             "NP_CONTROLLER_LOG_LEVEL": "debug",
             "NP_CONTROLLER_RETRIES": "5",
             "NP_CONTROLLER_BACKOFF": "120",
-            "NP_KUBE_VERSION": "v1.14.10",
             "NP_KUBE_URL": "https://kubernetes.default",
             "NP_KUBE_CERT_AUTHORITY_PATH": "/ca.crt",
             "NP_KUBE_CERT_AUTHORITY_DATA_PEM": "cert-authority-data",
@@ -72,12 +70,10 @@ class TestConfig:
         }
 
         assert Config.load_from_env(env) == Config(
-            node_name="minikube",
             log_level="DEBUG",
             retries=5,
             backoff=120,
             kube_config=KubeConfig(
-                version="1.14.10",
                 url=URL("https://kubernetes.default"),
                 auth_type=KubeClientAuthType.CERTIFICATE,
                 cert_authority_path=Path("/ca.crt"),
@@ -107,7 +103,6 @@ class TestConfig:
 
     def test_config_defaults(self) -> None:
         env = {
-            "NP_NODE_NAME": "minikube",
             "NP_PLATFORM_AUTH_URL": "http://platformauthapi:8080",
             "NP_PLATFORM_INGRESS_AUTH_URL": "http://platformingressauth:8080",
             "NP_PLATFORM_CONFIG_URL": "http://platformconfig:8080",
@@ -116,7 +111,6 @@ class TestConfig:
             "NP_PLATFORM_APPS_URL": "http://platformapps:8080",
             "NP_PLATFORM_NOTIFICATIONS_URL": "http://platformnotifications:8080",
             "NP_PLATFORM_EVENTS_URL": "http://platform-events:8080",
-            "NP_KUBE_VERSION": "v1.14.10",
             "NP_KUBE_URL": "https://kubernetes.default",
             "NP_KUBE_AUTH_TYPE": "none",
             "NP_LABEL_JOB": "platform.neuromation.io/job",
@@ -130,12 +124,10 @@ class TestConfig:
             "NP_ACME_CA_STAGING_PATH": "/ca.pem",
         }
         assert Config.load_from_env(env) == Config(
-            node_name="minikube",
             log_level="INFO",
             retries=3,
             backoff=60,
             kube_config=KubeConfig(
-                version="1.14.10",
                 url=URL("https://kubernetes.default"),
                 auth_type=KubeClientAuthType.NONE,
                 conn_timeout_s=300,

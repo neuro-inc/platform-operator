@@ -73,12 +73,10 @@ pytest_plugins = ["tests.integration.kube", "tests.integration.aws"]
 @pytest.fixture
 def config() -> Config:
     return Config(
-        node_name="minikube",
         log_level="DEBUG",
         retries=3,
         backoff=60,
         kube_config=KubeConfig(
-            version="1.29.0",
             url=URL("https://kubernetes.default"),
             auth_type=KubeClientAuthType.NONE,
         ),
@@ -445,7 +443,6 @@ def gcp_platform_config(
         ],
         pre_pull_images=["neuromation/base"],
         standard_storage_class_name="platform-standard-topology-aware",
-        kubernetes_version="1.29.0",
         kubernetes_tpu_network=IPv4Network("192.168.0.0/16"),
         kubelet_port=10250,
         nvidia_dcgm_port=9400,
