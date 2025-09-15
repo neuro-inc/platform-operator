@@ -34,20 +34,14 @@ spec:
         - --namespace={{ .Release.Namespace }}
         - --liveness=http://0.0.0.0:8080/healthz
         - --verbose
-        - --log-format=full
+        - --log-format=json
         env:
-        - name: NP_NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
         - name: NP_CONTROLLER_LOG_LEVEL
           value: {{ .Values.logLevel | default "INFO" }}
         - name: NP_CONTROLLER_RETRIES
           value: {{ .Values.controller.retries | quote }}
         - name: NP_CONTROLLER_BACKOFF
           value: {{ .Values.controller.backoff | quote }}
-        - name: NP_KUBE_VERSION
-          value: {{ .Capabilities.KubeVersion.Version | toString | quote }}
         - name: NP_KUBE_URL
           value: https://kubernetes.default.svc
         - name: NP_KUBE_CERT_AUTHORITY_PATH

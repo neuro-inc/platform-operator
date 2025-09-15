@@ -39,7 +39,6 @@ class KubeClientAuthType(str, Enum):
 
 @dataclass(frozen=True)
 class KubeConfig:
-    version: str
     url: URL
     auth_type: KubeClientAuthType = KubeClientAuthType.NONE
     cert_authority_path: Path | None = None
@@ -54,7 +53,6 @@ class KubeConfig:
     def load_from_env(cls, env: Mapping[str, str] | None = None) -> KubeConfig:
         env = env or os.environ
         return cls(
-            version=env["NP_KUBE_VERSION"].lstrip("v"),
             url=URL(env["NP_KUBE_URL"]),
             auth_type=KubeClientAuthType(env["NP_KUBE_AUTH_TYPE"]),
             cert_authority_path=cls._convert_to_path(
@@ -139,7 +137,6 @@ class HelmChartVersions:
 
 @dataclass(frozen=True)
 class Config:
-    node_name: str
     log_level: str
     retries: int
     backoff: int
@@ -164,7 +161,6 @@ class Config:
     def load_from_env(cls, env: Mapping[str, str] | None = None) -> Config:
         env = env or os.environ
         return cls(
-            node_name=env["NP_NODE_NAME"],
             log_level=(env.get("NP_CONTROLLER_LOG_LEVEL") or "INFO").upper(),
             retries=int(env.get("NP_CONTROLLER_RETRIES") or "3"),
             backoff=int(env.get("NP_CONTROLLER_BACKOFF") or "60"),
@@ -830,7 +826,6 @@ class PlatformConfig:
     image_pull_secret_names: Sequence[str]
     pre_pull_images: Sequence[str]
     standard_storage_class_name: str | None
-    kubernetes_version: str
     kubernetes_tpu_network: IPv4Network | None
     node_labels: LabelsConfig
     kubelet_port: int
@@ -1037,7 +1032,6 @@ class PlatformConfigFactory:
             standard_storage_class_name=(
                 spec.kubernetes.standard_storage_class_name or None
             ),
-            kubernetes_version=self._config.kube_config.version,
             kubernetes_tpu_network=spec.kubernetes.tpu_network,
             kubelet_port=int(spec.kubernetes.kubelet_port or 10250),
             nvidia_dcgm_port=9400,

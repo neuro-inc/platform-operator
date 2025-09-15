@@ -2275,9 +2275,7 @@ class TestHelmValuesFactory:
     def test_create_gcp_platform_reports_values_with_k8s_label_relabelings(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_reports_values(
-            replace(gcp_platform_config, kubernetes_version="1.17.3")
-        )
+        result = factory.create_platform_reports_values(gcp_platform_config)
 
         assert (
             result["kube-prometheus-stack"]["kubeStateMetrics"]["serviceMonitor"][
