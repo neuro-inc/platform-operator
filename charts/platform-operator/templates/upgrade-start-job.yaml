@@ -13,6 +13,15 @@ spec:
       serviceAccountName: {{ include "platformOperator.fullname" . }}-upgrade
       priorityClassName: {{ .Release.Namespace }}-operator-hook
       restartPolicy: Never
+      {{- if .Values.securityContext.enabled }}
+      securityContext:
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+        fsGroup: {{ .Values.securityContext.fsGroup }}
+        allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+        fsGroupChangePolicy: {{ .Values.securityContext.fsGroupChangePolicy}}
+      {{- end }}
       containers:
       - name: start-upgrade
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
