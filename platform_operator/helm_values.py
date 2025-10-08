@@ -1305,12 +1305,48 @@ class HelmValuesFactory:
                             "storageClassName": platform.standard_storage_class_name,
                         },
                     },
+                    "securityContext": {
+                        "runAsUser": 1001,
+                        "runAsGroup": 1001,
+                        "fsGroup": 1001,
+                        "runAsNonRoot": True,
+                        "allowPrivilegeEscalation": False,
+                        "fsGroupChangePolicy": "OnRootMismatch",
+                    },
+                },
+                "query": {
+                    "securityContext": {
+                        "runAsUser": 1001,
+                        "runAsGroup": 1001,
+                        "fsGroup": 1001,
+                        "runAsNonRoot": True,
+                        "allowPrivilegeEscalation": False,
+                        "fsGroupChangePolicy": "OnRootMismatch",
+                    },
                 },
                 "compact": {
                     "persistentVolumeClaim": {
                         "spec": {
                             "storageClassName": platform.standard_storage_class_name,
                         },
+                    },
+                    "securityContext": {
+                        "runAsUser": 1001,
+                        "runAsGroup": 1001,
+                        "fsGroup": 1001,
+                        "runAsNonRoot": True,
+                        "allowPrivilegeEscalation": False,
+                        "fsGroupChangePolicy": "OnRootMismatch",
+                    },
+                },
+                "bucket": {
+                    "securityContext": {
+                        "runAsUser": 1001,
+                        "runAsGroup": 1001,
+                        "fsGroup": 1001,
+                        "runAsNonRoot": True,
+                        "allowPrivilegeEscalation": False,
+                        "fsGroupChangePolicy": "OnRootMismatch",
                     },
                 },
                 "priorityClassName": platform.services_priority_class_name,
