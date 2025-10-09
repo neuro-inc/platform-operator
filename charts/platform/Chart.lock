@@ -48,8 +48,8 @@ dependencies:
   repository: https://neuro-inc.github.io/helm-charts
   version: 1.0.1
 - name: pgo
-  repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 5.6.1
+  repository: oci://ghcr.io/neuro-inc/app-crunchy-postgres
+  version: 5.8.3
 - name: spark-operator
   repository: https://kubeflow.github.io/spark-operator
   version: 2.1.0
@@ -65,5 +65,5 @@ dependencies:
 - name: alloy
   repository: https://grafana.github.io/helm-charts
   version: 1.0.1
-digest: sha256:ccac5aca8185302b4911344da93957a3614e483d755661780ecd795d65fd1ec3
-generated: "2025-09-14T12:02:42.137734004+02:00"
+digest: sha256:bcd15e26c1705ecc92205953b8a0fcc9dcf6d8b35dab1471410287f379590281
+generated: "2025-10-09T11:13:12.492113+03:00"
