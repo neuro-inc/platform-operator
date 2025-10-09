@@ -61,8 +61,8 @@ dependencies:
     repository: https://neuro-inc.github.io/helm-charts
   - name: pgo
     alias: apps-postgres-operator
-    version: "5.6.1"
-    repository: oci://ghcr.io/neuro-inc/helm-charts
+    version: "5.8.3"
+    repository: oci://ghcr.io/neuro-inc/app-crunchy-postgres
     condition: appsPostgresOperatorEnabled
   - name: spark-operator
     version: "2.1.0"
