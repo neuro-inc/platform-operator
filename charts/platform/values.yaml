@@ -123,6 +123,11 @@ federatedPrometheus:
     username: ""
     password: ""
 
+vault:
+  server: "https://vault.apolo.us"
+  tokenSecretName: ""
+  tokenValue: ""
+
 traefikEnabled: true
 acmeEnabled: false
 dockerRegistryEnabled: false
@@ -133,3 +138,4 @@ appsKedaEnabled: true
 lokiEnabled: true
 alloyEnabled: true
 appsSparkOperatorEnabled: true
+appsExternalSecretsEnabled: true
