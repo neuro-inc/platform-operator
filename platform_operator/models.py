@@ -128,6 +128,7 @@ class HelmChartNames:
     alloy: str = "alloy"
     loki: str = "loki"
     spark_operator: str = "spark-operator"
+    external_secrets: str = "external-secrets"
 
 
 @dataclass(frozen=True)
@@ -762,6 +763,7 @@ class AppsOperatorsConfig:
     postgres_operator_enabled: bool = True
     spark_operator_enabled: bool = True
     keda_enabled: bool = True
+    external_secrets_enabled: bool = True
 
 
 @dataclass(frozen=True)

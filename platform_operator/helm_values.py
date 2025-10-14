@@ -49,6 +49,7 @@ class HelmValuesFactory:
                 platform.apps_operator_config.spark_operator_enabled
             ),
             "appsKedaEnabled": platform.apps_operator_config.keda_enabled,
+            "appsExternalSecretsEnabled": platform.apps_operator_config.external_secrets_enabled,
             "minioEnabled": platform.buckets.minio_install,
             "minioGatewayEnabled": platform.minio_gateway is not None,
             "platformReportsEnabled": platform.monitoring.metrics_enabled,
@@ -137,6 +138,7 @@ class HelmValuesFactory:
                 platform
             ),
             HelmChartNames.spark_operator: self.create_spark_operator_values(platform),
+            HelmChartNames.external_secrets: self.create_external_secrets_values(platform),
         }
         if platform.ingress_acme_enabled:
             result["acme"] = self.create_acme_values(platform)
@@ -2324,3 +2326,17 @@ class HelmValuesFactory:
     def create_spark_operator_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {"spark": {"jobNamespaces": None}}
         return result
+
+    def create_external_secrets_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "nameOverride": f"{platform.release_name}",
+            "fullnameOverride": f"{platform.release_name}",
+            "installCRDs": True,
+            "replicaCount": 1,
+            "podLabels": {
+                "service": "external-secrets",
+                PLATFORM_APOLO_COMPONENT_LABEL_KEY: "external-secrets",
+            },
+        }
+        return result
+
