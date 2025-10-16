@@ -1951,6 +1951,7 @@ class TestHelmValuesFactory:
             "platform": {
                 "clusterName": gcp_platform_config.cluster_name,
                 "authUrl": "https://dev.neu.ro",
+                "eventsUrl": "https://platform-events/apis/events",
                 "token": {
                     "valueFrom": {
                         "secretKeyRef": {
