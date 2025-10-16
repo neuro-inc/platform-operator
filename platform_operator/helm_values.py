@@ -1028,6 +1028,9 @@ class HelmValuesFactory:
             "platform": {
                 "clusterName": platform.cluster_name,
                 **self._create_platform_url_value("authUrl", platform.auth_url),
+                **self._create_platform_url_value(
+                    "eventsUrl", platform.events_url, "apis/events"
+                ),
                 **self._create_platform_token_value(platform),
             },
             "secretsNamespace": platform.jobs_namespace,
