@@ -27,10 +27,9 @@ from platform_operator.models import (
     LabelsConfig,
     PlatformConfig,
     PlatformConfigFactory,
+    PlatformStorageSpec,
     RegistryConfig,
     RegistryProvider,
-    StorageConfig,
-    StorageType,
 )
 
 
@@ -623,27 +622,36 @@ class TestPlatformConfigFactory:
         with pytest.raises(ValueError, match="Registry spec is empty"):
             factory.create(azure_platform_body, cluster)
 
-    def test_azure_platform_config_with_nfs_storage(
+    def test_platform_storage_overrides(
         self,
         factory: PlatformConfigFactory,
         cluster: Cluster,
-        azure_platform_body: kopf.Body,
-        azure_platform_config: PlatformConfig,
+        gcp_platform_body: kopf.Body,
     ) -> None:
-        azure_platform_body["spec"]["storages"] = [
-            {"nfs": {"server": "nfs-server", "path": "/path"}}
-        ]
-        result = factory.create(azure_platform_body, cluster)
+        gcp_platform_body["spec"]["platformStorage"] = {
+            "helmValues": {
+                "storages": [
+                    {
+                        "path": "/path",
+                        "nfs": {"server": "nfs-server", "path": "/path"},
+                    }
+                ],
+                "securityContext": {"enabled": True},
+            }
+        }
 
-        assert result == replace(
-            azure_platform_config,
-            storages=[
-                StorageConfig(
-                    type=StorageType.NFS,
-                    nfs_server="nfs-server",
-                    nfs_export_path="/path",
-                )
-            ],
+        result = factory.create(gcp_platform_body, cluster)
+
+        assert result.platform_spec.platform_storage == PlatformStorageSpec(
+            helm_values=PlatformStorageSpec.HelmValues(
+                storages=[
+                    {
+                        "path": "/path",
+                        "nfs": {"server": "nfs-server", "path": "/path"},
+                    }
+                ],
+                securityContext={"enabled": True},
+            )
         )
 
     def test_azure_platform_config_without_blob_storage__fails(
@@ -667,61 +675,6 @@ class TestPlatformConfigFactory:
         result = factory.create(on_prem_platform_body, cluster)
 
         assert result == on_prem_platform_config
-
-    def test_on_prem_platform_config_with_nfs_storage(
-        self,
-        factory: PlatformConfigFactory,
-        cluster: Cluster,
-        on_prem_platform_body: kopf.Body,
-        on_prem_platform_config: PlatformConfig,
-    ) -> None:
-        on_prem_platform_body["spec"]["storages"] = [
-            {"nfs": {"server": "nfs-server", "path": "/path"}}
-        ]
-        result = factory.create(on_prem_platform_body, cluster)
-
-        assert result == replace(
-            on_prem_platform_config,
-            storages=[
-                StorageConfig(
-                    type=StorageType.NFS,
-                    nfs_server="nfs-server",
-                    nfs_export_path="/path",
-                )
-            ],
-        )
-
-    def test_on_prem_platform_config_with_smb_storage(
-        self,
-        factory: PlatformConfigFactory,
-        cluster: Cluster,
-        on_prem_platform_body: kopf.Body,
-        on_prem_platform_config: PlatformConfig,
-    ) -> None:
-        on_prem_platform_body["spec"]["storages"] = [
-            {
-                "smb": {
-                    "server": "smb-server",
-                    "shareName": "smb-share",
-                    "username": "smb-username",
-                    "password": "smb-password",
-                }
-            }
-        ]
-        result = factory.create(on_prem_platform_body, cluster)
-
-        assert result == replace(
-            on_prem_platform_config,
-            storages=[
-                StorageConfig(
-                    type=StorageType.SMB,
-                    smb_server="smb-server",
-                    smb_share_name="smb-share",
-                    smb_username="smb-username",
-                    smb_password="smb-password",
-                )
-            ],
-        )
 
     def test_on_prem_platform_config_without_metrics(
         self,
