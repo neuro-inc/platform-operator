@@ -645,10 +645,10 @@ class TestPlatformConfigFactory:
         assert result.platform_spec.platform_storage == PlatformStorageSpec(
             helm_values=PlatformStorageSpec.HelmValues(
                 storages=[
-                    {
-                        "path": "/path",
-                        "nfs": {"server": "nfs-server", "path": "/path"},
-                    }
+                    PlatformStorageSpec.HelmValues.Storage(
+                        path="/path",
+                        nfs={"server": "nfs-server", "path": "/path"},
+                    )
                 ],
                 securityContext={"enabled": True},
             )
