@@ -3,6 +3,8 @@ from __future__ import annotations
 import base64
 import re
 import textwrap
+from collections.abc import Mapping
+from copy import deepcopy
 from hashlib import sha256
 from typing import Any
 
@@ -19,8 +21,6 @@ from .models import (
     MetricsStorageType,
     PlatformConfig,
     RegistryProvider,
-    StorageConfig,
-    StorageType,
 )
 
 
@@ -34,6 +34,27 @@ PLATFORM_APOLO_COMPONENT_LABEL_KEY = "platform.apolo.us/component"
 
 def b64encode(value: str) -> str:
     return base64.b64encode(value.encode()).decode()
+
+
+def _merge_mappings(
+    base: dict[str, Any], overrides: Mapping[str, Any]
+) -> dict[str, Any]:
+    if not overrides:
+        return deepcopy(base)
+    result: dict[str, Any] = {}
+    for key, base_value in base.items():
+        if key in overrides:
+            override_value = overrides[key]
+            if isinstance(override_value, Mapping) and isinstance(base_value, dict):
+                result[key] = _merge_mappings(base_value, override_value)
+            else:
+                result[key] = deepcopy(override_value)
+        else:
+            result[key] = deepcopy(base_value)
+    for key, value in overrides.items():
+        if key not in base:
+            result[key] = deepcopy(value)
+    return result
 
 
 class HelmValuesFactory:
@@ -108,7 +129,10 @@ class HelmValuesFactory:
                 "label": platform.node_labels.job,
             },
             "idleJobs": [self._create_idle_job(job) for job in platform.idle_jobs],
-            "storages": [self._create_storage_values(s) for s in platform.storages],
+            "storages": [
+                s.model_dump(by_alias=True, exclude_none=True)
+                for s in platform.platform_spec.platform_storage.helm_values.storages
+            ],
             "federatedPrometheus": self.create_federated_prometheus(platform),
             HelmChartNames.traefik: self.create_traefik_values(platform),
             HelmChartNames.platform_storage: self.create_platform_storage_values(
@@ -310,42 +334,6 @@ class HelmValuesFactory:
         if job.node_selector:
             result["nodeSelector"] = job.node_selector
         return result
-
-    def _create_storage_values(self, storage: StorageConfig) -> dict[str, Any]:
-        if storage.type == StorageType.NFS:
-            return {
-                "type": StorageType.NFS.value,
-                "path": storage.path,
-                "size": storage.size,
-                "nfs": {
-                    "server": storage.nfs_server,
-                    "path": storage.nfs_export_path,
-                },
-            }
-        if storage.type == StorageType.SMB:
-            return {
-                "type": StorageType.SMB.value,
-                "path": storage.path,
-                "size": storage.size,
-                "smb": {
-                    "server": storage.smb_server,
-                    "shareName": storage.smb_share_name,
-                    "username": storage.smb_username,
-                    "password": storage.smb_password,
-                },
-            }
-        if storage.type == StorageType.AZURE_fILE:
-            return {
-                "type": StorageType.AZURE_fILE.value,
-                "path": storage.path,
-                "size": storage.size,
-                "azureFile": {
-                    "storageAccountName": storage.azure_storage_account_name,
-                    "storageAccountKey": storage.azure_storage_account_key,
-                    "shareName": storage.azure_share_name,
-                },
-            }
-        raise ValueError(f"Storage type {storage.type.value!r} is not supported")
 
     def create_docker_registry_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -652,7 +640,7 @@ class HelmValuesFactory:
                     "type": "pvc",
                     "claimName": platform.get_storage_claim_name(s.path),
                 }
-                for s in platform.storages
+                for s in platform.platform_spec.platform_storage.helm_values.storages
             ],
             "service": {
                 "annotations": {
@@ -802,7 +790,11 @@ class HelmValuesFactory:
             raise ValueError(
                 f"Bucket provider {platform.buckets.provider} not supported"
             )
-        return result
+        overrides = platform.platform_spec.platform_storage.helm_values.model_dump(
+            mode="json", by_alias=True
+        )
+        overrides.pop("storages", None)
+        return _merge_mappings(result, overrides)
 
     def create_platform_registry_values(
         self, platform: PlatformConfig
@@ -1571,7 +1563,7 @@ class HelmValuesFactory:
                     "type": "pvc",
                     "claimName": platform.get_storage_claim_name(s.path),
                 }
-                for s in platform.storages
+                for s in platform.platform_spec.platform_storage.helm_values.storages
             ],
             "ingress": {
                 "enabled": True,

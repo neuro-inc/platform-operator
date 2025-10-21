@@ -1,5 +1,6 @@
 import re
 from dataclasses import replace
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -17,8 +18,7 @@ from platform_operator.models import (
     MetricsStorageType,
     MonitoringConfig,
     PlatformConfig,
-    StorageConfig,
-    StorageType,
+    PlatformStorageSpec,
 )
 
 
@@ -115,7 +115,6 @@ class TestHelmValuesFactory:
             ],
             "storages": [
                 {
-                    "type": "nfs",
                     "path": "",
                     "size": "10Gi",
                     "nfs": {"server": "192.168.0.3", "path": "/"},
@@ -313,49 +312,6 @@ class TestHelmValuesFactory:
 
         assert result["serviceAccount"] == {"annotations": {"role-arn": "role"}}
 
-    def test_create_azure_platform_values(
-        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(azure_platform_config)
-
-        assert result["storages"] == [
-            {
-                "type": "azureFile",
-                "path": "",
-                "size": "10Gi",
-                "azureFile": {
-                    "storageAccountName": "accountName1",
-                    "storageAccountKey": "accountKey1",
-                    "shareName": "share",
-                },
-            }
-        ]
-
-    def test_create_azure_platform_values_with_nfs_storage(
-        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(
-            replace(
-                azure_platform_config,
-                storages=[
-                    StorageConfig(
-                        type=StorageType.NFS,
-                        nfs_server="nfs-server",
-                        nfs_export_path="/path",
-                    )
-                ],
-            )
-        )
-
-        assert result["storages"] == [
-            {
-                "type": "nfs",
-                "path": "",
-                "size": "10Gi",
-                "nfs": {"server": "nfs-server", "path": "/path"},
-            }
-        ]
-
     def test_create_on_prem_platform_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -363,7 +319,6 @@ class TestHelmValuesFactory:
 
         assert result["storages"] == [
             {
-                "type": "nfs",
                 "path": "",
                 "size": "10Gi",
                 "nfs": {"server": "192.168.0.3", "path": "/"},
@@ -381,38 +336,6 @@ class TestHelmValuesFactory:
         )
         assert "minio" in result
         assert "platform-object-storage" not in result
-
-    def test_create_gcp_platform_values_with_smb_storage(
-        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_values(
-            replace(
-                gcp_platform_config,
-                storages=[
-                    StorageConfig(
-                        type=StorageType.SMB,
-                        smb_server="smb-server",
-                        smb_share_name="smb-share",
-                        smb_username="smb-username",
-                        smb_password="smb-password",
-                    )
-                ],
-            )
-        )
-
-        assert result["storages"] == [
-            {
-                "type": "smb",
-                "path": "",
-                "size": "10Gi",
-                "smb": {
-                    "server": "smb-server",
-                    "shareName": "smb-share",
-                    "username": "smb-username",
-                    "password": "smb-password",
-                },
-            }
-        ]
 
     def test_create_on_prem_platform_values_without_docker_registry(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -1113,20 +1036,22 @@ class TestHelmValuesFactory:
         result = factory.create_platform_storage_values(
             replace(
                 gcp_platform_config,
-                storages=[
-                    StorageConfig(
-                        type=StorageType.NFS,
-                        path="/storage1",
-                        nfs_server="test-nfs-server-1",
-                        nfs_export_path="/test/export/path/1",
-                    ),
-                    StorageConfig(
-                        type=StorageType.NFS,
-                        path="/storage2",
-                        nfs_server="test-nfs-server-2",
-                        nfs_export_path="/test/export/path/2",
-                    ),
-                ],
+                platform_spec=gcp_platform_config.platform_spec.model_copy(
+                    update={
+                        "platform_storage": PlatformStorageSpec(
+                            helm_values=PlatformStorageSpec.HelmValues(
+                                storages=[
+                                    PlatformStorageSpec.HelmValues.Storage(
+                                        path="/storage1"
+                                    ),
+                                    PlatformStorageSpec.HelmValues.Storage(
+                                        path="/storage2"
+                                    ),
+                                ]
+                            )
+                        )
+                    }
+                ),
             )
         )
 
@@ -1161,6 +1086,41 @@ class TestHelmValuesFactory:
         result = factory.create_platform_storage_values(gcp_platform_config)
 
         assert "sentry" not in result
+
+    def test_create_platform_storage_values__with_overrides(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        overrides: dict[str, Any] = {
+            "helmValues": {
+                "storages": [
+                    {
+                        "path": "/override",
+                        "nfs": {"server": "server", "path": "/"},
+                    }
+                ],
+                "extra": {"foo": "bar"},
+            }
+        }
+
+        platform_storage = PlatformStorageSpec.model_validate(overrides)
+
+        result = factory.create_platform_storage_values(
+            replace(
+                gcp_platform_config,
+                platform_spec=gcp_platform_config.platform_spec.model_copy(
+                    update={"platform_storage": platform_storage},
+                ),
+            )
+        )
+
+        assert result["storages"] == [
+            {
+                "type": "pvc",
+                "path": "/override",
+                "claimName": "platform-storage-override",
+            }
+        ]
+        assert result["extra"] == overrides["helmValues"]["extra"]
 
     def test_create_aws_buckets_values(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -2642,20 +2602,22 @@ class TestHelmValuesFactory:
         result = factory.create_platform_api_poller_values(
             replace(
                 gcp_platform_config,
-                storages=[
-                    StorageConfig(
-                        type=StorageType.NFS,
-                        path="/storage1",
-                        nfs_server="test-nfs-server-1",
-                        nfs_export_path="/test/export/path/1",
-                    ),
-                    StorageConfig(
-                        type=StorageType.NFS,
-                        path="/storage2",
-                        nfs_server="test-nfs-server-2",
-                        nfs_export_path="/test/export/path/2",
-                    ),
-                ],
+                platform_spec=gcp_platform_config.platform_spec.model_copy(
+                    update={
+                        "platform_storage": PlatformStorageSpec(
+                            helm_values=PlatformStorageSpec.HelmValues(
+                                storages=[
+                                    PlatformStorageSpec.HelmValues.Storage(
+                                        path="/storage1"
+                                    ),
+                                    PlatformStorageSpec.HelmValues.Storage(
+                                        path="/storage2"
+                                    ),
+                                ]
+                            )
+                        )
+                    }
+                ),
             )
         )
 

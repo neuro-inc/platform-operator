@@ -39,7 +39,7 @@ from neuro_config_client import (
     Resources,
     SecretsConfig,
     SentryCredentials,
-    StorageConfig as ClusterStorageConfig,
+    StorageConfig,
 )
 from yarl import URL
 
@@ -59,11 +59,11 @@ from platform_operator.models import (
     MinioGatewayConfig,
     MonitoringConfig,
     PlatformConfig,
+    PlatformSpec,
+    PlatformStorageSpec,
     PrometheusConfig,
     RegistryConfig,
     RegistryProvider,
-    StorageConfig,
-    StorageType,
 )
 
 
@@ -191,7 +191,7 @@ def cluster_factory(
                     )
                 ],
             ),
-            storage=ClusterStorageConfig(
+            storage=StorageConfig(
                 url=URL(f"https://{name}.org.neu.ro/api/v1/storage"),
             ),
             registry=ClusterRegistryConfig(
@@ -266,6 +266,17 @@ def gcp_platform_body(cluster_name: str) -> kopf.Body:
                     }
                 }
             },
+            "platformStorage": {
+                "helmValues": {
+                    "storages": [
+                        {
+                            "path": "",
+                            "size": "10Gi",
+                            "nfs": {"server": "192.168.0.3", "path": "/"},
+                        }
+                    ]
+                }
+            },
         },
     }
     return kopf.Body(payload)
@@ -284,7 +295,6 @@ def aws_platform_body(cluster_name: str) -> kopf.Body:
                 "standardStorageClassName": "platform-standard-topology-aware",
             },
             "registry": {"aws": {"accountId": "platform", "region": "us-east-1"}},
-            "storages": [{"nfs": {"server": "192.168.0.3", "path": "/"}}],
             "blobStorage": {"aws": {"region": "us-east-1"}},
             "monitoring": {
                 "logs": {"blobStorage": {"bucket": "job-logs"}},
@@ -298,6 +308,17 @@ def aws_platform_body(cluster_name: str) -> kopf.Body:
                     "persistence": {
                         "storageClassName": "platform-disk",
                     }
+                }
+            },
+            "platformStorage": {
+                "helmValues": {
+                    "storages": [
+                        {
+                            "path": "",
+                            "size": "10Gi",
+                            "nfs": {"server": "192.168.0.3", "path": "/"},
+                        }
+                    ]
                 }
             },
         },
@@ -323,15 +344,6 @@ def azure_platform_body(cluster_name: str) -> kopf.Body:
                     "password": "admin-password",
                 }
             },
-            "storages": [
-                {
-                    "azureFile": {
-                        "storageAccountName": "accountName1",
-                        "storageAccountKey": "accountKey1",
-                        "shareName": "share",
-                    }
-                }
-            ],
             "blobStorage": {
                 "azure": {
                     "storageAccountName": "accountName2",
@@ -350,6 +362,21 @@ def azure_platform_body(cluster_name: str) -> kopf.Body:
                     "persistence": {
                         "storageClassName": "platform-disk",
                     }
+                }
+            },
+            "platformStorage": {
+                "helmValues": {
+                    "storages": [
+                        {
+                            "path": "",
+                            "size": "10Gi",
+                            "azureFile": {
+                                "storageAccountName": "accountName1",
+                                "storageAccountKey": "accountKey1",
+                                "shareName": "share",
+                            },
+                        }
+                    ]
                 }
             },
         },
@@ -379,14 +406,6 @@ def on_prem_platform_body(cluster_name: str) -> kopf.Body:
                     }
                 }
             },
-            "storages": [
-                {
-                    "nfs": {
-                        "server": "192.168.0.3",
-                        "path": "/",
-                    }
-                }
-            ],
             "blobStorage": {
                 "kubernetes": {
                     "persistence": {
@@ -411,6 +430,17 @@ def on_prem_platform_body(cluster_name: str) -> kopf.Body:
                     "persistence": {
                         "storageClassName": "openebs-cstor",
                     }
+                }
+            },
+            "platformStorage": {
+                "helmValues": {
+                    "storages": [
+                        {
+                            "path": "",
+                            "size": "10Gi",
+                            "nfs": {"server": "192.168.0.3", "path": "/"},
+                        }
+                    ]
                 }
             },
         },
@@ -491,13 +521,6 @@ def gcp_platform_config(
         ingress_host_port_https=None,
         ingress_ssl_cert_data="",
         ingress_ssl_cert_key_data="",
-        storages=[
-            StorageConfig(
-                type=StorageType.NFS,
-                nfs_server="192.168.0.3",
-                nfs_export_path="/",
-            )
-        ],
         registry=RegistryConfig(provider=RegistryProvider.GCP, gcp_project="project"),
         buckets=BucketsConfig(
             provider=BucketsProvider.GCP,
@@ -552,6 +575,19 @@ def gcp_platform_config(
                 )
             )
         ),
+        platform_spec=PlatformSpec(
+            platform_storage=PlatformStorageSpec(
+                helm_values=PlatformStorageSpec.HelmValues(
+                    storages=[
+                        PlatformStorageSpec.HelmValues.Storage(
+                            path="",
+                            size="10Gi",
+                            nfs={"server": "192.168.0.3", "path": "/"},
+                        )
+                    ],
+                )
+            )
+        ),
     )
 
 
@@ -597,14 +633,6 @@ def azure_platform_config(
         gcp_service_account_key_base64="",
         kubernetes_tpu_network=None,
         jobs_resource_pool_types=[resource_pool_type_factory()],
-        storages=[
-            StorageConfig(
-                type=StorageType.AZURE_fILE,
-                azure_storage_account_name="accountName1",
-                azure_storage_account_key="accountKey1",
-                azure_share_name="share",
-            )
-        ],
         registry=RegistryConfig(
             provider=RegistryProvider.AZURE,
             azure_url=URL("https://platform.azurecr.io"),
@@ -626,6 +654,23 @@ def azure_platform_config(
             metrics_region="westus",
             metrics_bucket_name="job-metrics",
         ),
+        platform_spec=PlatformSpec(
+            platform_storage=PlatformStorageSpec(
+                helm_values=PlatformStorageSpec.HelmValues(
+                    storages=[
+                        PlatformStorageSpec.HelmValues.Storage(
+                            path="",
+                            size="10Gi",
+                            azureFile={
+                                "storageAccountName": "accountName1",
+                                "storageAccountKey": "accountKey1",
+                                "shareName": "share",
+                            },
+                        )
+                    ]
+                )
+            )
+        ),
     )
 
 
@@ -644,13 +689,6 @@ def on_prem_platform_config(
         kubernetes_tpu_network=None,
         jobs_resource_pool_types=[resource_pool_type_factory()],
         disks_storage_class_name="openebs-cstor",
-        storages=[
-            StorageConfig(
-                type=StorageType.NFS,
-                nfs_server="192.168.0.3",
-                nfs_export_path="/",
-            )
-        ],
         registry=RegistryConfig(
             provider=RegistryProvider.DOCKER,
             docker_registry_install=True,

@@ -656,52 +656,6 @@ async def test_delete(
     )
 
 
-async def test_delete_on_prem(
-    helm_client: mock.AsyncMock,
-    config_client: mock.AsyncMock,
-    logger: logging.Logger,
-    cluster: Cluster,
-    on_prem_platform_body: kopf.Body,
-    on_prem_platform_config: PlatformConfig,
-) -> None:
-    from platform_operator.handlers import delete
-
-    config_client.get_cluster.return_value = cluster
-
-    await delete(  # type: ignore
-        name=on_prem_platform_config.cluster_name,
-        body=on_prem_platform_body,
-        logger=logger,
-        retry=0,
-    )
-
-    helm_client.delete.assert_awaited_once_with("platform", wait=True)
-
-
-async def test_delete_with_invalid_configuration(
-    status_manager: mock.AsyncMock,
-    logger: logging.Logger,
-    helm_client: mock.AsyncMock,
-    gcp_platform_body: kopf.Body,
-    gcp_platform_config: PlatformConfig,
-) -> None:
-    from platform_operator.handlers import delete
-
-    del gcp_platform_body["spec"]["storages"]
-
-    await delete(  # type: ignore
-        name=gcp_platform_config.cluster_name,
-        body=gcp_platform_body,
-        logger=logger,
-        retry=0,
-    )
-
-    status_manager.start_deletion.assert_awaited_once_with(
-        gcp_platform_config.cluster_name
-    )
-    helm_client.add_repo.assert_not_awaited()
-
-
 async def test_watch(
     status_manager: mock.AsyncMock,
     config_client: mock.AsyncMock,
