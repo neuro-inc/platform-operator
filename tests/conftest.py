@@ -250,6 +250,7 @@ def gcp_platform_body(cluster_name: str) -> kopf.Body:
             },
             "iam": {"gcp": {"serviceAccountKeyBase64": "e30="}},
             "registry": {"gcp": {"project": "project"}},
+            "storages": [{"nfs": {"server": "192.168.0.3", "path": "/"}}],
             "blobStorage": {"gcp": {"project": "project"}},
             "monitoring": {
                 "logs": {"blobStorage": {"bucket": "job-logs"}},
