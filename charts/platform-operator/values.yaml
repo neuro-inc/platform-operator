@@ -16,6 +16,14 @@ nginxImage:
   tag: latest
 
 controller:
+  securityContext:
+    enabled: true
+    runAsUser: 1001
+    runAsGroup: 1001
+    fsGroup: 1001
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    fsGroupChangePolicy: "OnRootMismatch"
   retries: 3
   backoff: 60
   logLevel: INFO
