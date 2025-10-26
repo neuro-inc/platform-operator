@@ -124,9 +124,26 @@ federatedPrometheus:
     password: ""
 
 vault:
-  server: "https://vault.apolo.us"
-  tokenSecretName: ""
-  tokenValue: ""
+  # Vault server URL (e.g., "https://vault.apolo.us")
+  server: ""
+  # Vault KV secrets engine path (e.g., "kv-v2-imdc-compute")
+  path: ""
+  # Vault KV secrets engine version ("v1" or "v2")
+  version: "v2"
+  appRole:
+    # AppRole authentication path (usually "approle")
+    path: "approle"
+    # AppRole Role ID for authentication
+    roleId: ""
+    # AppRole Secret ID for authentication
+    secretId: ""
+    secretRef:
+      # Name of the Kubernetes secret containing the AppRole secret ID
+      name: "vault-approle-secret"
+      # Namespace where the secret is located
+      namespace: "external-secrets"
+      # Key in the secret that contains the secret ID
+      key: "secret-id"
 
 traefikEnabled: true
 acmeEnabled: false
