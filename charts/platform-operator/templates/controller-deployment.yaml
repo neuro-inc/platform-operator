@@ -37,7 +37,7 @@ spec:
         - --log-format=json
         env:
         - name: NP_CONTROLLER_LOG_LEVEL
-          value: {{ .Values.logLevel | default "INFO" }}
+          value: {{ .Values.controller.logLevel | default "INFO" }}
         - name: NP_CONTROLLER_RETRIES
           value: {{ .Values.controller.retries | quote }}
         - name: NP_CONTROLLER_BACKOFF

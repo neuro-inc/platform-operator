@@ -12,12 +12,12 @@ spec:
   - ReadWriteMany
   volumeMode: Filesystem
   persistentVolumeReclaimPolicy: Retain
-  {{- if eq .type "nfs" }}
+  {{- if hasKey . "nfs" }}
   nfs:
     server: {{ .nfs.server }}
     path: {{ .nfs.path }}
     readOnly: false
-  {{- else if eq .type "smb" }}
+  {{- else if hasKey . "smb" }}
   csi:
     driver: smb.csi.k8s.io
     readOnly: false
@@ -31,7 +31,7 @@ spec:
   - dir_mode=0777
   - file_mode=0777
   - vers=3.0
-  {{- else if eq .type "azureFile" }}
+  {{- else if hasKey . "azureFile" }}
   azureFile:
     secretName: {{ $.Release.Name }}-{{ include "platform.azure.storageAccount.secretNameSuffix" .path }}
     secretNamespace: {{ $.Release.Namespace }}

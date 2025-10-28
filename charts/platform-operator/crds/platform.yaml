@@ -438,3 +438,56 @@ spec:
                         properties:
                           storageClassName:
                             type: string
+              platformStorage:
+                type: object
+                required: [helmValues]
+                properties:
+                  helmValues:
+                    type: object
+                    required: [storages]
+                    properties:
+                      storages:
+                        type: array
+                        minItems: 1
+                        items:
+                          type: object
+                          properties:
+                            path:
+                              type: string
+                            size:
+                              type: string
+                              default: '10Gi'
+                            nfs:
+                              type: object
+                              required: [server]
+                              properties:
+                                server:
+                                  type: string
+                                path:
+                                  type: string
+                            smb:
+                              type: object
+                              required: [server, shareName, username, password]
+                              properties:
+                                server:
+                                  type: string
+                                shareName:
+                                  type: string
+                                username:
+                                  type: string
+                                password:
+                                  type: string
+                            azureFile:
+                              type: object
+                              required: [storageAccountName, storageAccountKey, shareName]
+                              properties:
+                                storageAccountName:
+                                  type: string
+                                storageAccountKey:
+                                  type: string
+                                shareName:
+                                  type: string
+                          oneOf:
+                          - required: [nfs]
+                          - required: [smb]
+                          - required: [azureFile]
