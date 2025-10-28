@@ -55,7 +55,6 @@ from platform_operator.models import (
     KubeClientAuthType,
     KubeConfig,
     LabelsConfig,
-    MetricsStorageType,
     MinioGatewayConfig,
     MonitoringConfig,
     PlatformConfig,
@@ -417,12 +416,7 @@ def on_prem_platform_body(cluster_name: str) -> kopf.Body:
             "monitoring": {
                 "logs": {"blobStorage": {"bucket": "job-logs"}},
                 "metrics": {
-                    "kubernetes": {
-                        "persistence": {
-                            "storageClassName": "metrics-standard",
-                            "size": "100Gi",
-                        }
-                    }
+                    "blobStorage": {"bucket": "job-metrics"},
                 },
             },
             "disks": {
@@ -533,7 +527,6 @@ def gcp_platform_config(
         ),
         monitoring=MonitoringConfig(
             logs_bucket_name="job-logs",
-            metrics_storage_type=MetricsStorageType.BUCKETS,
             metrics_region="us-central1",
             metrics_bucket_name="job-metrics",
         ),
@@ -615,7 +608,6 @@ def aws_platform_config(
         minio_gateway=None,
         monitoring=MonitoringConfig(
             logs_bucket_name="job-logs",
-            metrics_storage_type=MetricsStorageType.BUCKETS,
             metrics_region="us-east-1",
             metrics_bucket_name="job-metrics",
         ),
@@ -650,7 +642,6 @@ def azure_platform_config(
         ),
         monitoring=MonitoringConfig(
             logs_bucket_name="job-logs",
-            metrics_storage_type=MetricsStorageType.BUCKETS,
             metrics_region="westus",
             metrics_bucket_name="job-metrics",
         ),
@@ -712,8 +703,6 @@ def on_prem_platform_config(
         minio_gateway=None,
         monitoring=MonitoringConfig(
             logs_bucket_name="job-logs",
-            metrics_storage_type=MetricsStorageType.KUBERNETES,
-            metrics_storage_class_name="metrics-standard",
-            metrics_storage_size="100Gi",
+            metrics_bucket_name="job-metrics",
         ),
     )

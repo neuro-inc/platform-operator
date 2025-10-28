@@ -418,20 +418,8 @@ class MonitoringSpec(dict[str, Any]):
         return self["metrics"].get("region", "")
 
     @property
-    def metrics_retention_time(self) -> str:
-        return self["metrics"].get("retentionTime", "")
-
-    @property
     def metrics_bucket(self) -> str:
         return self["metrics"]["blobStorage"].get("bucket", "")
-
-    @property
-    def metrics_storage_size(self) -> str:
-        return self["metrics"]["kubernetes"]["persistence"].get("size", "")
-
-    @property
-    def metrics_storage_class_name(self) -> str:
-        return self["metrics"]["kubernetes"]["persistence"].get("storageClassName", "")
 
     @property
     def metrics_node_exporter_enabled(self) -> bool:
@@ -701,21 +689,12 @@ class MinioGatewayConfig:
     endpoint_url: str = "http://minio-gateway:9000"
 
 
-class MetricsStorageType(Enum):
-    BUCKETS = 1
-    KUBERNETES = 2
-
-
 @dataclass(frozen=True)
 class MonitoringConfig:
     logs_bucket_name: str
     logs_region: str = ""
     metrics_enabled: bool = True
-    metrics_storage_type: MetricsStorageType = MetricsStorageType.BUCKETS
     metrics_bucket_name: str = ""
-    metrics_storage_class_name: str = ""
-    metrics_storage_size: str = ""
-    metrics_retention_time: str = "3d"
     metrics_region: str = ""
     metrics_node_exporter_enabled: bool = True
     loki_enabled: bool = True
@@ -1322,43 +1301,18 @@ class PlatformConfigFactory:
                 loki_endpoint=loki_endpoint,
                 alloy_enabled=spec.alloy_enabled,
             )
-        if "blobStorage" in spec.metrics:
-            return MonitoringConfig(
-                logs_region=spec.logs_region,
-                logs_bucket_name=spec.logs_bucket,
-                metrics_enabled=True,
-                metrics_storage_type=MetricsStorageType.BUCKETS,
-                metrics_region=spec.metrics_region,
-                metrics_bucket_name=spec.metrics_bucket,
-                metrics_retention_time=(
-                    spec.metrics_retention_time
-                    or MonitoringConfig.metrics_retention_time
-                ),
-                metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
-                loki_enabled=loki_enabled,
-                loki_dns_service=loki_dns_service,
-                loki_endpoint=loki_endpoint,
-                alloy_enabled=spec.alloy_enabled,
-            )
-        if "kubernetes" in spec.metrics:
-            return MonitoringConfig(
-                logs_bucket_name=spec.logs_bucket,
-                metrics_enabled=True,
-                metrics_storage_type=MetricsStorageType.KUBERNETES,
-                metrics_storage_class_name=spec.metrics_storage_class_name,
-                metrics_storage_size=spec.metrics_storage_size or "10Gi",
-                metrics_retention_time=(
-                    spec.metrics_retention_time
-                    or MonitoringConfig.metrics_retention_time
-                ),
-                metrics_region=spec.metrics_region,
-                metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
-                loki_enabled=loki_enabled,
-                loki_dns_service=loki_dns_service,
-                loki_endpoint=loki_endpoint,
-                alloy_enabled=spec.alloy_enabled,
-            )
-        raise ValueError("Metrics storage type is not supported")
+        return MonitoringConfig(
+            logs_region=spec.logs_region,
+            logs_bucket_name=spec.logs_bucket,
+            metrics_enabled=True,
+            metrics_region=spec.metrics_region,
+            metrics_bucket_name=spec.metrics_bucket,
+            metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
+            loki_enabled=loki_enabled,
+            loki_dns_service=loki_dns_service,
+            loki_endpoint=loki_endpoint,
+            alloy_enabled=spec.alloy_enabled,
+        )
 
     def _create_minio_gateway(self, spec: Spec) -> MinioGatewayConfig | None:
         if BucketsProvider.GCP in spec.blob_storage:

@@ -15,8 +15,6 @@ from platform_operator.models import (
     DockerRegistryStorageDriver,
     IngressServiceType,
     LabelsConfig,
-    MetricsStorageType,
-    MonitoringConfig,
     PlatformConfig,
     PlatformStorageSpec,
 )
@@ -879,16 +877,7 @@ class TestHelmValuesFactory:
     def test_create_platform_storage_values__minio(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_storage_values(
-            replace(
-                on_prem_platform_config,
-                monitoring=MonitoringConfig(
-                    metrics_storage_type=MetricsStorageType.BUCKETS,
-                    logs_bucket_name="job-logs",
-                    metrics_bucket_name="job-metrics",
-                ),
-            )
-        )
+        result = factory.create_platform_storage_values(on_prem_platform_config)
 
         assert result["secrets"] == [
             {
@@ -935,11 +924,6 @@ class TestHelmValuesFactory:
                     emc_ecs_s3_endpoint=URL("https://emc-ecs.s3"),
                     emc_ecs_management_endpoint=URL("https://emc-ecs.management"),
                     emc_ecs_s3_assumable_role="s3-role",
-                ),
-                monitoring=MonitoringConfig(
-                    metrics_storage_type=MetricsStorageType.BUCKETS,
-                    logs_bucket_name="job-logs",
-                    metrics_bucket_name="job-metrics",
                 ),
             )
         )
@@ -989,11 +973,6 @@ class TestHelmValuesFactory:
                     open_stack_s3_endpoint=URL("https://os.s3"),
                     open_stack_endpoint=URL("https://os.management"),
                     open_stack_region_name="os_region",
-                ),
-                monitoring=MonitoringConfig(
-                    metrics_storage_type=MetricsStorageType.BUCKETS,
-                    logs_bucket_name="job-logs",
-                    metrics_bucket_name="job-metrics",
                 ),
             )
         )
@@ -2026,7 +2005,6 @@ class TestHelmValuesFactory:
                             "registry": "ghcr.io",
                             "repository": "neuro-inc/prometheus",
                         },
-                        "retention": "3d",
                         "thanos": {
                             "objectStorageConfig": {
                                 "secret": {
@@ -2233,22 +2211,206 @@ class TestHelmValuesFactory:
             "priorityClassName": "platform-services",
         }
 
-    def test_create_gcp_platform_reports_values_with_k8s_label_relabelings(
+    def test_create_aws_platform_reports_values(
+        self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_reports_values(aws_platform_config)
+
+        assert result["cloudProvider"] == {"type": "aws", "region": "us-east-1"}
+
+    def test_create_azure_platform_reports_values(
+        self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_reports_values(azure_platform_config)
+
+        assert result["cloudProvider"] == {"type": "azure", "region": "westus"}
+
+    def test_create_kube_prometheus_stack_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_reports_values(gcp_platform_config)
+        result = factory.create_kube_prometheus_stack_values(gcp_platform_config)
 
-        assert (
-            result["kube-prometheus-stack"]["kubeStateMetrics"]["serviceMonitor"][
-                "metricRelabelings"
-            ]
-            == []
-        )
+        assert result == {
+            "global": {
+                "imageRegistry": "ghcr.io",
+                "imagePullSecrets": [
+                    {"name": "platform-docker-config"},
+                    {"name": "platform-docker-hub-config"},
+                ],
+            },
+            "prometheus": {
+                "ingress": {
+                    "enabled": True,
+                    "annotations": {
+                        "traefik.ingress.kubernetes.io/router.middlewares": (
+                            "platform-platform-federated-prometheus-auth@kubernetescrd"
+                        ),
+                        "traefik.ingress.kubernetes.io/router.priority": "1000",
+                    },
+                    "hosts": [
+                        f"prometheus.{gcp_platform_config.cluster_name}.org.neu.ro",
+                    ],
+                    "ingressClassName": "traefik",
+                    "paths": ["/federate"],
+                },
+                "prometheusSpec": {
+                    "image": {
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/prometheus",
+                    },
+                    "storageSpec": {
+                        "volumeClaimTemplate": {
+                            "spec": {
+                                "storageClassName": ("platform-standard-topology-aware")
+                            }
+                        }
+                    },
+                    "externalLabels": {
+                        "cluster": gcp_platform_config.cluster_name,
+                    },
+                    "priorityClassName": "platform-services",
+                    "thanos": {
+                        "objectStorageConfig": {
+                            "secret": {
+                                "config": {
+                                    "bucket": "job-metrics",
+                                    "service_account": "{}",
+                                },
+                                "type": "GCS",
+                            },
+                        },
+                    },
+                },
+            },
+            "prometheusOperator": {
+                "image": {
+                    "registry": "ghcr.io",
+                    "repository": "neuro-inc/prometheus-operator",
+                },
+                "prometheusConfigReloader": {
+                    "image": {
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/prometheus-config-reloader",
+                    }
+                },
+                "thanosImage": {
+                    "registry": "ghcr.io",
+                    "repository": "neuro-inc/thanos",
+                },
+                "admissionWebhooks": {
+                    "patch": {
+                        "image": {
+                            "registry": "ghcr.io",
+                            "repository": "neuro-inc/kube-webhook-certgen",
+                        },
+                        "priorityClassName": "platform-services",
+                    }
+                },
+                "kubeletService": {"namespace": "platform"},
+                "priorityClassName": "platform-services",
+            },
+            "kubelet": {"namespace": "platform"},
+            "kubeStateMetrics": {"serviceMonitor": {"metricRelabelings": []}},
+            "kube-state-metrics": {
+                "image": {
+                    "registry": "ghcr.io",
+                    "repository": "neuro-inc/kube-state-metrics",
+                },
+                "serviceAccount": {
+                    "imagePullSecrets": [
+                        {"name": "platform-docker-config"},
+                        {"name": "platform-docker-hub-config"},
+                    ]
+                },
+                "priorityClassName": "platform-services",
+                "rbac": {
+                    "extraRules": [
+                        {
+                            "apiGroups": ["neuromation.io"],
+                            "resources": ["platforms"],
+                            "verbs": ["list", "watch"],
+                        }
+                    ]
+                },
+                "customResourceState": {
+                    "enabled": True,
+                    "config": {
+                        "spec": {
+                            "resources": [
+                                {
+                                    "groupVersionKind": {
+                                        "group": "neuromation.io",
+                                        "version": "*",
+                                        "kind": "Platform",
+                                    },
+                                    "labelsFromPath": {
+                                        "name": ["metadata", "name"],
+                                    },
+                                    "metricNamePrefix": "kube_platform",
+                                    "metrics": [
+                                        {
+                                            "name": "status_phase",
+                                            "help": "Platform status phase",
+                                            "each": {
+                                                "type": "StateSet",
+                                                "stateSet": {
+                                                    "labelName": "phase",
+                                                    "path": ["status", "phase"],
+                                                    "list": [
+                                                        "Pending",
+                                                        "Deploying",
+                                                        "Deleting",
+                                                        "Deployed",
+                                                        "Failed",
+                                                    ],
+                                                },
+                                            },
+                                        }
+                                    ],
+                                }
+                            ]
+                        }
+                    },
+                },
+            },
+            "nodeExporter": {
+                "enabled": True,
+            },
+            "prometheus-node-exporter": {
+                "image": {
+                    "registry": "ghcr.io",
+                    "repository": "neuro-inc/node-exporter",
+                },
+                "serviceAccount": {
+                    "imagePullSecrets": [
+                        {"name": "platform-docker-config"},
+                        {"name": "platform-docker-hub-config"},
+                    ]
+                },
+            },
+            "alertmanager": {
+                "alertmanagerSpec": {
+                    "image": {
+                        "registry": "ghcr.io",
+                        "repository": "neuro-inc/alertmanager",
+                    },
+                    "configSecret": "platform-alertmanager-config",
+                    "secrets": ["platform-token"],
+                }
+            },
+        }
 
-    def test_create_gcp_platform_reports_values_with_platform_label_relabelings(
+    def test_create_kube_prometheus_stack_values_with_k8s_label_relabelings(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_reports_values(
+        result = factory.create_kube_prometheus_stack_values(gcp_platform_config)
+
+        assert result["kubeStateMetrics"]["serviceMonitor"]["metricRelabelings"] == []
+
+    def test_create_kube_prometheus_stack_values_with_platform_label_relabelings(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_kube_prometheus_stack_values(
             replace(
                 gcp_platform_config,
                 node_labels=LabelsConfig(
@@ -2260,9 +2422,7 @@ class TestHelmValuesFactory:
             )
         )
 
-        assert result["kube-prometheus-stack"]["kubeStateMetrics"]["serviceMonitor"][
-            "metricRelabelings"
-        ] == [
+        assert result["kubeStateMetrics"]["serviceMonitor"]["metricRelabelings"] == [
             {
                 "sourceLabels": ["label_other_io_job"],
                 "targetLabel": "label_platform_neuromation_io_job",
@@ -2281,29 +2441,50 @@ class TestHelmValuesFactory:
             },
         ]
 
-    def test_create_aws_platform_reports_values(
+    def test_create_thanos_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        updates = factory.create_thanos_values(gcp_platform_config)
+
+        assert updates == {
+            "image": {"repository": "ghcr.io/neuro-inc/thanos"},
+            "store": {
+                "persistentVolumeClaim": {
+                    "spec": {"storageClassName": "platform-standard-topology-aware"}
+                }
+            },
+            "compact": {
+                "persistentVolumeClaim": {
+                    "spec": {"storageClassName": "platform-standard-topology-aware"}
+                }
+            },
+            "objstore": {
+                "type": "GCS",
+                "config": {"bucket": "job-metrics", "service_account": "{}"},
+            },
+            "priorityClassName": "platform-services",
+            "sidecar": {"selector": {"app": None}},
+        }
+
+    def test_create_thanos_values_for_aws(
         self, aws_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_reports_values(aws_platform_config)
+        result = factory.create_thanos_values(aws_platform_config)
 
-        assert result["thanos"]["objstore"] == {
+        assert result["objstore"] == {
             "type": "S3",
             "config": {
                 "bucket": "job-metrics",
                 "endpoint": "s3.us-east-1.amazonaws.com",
             },
         }
-        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
-            "thanos"
-        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
-        assert result["cloudProvider"] == {"type": "aws", "region": "us-east-1"}
 
-    def test_create_azure_platform_reports_values(
+    def test_create_thanos_values_for_azure(
         self, azure_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_reports_values(azure_platform_config)
+        result = factory.create_thanos_values(azure_platform_config)
 
-        assert result["thanos"]["objstore"] == {
+        assert result["objstore"] == {
             "type": "AZURE",
             "config": {
                 "container": "job-metrics",
@@ -2311,37 +2492,11 @@ class TestHelmValuesFactory:
                 "storage_account_key": "accountKey2",
             },
         }
-        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
-            "thanos"
-        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
-        assert result["cloudProvider"] == {"type": "azure", "region": "westus"}
 
-    def test_create_on_prem_platform_reports_values(
+    def test_create_thanos_values_for_minio(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_reports_values(on_prem_platform_config)
-
-        assert result["prometheus"] == {
-            "url": "http://prometheus-prometheus:9090",
-            "remoteStorageEnabled": False,
-        }
-        assert result["prometheusProxy"] == {
-            "prometheus": {"host": "prometheus-prometheus", "port": 9090}
-        }
-        assert (
-            result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]["retention"]
-            == "3d"
-        )
-        assert (
-            "thanos"
-            not in result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]
-        )
-        assert "cloudProvider" not in result
-
-    def test_create_on_prem_platform_reports_values_with_minio(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_platform_reports_values(
+        result = factory.create_thanos_values(
             replace(
                 on_prem_platform_config,
                 buckets=BucketsConfig(
@@ -2354,15 +2509,10 @@ class TestHelmValuesFactory:
                     minio_storage_class_name="blob-storage-standard",
                     minio_storage_size="10Gi",
                 ),
-                monitoring=MonitoringConfig(
-                    logs_bucket_name="job-logs",
-                    metrics_storage_type=MetricsStorageType.BUCKETS,
-                    metrics_bucket_name="job-metrics",
-                ),
             )
         )
 
-        assert result["thanos"]["objstore"] == {
+        assert result["objstore"] == {
             "type": "S3",
             "config": {
                 "bucket": "job-metrics",
@@ -2373,14 +2523,11 @@ class TestHelmValuesFactory:
                 "insecure": True,
             },
         }
-        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
-            "thanos"
-        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
 
-    def test_create_on_prem_platform_reports_values_with_emc_ecs(
+    def test_create_thanos_values_for_emc_ecs(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_reports_values(
+        result = factory.create_thanos_values(
             replace(
                 on_prem_platform_config,
                 buckets=BucketsConfig(
@@ -2391,15 +2538,10 @@ class TestHelmValuesFactory:
                     emc_ecs_management_endpoint=URL("https://emc-ecs.management"),
                     emc_ecs_s3_assumable_role="s3-role",
                 ),
-                monitoring=MonitoringConfig(
-                    logs_bucket_name="job-logs",
-                    metrics_storage_type=MetricsStorageType.BUCKETS,
-                    metrics_bucket_name="job-metrics",
-                ),
             )
         )
 
-        assert result["thanos"]["objstore"] == {
+        assert result["objstore"] == {
             "type": "S3",
             "config": {
                 "bucket": "job-metrics",
@@ -2408,14 +2550,11 @@ class TestHelmValuesFactory:
                 "secret_key": "emc_ecs_secret_key",
             },
         }
-        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
-            "thanos"
-        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
 
-    def test_create_on_prem_platform_reports_values_with_open_stack(
+    def test_create_thanos_values_for_open_stack(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_platform_reports_values(
+        result = factory.create_thanos_values(
             replace(
                 on_prem_platform_config,
                 buckets=BucketsConfig(
@@ -2426,15 +2565,10 @@ class TestHelmValuesFactory:
                     open_stack_endpoint=URL("https://os.management"),
                     open_stack_region_name="os_region",
                 ),
-                monitoring=MonitoringConfig(
-                    logs_bucket_name="job-logs",
-                    metrics_storage_type=MetricsStorageType.BUCKETS,
-                    metrics_bucket_name="job-metrics",
-                ),
             )
         )
 
-        assert result["thanos"]["objstore"] == {
+        assert result["objstore"] == {
             "type": "S3",
             "config": {
                 "bucket": "job-metrics",
@@ -2444,34 +2578,45 @@ class TestHelmValuesFactory:
                 "secret_key": "os_password",
             },
         }
-        assert result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
-            "thanos"
-        ] == {"objectStorageConfig": {"secret": result["thanos"]["objstore"]}}
 
-    def test_create_on_prem_platform_reports_values_with_retention(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    def test_create_grafana_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        on_prem_platform_config = replace(
-            on_prem_platform_config,
-            monitoring=replace(
-                on_prem_platform_config.monitoring,
-                metrics_retention_time="1d",
-                metrics_storage_size="10Gi",
-            ),
-        )
+        result = factory.create_grafana_values(gcp_platform_config)
 
-        result = factory.create_platform_reports_values(on_prem_platform_config)
-
-        assert (
-            result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"]["retention"]
-            == "1d"
-        )
-        assert (
-            result["kube-prometheus-stack"]["prometheus"]["prometheusSpec"][
-                "retentionSize"
-            ]
-            == "10GB"
-        )
+        assert result == {
+            "image": {
+                "registry": "ghcr.io",
+                "repository": "neuro-inc/grafana",
+                "pullSecrets": [
+                    "platform-docker-config",
+                    "platform-docker-hub-config",
+                ],
+            },
+            "initChownData": {
+                "image": {
+                    "registry": "ghcr.io",
+                    "repository": "neuro-inc/busybox",
+                    "pullSecrets": [
+                        "platform-docker-config",
+                        "platform-docker-hub-config",
+                    ],
+                }
+            },
+            "sidecar": {
+                "image": {
+                    "registry": "ghcr.io",
+                    "repository": "neuro-inc/k8s-sidecar",
+                    "pullSecrets": [
+                        "platform-docker-config",
+                        "platform-docker-hub-config",
+                    ],
+                }
+            },
+            "adminUser": "admin",
+            "adminPassword": "grafana_password",
+            "priorityClassName": "platform-services",
+        }
 
     def test_create_platform_disks_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory

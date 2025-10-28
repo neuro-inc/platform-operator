@@ -690,18 +690,6 @@ class TestPlatformConfigFactory:
 
         assert result.monitoring.metrics_enabled is False
 
-    def test_on_prem_platform_config_with_metrics_retention_time(
-        self,
-        factory: PlatformConfigFactory,
-        cluster: Cluster,
-        on_prem_platform_body: kopf.Body,
-    ) -> None:
-        on_prem_platform_body["spec"]["monitoring"]["metrics"]["retentionTime"] = "1d"
-
-        result = factory.create(on_prem_platform_body, cluster)
-
-        assert result.monitoring.metrics_retention_time == "1d"
-
     def test_on_prem_platform_config_with_docker_registry_filesystem(
         self,
         factory: PlatformConfigFactory,
