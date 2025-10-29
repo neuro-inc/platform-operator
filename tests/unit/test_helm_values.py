@@ -824,6 +824,7 @@ class TestHelmValuesFactory:
                     "limits": {"cpu": "1000m", "memory": "1Gi"},
                 }
             },
+            "securityContext": {"enabled": True},
         }
 
     def test_create_platform_storage_values__aws(
@@ -1144,6 +1145,7 @@ class TestHelmValuesFactory:
             "sentry": mock.ANY,
             "disableCreation": False,
             "priorityClassName": "platform-services",
+            "securityContext": {"enabled": True},
         }
 
     def test_create_aws_buckets_values_without_cors(
@@ -1237,6 +1239,7 @@ class TestHelmValuesFactory:
             "sentry": mock.ANY,
             "disableCreation": False,
             "priorityClassName": "platform-services",
+            "securityContext": {"enabled": True},
         }
 
     def test_create_open_stack_buckets_values(
@@ -1321,6 +1324,7 @@ class TestHelmValuesFactory:
             "sentry": mock.ANY,
             "disableCreation": False,
             "priorityClassName": "platform-services",
+            "securityContext": {"enabled": True},
         }
 
     def test_create_on_prem_buckets_values(
@@ -1373,6 +1377,7 @@ class TestHelmValuesFactory:
             "sentry": mock.ANY,
             "disableCreation": False,
             "priorityClassName": "platform-services",
+            "securityContext": {"enabled": True},
         }
 
     def test_create_gcp_buckets_values(
@@ -1429,6 +1434,7 @@ class TestHelmValuesFactory:
             "sentry": mock.ANY,
             "disableCreation": False,
             "priorityClassName": "platform-services",
+            "securityContext": {"enabled": True},
         }
 
     def test_create_azure_buckets_values(
@@ -1489,6 +1495,7 @@ class TestHelmValuesFactory:
             "sentry": mock.ANY,
             "disableCreation": False,
             "priorityClassName": "platform-services",
+            "securityContext": {"enabled": True},
         }
 
     def test_create_gcp_platform_registry_values(
@@ -1564,6 +1571,7 @@ class TestHelmValuesFactory:
                 "sampleRate": 0.1,
             },
             "priorityClassName": "platform-services",
+            "securityContext": {"enabled": True},
         }
 
     def test_create_aws_platform_registry_values(
@@ -1610,6 +1618,7 @@ class TestHelmValuesFactory:
             },
             "sentry": mock.ANY,
             "priorityClassName": "platform-services",
+            "securityContext": {"enabled": True},
         }
 
     def test_create_azure_platform_registry_values(
@@ -1681,6 +1690,7 @@ class TestHelmValuesFactory:
             },
             "sentry": mock.ANY,
             "priorityClassName": "platform-services",
+            "securityContext": {"enabled": True},
         }
 
     def test_create_on_prem_platform_registry_values(
@@ -1752,6 +1762,7 @@ class TestHelmValuesFactory:
             },
             "sentry": mock.ANY,
             "priorityClassName": "platform-services",
+            "securityContext": {"enabled": True},
         }
 
     def test_create_platform_monitoring_values(
@@ -1819,6 +1830,7 @@ class TestHelmValuesFactory:
                 "sampleRate": 0.1,
             },
             "priorityClassName": "platform-services",
+            "securityContext": {"enabled": True},
         }
 
     def test_create_platform_monitoring_values__no_api_url(
@@ -1906,6 +1918,7 @@ class TestHelmValuesFactory:
                 "sampleRate": 0.1,
             },
             "priorityClassName": "platform-services",
+            "securityContext": {"enabled": True},
         }
 
     def test_create_gcp_platform_reports_values(
@@ -2153,12 +2166,28 @@ class TestHelmValuesFactory:
                 "store": {
                     "persistentVolumeClaim": {
                         "spec": {"storageClassName": "platform-standard-topology-aware"}
-                    }
+                    },
+                    "securityContext": {
+                        "allowPrivilegeEscalation": False,
+                        "fsGroup": 1001,
+                        "fsGroupChangePolicy": "OnRootMismatch",
+                        "runAsGroup": 1001,
+                        "runAsNonRoot": True,
+                        "runAsUser": 1001,
+                    },
                 },
                 "compact": {
                     "persistentVolumeClaim": {
                         "spec": {"storageClassName": "platform-standard-topology-aware"}
-                    }
+                    },
+                    "securityContext": {
+                        "allowPrivilegeEscalation": False,
+                        "fsGroup": 1001,
+                        "fsGroupChangePolicy": "OnRootMismatch",
+                        "runAsGroup": 1001,
+                        "runAsNonRoot": True,
+                        "runAsUser": 1001,
+                    },
                 },
                 "objstore": {
                     "type": "GCS",
@@ -2166,6 +2195,26 @@ class TestHelmValuesFactory:
                 },
                 "priorityClassName": "platform-services",
                 "sidecar": {"selector": {"app": None}},
+                "bucket": {
+                    "securityContext": {
+                        "allowPrivilegeEscalation": False,
+                        "fsGroup": 1001,
+                        "fsGroupChangePolicy": "OnRootMismatch",
+                        "runAsGroup": 1001,
+                        "runAsNonRoot": True,
+                        "runAsUser": 1001,
+                    },
+                },
+                "query": {
+                    "securityContext": {
+                        "allowPrivilegeEscalation": False,
+                        "fsGroup": 1001,
+                        "fsGroupChangePolicy": "OnRootMismatch",
+                        "runAsGroup": 1001,
+                        "runAsNonRoot": True,
+                        "runAsUser": 1001,
+                    },
+                },
             },
             "cloudProvider": {
                 "type": "gcp",
@@ -2209,6 +2258,7 @@ class TestHelmValuesFactory:
                 "priorityClassName": "platform-services",
             },
             "priorityClassName": "platform-services",
+            "securityContext": {"enabled": True},
         }
 
     def test_create_aws_platform_reports_values(
@@ -2451,12 +2501,48 @@ class TestHelmValuesFactory:
             "store": {
                 "persistentVolumeClaim": {
                     "spec": {"storageClassName": "platform-standard-topology-aware"}
-                }
+                },
+                "securityContext": {
+                    "runAsUser": 1001,
+                    "runAsGroup": 1001,
+                    "fsGroup": 1001,
+                    "runAsNonRoot": True,
+                    "allowPrivilegeEscalation": False,
+                    "fsGroupChangePolicy": "OnRootMismatch",
+                },
+            },
+            "query": {
+                "securityContext": {
+                    "runAsUser": 1001,
+                    "runAsGroup": 1001,
+                    "fsGroup": 1001,
+                    "runAsNonRoot": True,
+                    "allowPrivilegeEscalation": False,
+                    "fsGroupChangePolicy": "OnRootMismatch",
+                },
             },
             "compact": {
                 "persistentVolumeClaim": {
                     "spec": {"storageClassName": "platform-standard-topology-aware"}
-                }
+                },
+                "securityContext": {
+                    "runAsUser": 1001,
+                    "runAsGroup": 1001,
+                    "fsGroup": 1001,
+                    "runAsNonRoot": True,
+                    "allowPrivilegeEscalation": False,
+                    "fsGroupChangePolicy": "OnRootMismatch",
+                },
+            },
+            "bucket": {
+                "securityContext": {
+                    "runAsUser": 1001,
+                    "runAsGroup": 1001,
+                    "fsGroup": 1001,
+                    "runAsNonRoot": True,
+                    "allowPrivilegeEscalation": False,
+                    "fsGroupChangePolicy": "OnRootMismatch",
+                },
             },
             "objstore": {
                 "type": "GCS",
@@ -2660,6 +2746,7 @@ class TestHelmValuesFactory:
                 "sampleRate": 0.1,
             },
             "priorityClassName": "platform-services",
+            "securityContext": {"enabled": True},
         }
 
     def test_create_platform_disks_values_without_storage_class(
@@ -2813,4 +2900,5 @@ class TestHelmValuesFactory:
                     },
                 },
             },
+            "securityContext": {"enabled": True},
         }

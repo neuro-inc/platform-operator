@@ -627,6 +627,9 @@ class HelmValuesFactory:
             "nameOverride": f"{platform.release_name}-storage",
             "fullnameOverride": f"{platform.release_name}-storage",
             "image": {"repository": platform.get_image("platformstorageapi")},
+            "securityContext": {
+                "enabled": True,
+            },
             "platform": {
                 "clusterName": platform.cluster_name,
                 **self._create_platform_url_value("authUrl", platform.auth_url),
@@ -802,6 +805,9 @@ class HelmValuesFactory:
             "nameOverride": f"{platform.release_name}-registry",
             "fullnameOverride": f"{platform.release_name}-registry",
             "image": {"repository": platform.get_image("platformregistryapi")},
+            "securityContext": {
+                "enabled": True,
+            },
             "platform": {
                 "clusterName": platform.cluster_name,
                 **self._create_platform_url_value("authUrl", platform.auth_url),
@@ -936,6 +942,9 @@ class HelmValuesFactory:
             "nameOverride": f"{platform.release_name}-monitoring",
             "fullnameOverride": f"{platform.release_name}-monitoring",
             "image": {"repository": platform.get_image("platformmonitoringapi")},
+            "securityContext": {
+                "enabled": True,
+            },
             "jobsNamespace": platform.jobs_namespace,
             "kubeletPort": platform.kubelet_port,
             "nvidiaDCGMPort": platform.nvidia_dcgm_port,
@@ -1016,6 +1025,9 @@ class HelmValuesFactory:
             "nameOverride": f"{platform.release_name}-secrets",
             "fullnameOverride": f"{platform.release_name}-secrets",
             "image": {"repository": platform.get_image("platformsecrets")},
+            "securityContext": {
+                "enabled": True,
+            },
             "platform": {
                 "clusterName": platform.cluster_name,
                 **self._create_platform_url_value("authUrl", platform.auth_url),
@@ -1048,6 +1060,9 @@ class HelmValuesFactory:
     ) -> dict[str, Any]:
         result: dict[str, Any] = {
             "image": {"repository": platform.get_image("platform-reports")},
+            "securityContext": {
+                "enabled": True,
+            },
             "nodePoolLabels": {
                 "job": platform.node_labels.job,
                 "gpu": platform.node_labels.accelerator,
@@ -1322,12 +1337,48 @@ class HelmValuesFactory:
                         "storageClassName": platform.standard_storage_class_name,
                     },
                 },
+                "securityContext": {
+                    "runAsUser": 1001,
+                    "runAsGroup": 1001,
+                    "fsGroup": 1001,
+                    "runAsNonRoot": True,
+                    "allowPrivilegeEscalation": False,
+                    "fsGroupChangePolicy": "OnRootMismatch",
+                },
+            },
+            "query": {
+                "securityContext": {
+                    "runAsUser": 1001,
+                    "runAsGroup": 1001,
+                    "fsGroup": 1001,
+                    "runAsNonRoot": True,
+                    "allowPrivilegeEscalation": False,
+                    "fsGroupChangePolicy": "OnRootMismatch",
+                },
             },
             "compact": {
                 "persistentVolumeClaim": {
                     "spec": {
                         "storageClassName": platform.standard_storage_class_name,
                     },
+                },
+                "securityContext": {
+                    "runAsUser": 1001,
+                    "runAsGroup": 1001,
+                    "fsGroup": 1001,
+                    "runAsNonRoot": True,
+                    "allowPrivilegeEscalation": False,
+                    "fsGroupChangePolicy": "OnRootMismatch",
+                },
+            },
+            "bucket": {
+                "securityContext": {
+                    "runAsUser": 1001,
+                    "runAsGroup": 1001,
+                    "fsGroup": 1001,
+                    "runAsNonRoot": True,
+                    "allowPrivilegeEscalation": False,
+                    "fsGroupChangePolicy": "OnRootMismatch",
                 },
             },
             "priorityClassName": platform.services_priority_class_name,
@@ -1463,6 +1514,9 @@ class HelmValuesFactory:
             "nameOverride": f"{platform.release_name}-disks",
             "fullnameOverride": f"{platform.release_name}-disks",
             "image": {"repository": platform.get_image("platformdiskapi")},
+            "securityContext": {
+                "enabled": True,
+            },
             "disks": {
                 "namespace": platform.jobs_namespace,
                 "limitPerUser": str(platform.disks_storage_limit_per_user),
@@ -1560,6 +1614,9 @@ class HelmValuesFactory:
             "nameOverride": f"{platform.release_name}-buckets",
             "fullnameOverride": f"{platform.release_name}-buckets",
             "image": {"repository": platform.get_image("platformbucketsapi")},
+            "securityContext": {
+                "enabled": True,
+            },
             "bucketNamespace": platform.jobs_namespace,
             "platform": {
                 "clusterName": platform.cluster_name,
@@ -2283,6 +2340,9 @@ class HelmValuesFactory:
             "nameOverride": f"{platform.release_name}-metadata",
             "fullnameOverride": f"{platform.release_name}-metadata",
             "image": {"repository": platform.get_image("platform-metadata")},
+            "securityContext": {
+                "enabled": True,
+            },
             "priorityClassName": platform.services_priority_class_name,
             "platform": {
                 **self._create_platform_url_value("appsUrl", platform.apps_url),
