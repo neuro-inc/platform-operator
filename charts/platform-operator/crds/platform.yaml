@@ -444,6 +444,7 @@ spec:
                 properties:
                   helmValues:
                     type: object
+                    x-kubernetes-preserve-unknown-fields: true
                     required: [storages]
                     properties:
                       storages:
