@@ -22,18 +22,19 @@ RUN apt-get update && apt-get install -y curl \
     && rm -rf /var/lib/apt/lists/*
 RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash -s -- -v v3.14.0
 
-RUN mkdir /etc/platform \
-    && curl -o /etc/platform/ca_staging.pem https://letsencrypt.org/certs/staging/letsencrypt-stg-root-x1.pem
-
-# Name of your service (folder under /home)
 ARG SERVICE_NAME="platform-operator"
 
-# Tell Python where the "user" site is
+RUN addgroup --gid 1001 $SERVICE_NAME && \
+    adduser --gid 1001 --shell /bin/false --disabled-password --gecos "" --uid 1001 $SERVICE_NAME && \
+    mkdir -p /var/log/$SERVICE_NAME && \
+    chown $SERVICE_NAME:$SERVICE_NAME /var/log/$SERVICE_NAME
+
+WORKDIR /home/${SERVICE_NAME}
+
 ENV HOME=/home/${SERVICE_NAME}
 ENV PYTHONUSERBASE=/home/${SERVICE_NAME}/.local
 ENV PATH=/home/${SERVICE_NAME}/.local/bin:$PATH
 
-# Copy everything from the builder’s user‐site into your service’s user‐site
-COPY --from=builder /root/.local /home/${SERVICE_NAME}/.local
+COPY --from=builder --chown=$SERVICE_NAME /root/.local /home/${SERVICE_NAME}/.local
 
 ENTRYPOINT ["kopf", "run", "-m", "platform_operator.handlers"]
