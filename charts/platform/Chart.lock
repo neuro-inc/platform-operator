@@ -22,22 +22,22 @@ dependencies:
   version: 24.11.1
 - name: platform-monitoring
   repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 25.9.3
+  version: 25.10.0
 - name: platform-container-runtime
   repository: oci://ghcr.io/neuro-inc/helm-charts
   version: 23.7.0
 - name: platform-secrets
   repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 25.7.4
+  version: 25.10.0
 - name: platform-reports
   repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 25.9.0
+  version: 25.10.3
 - name: platform-disks
   repository: oci://ghcr.io/neuro-inc/helm-charts
   version: 25.7.2
 - name: platform-api-poller
   repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 25.9.1
+  version: 25.10.1
 - name: platform-buckets
   repository: oci://ghcr.io/neuro-inc/helm-charts
   version: 25.7.2
@@ -48,8 +48,8 @@ dependencies:
   repository: https://neuro-inc.github.io/helm-charts
   version: 1.0.1
 - name: pgo
-  repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 5.6.1
+  repository: oci://ghcr.io/neuro-inc/app-crunchy-postgres
+  version: 5.8.3
 - name: spark-operator
   repository: https://kubeflow.github.io/spark-operator
   version: 2.1.0
@@ -65,5 +65,5 @@ dependencies:
 - name: alloy
   repository: https://grafana.github.io/helm-charts
   version: 1.0.1
-digest: sha256:ccac5aca8185302b4911344da93957a3614e483d755661780ecd795d65fd1ec3
-generated: "2025-09-14T12:02:42.137734004+02:00"
+digest: sha256:b55072121ff40c40a937359f031f7cf74d0415a7a00d9d0c20533a765af473ff
+generated: "2025-10-20T19:12:22.288401+03:00"
