@@ -2,14 +2,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
 
 import kopf
 import pytest
 from neuro_config_client import (
-    ARecord,
     Cluster,
-    DNSConfig,
     DockerRegistryConfig,
 )
 from yarl import URL
@@ -149,125 +146,6 @@ class TestConfig:
             acme_ca_staging_path="/ca.pem",
             is_standalone=False,
         )
-
-
-class TestPlatformConfig:
-    @pytest.fixture
-    def traefik_service(self) -> dict[str, Any]:
-        return {
-            "metadata": {"name", "traefik"},
-            "spec": {"type": "LoadBalancer"},
-            "status": {"loadBalancer": {"ingress": [{"ip": "192.168.0.1"}]}},
-        }
-
-    @pytest.fixture
-    def traefik_node_port_service(self) -> dict[str, Any]:
-        return {
-            "metadata": {"name", "traefik"},
-            "spec": {"type": "NodePort"},
-        }
-
-    @pytest.fixture
-    def aws_traefik_service(self) -> dict[str, Any]:
-        return {
-            "metadata": {"name", "traefik"},
-            "spec": {"type": "LoadBalancer"},
-            "status": {"loadBalancer": {"ingress": [{"hostname": "traefik"}]}},
-        }
-
-    @pytest.fixture
-    def aws_traefik_lb(self) -> dict[str, Any]:
-        return {
-            "CanonicalHostedZoneId": "/hostedzone/traefik",
-        }
-
-    def test_create_dns_config_from_traefik_load_balancer_service(
-        self, gcp_platform_config: PlatformConfig, traefik_service: dict[str, Any]
-    ) -> None:
-        result = gcp_platform_config.create_dns_config(ingress_service=traefik_service)
-        dns_name = gcp_platform_config.ingress_dns_name
-
-        assert result == DNSConfig(
-            name=gcp_platform_config.ingress_dns_name,
-            a_records=[
-                ARecord(name=f"{dns_name}.", ips=["192.168.0.1"]),
-                ARecord(name=f"*.{dns_name}.", ips=["192.168.0.1"]),
-                ARecord(name=f"*.jobs.{dns_name}.", ips=["192.168.0.1"]),
-                ARecord(name=f"*.apps.{dns_name}.", ips=["192.168.0.1"]),
-            ],
-        )
-
-    def test_create_dns_config_from_traefik_node_port_service(
-        self,
-        gcp_platform_config: PlatformConfig,
-        traefik_node_port_service: dict[str, Any],
-    ) -> None:
-        result = gcp_platform_config.create_dns_config(
-            ingress_service=traefik_node_port_service
-        )
-
-        assert result is None
-
-    def test_create_dns_config_from_ingress_public_ips(
-        self, on_prem_platform_config: PlatformConfig
-    ) -> None:
-        result = on_prem_platform_config.create_dns_config()
-        dns_name = on_prem_platform_config.ingress_dns_name
-
-        assert result == DNSConfig(
-            name=on_prem_platform_config.ingress_dns_name,
-            a_records=[
-                ARecord(name=f"{dns_name}.", ips=["192.168.0.3"]),
-                ARecord(name=f"*.{dns_name}.", ips=["192.168.0.3"]),
-                ARecord(name=f"*.jobs.{dns_name}.", ips=["192.168.0.3"]),
-                ARecord(name=f"*.apps.{dns_name}.", ips=["192.168.0.3"]),
-            ],
-        )
-
-    def test_create_aws_dns_config(
-        self,
-        aws_platform_config: PlatformConfig,
-        aws_traefik_service: dict[str, Any],
-        aws_traefik_lb: dict[str, Any],
-    ) -> None:
-        result = aws_platform_config.create_dns_config(
-            ingress_service=aws_traefik_service, aws_ingress_lb=aws_traefik_lb
-        )
-        dns_name = aws_platform_config.ingress_dns_name
-
-        assert result == DNSConfig(
-            name=aws_platform_config.ingress_dns_name,
-            a_records=[
-                ARecord(
-                    name=f"{dns_name}.",
-                    dns_name="traefik.",
-                    zone_id="/hostedzone/traefik",
-                ),
-                ARecord(
-                    name=f"*.{dns_name}.",
-                    dns_name="traefik.",
-                    zone_id="/hostedzone/traefik",
-                ),
-                ARecord(
-                    name=f"*.jobs.{dns_name}.",
-                    dns_name="traefik.",
-                    zone_id="/hostedzone/traefik",
-                ),
-                ARecord(
-                    name=f"*.apps.{dns_name}.",
-                    dns_name="traefik.",
-                    zone_id="/hostedzone/traefik",
-                ),
-            ],
-        )
-
-    def test_create_dns_config_none(
-        self,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        result = gcp_platform_config.create_dns_config()
-
-        assert result is None
 
 
 class TestPlatformConfigFactory:

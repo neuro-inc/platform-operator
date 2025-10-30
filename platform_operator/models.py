@@ -5,7 +5,7 @@ import os
 from base64 import b64decode, urlsafe_b64decode
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from enum import Enum
 from hashlib import sha256
 from ipaddress import IPv4Address, IPv4Network
@@ -15,9 +15,7 @@ from typing import Any, NoReturn
 import kopf
 from neuro_config_client import (
     ACMEEnvironment,
-    ARecord,
     Cluster,
-    DNSConfig,
     DockerRegistryConfig,
     IdleJobConfig,
     ResourcePoolType,
@@ -848,84 +846,6 @@ class PlatformConfig:
     def get_image_repo(self, name: str) -> str:
         url = self.docker_config.url / name
         return url.path.lstrip("/")
-
-    def create_dns_config(
-        self,
-        ingress_service: dict[str, Any] | None = None,
-        aws_ingress_lb: dict[str, Any] | None = None,
-    ) -> DNSConfig | None:
-        if not ingress_service and not self.ingress_public_ips:
-            return None
-        a_records: list[ARecord] = []
-        if self.ingress_public_ips:
-            ips = [str(ip) for ip in self.ingress_public_ips]
-            a_records.extend(
-                (
-                    ARecord(name=f"{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"*.{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"*.jobs.{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"*.apps.{self.ingress_dns_name}.", ips=ips),
-                )
-            )
-        elif aws_ingress_lb and ingress_service:
-            ingress_host = ingress_service["status"]["loadBalancer"]["ingress"][0][
-                "hostname"
-            ]
-            ingress_zone_id = aws_ingress_lb["CanonicalHostedZoneId"]
-            a_records.extend(
-                (
-                    ARecord(
-                        name=f"{self.ingress_dns_name}.",
-                        dns_name=f"{ingress_host}.",
-                        zone_id=ingress_zone_id,
-                    ),
-                    ARecord(
-                        name=f"*.{self.ingress_dns_name}.",
-                        dns_name=f"{ingress_host}.",
-                        zone_id=ingress_zone_id,
-                    ),
-                    ARecord(
-                        name=f"*.jobs.{self.ingress_dns_name}.",
-                        dns_name=f"{ingress_host}.",
-                        zone_id=ingress_zone_id,
-                    ),
-                    ARecord(
-                        name=f"*.apps.{self.ingress_dns_name}.",
-                        dns_name=f"{ingress_host}.",
-                        zone_id=ingress_zone_id,
-                    ),
-                )
-            )
-        elif ingress_service and ingress_service["spec"]["type"] == "LoadBalancer":
-            ingress_host = ingress_service["status"]["loadBalancer"]["ingress"][0]["ip"]
-            ips = [ingress_host]
-            a_records.extend(
-                (
-                    ARecord(name=f"{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"*.{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"*.jobs.{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"*.apps.{self.ingress_dns_name}.", ips=ips),
-                )
-            )
-        else:
-            return None
-        return DNSConfig(name=self.ingress_dns_name, a_records=a_records)
-
-    @classmethod
-    def _update_tpu_network(
-        cls,
-        resource_pools_types: Sequence[ResourcePoolType],
-        tpu_network: IPv4Network,
-    ) -> Sequence[ResourcePoolType]:
-        result = []
-        for rpt in resource_pools_types:
-            if rpt.tpu:
-                result.append(
-                    replace(rpt, tpu=replace(rpt.tpu, ipv4_cidr_block=str(tpu_network)))
-                )
-            else:
-                result.append(rpt)
-        return result
 
 
 class PlatformConfigFactory:
