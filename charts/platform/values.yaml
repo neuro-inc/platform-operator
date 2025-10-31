@@ -140,6 +140,11 @@ vault:
     secretRef:
       # Name of the Kubernetes secret containing the AppRole secret ID
       name: "vault-approle-secret"
+<<<<<<< HEAD
+=======
+      # Namespace where the secret is located
+      namespace: "platform"
+>>>>>>> 97ddb7f3be1104ea3cf83ecb0e54e49f6163c785
       # Key in the secret that contains the secret ID
       # Note: The secret will be created in the platform namespace (Release.Namespace)
       key: "secret-id"
