@@ -13,11 +13,10 @@ import kopf
 from neuro_config_client import (
     Cluster,
     ConfigClient,
-    PatchClusterRequest,
 )
 from yarl import URL
 
-from .aws_client import AwsElbClient, S3Client
+from .aws_client import S3Client
 from .helm_client import HelmClient, ReleaseStatus
 from .helm_values import HelmValuesFactory
 from .kube_client import (
@@ -162,10 +161,6 @@ async def _deploy(name: str, body: kopf.Body, logger: kopf.Logger, retry: int) -
         if platform_deploy_required:
             await upgrade_platform_helm_release(platform)
 
-        LOGGER.info("Configuring cluster")
-        await configure_cluster(platform)
-        LOGGER.info("Cluster configured")
-
         await complete_deployment(cluster, platform)
 
         logger.info("Platform deployment completed")
@@ -273,7 +268,6 @@ async def _update(name: str, body: kopf.Body, logger: kopf.Logger) -> None:
         if platform_deploy_required:
             await upgrade_platform_helm_release(platform)
 
-        await configure_cluster(platform)
         await complete_deployment(cluster, platform)
 
         logger.info("Platform deployment completed")
@@ -412,26 +406,4 @@ async def upgrade_platform_helm_release(platform: PlatformConfig) -> None:
         timeout_s=600,
         username=platform.helm_repo.username,
         password=platform.helm_repo.password,
-    )
-
-
-async def configure_cluster(platform: PlatformConfig) -> None:
-    ingress_service: dict[str, Any] | None = None
-    aws_ingress_lb: dict[str, Any] | None = None
-
-    if platform.ingress_controller_install:
-        ingress_service = await app.kube_client.get_service(
-            namespace=platform.namespace, name=platform.ingress_service_name
-        )
-        if platform.aws_region:
-            async with AwsElbClient(region=platform.aws_region) as client:
-                aws_ingress_lb = await client.get_load_balancer_by_dns_name(
-                    ingress_service.load_balancer_host
-                )
-
-    dns = platform.create_dns_config(
-        ingress_service=ingress_service, aws_ingress_lb=aws_ingress_lb
-    )
-    await app.config_client.patch_cluster(
-        platform.cluster_name, PatchClusterRequest(dns=dns), token=platform.token
     )
