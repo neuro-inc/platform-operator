@@ -759,7 +759,9 @@ class ExternalSecretsSpec(BaseModel):
     helm_values: HelmValues = Field(default_factory=HelmValues)
 
 
-class ExternalSecretObjectsSpec(RootModel):
+class ExternalSecretObjectsSpec(
+    RootModel[Sequence["ExternalSecretObjectsSpec.ExternalSecretObject"]]
+):
     class ExternalSecretObject(BaseModel):
         class RemoteRef(BaseModel):
             key: str
