@@ -123,6 +123,17 @@ federatedPrometheus:
     username: ""
     password: ""
 
+clusterSecretStore:
+  # Vault server URL (e.g., "https://vault.apolo.us")
+  server: ""
+  # Vault KV secrets engine path (e.g., "imdc--kv-v2")
+  path: ""
+  # Vault KV secrets engine version ("v1" or "v2")
+  version: "v2"
+  auth: {}
+
+externalSecretObjects: []
+
 traefikEnabled: true
 acmeEnabled: false
 dockerRegistryEnabled: false
@@ -133,3 +144,4 @@ appsKedaEnabled: true
 lokiEnabled: true
 alloyEnabled: true
 appsSparkOperatorEnabled: true
+externalSecretsEnabled: true

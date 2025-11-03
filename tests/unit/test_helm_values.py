@@ -13,6 +13,8 @@ from platform_operator.models import (
     BucketsProvider,
     DockerConfig,
     DockerRegistryStorageDriver,
+    ExternalSecretObjectsSpec,
+    ExternalSecretsSpec,
     IngressServiceType,
     LabelsConfig,
     PlatformConfig,
@@ -45,6 +47,7 @@ class TestHelmValuesFactory:
             "platformReportsEnabled": True,
             "lokiEnabled": True,
             "alloyEnabled": True,
+            "externalSecretsEnabled": True,
             "alpineImage": {"repository": "ghcr.io/neuro-inc/alpine"},
             "pauseImage": {"repository": "ghcr.io/neuro-inc/pause"},
             "crictlImage": {"repository": "ghcr.io/neuro-inc/crictl"},
@@ -178,6 +181,8 @@ class TestHelmValuesFactory:
                 }
             },
             "ssl": {"cert": "", "key": ""},
+            "clusterSecretStore": mock.ANY,
+            "externalSecretObjects": mock.ANY,
             "acme": mock.ANY,
             "traefik": mock.ANY,
             "minio-gateway": mock.ANY,
@@ -194,6 +199,7 @@ class TestHelmValuesFactory:
             "loki": mock.ANY,
             "alloy": mock.ANY,
             "spark-operator": mock.ANY,
+            "external-secrets": mock.ANY,
         }
 
     def test_create_gcp_platform_with_ssl_cert(
@@ -2902,3 +2908,105 @@ class TestHelmValuesFactory:
             },
             "securityContext": {"enabled": True},
         }
+
+    def test_create_cluster_secret_store(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        cluster_name = gcp_platform_config.cluster_name
+        result = factory.create_cluster_secret_store(gcp_platform_config)
+
+        assert result == {
+            "vault": {
+                "server": "https://vault.dev.apolo.us",
+                "path": f"{cluster_name}--kv-v2",
+                "version": "v2",
+                "auth": {
+                    "kubernetes": {
+                        "mountPath": f"{cluster_name}--jwt",
+                        "role": f"{cluster_name}--platform",
+                    }
+                },
+            }
+        }
+
+    def test_create_external_secrets_values(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_external_secrets_values(gcp_platform_config)
+
+        assert result == {
+            "nameOverride": "external-secrets",
+            "fullnameOverride": "external-secrets",
+            "installCRDs": True,
+            "replicaCount": 1,
+            "podLabels": {
+                "service": "external-secrets",
+                "platform.apolo.us/component": "external-secrets",
+            },
+        }
+
+    def test_create_external_secrets_values__with_overrides(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        external_secrets = ExternalSecretsSpec.model_validate(
+            {"helmValues": {"customField": "customValue"}}
+        )
+
+        result = factory.create_external_secrets_values(
+            replace(
+                gcp_platform_config,
+                platform_spec=gcp_platform_config.platform_spec.model_copy(
+                    update={"external_secrets": external_secrets},
+                ),
+            )
+        )
+
+        assert result == {
+            "nameOverride": "external-secrets",
+            "fullnameOverride": "external-secrets",
+            "installCRDs": True,
+            "replicaCount": 1,
+            "podLabels": {
+                "service": "external-secrets",
+                "platform.apolo.us/component": "external-secrets",
+            },
+            "customField": "customValue",
+        }
+
+    def test_create_external_secret_objects(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_external_secret_objects(
+            replace(
+                gcp_platform_config,
+                platform_spec=gcp_platform_config.platform_spec.model_copy(
+                    update={
+                        "external_secret_objects": ExternalSecretObjectsSpec(
+                            root=[
+                                ExternalSecretObjectsSpec.ExternalSecretObject(
+                                    name="test-secret",
+                                    data={
+                                        "secret-key": ExternalSecretObjectsSpec.ExternalSecretObject.RemoteRef(  # noqa: E501
+                                            key="remote-key",
+                                            property="remote-property",
+                                        )
+                                    },
+                                )
+                            ]
+                        )
+                    }
+                ),
+            )
+        )
+
+        assert result == [
+            {
+                "name": "test-secret",
+                "data": {
+                    "secret-key": {
+                        "key": "remote-key",
+                        "property": "remote-property",
+                    }
+                },
+            }
+        ]

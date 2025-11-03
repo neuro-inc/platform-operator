@@ -39,3 +39,6 @@ platform:
   adminUrl: https://api.apolo.us
   notificationsUrl: https://api.apolo.us
   eventsUrl: https://api.apolo.us
+
+vault:
+  url: https://vault.apolo.us
