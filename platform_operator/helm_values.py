@@ -3,6 +3,8 @@ from __future__ import annotations
 import base64
 import re
 import textwrap
+from collections.abc import Mapping
+from copy import deepcopy
 from hashlib import sha256
 from typing import Any
 
@@ -16,11 +18,8 @@ from .models import (
     HelmChartNames,
     IngressServiceType,
     LabelsConfig,
-    MetricsStorageType,
     PlatformConfig,
     RegistryProvider,
-    StorageConfig,
-    StorageType,
 )
 
 
@@ -34,6 +33,27 @@ PLATFORM_APOLO_COMPONENT_LABEL_KEY = "platform.apolo.us/component"
 
 def b64encode(value: str) -> str:
     return base64.b64encode(value.encode()).decode()
+
+
+def _merge_mappings(
+    base: dict[str, Any], overrides: Mapping[str, Any]
+) -> dict[str, Any]:
+    if not overrides:
+        return deepcopy(base)
+    result: dict[str, Any] = {}
+    for key, base_value in base.items():
+        if key in overrides:
+            override_value = overrides[key]
+            if isinstance(override_value, Mapping) and isinstance(base_value, dict):
+                result[key] = _merge_mappings(base_value, override_value)
+            else:
+                result[key] = deepcopy(override_value)
+        else:
+            result[key] = deepcopy(base_value)
+    for key, value in overrides.items():
+        if key not in base:
+            result[key] = deepcopy(value)
+    return result
 
 
 class HelmValuesFactory:
@@ -111,7 +131,10 @@ class HelmValuesFactory:
                 "label": platform.node_labels.job,
             },
             "idleJobs": [self._create_idle_job(job) for job in platform.idle_jobs],
-            "storages": [self._create_storage_values(s) for s in platform.storages],
+            "storages": [
+                s.model_dump(by_alias=True, exclude_none=True)
+                for s in platform.platform_spec.platform_storage.helm_values.storages
+            ],
             "federatedPrometheus": self.create_federated_prometheus(platform),
             HelmChartNames.traefik: self.create_traefik_values(platform),
             HelmChartNames.platform_storage: self.create_platform_storage_values(
@@ -316,42 +339,6 @@ class HelmValuesFactory:
         if job.node_selector:
             result["nodeSelector"] = job.node_selector
         return result
-
-    def _create_storage_values(self, storage: StorageConfig) -> dict[str, Any]:
-        if storage.type == StorageType.NFS:
-            return {
-                "type": StorageType.NFS.value,
-                "path": storage.path,
-                "size": storage.size,
-                "nfs": {
-                    "server": storage.nfs_server,
-                    "path": storage.nfs_export_path,
-                },
-            }
-        if storage.type == StorageType.SMB:
-            return {
-                "type": StorageType.SMB.value,
-                "path": storage.path,
-                "size": storage.size,
-                "smb": {
-                    "server": storage.smb_server,
-                    "shareName": storage.smb_share_name,
-                    "username": storage.smb_username,
-                    "password": storage.smb_password,
-                },
-            }
-        if storage.type == StorageType.AZURE_fILE:
-            return {
-                "type": StorageType.AZURE_fILE.value,
-                "path": storage.path,
-                "size": storage.size,
-                "azureFile": {
-                    "storageAccountName": storage.azure_storage_account_name,
-                    "storageAccountKey": storage.azure_storage_account_key,
-                    "shareName": storage.azure_share_name,
-                },
-            }
-        raise ValueError(f"Storage type {storage.type.value!r} is not supported")
 
     def create_docker_registry_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -646,6 +633,9 @@ class HelmValuesFactory:
             "nameOverride": f"{platform.release_name}-storage",
             "fullnameOverride": f"{platform.release_name}-storage",
             "image": {"repository": platform.get_image("platformstorageapi")},
+            "securityContext": {
+                "enabled": True,
+            },
             "platform": {
                 "clusterName": platform.cluster_name,
                 **self._create_platform_url_value("authUrl", platform.auth_url),
@@ -658,7 +648,7 @@ class HelmValuesFactory:
                     "type": "pvc",
                     "claimName": platform.get_storage_claim_name(s.path),
                 }
-                for s in platform.storages
+                for s in platform.platform_spec.platform_storage.helm_values.storages
             ],
             "service": {
                 "annotations": {
@@ -808,7 +798,11 @@ class HelmValuesFactory:
             raise ValueError(
                 f"Bucket provider {platform.buckets.provider} not supported"
             )
-        return result
+        overrides = platform.platform_spec.platform_storage.helm_values.model_dump(
+            mode="json", by_alias=True
+        )
+        overrides.pop("storages", None)
+        return _merge_mappings(result, overrides)
 
     def create_platform_registry_values(
         self, platform: PlatformConfig
@@ -817,6 +811,9 @@ class HelmValuesFactory:
             "nameOverride": f"{platform.release_name}-registry",
             "fullnameOverride": f"{platform.release_name}-registry",
             "image": {"repository": platform.get_image("platformregistryapi")},
+            "securityContext": {
+                "enabled": True,
+            },
             "platform": {
                 "clusterName": platform.cluster_name,
                 **self._create_platform_url_value("authUrl", platform.auth_url),
@@ -951,6 +948,9 @@ class HelmValuesFactory:
             "nameOverride": f"{platform.release_name}-monitoring",
             "fullnameOverride": f"{platform.release_name}-monitoring",
             "image": {"repository": platform.get_image("platformmonitoringapi")},
+            "securityContext": {
+                "enabled": True,
+            },
             "jobsNamespace": platform.jobs_namespace,
             "kubeletPort": platform.kubelet_port,
             "nvidiaDCGMPort": platform.nvidia_dcgm_port,
@@ -1031,9 +1031,15 @@ class HelmValuesFactory:
             "nameOverride": f"{platform.release_name}-secrets",
             "fullnameOverride": f"{platform.release_name}-secrets",
             "image": {"repository": platform.get_image("platformsecrets")},
+            "securityContext": {
+                "enabled": True,
+            },
             "platform": {
                 "clusterName": platform.cluster_name,
                 **self._create_platform_url_value("authUrl", platform.auth_url),
+                **self._create_platform_url_value(
+                    "eventsUrl", platform.events_url, "apis/events"
+                ),
                 **self._create_platform_token_value(platform),
             },
             "secretsNamespace": platform.jobs_namespace,
@@ -1058,27 +1064,11 @@ class HelmValuesFactory:
     def create_platform_reports_values(
         self, platform: PlatformConfig
     ) -> dict[str, Any]:
-        relabelings = [
-            self._relabel_reports_label(
-                platform.node_labels.job,
-                LabelsConfig.job,
-            ),
-            self._relabel_reports_label(
-                platform.node_labels.node_pool,
-                LabelsConfig.node_pool,
-            ),
-            self._relabel_reports_label(
-                platform.node_labels.accelerator,
-                LabelsConfig.accelerator,
-            ),
-            self._relabel_reports_label(
-                platform.node_labels.preemptible,
-                LabelsConfig.preemptible,
-            ),
-        ]
-        relabelings = [r for r in relabelings if r]
         result: dict[str, Any] = {
             "image": {"repository": platform.get_image("platform-reports")},
+            "securityContext": {
+                "enabled": True,
+            },
             "nodePoolLabels": {
                 "job": platform.node_labels.job,
                 "gpu": platform.node_labels.accelerator,
@@ -1125,245 +1115,20 @@ class HelmValuesFactory:
                 "url": "http://thanos-query-http:10902",
                 "remoteStorageEnabled": True,
             },
-            "kube-prometheus-stack": {
-                "global": {
-                    "imageRegistry": platform.image_registry,
-                    "imagePullSecrets": [
-                        {"name": name} for name in platform.image_pull_secret_names
-                    ],
-                },
-                "prometheus": {
-                    "prometheusSpec": {
-                        "image": {
-                            "registry": platform.image_registry,
-                            "repository": platform.get_image_repo("prometheus"),
-                        },
-                        "retention": platform.monitoring.metrics_retention_time,
-                        "storageSpec": {
-                            "volumeClaimTemplate": {
-                                "spec": {
-                                    "storageClassName": (
-                                        platform.standard_storage_class_name
-                                    )
-                                },
-                            }
-                        },
-                        "externalLabels": {
-                            "cluster": platform.cluster_name,
-                        },
-                        "priorityClassName": platform.services_priority_class_name,
-                    },
-                    "ingress": {
-                        "enabled": True,
-                        "ingressClassName": "traefik",
-                        "annotations": {
-                            "traefik.ingress.kubernetes.io/router.middlewares": (
-                                f"{platform.namespace}-{platform.release_name}-federated-"
-                                "prometheus-auth@kubernetescrd"
-                            ),
-                            "traefik.ingress.kubernetes.io/router.priority": "1000",
-                        },
-                        "hosts": [platform.ingress_prometheus_url.host],
-                        "paths": ["/federate"],
-                    },
-                },
-                "prometheusOperator": {
-                    "image": {
-                        "registry": platform.image_registry,
-                        "repository": platform.get_image_repo("prometheus-operator"),
-                    },
-                    "prometheusConfigReloader": {
-                        "image": {
-                            "registry": platform.image_registry,
-                            "repository": platform.get_image_repo(
-                                "prometheus-config-reloader"
-                            ),
-                        }
-                    },
-                    "thanosImage": {
-                        "registry": platform.image_registry,
-                        "repository": platform.get_image_repo("thanos"),
-                    },
-                    "admissionWebhooks": {
-                        "patch": {
-                            "image": {
-                                "registry": platform.image_registry,
-                                "repository": platform.get_image_repo(
-                                    "kube-webhook-certgen"
-                                ),
-                            },
-                            "priorityClassName": platform.services_priority_class_name,
-                        }
-                    },
-                    "kubeletService": {"namespace": platform.namespace},
-                    "priorityClassName": platform.services_priority_class_name,
-                },
-                "kubelet": {"namespace": platform.namespace},
-                "kubeStateMetrics": {
-                    "serviceMonitor": {"metricRelabelings": relabelings}
-                },
-                "kube-state-metrics": {
-                    "image": {
-                        "registry": platform.image_registry,
-                        "repository": platform.get_image_repo("kube-state-metrics"),
-                    },
-                    "serviceAccount": {
-                        "imagePullSecrets": [
-                            {"name": name} for name in platform.image_pull_secret_names
-                        ]
-                    },
-                    "priorityClassName": platform.services_priority_class_name,
-                    "rbac": {
-                        "extraRules": [
-                            {
-                                "apiGroups": ["neuromation.io"],
-                                "resources": ["platforms"],
-                                "verbs": ["list", "watch"],
-                            }
-                        ]
-                    },
-                    "customResourceState": {
-                        "enabled": True,
-                        "config": {
-                            "spec": {
-                                "resources": [
-                                    {
-                                        "groupVersionKind": {
-                                            "group": "neuromation.io",
-                                            "version": "*",
-                                            "kind": "Platform",
-                                        },
-                                        "labelsFromPath": {
-                                            "name": ["metadata", "name"],
-                                        },
-                                        "metricNamePrefix": "kube_platform",
-                                        "metrics": [
-                                            {
-                                                "name": "status_phase",
-                                                "help": "Platform status phase",
-                                                "each": {
-                                                    "type": "StateSet",
-                                                    "stateSet": {
-                                                        "labelName": "phase",
-                                                        "path": ["status", "phase"],
-                                                        "list": [
-                                                            "Pending",
-                                                            "Deploying",
-                                                            "Deleting",
-                                                            "Deployed",
-                                                            "Failed",
-                                                        ],
-                                                    },
-                                                },
-                                            }
-                                        ],
-                                    }
-                                ]
-                            }
-                        },
-                    },
-                },
-                "nodeExporter": {
-                    "enabled": platform.monitoring.metrics_node_exporter_enabled,
-                },
-                "prometheus-node-exporter": {
-                    "image": {
-                        "registry": platform.image_registry,
-                        "repository": platform.get_image_repo("node-exporter"),
-                    },
-                    "serviceAccount": {
-                        "imagePullSecrets": [
-                            {"name": name} for name in platform.image_pull_secret_names
-                        ]
-                    },
-                },
-                "alertmanager": {
-                    "alertmanagerSpec": {
-                        "image": {
-                            "registry": platform.image_registry,
-                            "repository": platform.get_image_repo("alertmanager"),
-                        },
-                        "configSecret": f"{platform.release_name}-alertmanager-config",
-                        "secrets": [f"{platform.release_name}-token"],
-                    }
-                },
-            },
-            "thanos": {
-                "image": {"repository": platform.get_image("thanos")},
-                "store": {
-                    "persistentVolumeClaim": {
-                        "spec": {
-                            "storageClassName": platform.standard_storage_class_name,
-                        },
-                    },
-                },
-                "compact": {
-                    "persistentVolumeClaim": {
-                        "spec": {
-                            "storageClassName": platform.standard_storage_class_name,
-                        },
-                    },
-                },
-                "priorityClassName": platform.services_priority_class_name,
-                "sidecar": {"selector": {"app": None}},
-            },
-            "grafana": {
-                "image": {
-                    "registry": platform.image_registry,
-                    "repository": platform.get_image_repo("grafana"),
-                    "pullSecrets": platform.image_pull_secret_names,
-                },
-                "initChownData": {
-                    "image": {
-                        "registry": platform.image_registry,
-                        "repository": platform.get_image_repo("busybox"),
-                        "pullSecrets": platform.image_pull_secret_names,
-                    }
-                },
-                "sidecar": {
-                    "image": {
-                        "registry": platform.image_registry,
-                        "repository": platform.get_image_repo("k8s-sidecar"),
-                        "pullSecrets": platform.image_pull_secret_names,
-                    }
-                },
-                "adminUser": platform.grafana_username,
-                "adminPassword": platform.grafana_password,
-                "priorityClassName": platform.services_priority_class_name,
-            },
+            "kube-prometheus-stack": self.create_kube_prometheus_stack_values(platform),
+            "thanos": self.create_thanos_values(platform),
+            "grafana": self.create_grafana_values(platform),
             "priorityClassName": platform.services_priority_class_name,
         }
         result.update(**self._create_tracing_values(platform))
-        prometheus_spec = result["kube-prometheus-stack"]["prometheus"][
-            "prometheusSpec"
-        ]
-        if platform.monitoring.metrics_storage_type == MetricsStorageType.KUBERNETES:
-            result["prometheus"]["url"] = "http://prometheus-prometheus:9090"
-            result["prometheus"]["remoteStorageEnabled"] = False
-            result["prometheusProxy"] = {
-                "prometheus": {"host": "prometheus-prometheus", "port": 9090}
-            }
-            prometheus_spec["retentionSize"] = (
-                platform.monitoring.metrics_storage_size.replace("i", "")
-                + "B"  # Gi -> GB
-            )
-            prometheus_spec["storageSpec"]["volumeClaimTemplate"]["spec"] = {
-                "storageClassName": platform.monitoring.metrics_storage_class_name,
-                "resources": {
-                    "requests": {"storage": platform.monitoring.metrics_storage_size}
+        if platform.buckets.provider == BucketsProvider.GCP:
+            result["cloudProvider"] = {
+                "type": "gcp",
+                "region": platform.monitoring.metrics_region,
+                "serviceAccountSecret": {
+                    "name": f"{platform.release_name}-reports-gcp-key",
+                    "key": "key.json",
                 },
-            }
-            del result["thanos"]
-        elif platform.buckets.provider == BucketsProvider.GCP:
-            result["thanos"]["objstore"] = {
-                "type": "GCS",
-                "config": {
-                    "bucket": platform.monitoring.metrics_bucket_name,
-                    "service_account": platform.gcp_service_account_key,
-                },
-            }
-            prometheus_spec["thanos"] = {
-                "objectStorageConfig": {"secret": result["thanos"]["objstore"]}
             }
             result["secrets"].append(
                 {
@@ -1372,18 +1137,282 @@ class HelmValuesFactory:
                 }
             )
         elif platform.buckets.provider == BucketsProvider.AWS:
-            result["thanos"]["objstore"] = {
+            result["cloudProvider"] = {
+                "type": "aws",
+                "region": platform.monitoring.metrics_region,
+            }
+        elif platform.buckets.provider == BucketsProvider.AZURE:
+            result["cloudProvider"] = {
+                "type": "azure",
+                "region": platform.monitoring.metrics_region,
+            }
+        return result
+
+    def create_kube_prometheus_stack_values(
+        self, platform: PlatformConfig
+    ) -> dict[str, Any]:
+        relabelings = [
+            self._relabel_reports_label(
+                platform.node_labels.job,
+                LabelsConfig.job,
+            ),
+            self._relabel_reports_label(
+                platform.node_labels.node_pool,
+                LabelsConfig.node_pool,
+            ),
+            self._relabel_reports_label(
+                platform.node_labels.accelerator,
+                LabelsConfig.accelerator,
+            ),
+            self._relabel_reports_label(
+                platform.node_labels.preemptible,
+                LabelsConfig.preemptible,
+            ),
+        ]
+        relabelings = [r for r in relabelings if r]
+        return {
+            "global": {
+                "imageRegistry": platform.image_registry,
+                "imagePullSecrets": [
+                    {"name": name} for name in platform.image_pull_secret_names
+                ],
+            },
+            "prometheus": {
+                "prometheusSpec": {
+                    "image": {
+                        "registry": platform.image_registry,
+                        "repository": platform.get_image_repo("prometheus"),
+                    },
+                    "storageSpec": {
+                        "volumeClaimTemplate": {
+                            "spec": {
+                                "storageClassName": platform.standard_storage_class_name
+                            },
+                        }
+                    },
+                    "externalLabels": {
+                        "cluster": platform.cluster_name,
+                    },
+                    "priorityClassName": platform.services_priority_class_name,
+                    "thanos": {
+                        "objectStorageConfig": {
+                            "secret": self._create_thanos_object_store_config(platform)
+                        }
+                    },
+                },
+                "ingress": {
+                    "enabled": True,
+                    "ingressClassName": "traefik",
+                    "annotations": {
+                        "traefik.ingress.kubernetes.io/router.middlewares": (
+                            f"{platform.namespace}-{platform.release_name}-federated-"
+                            "prometheus-auth@kubernetescrd"
+                        ),
+                        "traefik.ingress.kubernetes.io/router.priority": "1000",
+                    },
+                    "hosts": [platform.ingress_prometheus_url.host],
+                    "paths": ["/federate"],
+                },
+            },
+            "prometheusOperator": {
+                "image": {
+                    "registry": platform.image_registry,
+                    "repository": platform.get_image_repo("prometheus-operator"),
+                },
+                "prometheusConfigReloader": {
+                    "image": {
+                        "registry": platform.image_registry,
+                        "repository": platform.get_image_repo(
+                            "prometheus-config-reloader"
+                        ),
+                    }
+                },
+                "thanosImage": {
+                    "registry": platform.image_registry,
+                    "repository": platform.get_image_repo("thanos"),
+                },
+                "admissionWebhooks": {
+                    "patch": {
+                        "image": {
+                            "registry": platform.image_registry,
+                            "repository": platform.get_image_repo(
+                                "kube-webhook-certgen"
+                            ),
+                        },
+                        "priorityClassName": platform.services_priority_class_name,
+                    }
+                },
+                "kubeletService": {"namespace": platform.namespace},
+                "priorityClassName": platform.services_priority_class_name,
+            },
+            "kubelet": {"namespace": platform.namespace},
+            "kubeStateMetrics": {"serviceMonitor": {"metricRelabelings": relabelings}},
+            "kube-state-metrics": {
+                "image": {
+                    "registry": platform.image_registry,
+                    "repository": platform.get_image_repo("kube-state-metrics"),
+                },
+                "serviceAccount": {
+                    "imagePullSecrets": [
+                        {"name": name} for name in platform.image_pull_secret_names
+                    ]
+                },
+                "priorityClassName": platform.services_priority_class_name,
+                "rbac": {
+                    "extraRules": [
+                        {
+                            "apiGroups": ["neuromation.io"],
+                            "resources": ["platforms"],
+                            "verbs": ["list", "watch"],
+                        }
+                    ]
+                },
+                "customResourceState": {
+                    "enabled": True,
+                    "config": {
+                        "spec": {
+                            "resources": [
+                                {
+                                    "groupVersionKind": {
+                                        "group": "neuromation.io",
+                                        "version": "*",
+                                        "kind": "Platform",
+                                    },
+                                    "labelsFromPath": {
+                                        "name": ["metadata", "name"],
+                                    },
+                                    "metricNamePrefix": "kube_platform",
+                                    "metrics": [
+                                        {
+                                            "name": "status_phase",
+                                            "help": "Platform status phase",
+                                            "each": {
+                                                "type": "StateSet",
+                                                "stateSet": {
+                                                    "labelName": "phase",
+                                                    "path": ["status", "phase"],
+                                                    "list": [
+                                                        "Pending",
+                                                        "Deploying",
+                                                        "Deleting",
+                                                        "Deployed",
+                                                        "Failed",
+                                                    ],
+                                                },
+                                            },
+                                        }
+                                    ],
+                                }
+                            ]
+                        }
+                    },
+                },
+            },
+            "nodeExporter": {
+                "enabled": platform.monitoring.metrics_node_exporter_enabled,
+            },
+            "prometheus-node-exporter": {
+                "image": {
+                    "registry": platform.image_registry,
+                    "repository": platform.get_image_repo("node-exporter"),
+                },
+                "serviceAccount": {
+                    "imagePullSecrets": [
+                        {"name": name} for name in platform.image_pull_secret_names
+                    ]
+                },
+            },
+            "alertmanager": {
+                "alertmanagerSpec": {
+                    "image": {
+                        "registry": platform.image_registry,
+                        "repository": platform.get_image_repo("alertmanager"),
+                    },
+                    "configSecret": f"{platform.release_name}-alertmanager-config",
+                    "secrets": [f"{platform.release_name}-token"],
+                }
+            },
+        }
+
+    def create_thanos_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        return {
+            "image": {"repository": platform.get_image("thanos")},
+            "store": {
+                "persistentVolumeClaim": {
+                    "spec": {
+                        "storageClassName": platform.standard_storage_class_name,
+                    },
+                },
+                "securityContext": {
+                    "runAsUser": 1001,
+                    "runAsGroup": 1001,
+                    "fsGroup": 1001,
+                    "runAsNonRoot": True,
+                    "allowPrivilegeEscalation": False,
+                    "fsGroupChangePolicy": "OnRootMismatch",
+                },
+            },
+            "query": {
+                "securityContext": {
+                    "runAsUser": 1001,
+                    "runAsGroup": 1001,
+                    "fsGroup": 1001,
+                    "runAsNonRoot": True,
+                    "allowPrivilegeEscalation": False,
+                    "fsGroupChangePolicy": "OnRootMismatch",
+                },
+            },
+            "compact": {
+                "persistentVolumeClaim": {
+                    "spec": {
+                        "storageClassName": platform.standard_storage_class_name,
+                    },
+                },
+                "securityContext": {
+                    "runAsUser": 1001,
+                    "runAsGroup": 1001,
+                    "fsGroup": 1001,
+                    "runAsNonRoot": True,
+                    "allowPrivilegeEscalation": False,
+                    "fsGroupChangePolicy": "OnRootMismatch",
+                },
+            },
+            "bucket": {
+                "securityContext": {
+                    "runAsUser": 1001,
+                    "runAsGroup": 1001,
+                    "fsGroup": 1001,
+                    "runAsNonRoot": True,
+                    "allowPrivilegeEscalation": False,
+                    "fsGroupChangePolicy": "OnRootMismatch",
+                },
+            },
+            "priorityClassName": platform.services_priority_class_name,
+            "sidecar": {"selector": {"app": None}},
+            "objstore": self._create_thanos_object_store_config(platform),
+        }
+
+    def _create_thanos_object_store_config(
+        self, platform: PlatformConfig
+    ) -> dict[str, Any]:
+        if platform.buckets.provider == BucketsProvider.GCP:
+            return {
+                "type": "GCS",
+                "config": {
+                    "bucket": platform.monitoring.metrics_bucket_name,
+                    "service_account": platform.gcp_service_account_key,
+                },
+            }
+        if platform.buckets.provider == BucketsProvider.AWS:
+            return {
                 "type": "S3",
                 "config": {
                     "bucket": platform.monitoring.metrics_bucket_name,
                     "endpoint": f"s3.{platform.buckets.aws_region}.amazonaws.com",
                 },
             }
-            prometheus_spec["thanos"] = {
-                "objectStorageConfig": {"secret": result["thanos"]["objstore"]}
-            }
-        elif platform.buckets.provider == BucketsProvider.AZURE:
-            result["thanos"]["objstore"] = {
+        if platform.buckets.provider == BucketsProvider.AZURE:
+            return {
                 "type": "AZURE",
                 "config": {
                     "container": platform.monitoring.metrics_bucket_name,
@@ -1391,12 +1420,9 @@ class HelmValuesFactory:
                     "storage_account_key": platform.buckets.azure_storage_account_key,
                 },
             }
-            prometheus_spec["thanos"] = {
-                "objectStorageConfig": {"secret": result["thanos"]["objstore"]}
-            }
-        elif platform.buckets.provider == BucketsProvider.MINIO:
+        if platform.buckets.provider == BucketsProvider.MINIO:
             assert platform.buckets.minio_url
-            result["thanos"]["objstore"] = {
+            return {
                 "type": "S3",
                 "config": {
                     "bucket": platform.monitoring.metrics_bucket_name,
@@ -1407,12 +1433,9 @@ class HelmValuesFactory:
                     "insecure": platform.buckets.minio_url.scheme == "http",
                 },
             }
-            prometheus_spec["thanos"] = {
-                "objectStorageConfig": {"secret": result["thanos"]["objstore"]}
-            }
-        elif platform.buckets.provider == BucketsProvider.EMC_ECS:
+        if platform.buckets.provider == BucketsProvider.EMC_ECS:
             assert platform.buckets.emc_ecs_s3_endpoint
-            result["thanos"]["objstore"] = {
+            return {
                 "type": "S3",
                 "config": {
                     "bucket": platform.monitoring.metrics_bucket_name,
@@ -1423,12 +1446,9 @@ class HelmValuesFactory:
                     "secret_key": platform.buckets.emc_ecs_secret_access_key,
                 },
             }
-            prometheus_spec["thanos"] = {
-                "objectStorageConfig": {"secret": result["thanos"]["objstore"]}
-            }
-        elif platform.buckets.provider == BucketsProvider.OPEN_STACK:
+        if platform.buckets.provider == BucketsProvider.OPEN_STACK:
             assert platform.buckets.open_stack_s3_endpoint
-            result["thanos"]["objstore"] = {
+            return {
                 "type": "S3",
                 "config": {
                     "bucket": platform.monitoring.metrics_bucket_name,
@@ -1440,31 +1460,33 @@ class HelmValuesFactory:
                     "secret_key": platform.buckets.open_stack_password,
                 },
             }
-            prometheus_spec["thanos"] = {
-                "objectStorageConfig": {"secret": result["thanos"]["objstore"]}
-            }
-        else:
-            raise AssertionError("was unable to construct thanos object store config")
-        if platform.buckets.provider == BucketsProvider.GCP:
-            result["cloudProvider"] = {
-                "type": "gcp",
-                "region": platform.monitoring.metrics_region,
-                "serviceAccountSecret": {
-                    "name": f"{platform.release_name}-reports-gcp-key",
-                    "key": "key.json",
-                },
-            }
-        if platform.buckets.provider == BucketsProvider.AWS:
-            result["cloudProvider"] = {
-                "type": "aws",
-                "region": platform.monitoring.metrics_region,
-            }
-        if platform.buckets.provider == BucketsProvider.AZURE:
-            result["cloudProvider"] = {
-                "type": "azure",
-                "region": platform.monitoring.metrics_region,
-            }
-        return result
+        raise AssertionError("was unable to construct thanos object store config")
+
+    def create_grafana_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        return {
+            "image": {
+                "registry": platform.image_registry,
+                "repository": platform.get_image_repo("grafana"),
+                "pullSecrets": platform.image_pull_secret_names,
+            },
+            "initChownData": {
+                "image": {
+                    "registry": platform.image_registry,
+                    "repository": platform.get_image_repo("busybox"),
+                    "pullSecrets": platform.image_pull_secret_names,
+                }
+            },
+            "sidecar": {
+                "image": {
+                    "registry": platform.image_registry,
+                    "repository": platform.get_image_repo("k8s-sidecar"),
+                    "pullSecrets": platform.image_pull_secret_names,
+                }
+            },
+            "adminUser": platform.grafana_username,
+            "adminPassword": platform.grafana_password,
+            "priorityClassName": platform.services_priority_class_name,
+        }
 
     def _relabel_reports_label(
         self, source_label: str, target_label: str
@@ -1498,6 +1520,9 @@ class HelmValuesFactory:
             "nameOverride": f"{platform.release_name}-disks",
             "fullnameOverride": f"{platform.release_name}-disks",
             "image": {"repository": platform.get_image("platformdiskapi")},
+            "securityContext": {
+                "enabled": True,
+            },
             "disks": {
                 "namespace": platform.jobs_namespace,
                 "limitPerUser": str(platform.disks_storage_limit_per_user),
@@ -1574,7 +1599,7 @@ class HelmValuesFactory:
                     "type": "pvc",
                     "claimName": platform.get_storage_claim_name(s.path),
                 }
-                for s in platform.storages
+                for s in platform.platform_spec.platform_storage.helm_values.storages
             ],
             "ingress": {
                 "enabled": True,
@@ -1595,6 +1620,9 @@ class HelmValuesFactory:
             "nameOverride": f"{platform.release_name}-buckets",
             "fullnameOverride": f"{platform.release_name}-buckets",
             "image": {"repository": platform.get_image("platformbucketsapi")},
+            "securityContext": {
+                "enabled": True,
+            },
             "bucketNamespace": platform.jobs_namespace,
             "platform": {
                 "clusterName": platform.cluster_name,
@@ -2318,6 +2346,9 @@ class HelmValuesFactory:
             "nameOverride": f"{platform.release_name}-metadata",
             "fullnameOverride": f"{platform.release_name}-metadata",
             "image": {"repository": platform.get_image("platform-metadata")},
+            "securityContext": {
+                "enabled": True,
+            },
             "priorityClassName": platform.services_priority_class_name,
             "platform": {
                 **self._create_platform_url_value("appsUrl", platform.apps_url),

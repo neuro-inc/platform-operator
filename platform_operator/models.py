@@ -5,7 +5,7 @@ import os
 from base64 import b64decode, urlsafe_b64decode
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from enum import Enum
 from hashlib import sha256
 from ipaddress import IPv4Address, IPv4Network
@@ -15,13 +15,13 @@ from typing import Any, NoReturn
 import kopf
 from neuro_config_client import (
     ACMEEnvironment,
-    ARecord,
     Cluster,
-    DNSConfig,
     DockerRegistryConfig,
     IdleJobConfig,
     ResourcePoolType,
 )
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 from yarl import URL
 
 
@@ -258,51 +258,6 @@ class KubernetesSpec(dict[str, Any]):
         return IPv4Network(self["tpuIPv4CIDR"]) if self.get("tpuIPv4CIDR") else None
 
 
-class StorageSpec(dict[str, Any]):
-    def __init__(self, spec: dict[str, Any]) -> None:
-        super().__init__(spec)
-
-    @property
-    def path(self) -> str:
-        return self.get("path", "")
-
-    @property
-    def nfs_server(self) -> str:
-        return self["nfs"].get("server", "")
-
-    @property
-    def nfs_export_path(self) -> str:
-        return self["nfs"].get("path", "/")
-
-    @property
-    def smb_server(self) -> str:
-        return self["smb"].get("server", "")
-
-    @property
-    def smb_share_name(self) -> str:
-        return self["smb"].get("shareName", "")
-
-    @property
-    def smb_username(self) -> str:
-        return self["smb"].get("username", "")
-
-    @property
-    def smb_password(self) -> str:
-        return self["smb"].get("password", "")
-
-    @property
-    def azure_storage_account_name(self) -> str:
-        return self["azureFile"].get("storageAccountName", "")
-
-    @property
-    def azure_storage_account_key(self) -> str:
-        return self["azureFile"].get("storageAccountKey", "")
-
-    @property
-    def azure_share_name(self) -> str:
-        return self["azureFile"].get("shareName", "")
-
-
 class BlobStorageSpec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
@@ -462,20 +417,8 @@ class MonitoringSpec(dict[str, Any]):
         return self["metrics"].get("region", "")
 
     @property
-    def metrics_retention_time(self) -> str:
-        return self["metrics"].get("retentionTime", "")
-
-    @property
     def metrics_bucket(self) -> str:
         return self["metrics"]["blobStorage"].get("bucket", "")
-
-    @property
-    def metrics_storage_size(self) -> str:
-        return self["metrics"]["kubernetes"]["persistence"].get("size", "")
-
-    @property
-    def metrics_storage_class_name(self) -> str:
-        return self["metrics"]["kubernetes"]["persistence"].get("storageClassName", "")
 
     @property
     def metrics_node_exporter_enabled(self) -> bool:
@@ -578,7 +521,6 @@ class Spec(dict[str, Any]):
         self._kubernetes = KubernetesSpec(spec["kubernetes"])
         self._ingress_controller = IngressControllerSpec(spec["ingressController"])
         self._registry = RegistrySpec(spec["registry"])
-        self._storages = [StorageSpec(s) for s in spec["storages"]]
         self._blob_storage = BlobStorageSpec(spec["blobStorage"])
         self._disks = DisksSpec(spec["disks"])
         self._monitoring = MonitoringSpec(spec["monitoring"])
@@ -602,10 +544,6 @@ class Spec(dict[str, Any]):
     @property
     def registry(self) -> RegistrySpec:
         return self._registry
-
-    @property
-    def storages(self) -> Sequence[StorageSpec]:
-        return self._storages
 
     @property
     def blob_storage(self) -> BlobStorageSpec:
@@ -642,28 +580,6 @@ class DockerConfig:
 class IngressServiceType(str, Enum):
     LOAD_BALANCER = "LoadBalancer"
     NODE_PORT = "NodePort"
-
-
-class StorageType(str, Enum):
-    NFS = "nfs"
-    SMB = "smb"
-    AZURE_fILE = "azureFile"
-
-
-@dataclass(frozen=True)
-class StorageConfig:
-    type: StorageType
-    path: str = ""
-    size: str = "10Gi"
-    nfs_export_path: str = ""
-    nfs_server: str = ""
-    smb_server: str = ""
-    smb_share_name: str = ""
-    smb_username: str = ""
-    smb_password: str = ""
-    azure_storage_account_name: str = ""
-    azure_storage_account_key: str = ""
-    azure_share_name: str = ""
 
 
 class RegistryProvider(str, Enum):
@@ -773,21 +689,12 @@ class MinioGatewayConfig:
     endpoint_url: str = "http://minio-gateway:9000"
 
 
-class MetricsStorageType(Enum):
-    BUCKETS = 1
-    KUBERNETES = 2
-
-
 @dataclass(frozen=True)
 class MonitoringConfig:
     logs_bucket_name: str
     logs_region: str = ""
     metrics_enabled: bool = True
-    metrics_storage_type: MetricsStorageType = MetricsStorageType.BUCKETS
     metrics_bucket_name: str = ""
-    metrics_storage_class_name: str = ""
-    metrics_storage_size: str = ""
-    metrics_retention_time: str = "3d"
     metrics_region: str = ""
     metrics_node_exporter_enabled: bool = True
     loki_enabled: bool = True
@@ -808,6 +715,42 @@ class PrometheusConfig:
         auth: Auth
 
     federation: Federation
+
+
+class PlatformStorageSpec(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_name=True,
+        validate_by_alias=True,
+    )
+
+    class HelmValues(BaseModel):
+        model_config = ConfigDict(
+            alias_generator=to_camel,
+            validate_by_name=True,
+            validate_by_alias=True,
+            extra="allow",
+        )
+
+        class Storage(BaseModel):
+            model_config = ConfigDict(extra="allow")
+
+            path: str | None = None
+
+        storages: Sequence[Storage] = Field(min_length=1)
+
+    helm_values: HelmValues
+
+
+class PlatformSpec(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_name=True,
+        validate_by_alias=True,
+        extra="allow",
+    )
+
+    platform_storage: PlatformStorageSpec
 
 
 @dataclass(frozen=True)
@@ -863,13 +806,13 @@ class PlatformConfig:
     jobs_internal_host_template: str
     jobs_fallback_host: str
     idle_jobs: Sequence[IdleJobConfig]
-    storages: Sequence[StorageConfig]
     buckets: BucketsConfig
     registry: RegistryConfig
     monitoring: MonitoringConfig
     helm_repo: HelmRepo
     docker_config: DockerConfig
     prometheus: PrometheusConfig
+    platform_spec: PlatformSpec
     grafana_username: str | None = None
     grafana_password: str | None = None
     sentry_dsn: URL | None = None
@@ -886,7 +829,7 @@ class PlatformConfig:
         default_factory=AppsOperatorsConfig
     )
 
-    def get_storage_claim_name(self, path: str) -> str:
+    def get_storage_claim_name(self, path: str | None) -> str:
         name = f"{self.release_name}-storage"
         if path:
             name += path.replace("/", "-")
@@ -905,84 +848,6 @@ class PlatformConfig:
     def get_image_repo(self, name: str) -> str:
         url = self.docker_config.url / name
         return url.path.lstrip("/")
-
-    def create_dns_config(
-        self,
-        ingress_service: dict[str, Any] | None = None,
-        aws_ingress_lb: dict[str, Any] | None = None,
-    ) -> DNSConfig | None:
-        if not ingress_service and not self.ingress_public_ips:
-            return None
-        a_records: list[ARecord] = []
-        if self.ingress_public_ips:
-            ips = [str(ip) for ip in self.ingress_public_ips]
-            a_records.extend(
-                (
-                    ARecord(name=f"{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"*.{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"*.jobs.{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"*.apps.{self.ingress_dns_name}.", ips=ips),
-                )
-            )
-        elif aws_ingress_lb and ingress_service:
-            ingress_host = ingress_service["status"]["loadBalancer"]["ingress"][0][
-                "hostname"
-            ]
-            ingress_zone_id = aws_ingress_lb["CanonicalHostedZoneId"]
-            a_records.extend(
-                (
-                    ARecord(
-                        name=f"{self.ingress_dns_name}.",
-                        dns_name=f"{ingress_host}.",
-                        zone_id=ingress_zone_id,
-                    ),
-                    ARecord(
-                        name=f"*.{self.ingress_dns_name}.",
-                        dns_name=f"{ingress_host}.",
-                        zone_id=ingress_zone_id,
-                    ),
-                    ARecord(
-                        name=f"*.jobs.{self.ingress_dns_name}.",
-                        dns_name=f"{ingress_host}.",
-                        zone_id=ingress_zone_id,
-                    ),
-                    ARecord(
-                        name=f"*.apps.{self.ingress_dns_name}.",
-                        dns_name=f"{ingress_host}.",
-                        zone_id=ingress_zone_id,
-                    ),
-                )
-            )
-        elif ingress_service and ingress_service["spec"]["type"] == "LoadBalancer":
-            ingress_host = ingress_service["status"]["loadBalancer"]["ingress"][0]["ip"]
-            ips = [ingress_host]
-            a_records.extend(
-                (
-                    ARecord(name=f"{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"*.{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"*.jobs.{self.ingress_dns_name}.", ips=ips),
-                    ARecord(name=f"*.apps.{self.ingress_dns_name}.", ips=ips),
-                )
-            )
-        else:
-            return None
-        return DNSConfig(name=self.ingress_dns_name, a_records=a_records)
-
-    @classmethod
-    def _update_tpu_network(
-        cls,
-        resource_pools_types: Sequence[ResourcePoolType],
-        tpu_network: IPv4Network,
-    ) -> Sequence[ResourcePoolType]:
-        result = []
-        for rpt in resource_pools_types:
-            if rpt.tpu:
-                result.append(
-                    replace(rpt, tpu=replace(rpt.tpu, ipv4_cidr_block=str(tpu_network)))
-                )
-            else:
-                result.append(rpt)
-        return result
 
 
 class PlatformConfigFactory:
@@ -1012,6 +877,13 @@ class PlatformConfigFactory:
                 spec.iam.aws_role_arn
             )
         buckets_config = self._create_buckets(spec.blob_storage, cluster)
+        platform_spec = PlatformSpec.model_validate(
+            {
+                "platformStorage": PlatformStorageSpec.model_validate(
+                    platform_body["spec"]["platformStorage"]
+                )
+            }
+        )
         return PlatformConfig(
             release_name=release_name,
             auth_url=self._config.platform_auth_url,
@@ -1089,7 +961,6 @@ class PlatformConfigFactory:
             jobs_internal_host_template=f"{{job_id}}.{jobs_namespace}",
             jobs_fallback_host=cluster.orchestrator.job_fallback_hostname,
             idle_jobs=cluster.orchestrator.idle_jobs,
-            storages=[self._create_storage(s) for s in spec.storages],
             buckets=buckets_config,
             registry=self._create_registry(
                 spec.registry, buckets_config=buckets_config
@@ -1130,6 +1001,7 @@ class PlatformConfigFactory:
             services_priority_class_name=f"{self._config.platform_namespace}-services",
             minio_gateway=self._create_minio_gateway(spec),
             prometheus=self._create_prometheus(cluster),
+            platform_spec=platform_spec,
         )
 
     def _create_helm_repo(self, cluster: Cluster) -> HelmRepo:
@@ -1181,36 +1053,6 @@ class PlatformConfigFactory:
             if config and config.secret_name:
                 result.append(config.secret_name)
         return result
-
-    def _create_storage(self, spec: StorageSpec) -> StorageConfig:
-        if not spec:
-            raise ValueError("Storage spec is empty")
-
-        if StorageType.NFS in spec:
-            return StorageConfig(
-                type=StorageType.NFS,
-                path=spec.path,
-                nfs_server=spec.nfs_server,
-                nfs_export_path=spec.nfs_export_path,
-            )
-        if StorageType.SMB in spec:
-            return StorageConfig(
-                type=StorageType.SMB,
-                path=spec.path,
-                smb_server=spec.smb_server,
-                smb_share_name=spec.smb_share_name,
-                smb_username=spec.smb_username,
-                smb_password=spec.smb_password,
-            )
-        if StorageType.AZURE_fILE in spec:
-            return StorageConfig(
-                type=StorageType.AZURE_fILE,
-                path=spec.path,
-                azure_storage_account_name=spec.azure_storage_account_name,
-                azure_storage_account_key=spec.azure_storage_account_key,
-                azure_share_name=spec.azure_share_name,
-            )
-        raise ValueError("Storage type is not supported")
 
     def _create_buckets(self, spec: BlobStorageSpec, cluster: Cluster) -> BucketsConfig:
         if not spec:
@@ -1381,43 +1223,18 @@ class PlatformConfigFactory:
                 loki_endpoint=loki_endpoint,
                 alloy_enabled=spec.alloy_enabled,
             )
-        if "blobStorage" in spec.metrics:
-            return MonitoringConfig(
-                logs_region=spec.logs_region,
-                logs_bucket_name=spec.logs_bucket,
-                metrics_enabled=True,
-                metrics_storage_type=MetricsStorageType.BUCKETS,
-                metrics_region=spec.metrics_region,
-                metrics_bucket_name=spec.metrics_bucket,
-                metrics_retention_time=(
-                    spec.metrics_retention_time
-                    or MonitoringConfig.metrics_retention_time
-                ),
-                metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
-                loki_enabled=loki_enabled,
-                loki_dns_service=loki_dns_service,
-                loki_endpoint=loki_endpoint,
-                alloy_enabled=spec.alloy_enabled,
-            )
-        if "kubernetes" in spec.metrics:
-            return MonitoringConfig(
-                logs_bucket_name=spec.logs_bucket,
-                metrics_enabled=True,
-                metrics_storage_type=MetricsStorageType.KUBERNETES,
-                metrics_storage_class_name=spec.metrics_storage_class_name,
-                metrics_storage_size=spec.metrics_storage_size or "10Gi",
-                metrics_retention_time=(
-                    spec.metrics_retention_time
-                    or MonitoringConfig.metrics_retention_time
-                ),
-                metrics_region=spec.metrics_region,
-                metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
-                loki_enabled=loki_enabled,
-                loki_dns_service=loki_dns_service,
-                loki_endpoint=loki_endpoint,
-                alloy_enabled=spec.alloy_enabled,
-            )
-        raise ValueError("Metrics storage type is not supported")
+        return MonitoringConfig(
+            logs_region=spec.logs_region,
+            logs_bucket_name=spec.logs_bucket,
+            metrics_enabled=True,
+            metrics_region=spec.metrics_region,
+            metrics_bucket_name=spec.metrics_bucket,
+            metrics_node_exporter_enabled=spec.metrics_node_exporter_enabled,
+            loki_enabled=loki_enabled,
+            loki_dns_service=loki_dns_service,
+            loki_endpoint=loki_endpoint,
+            alloy_enabled=spec.alloy_enabled,
+        )
 
     def _create_minio_gateway(self, spec: Spec) -> MinioGatewayConfig | None:
         if BucketsProvider.GCP in spec.blob_storage:

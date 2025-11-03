@@ -2,14 +2,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
 
 import kopf
 import pytest
 from neuro_config_client import (
-    ARecord,
     Cluster,
-    DNSConfig,
     DockerRegistryConfig,
 )
 from yarl import URL
@@ -27,10 +24,9 @@ from platform_operator.models import (
     LabelsConfig,
     PlatformConfig,
     PlatformConfigFactory,
+    PlatformStorageSpec,
     RegistryConfig,
     RegistryProvider,
-    StorageConfig,
-    StorageType,
 )
 
 
@@ -150,125 +146,6 @@ class TestConfig:
             acme_ca_staging_path="/ca.pem",
             is_standalone=False,
         )
-
-
-class TestPlatformConfig:
-    @pytest.fixture
-    def traefik_service(self) -> dict[str, Any]:
-        return {
-            "metadata": {"name", "traefik"},
-            "spec": {"type": "LoadBalancer"},
-            "status": {"loadBalancer": {"ingress": [{"ip": "192.168.0.1"}]}},
-        }
-
-    @pytest.fixture
-    def traefik_node_port_service(self) -> dict[str, Any]:
-        return {
-            "metadata": {"name", "traefik"},
-            "spec": {"type": "NodePort"},
-        }
-
-    @pytest.fixture
-    def aws_traefik_service(self) -> dict[str, Any]:
-        return {
-            "metadata": {"name", "traefik"},
-            "spec": {"type": "LoadBalancer"},
-            "status": {"loadBalancer": {"ingress": [{"hostname": "traefik"}]}},
-        }
-
-    @pytest.fixture
-    def aws_traefik_lb(self) -> dict[str, Any]:
-        return {
-            "CanonicalHostedZoneId": "/hostedzone/traefik",
-        }
-
-    def test_create_dns_config_from_traefik_load_balancer_service(
-        self, gcp_platform_config: PlatformConfig, traefik_service: dict[str, Any]
-    ) -> None:
-        result = gcp_platform_config.create_dns_config(ingress_service=traefik_service)
-        dns_name = gcp_platform_config.ingress_dns_name
-
-        assert result == DNSConfig(
-            name=gcp_platform_config.ingress_dns_name,
-            a_records=[
-                ARecord(name=f"{dns_name}.", ips=["192.168.0.1"]),
-                ARecord(name=f"*.{dns_name}.", ips=["192.168.0.1"]),
-                ARecord(name=f"*.jobs.{dns_name}.", ips=["192.168.0.1"]),
-                ARecord(name=f"*.apps.{dns_name}.", ips=["192.168.0.1"]),
-            ],
-        )
-
-    def test_create_dns_config_from_traefik_node_port_service(
-        self,
-        gcp_platform_config: PlatformConfig,
-        traefik_node_port_service: dict[str, Any],
-    ) -> None:
-        result = gcp_platform_config.create_dns_config(
-            ingress_service=traefik_node_port_service
-        )
-
-        assert result is None
-
-    def test_create_dns_config_from_ingress_public_ips(
-        self, on_prem_platform_config: PlatformConfig
-    ) -> None:
-        result = on_prem_platform_config.create_dns_config()
-        dns_name = on_prem_platform_config.ingress_dns_name
-
-        assert result == DNSConfig(
-            name=on_prem_platform_config.ingress_dns_name,
-            a_records=[
-                ARecord(name=f"{dns_name}.", ips=["192.168.0.3"]),
-                ARecord(name=f"*.{dns_name}.", ips=["192.168.0.3"]),
-                ARecord(name=f"*.jobs.{dns_name}.", ips=["192.168.0.3"]),
-                ARecord(name=f"*.apps.{dns_name}.", ips=["192.168.0.3"]),
-            ],
-        )
-
-    def test_create_aws_dns_config(
-        self,
-        aws_platform_config: PlatformConfig,
-        aws_traefik_service: dict[str, Any],
-        aws_traefik_lb: dict[str, Any],
-    ) -> None:
-        result = aws_platform_config.create_dns_config(
-            ingress_service=aws_traefik_service, aws_ingress_lb=aws_traefik_lb
-        )
-        dns_name = aws_platform_config.ingress_dns_name
-
-        assert result == DNSConfig(
-            name=aws_platform_config.ingress_dns_name,
-            a_records=[
-                ARecord(
-                    name=f"{dns_name}.",
-                    dns_name="traefik.",
-                    zone_id="/hostedzone/traefik",
-                ),
-                ARecord(
-                    name=f"*.{dns_name}.",
-                    dns_name="traefik.",
-                    zone_id="/hostedzone/traefik",
-                ),
-                ARecord(
-                    name=f"*.jobs.{dns_name}.",
-                    dns_name="traefik.",
-                    zone_id="/hostedzone/traefik",
-                ),
-                ARecord(
-                    name=f"*.apps.{dns_name}.",
-                    dns_name="traefik.",
-                    zone_id="/hostedzone/traefik",
-                ),
-            ],
-        )
-
-    def test_create_dns_config_none(
-        self,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        result = gcp_platform_config.create_dns_config()
-
-        assert result is None
 
 
 class TestPlatformConfigFactory:
@@ -623,27 +500,36 @@ class TestPlatformConfigFactory:
         with pytest.raises(ValueError, match="Registry spec is empty"):
             factory.create(azure_platform_body, cluster)
 
-    def test_azure_platform_config_with_nfs_storage(
+    def test_platform_storage_overrides(
         self,
         factory: PlatformConfigFactory,
         cluster: Cluster,
-        azure_platform_body: kopf.Body,
-        azure_platform_config: PlatformConfig,
+        gcp_platform_body: kopf.Body,
     ) -> None:
-        azure_platform_body["spec"]["storages"] = [
-            {"nfs": {"server": "nfs-server", "path": "/path"}}
-        ]
-        result = factory.create(azure_platform_body, cluster)
+        gcp_platform_body["spec"]["platformStorage"] = {
+            "helmValues": {
+                "storages": [
+                    {
+                        "path": "/path",
+                        "nfs": {"server": "nfs-server", "path": "/path"},
+                    }
+                ],
+                "securityContext": {"enabled": True},
+            }
+        }
 
-        assert result == replace(
-            azure_platform_config,
-            storages=[
-                StorageConfig(
-                    type=StorageType.NFS,
-                    nfs_server="nfs-server",
-                    nfs_export_path="/path",
-                )
-            ],
+        result = factory.create(gcp_platform_body, cluster)
+
+        assert result.platform_spec.platform_storage == PlatformStorageSpec(
+            helm_values=PlatformStorageSpec.HelmValues(
+                storages=[
+                    PlatformStorageSpec.HelmValues.Storage(
+                        path="/path",
+                        nfs={"server": "nfs-server", "path": "/path"},
+                    )
+                ],
+                securityContext={"enabled": True},
+            )
         )
 
     def test_azure_platform_config_without_blob_storage__fails(
@@ -668,61 +554,6 @@ class TestPlatformConfigFactory:
 
         assert result == on_prem_platform_config
 
-    def test_on_prem_platform_config_with_nfs_storage(
-        self,
-        factory: PlatformConfigFactory,
-        cluster: Cluster,
-        on_prem_platform_body: kopf.Body,
-        on_prem_platform_config: PlatformConfig,
-    ) -> None:
-        on_prem_platform_body["spec"]["storages"] = [
-            {"nfs": {"server": "nfs-server", "path": "/path"}}
-        ]
-        result = factory.create(on_prem_platform_body, cluster)
-
-        assert result == replace(
-            on_prem_platform_config,
-            storages=[
-                StorageConfig(
-                    type=StorageType.NFS,
-                    nfs_server="nfs-server",
-                    nfs_export_path="/path",
-                )
-            ],
-        )
-
-    def test_on_prem_platform_config_with_smb_storage(
-        self,
-        factory: PlatformConfigFactory,
-        cluster: Cluster,
-        on_prem_platform_body: kopf.Body,
-        on_prem_platform_config: PlatformConfig,
-    ) -> None:
-        on_prem_platform_body["spec"]["storages"] = [
-            {
-                "smb": {
-                    "server": "smb-server",
-                    "shareName": "smb-share",
-                    "username": "smb-username",
-                    "password": "smb-password",
-                }
-            }
-        ]
-        result = factory.create(on_prem_platform_body, cluster)
-
-        assert result == replace(
-            on_prem_platform_config,
-            storages=[
-                StorageConfig(
-                    type=StorageType.SMB,
-                    smb_server="smb-server",
-                    smb_share_name="smb-share",
-                    smb_username="smb-username",
-                    smb_password="smb-password",
-                )
-            ],
-        )
-
     def test_on_prem_platform_config_without_metrics(
         self,
         config: Config,
@@ -736,18 +567,6 @@ class TestPlatformConfigFactory:
         result = factory.create(on_prem_platform_body, cluster)
 
         assert result.monitoring.metrics_enabled is False
-
-    def test_on_prem_platform_config_with_metrics_retention_time(
-        self,
-        factory: PlatformConfigFactory,
-        cluster: Cluster,
-        on_prem_platform_body: kopf.Body,
-    ) -> None:
-        on_prem_platform_body["spec"]["monitoring"]["metrics"]["retentionTime"] = "1d"
-
-        result = factory.create(on_prem_platform_body, cluster)
-
-        assert result.monitoring.metrics_retention_time == "1d"
 
     def test_on_prem_platform_config_with_docker_registry_filesystem(
         self,

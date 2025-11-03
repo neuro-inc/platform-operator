@@ -22,22 +22,22 @@ dependencies:
   version: 24.11.1
 - name: platform-monitoring
   repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 25.9.3
+  version: 25.10.0
 - name: platform-container-runtime
   repository: oci://ghcr.io/neuro-inc/helm-charts
   version: 23.7.0
 - name: platform-secrets
   repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 25.7.4
+  version: 25.10.0
 - name: platform-reports
   repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 25.9.0
+  version: 25.10.3
 - name: platform-disks
   repository: oci://ghcr.io/neuro-inc/helm-charts
   version: 25.7.2
 - name: platform-api-poller
   repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 25.9.1
+  version: 25.10.1
 - name: platform-buckets
   repository: oci://ghcr.io/neuro-inc/helm-charts
   version: 25.7.2
@@ -68,5 +68,5 @@ dependencies:
 - name: external-secrets
   repository: https://charts.external-secrets.io
   version: 0.20.3
-digest: sha256:bcd15e26c1705ecc92205953b8a0fcc9dcf6d8b35dab1471410287f379590281
-generated: "2025-10-09T11:13:12.492113+03:00"
+digest: sha256:b19048bc9d77cb8301de4cb9799ab946335092bbbd4c06ee20f3b8b47f01a524
+generated: "2025-11-03T09:47:32.881675916+01:00"
