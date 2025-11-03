@@ -438,6 +438,46 @@ spec:
                         properties:
                           storageClassName:
                             type: string
+              externalSecrets:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    default: True
+                  helmValues:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+              clusterSecretStore:
+                type: object
+                required: [vault]
+                properties:
+                  vault:
+                    type: object
+                    properties:
+                      server:
+                        type: string
+                      path:
+                        type: string
+                      version:
+                        type: string
+                        default: v2
+              externalSecretObjects:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    data:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                      additionalProperties:
+                        type: object
+                        properties:
+                          key:
+                            type: string
+                          property:
+                            type: string
               platformStorage:
                 type: object
                 required: [helmValues]

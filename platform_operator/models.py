@@ -20,7 +20,7 @@ from neuro_config_client import (
     IdleJobConfig,
     ResourcePoolType,
 )
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 from pydantic.alias_generators import to_camel
 from yarl import URL
 
@@ -144,6 +144,7 @@ class Config:
     kube_config: KubeConfig
     helm_release_names: HelmReleaseNames
     helm_chart_versions: HelmChartVersions
+    vault_url: URL
     platform_auth_url: URL
     platform_ingress_auth_url: URL
     platform_config_url: URL
@@ -170,6 +171,7 @@ class Config:
             helm_chart_versions=HelmChartVersions(
                 platform=env["NP_HELM_PLATFORM_CHART_VERSION"],
             ),
+            vault_url=URL(env["NP_VAULT_URL"]),
             platform_auth_url=URL(env["NP_PLATFORM_AUTH_URL"]),
             platform_ingress_auth_url=URL(env["NP_PLATFORM_INGRESS_AUTH_URL"]),
             platform_config_url=URL(env["NP_PLATFORM_CONFIG_URL"]),
@@ -679,7 +681,6 @@ class AppsOperatorsConfig:
     postgres_operator_enabled: bool = True
     spark_operator_enabled: bool = True
     keda_enabled: bool = True
-    external_secrets_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -717,6 +718,59 @@ class PrometheusConfig:
     federation: Federation
 
 
+class ClusterSecretStoreSpec(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_name=True,
+        validate_by_alias=True,
+    )
+
+    class Vault(BaseModel):
+        model_config = ConfigDict(
+            alias_generator=to_camel,
+            validate_by_name=True,
+            validate_by_alias=True,
+        )
+
+        server: str = ""
+        path: str = ""
+        version: str = "v2"
+        auth: dict[str, Any] = Field(default_factory=dict)
+
+    vault: Vault = Field(default_factory=Vault)
+
+
+class ExternalSecretsSpec(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_name=True,
+        validate_by_alias=True,
+    )
+
+    class HelmValues(BaseModel):
+        model_config = ConfigDict(
+            alias_generator=to_camel,
+            validate_by_name=True,
+            validate_by_alias=True,
+            extra="allow",
+        )
+
+    enabled: bool = True
+    helm_values: HelmValues = Field(default_factory=HelmValues)
+
+
+class ExternalSecretObjectsSpec(RootModel):
+    class ExternalSecretObject(BaseModel):
+        class RemoteRef(BaseModel):
+            key: str
+            property: str
+
+        name: str
+        data: dict[str, RemoteRef]
+
+    root: Sequence[ExternalSecretObject] = Field(default_factory=list)
+
+
 class PlatformStorageSpec(BaseModel):
     model_config = ConfigDict(
         alias_generator=to_camel,
@@ -750,6 +804,13 @@ class PlatformSpec(BaseModel):
         extra="allow",
     )
 
+    external_secrets: ExternalSecretsSpec = ExternalSecretsSpec()
+    cluster_secret_store: ClusterSecretStoreSpec = Field(
+        default_factory=ClusterSecretStoreSpec
+    )
+    external_secret_objects: ExternalSecretObjectsSpec = Field(
+        default_factory=ExternalSecretObjectsSpec
+    )
     platform_storage: PlatformStorageSpec
 
 
@@ -879,9 +940,18 @@ class PlatformConfigFactory:
         buckets_config = self._create_buckets(spec.blob_storage, cluster)
         platform_spec = PlatformSpec.model_validate(
             {
+                "externalSecrets": ExternalSecretsSpec.model_validate(
+                    platform_body["spec"].get("externalSecrets", {})
+                ),
+                "clusterSecretStore": self._create_cluster_secret_store_spec(
+                    platform_body
+                ),
+                "externalSecretObjects": ExternalSecretObjectsSpec.model_validate(
+                    platform_body["spec"].get("externalSecretObjects") or []
+                ),
                 "platformStorage": PlatformStorageSpec.model_validate(
                     platform_body["spec"]["platformStorage"]
-                )
+                ),
             }
         )
         return PlatformConfig(
@@ -1003,6 +1073,24 @@ class PlatformConfigFactory:
             prometheus=self._create_prometheus(cluster),
             platform_spec=platform_spec,
         )
+
+    def _create_cluster_secret_store_spec(
+        self, platform_body: kopf.Body
+    ) -> ClusterSecretStoreSpec:
+        cluster_name = platform_body["metadata"]["name"]
+        spec = ClusterSecretStoreSpec.model_validate(
+            platform_body["spec"].get("clusterSecretStore", {})
+        )
+        spec.vault.server = spec.vault.server or str(self._config.vault_url)
+        spec.vault.path = spec.vault.path or f"{cluster_name}--kv-v2"
+        spec.vault.version = spec.vault.version or "v2"
+        spec.vault.auth = spec.vault.auth or {
+            "kubernetes": {
+                "mountPath": f"{cluster_name}--jwt",
+                "role": f"{cluster_name}--platform",
+            }
+        }
+        return spec
 
     def _create_helm_repo(self, cluster: Cluster) -> HelmRepo:
         assert cluster.credentials

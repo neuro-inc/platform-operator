@@ -69,9 +69,7 @@ class HelmValuesFactory:
                 platform.apps_operator_config.spark_operator_enabled
             ),
             "appsKedaEnabled": platform.apps_operator_config.keda_enabled,
-            "appsExternalSecretsEnabled": (
-                platform.apps_operator_config.external_secrets_enabled
-            ),
+            "externalSecretsEnabled": (platform.platform_spec.external_secrets.enabled),
             "minioEnabled": platform.buckets.minio_install,
             "minioGatewayEnabled": platform.minio_gateway is not None,
             "platformReportsEnabled": platform.monitoring.metrics_enabled,
@@ -132,10 +130,12 @@ class HelmValuesFactory:
             },
             "idleJobs": [self._create_idle_job(job) for job in platform.idle_jobs],
             "storages": [
-                s.model_dump(by_alias=True, exclude_none=True)
+                s.model_dump(mode="json", by_alias=True, exclude_none=True)
                 for s in platform.platform_spec.platform_storage.helm_values.storages
             ],
             "federatedPrometheus": self.create_federated_prometheus(platform),
+            "clusterSecretStore": self.create_cluster_secret_store(platform),
+            "externalSecretObjects": self.create_external_secret_objects(platform),
             HelmChartNames.traefik: self.create_traefik_values(platform),
             HelmChartNames.platform_storage: self.create_platform_storage_values(
                 platform
@@ -279,6 +279,16 @@ class HelmValuesFactory:
                 ],
             }
         }
+
+    def create_cluster_secret_store(self, platform: PlatformConfig) -> dict[str, Any]:
+        return platform.platform_spec.cluster_secret_store.model_dump(
+            mode="json", by_alias=True, exclude_none=True
+        )
+
+    def create_external_secret_objects(
+        self, platform: PlatformConfig
+    ) -> dict[str, Any]:
+        return platform.platform_spec.external_secret_objects.model_dump(mode="json")
 
     def create_acme_values(self, platform: PlatformConfig) -> dict[str, Any]:
         return {
@@ -2366,8 +2376,8 @@ class HelmValuesFactory:
         self, platform: PlatformConfig
     ) -> dict[str, Any]:
         result: dict[str, Any] = {
-            "nameOverride": f"{platform.release_name}",
-            "fullnameOverride": f"{platform.release_name}",
+            "nameOverride": "external-secrets",
+            "fullnameOverride": "external-secrets",
             "installCRDs": True,
             "replicaCount": 1,
             "podLabels": {
@@ -2375,4 +2385,7 @@ class HelmValuesFactory:
                 PLATFORM_APOLO_COMPONENT_LABEL_KEY: "external-secrets",
             },
         }
-        return result
+        overrides = platform.platform_spec.external_secrets.helm_values.model_dump(
+            mode="json", by_alias=True
+        )
+        return _merge_mappings(result, overrides)
