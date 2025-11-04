@@ -195,6 +195,11 @@ spec:
                     type: object
                     required: [persistence]
                     properties:
+                      registry_type:
+                        enum:
+                          - "docker"
+                          - "harbor"
+                        default: "registry"
                       persistence:
                         type: object
                         required: [storageClassName]

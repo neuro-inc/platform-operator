@@ -106,6 +106,7 @@ class HelmReleaseNames:
 
 class HelmChartNames:
     docker_registry: str = "docker-registry"
+    harbor: str = "harbor"
     minio: str = "minio"
     minio_gateway: str = "minio-gateway"
     traefik: str = "traefik"
@@ -593,6 +594,11 @@ class DockerRegistryStorageDriver(str, Enum):
     S3 = "s3"
 
 
+class DockerRegistryType(str, Enum):
+    DOCKER = "docker"
+    HARBOR = "harbor"
+
+
 @dataclass(frozen=True)
 class RegistryConfig:
     provider: RegistryProvider
@@ -607,6 +613,7 @@ class RegistryConfig:
     azure_password: str = ""
 
     docker_registry_install: bool = False
+    docker_registry_type: DockerRegistryType = DockerRegistryType.DOCKER
     docker_registry_url: URL | None = None
     docker_registry_username: str = ""
     docker_registry_password: str = ""
@@ -961,7 +968,7 @@ class PlatformConfigFactory:
             idle_jobs=cluster.orchestrator.idle_jobs,
             buckets=buckets_config,
             registry=self._create_registry(
-                spec.registry, buckets_config=buckets_config
+                spec.registry, buckets_config=buckets_config, cluster=cluster
             ),
             monitoring=self._create_monitoring(spec.monitoring),
             disks_storage_limit_per_user=cluster.disks.storage_limit_per_user,
@@ -1130,7 +1137,7 @@ class PlatformConfigFactory:
         raise ValueError("Bucket provider is not supported")
 
     def _create_registry(
-        self, spec: RegistrySpec, *, buckets_config: BucketsConfig
+        self, spec: RegistrySpec, *, buckets_config: BucketsConfig, cluster: Cluster
     ) -> RegistryConfig:
         if not spec:
             raise ValueError("Registry spec is empty")
@@ -1164,14 +1171,24 @@ class PlatformConfigFactory:
                 docker_registry_password=spec.docker_password,
             )
         if "kubernetes" in spec:
-            return RegistryConfig(
-                provider=RegistryProvider.DOCKER,
-                docker_registry_install=True,
-                docker_registry_url=URL.build(
+            reg_type = DockerRegistryType(
+                spec.get("kubernetes", {}).get("registry_type", "docker")
+            )
+            if reg_type == DockerRegistryType.HARBOR:
+                docker_registry_url = URL.build(
+                    scheme="https", host=f"harbor.apps.{cluster.dns.name}"
+                )
+            else:
+                docker_registry_url = URL.build(
                     scheme="http",
                     host=f"{self._config.helm_release_names.platform}-docker-registry",
                     port=5000,
-                ),
+                )
+            return RegistryConfig(
+                provider=RegistryProvider.DOCKER,
+                docker_registry_install=True,
+                docker_registry_type=reg_type,
+                docker_registry_url=docker_registry_url,
                 docker_registry_storage_driver=DockerRegistryStorageDriver.FILE_SYSTEM,
                 docker_registry_file_system_storage_class_name=(
                     spec.kubernetes_storage_class_name
