@@ -199,7 +199,7 @@ spec:
                         enum:
                           - "docker"
                           - "harbor"
-                        default: "registry"
+                        default: "docker"
                       persistence:
                         type: object
                         required: [storageClassName]
