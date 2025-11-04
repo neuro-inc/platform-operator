@@ -13,6 +13,7 @@ from platform_operator.models import (
     BucketsProvider,
     DockerConfig,
     DockerRegistryStorageDriver,
+    DockerRegistryType,
     IngressServiceType,
     LabelsConfig,
     PlatformConfig,
@@ -37,6 +38,7 @@ class TestHelmValuesFactory:
             "traefikEnabled": True,
             "acmeEnabled": True,
             "dockerRegistryEnabled": False,
+            "harborEnabled": False,
             "appsPostgresOperatorEnabled": True,
             "appsSparkOperatorEnabled": True,
             "appsKedaEnabled": True,
@@ -350,6 +352,42 @@ class TestHelmValuesFactory:
         assert result["dockerRegistryEnabled"] is False
         assert "docker-registry" not in result
 
+    def test_create_on_prem_platform_values_with_harbor_registry(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(
+                on_prem_platform_config,
+                registry=replace(
+                    on_prem_platform_config.registry,
+                    docker_registry_type=DockerRegistryType.HARBOR,
+                ),
+            )
+        )
+
+        assert result["dockerRegistryEnabled"] is False
+        assert result["harborEnabled"] is True
+        assert "harbor" in result
+        assert "docker-registry" not in result
+
+    def test_create_on_prem_platform_values_with_docker_registry_explicit(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_platform_values(
+            replace(
+                on_prem_platform_config,
+                registry=replace(
+                    on_prem_platform_config.registry,
+                    docker_registry_type=DockerRegistryType.DOCKER,
+                ),
+            )
+        )
+
+        assert result["dockerRegistryEnabled"] is True
+        assert result["harborEnabled"] is False
+        assert "docker-registry" in result
+        assert "harbor" not in result
+
     def test_create_on_prem_platform_values_without_minio(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
@@ -508,6 +546,112 @@ class TestHelmValuesFactory:
             "priorityClassName": "platform-services",
         }
         assert result["secrets"]["haSharedSecret"]
+
+    def test_create_harbor_values_with_filesystem_storage(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        on_prem_platform_config = replace(
+            on_prem_platform_config,
+            registry=replace(
+                on_prem_platform_config.registry,
+                docker_registry_type=DockerRegistryType.HARBOR,
+            ),
+        )
+        result = factory.create_harbor_values(on_prem_platform_config)
+
+        assert result == {
+            "expose": {
+                "tls": {"enabled": False},
+                "ingress": {
+                    "hosts": {
+                        "core": "harbor.apps.{on_prem_platform_config.ingress_dns_name}"
+                    },
+                    "className": "traefik",
+                    "annotations": None,
+                },
+            },
+            "persistence": {
+                "persistentVolumeClaim": {
+                    "registry": {
+                        "storageClass": "registry-standard",
+                        "size": "100Gi",
+                    },
+                },
+                "imageChartStorage": {"type": "filesystem"},
+            },
+            "externalURL": f"harbor.apps.{on_prem_platform_config.ingress_dns_name}",
+        }
+
+    def test_create_harbor_values_with_s3_storage(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        on_prem_platform_config = replace(
+            on_prem_platform_config,
+            registry=replace(
+                on_prem_platform_config.registry,
+                docker_registry_type=DockerRegistryType.HARBOR,
+                docker_registry_storage_driver=DockerRegistryStorageDriver.S3,
+                docker_registry_s3_endpoint=URL("https://s3.amazonaws.com"),
+                docker_registry_s3_region="us-east-1",
+                docker_registry_s3_bucket="harbor-registry",
+                docker_registry_s3_access_key="aws-access-key",
+                docker_registry_s3_secret_key="aws-secret-key",
+                docker_registry_s3_disable_redirect=False,
+            ),
+        )
+        result = factory.create_harbor_values(on_prem_platform_config)
+
+        assert result == {
+            "expose": {
+                "tls": {"enabled": False},
+                "ingress": {
+                    "hosts": {
+                        "core": "harbor.apps.{on_prem_platform_config.ingress_dns_name}"
+                    },
+                    "className": "traefik",
+                    "annotations": None,
+                },
+            },
+            "persistence": {
+                "persistentVolumeClaim": {
+                    "registry": {},
+                },
+                "imageChartStorage": {
+                    "type": "s3",
+                    "s3": {
+                        "bucket": "harbor-registry",
+                        "region": "us-east-1",
+                        "regionendpoint": "s3.amazonaws.com",
+                        "accesskey": "aws-access-key",
+                        "secretkey": "aws-secret-key",
+                        "secure": True,
+                        "rootdirectory": "/harbor",
+                    },
+                    "disableredirect": False,
+                },
+            },
+            "externalURL": f"harbor.apps.{on_prem_platform_config.ingress_dns_name}",
+        }
+
+    def test_create_harbor_values_with_admin_credentials(
+        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        on_prem_platform_config = replace(
+            on_prem_platform_config,
+            registry=replace(
+                on_prem_platform_config.registry,
+                docker_registry_type=DockerRegistryType.HARBOR,
+                docker_registry_username="admin",
+                docker_registry_password="admin-password",
+            ),
+        )
+        result = factory.create_harbor_values(on_prem_platform_config)
+
+        assert (
+            result["existingSecretAdminPassword"]
+            == f"{on_prem_platform_config.release_name}-docker-registry"
+        )
+        assert result["existingSecretAdminPasswordKey"] == "password"
 
     def test_create_minio_values(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
