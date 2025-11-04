@@ -196,6 +196,7 @@ spec:
                     required: [persistence]
                     properties:
                       registry_type:
+                        type: string
                         enum:
                           - "docker"
                           - "harbor"
