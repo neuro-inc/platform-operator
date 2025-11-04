@@ -14,9 +14,11 @@ from yarl import URL
 from platform_operator.models import (
     BucketsConfig,
     BucketsProvider,
+    ClusterSecretStoreSpec,
     Config,
     DockerRegistryStorageDriver,
     DockerRegistryType,
+    ExternalSecretObjectsSpec,
     HelmChartVersions,
     HelmReleaseNames,
     IngressServiceType,
@@ -34,6 +36,7 @@ from platform_operator.models import (
 class TestConfig:
     def test_config(self) -> None:
         env = {
+            "NP_VAULT_URL": "https://vault.apolo.us",
             "NP_PLATFORM_AUTH_URL": "http://platformauthapi:8080",
             "NP_PLATFORM_INGRESS_AUTH_URL": "http://platformingressauth:8080",
             "NP_PLATFORM_CONFIG_URL": "http://platformconfig:8080",
@@ -83,6 +86,7 @@ class TestConfig:
             ),
             helm_release_names=HelmReleaseNames(platform="platform"),
             helm_chart_versions=HelmChartVersions(platform="1.0.0"),
+            vault_url=URL("https://vault.apolo.us"),
             platform_auth_url=URL("http://platformauthapi:8080"),
             platform_ingress_auth_url=URL("http://platformingressauth:8080"),
             platform_config_url=URL("http://platformconfig:8080"),
@@ -100,6 +104,7 @@ class TestConfig:
 
     def test_config_defaults(self) -> None:
         env = {
+            "NP_VAULT_URL": "https://vault.apolo.us",
             "NP_PLATFORM_AUTH_URL": "http://platformauthapi:8080",
             "NP_PLATFORM_INGRESS_AUTH_URL": "http://platformingressauth:8080",
             "NP_PLATFORM_CONFIG_URL": "http://platformconfig:8080",
@@ -133,6 +138,7 @@ class TestConfig:
             ),
             helm_release_names=HelmReleaseNames(platform="platform"),
             helm_chart_versions=HelmChartVersions(platform="1.0.0"),
+            vault_url=URL("https://vault.apolo.us"),
             platform_auth_url=URL("http://platformauthapi:8080"),
             platform_ingress_auth_url=URL("http://platformingressauth:8080"),
             platform_config_url=URL("http://platformconfig:8080"),
@@ -186,6 +192,67 @@ class TestPlatformConfigFactory:
         result = factory.create(gcp_platform_body, cluster)
 
         assert result == gcp_platform_config
+
+    def test_gcp_platform_config_with_custom_cluster_secret_store(
+        self,
+        factory: PlatformConfigFactory,
+        cluster: Cluster,
+        gcp_platform_body: kopf.Body,
+    ) -> None:
+        gcp_platform_body["spec"]["clusterSecretStore"] = {
+            "vault": {
+                "server": "https://custom-vault:8200",
+                "path": "custom-path",
+                "version": "v1",
+                "auth": {"custom": {}},
+            }
+        }
+        result = factory.create(gcp_platform_body, cluster)
+
+        assert result.platform_spec.cluster_secret_store == ClusterSecretStoreSpec(
+            vault=ClusterSecretStoreSpec.Vault(
+                server="https://custom-vault:8200",
+                path="custom-path",
+                version="v1",
+                auth={"custom": {}},
+            )
+        )
+
+    def test_gcp_platform_config_with_external_secret_objects(
+        self,
+        factory: PlatformConfigFactory,
+        cluster: Cluster,
+        gcp_platform_body: kopf.Body,
+    ) -> None:
+        gcp_platform_body["spec"]["externalSecretObjects"] = [
+            {
+                "name": "test-secret",
+                "data": {
+                    "secret-key": {
+                        "key": "remote-key",
+                        "property": "remote-property",
+                    }
+                },
+            }
+        ]
+
+        result = factory.create(gcp_platform_body, cluster)
+
+        assert (
+            result.platform_spec.external_secret_objects
+            == ExternalSecretObjectsSpec(
+                root=[
+                    ExternalSecretObjectsSpec.ExternalSecretObject(
+                        name="test-secret",
+                        data={
+                            "secret-key": ExternalSecretObjectsSpec.ExternalSecretObject.RemoteRef(  # noqa: E501
+                                key="remote-key", property="remote-property"
+                            )
+                        },
+                    )
+                ]
+            )
+        )
 
     def test_gcp_platform_config_without_token(
         self,

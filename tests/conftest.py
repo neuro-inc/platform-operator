@@ -46,8 +46,10 @@ from yarl import URL
 from platform_operator.models import (
     BucketsConfig,
     BucketsProvider,
+    ClusterSecretStoreSpec,
     Config,
     DockerConfig,
+    ExternalSecretsSpec,
     HelmChartVersions,
     HelmReleaseNames,
     HelmRepo,
@@ -81,6 +83,7 @@ def config() -> Config:
         ),
         helm_release_names=HelmReleaseNames(platform="platform"),
         helm_chart_versions=HelmChartVersions(platform="1.0.0"),
+        vault_url=URL("https://vault.dev.apolo.us"),
         platform_auth_url=URL("https://dev.neu.ro"),
         platform_ingress_auth_url=URL("https://platformingressauth"),
         platform_config_url=URL("https://dev.neu.ro"),
@@ -569,6 +572,20 @@ def gcp_platform_config(
             )
         ),
         platform_spec=PlatformSpec(
+            cluster_secret_store=ClusterSecretStoreSpec(
+                vault=ClusterSecretStoreSpec.Vault(
+                    server="https://vault.dev.apolo.us",
+                    path=f"{cluster_name}--kv-v2",
+                    version="v2",
+                    auth={
+                        "kubernetes": {
+                            "mountPath": f"{cluster_name}--jwt",
+                            "role": f"{cluster_name}--platform",
+                        }
+                    },
+                )
+            ),
+            external_secrets=ExternalSecretsSpec(root=[]),
             platform_storage=PlatformStorageSpec(
                 helm_values=PlatformStorageSpec.HelmValues(
                     storages=[
@@ -579,7 +596,7 @@ def gcp_platform_config(
                         )
                     ],
                 )
-            )
+            ),
         ),
     )
 
@@ -645,22 +662,24 @@ def azure_platform_config(
             metrics_region="westus",
             metrics_bucket_name="job-metrics",
         ),
-        platform_spec=PlatformSpec(
-            platform_storage=PlatformStorageSpec(
-                helm_values=PlatformStorageSpec.HelmValues(
-                    storages=[
-                        PlatformStorageSpec.HelmValues.Storage(
-                            path="",
-                            size="10Gi",
-                            azureFile={
-                                "storageAccountName": "accountName1",
-                                "storageAccountKey": "accountKey1",
-                                "shareName": "share",
-                            },
-                        )
-                    ]
-                )
-            )
+        platform_spec=gcp_platform_config.platform_spec.model_copy(
+            update={
+                "platform_storage": PlatformStorageSpec(
+                    helm_values=PlatformStorageSpec.HelmValues(
+                        storages=[
+                            PlatformStorageSpec.HelmValues.Storage(
+                                path="",
+                                size="10Gi",
+                                azureFile={
+                                    "storageAccountName": "accountName1",
+                                    "storageAccountKey": "accountKey1",
+                                    "shareName": "share",
+                                },
+                            )
+                        ]
+                    )
+                ),
+            }
         ),
     )
 
