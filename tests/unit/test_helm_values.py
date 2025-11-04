@@ -570,7 +570,8 @@ class TestHelmValuesFactory:
                 "tls": {"enabled": False},
                 "ingress": {
                     "hosts": {
-                        "core": "harbor.apps.{on_prem_platform_config.ingress_dns_name}"
+                        "core": "harbor.apps."
+                        f"{on_prem_platform_config.ingress_dns_name}"
                     },
                     "className": "traefik",
                     "annotations": None,
@@ -612,7 +613,8 @@ class TestHelmValuesFactory:
                 "tls": {"enabled": False},
                 "ingress": {
                     "hosts": {
-                        "core": "harbor.apps.{on_prem_platform_config.ingress_dns_name}"
+                        "core": "harbor.apps."
+                        f"{on_prem_platform_config.ingress_dns_name}"
                     },
                     "className": "traefik",
                     "annotations": None,
