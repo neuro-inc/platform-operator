@@ -62,10 +62,8 @@ class HelmValuesFactory:
         result: dict[str, Any] = {
             "traefikEnabled": platform.ingress_controller_install,
             "acmeEnabled": platform.ingress_acme_enabled,
-            "dockerRegistryEnabled": platform.registry.docker_registry_install
-            and platform.registry.docker_registry_type == DockerRegistryType.DOCKER,
-            "harborEnabled": platform.registry.docker_registry_install
-            and platform.registry.docker_registry_type == DockerRegistryType.HARBOR,
+            "dockerRegistryEnabled": platform.registry.docker_registry_install,
+            "harborEnabled": platform.registry.harbor_registry_install,
             "appsPostgresOperatorEnabled": (
                 platform.apps_operator_config.postgres_operator_enabled
             ),
