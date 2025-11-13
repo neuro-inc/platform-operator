@@ -443,7 +443,7 @@ spec:
                 properties:
                   enabled:
                     type: boolean
-                    default: True
+                    default: true
                   helmValues:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
@@ -478,6 +478,15 @@ spec:
                             type: string
                           property:
                             type: string
+              traefik:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    default: true
+                  helmValues:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
               platformStorage:
                 type: object
                 required: [helmValues]
