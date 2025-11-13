@@ -15,6 +15,7 @@ from yarl import URL
 from .models import (
     BucketsProvider,
     DockerRegistryStorageDriver,
+    DockerRegistryType,
     HelmChartNames,
     LabelsConfig,
     PlatformConfig,
@@ -61,6 +62,7 @@ class HelmValuesFactory:
         result: dict[str, Any] = {
             "traefikEnabled": platform.platform_spec.traefik.enabled,
             "dockerRegistryEnabled": platform.registry.docker_registry_install,
+            "harborEnabled": platform.registry.harbor_registry_install,
             "appsPostgresOperatorEnabled": (
                 platform.apps_operator_config.postgres_operator_enabled
             ),
@@ -191,9 +193,13 @@ class HelmValuesFactory:
         else:
             result["dockerHubConfigSecret"] = {"create": False}
         if platform.registry.docker_registry_install:
-            result[HelmChartNames.docker_registry] = self.create_docker_registry_values(
-                platform
-            )
+            if platform.registry.docker_registry_type == DockerRegistryType.DOCKER:
+                result[HelmChartNames.docker_registry] = (
+                    self.create_docker_registry_values(platform)
+                )
+            elif platform.registry.docker_registry_type == DockerRegistryType.HARBOR:
+                result[HelmChartNames.harbor] = self.create_harbor_values(platform)
+
         if platform.buckets.minio_install:
             assert platform.buckets.minio_public_url
             result["ingress"]["minioHost"] = platform.buckets.minio_public_url.host
@@ -366,6 +372,73 @@ class HelmValuesFactory:
             result["configData"]["storage"]["redirect"] = {
                 "disable": platform.registry.docker_registry_s3_disable_redirect
             }
+        return result
+
+    def create_harbor_values(self, platform: PlatformConfig) -> dict[str, Any]:
+        docker_registry_credentials_secret_name = (
+            f"{platform.release_name}-docker-registry"
+        )
+        harbor_external_host = f"harbor.apps.{platform.ingress_dns_name}"
+        result: dict[str, Any] = {
+            "expose": {
+                "tls": {"enabled": False},
+                "ingress": {
+                    "hosts": {"core": harbor_external_host},
+                    "className": "traefik",
+                    "annotations": None,
+                },
+            },
+            "persistence": {
+                "persistentVolumeClaim": {
+                    "registry": {},
+                },
+                "imageChartStorage": {},
+            },
+            "externalURL": harbor_external_host,
+        }
+
+        if (
+            platform.registry.docker_registry_username
+            and platform.registry.docker_registry_password
+        ):
+            assert platform.registry.docker_registry_username == "admin"
+            result["existingSecretAdminPassword"] = (
+                docker_registry_credentials_secret_name
+            )
+            result["existingSecretAdminPasswordKey"] = "password"
+
+        if (
+            platform.registry.docker_registry_storage_driver
+            == DockerRegistryStorageDriver.FILE_SYSTEM
+        ):
+            result["persistence"]["imageChartStorage"]["type"] = "filesystem"
+            result["persistence"]["persistentVolumeClaim"]["registry"] = {
+                "storageClass": (
+                    platform.registry.docker_registry_file_system_storage_class_name
+                ),
+                "size": platform.registry.docker_registry_file_system_storage_size,
+            }
+        elif (
+            platform.registry.docker_registry_storage_driver
+            == DockerRegistryStorageDriver.S3
+        ):
+            assert platform.registry.docker_registry_s3_endpoint
+            result["persistence"]["imageChartStorage"]["type"] = "s3"
+            result["persistence"]["imageChartStorage"]["s3"] = {
+                "bucket": str(platform.registry.docker_registry_s3_bucket),
+                "region": platform.registry.docker_registry_s3_region,
+                "regionendpoint": self._get_url_authority(
+                    platform.registry.docker_registry_s3_endpoint
+                ),
+                "accesskey": platform.registry.docker_registry_s3_access_key,
+                "secretkey": platform.registry.docker_registry_s3_secret_key,
+                "secure": platform.registry.docker_registry_s3_endpoint.scheme
+                == "https",
+                "rootdirectory": "/harbor",
+            }
+            result["persistence"]["imageChartStorage"]["disableredirect"] = (
+                platform.registry.docker_registry_s3_disable_redirect
+            )
         return result
 
     def create_minio_values(self, platform: PlatformConfig) -> dict[str, Any]:
