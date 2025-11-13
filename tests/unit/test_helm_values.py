@@ -4,7 +4,7 @@ from typing import Any
 from unittest import mock
 
 import pytest
-from neuro_config_client import ACMEEnvironment, IdleJobConfig, Resources
+from neuro_config_client import IdleJobConfig, Resources
 from yarl import URL
 
 from platform_operator.helm_values import HelmValuesFactory
@@ -15,10 +15,10 @@ from platform_operator.models import (
     DockerRegistryStorageDriver,
     ExternalSecretObjectsSpec,
     ExternalSecretsSpec,
-    IngressServiceType,
     LabelsConfig,
     PlatformConfig,
     PlatformStorageSpec,
+    TraefikSpec,
 )
 
 
@@ -37,7 +37,6 @@ class TestHelmValuesFactory:
 
         assert result == {
             "traefikEnabled": True,
-            "acmeEnabled": True,
             "dockerRegistryEnabled": False,
             "appsPostgresOperatorEnabled": True,
             "appsSparkOperatorEnabled": True,
@@ -180,10 +179,8 @@ class TestHelmValuesFactory:
                     "password": "prometheus-password",
                 }
             },
-            "ssl": {"cert": "", "key": ""},
             "clusterSecretStore": mock.ANY,
             "externalSecretObjects": mock.ANY,
-            "acme": mock.ANY,
             "traefik": mock.ANY,
             "minio-gateway": mock.ANY,
             "platform-storage": mock.ANY,
@@ -201,24 +198,6 @@ class TestHelmValuesFactory:
             "spark-operator": mock.ANY,
             "external-secrets": mock.ANY,
         }
-
-    def test_create_gcp_platform_with_ssl_cert(
-        self,
-        gcp_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
-    ) -> None:
-        gcp_platform_config = replace(
-            gcp_platform_config,
-            ingress_acme_enabled=False,
-            ingress_ssl_cert_data="cert_data",
-            ingress_ssl_cert_key_data="key_data",
-        )
-
-        result = factory.create_platform_values(gcp_platform_config)
-
-        assert result["ssl"] == {"cert": "cert_data", "key": "key_data"}
-        assert result["acmeEnabled"] is False
-        assert "acme" not in result
 
     def test_create_gcp_platform_values_with_idle_jobs(
         self,
@@ -393,58 +372,6 @@ class TestHelmValuesFactory:
         result = factory.create_platform_values(gcp_platform_config)
 
         assert result["alertmanager"] == {}
-
-    def test_create_acme_values(
-        self,
-        gcp_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
-    ) -> None:
-        cluster_name = gcp_platform_config.cluster_name
-        result = factory.create_acme_values(gcp_platform_config)
-
-        assert result == {
-            "nameOverride": "acme",
-            "fullnameOverride": "acme",
-            "bashImage": {"repository": "ghcr.io/neuro-inc/bash"},
-            "acme": {
-                "email": f"{cluster_name}@neu.ro",
-                "dns": "neuro",
-                "server": "letsencrypt",
-                "domains": [
-                    f"{cluster_name}.org.neu.ro",
-                    f"*.{cluster_name}.org.neu.ro",
-                    f"*.jobs.{cluster_name}.org.neu.ro",
-                    f"*.apps.{cluster_name}.org.neu.ro",
-                ],
-                "sslCertSecretName": "platform-ssl-cert",
-            },
-            "podLabels": {"service": "acme"},
-            "env": [
-                {"name": "NEURO_URL", "value": "https://dev.neu.ro"},
-                {"name": "NEURO_CLUSTER", "value": cluster_name},
-                {
-                    "name": "NEURO_TOKEN",
-                    "valueFrom": {
-                        "secretKeyRef": {"key": "token", "name": "platform-token"}
-                    },
-                },
-            ],
-            "persistence": {"storageClassName": "platform-standard-topology-aware"},
-            "priorityClassName": "platform-services",
-        }
-
-    def test_create_acme_values_with_acme_staging(
-        self,
-        gcp_platform_config: PlatformConfig,
-        factory: HelmValuesFactory,
-    ) -> None:
-        gcp_platform_config = replace(
-            gcp_platform_config, ingress_acme_environment=ACMEEnvironment.STAGING
-        )
-
-        result = factory.create_acme_values(gcp_platform_config)
-
-        assert result["acme"]["server"] == "letsencrypt_test"
 
     def test_create_docker_registry_values_with_filesystem_storage(
         self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -637,7 +564,7 @@ class TestHelmValuesFactory:
             },
         }
 
-    def test_create_gcp_traefik_values(
+    def test_create_traefik_values(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
         result = factory.create_traefik_values(gcp_platform_config)
@@ -648,7 +575,6 @@ class TestHelmValuesFactory:
             "instanceLabelOverride": "platform",
             "image": {"name": "ghcr.io/neuro-inc/traefik"},
             "deployment": {
-                "replicas": 2,
                 "labels": {
                     "service": "traefik",
                     "platform.apolo.us/component": "ingress-gateway",
@@ -665,10 +591,6 @@ class TestHelmValuesFactory:
             "resources": {
                 "requests": {"cpu": "250m", "memory": "256Mi"},
                 "limits": {"cpu": "1000m", "memory": "1Gi"},
-            },
-            "service": {
-                "type": "LoadBalancer",
-                "annotations": {},
             },
             "ports": {
                 "web": {"redirectTo": {"port": "websecure"}},
@@ -693,13 +615,6 @@ class TestHelmValuesFactory:
                     "publishedService": {"enabled": False},
                 },
             },
-            "tlsStore": {
-                "default": {
-                    "defaultCertificate": {
-                        "secretName": "platform-ssl-cert",
-                    },
-                },
-            },
             "ingressClass": {"enabled": True},
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
@@ -717,39 +632,52 @@ class TestHelmValuesFactory:
             },
         }
 
-    def test_create_gcp_traefik_values_with_ingress_load_balancer_source_ranges(
+    def test_create_traefik_values__with_overrides(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
     ) -> None:
-        result = factory.create_traefik_values(
-            replace(
-                gcp_platform_config, ingress_load_balancer_source_ranges=["0.0.0.0/0"]
-            )
-        )
-
-        assert result["service"]["loadBalancerSourceRanges"] == ["0.0.0.0/0"]
-
-    def test_create_on_prem_traefik_values_with_custom_ports(
-        self, on_prem_platform_config: PlatformConfig, factory: HelmValuesFactory
-    ) -> None:
-        result = factory.create_traefik_values(
-            replace(
-                on_prem_platform_config,
-                ingress_service_type=IngressServiceType.NODE_PORT,
-                ingress_node_port_http=30080,
-                ingress_node_port_https=30443,
-                ingress_host_port_http=80,
-                ingress_host_port_https=443,
-            )
-        )
-
-        assert result["updateStrategy"] == {
-            "rollingUpdate": {"maxSurge": 0, "maxUnavailable": 1}
+        overrides: dict[str, Any] = {
+            "helmValues": {
+                "extra": {"foo": "bar"},
+            }
         }
-        assert result["service"]["type"] == "NodePort"
-        assert result["ports"]["web"]["nodePort"] == 30080
-        assert result["ports"]["web"]["hostPort"] == 80
-        assert result["ports"]["websecure"]["nodePort"] == 30443
-        assert result["ports"]["websecure"]["hostPort"] == 443
+
+        traefik = TraefikSpec.model_validate(overrides)
+
+        result = factory.create_traefik_values(
+            replace(
+                gcp_platform_config,
+                platform_spec=gcp_platform_config.platform_spec.model_copy(
+                    update={"traefik": traefik},
+                ),
+            )
+        )
+
+        assert result["extra"] == overrides["helmValues"]["extra"]
+
+    def test_create_traefik_values__with_overrides__additional_arguments_preserved(
+        self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
+    ) -> None:
+        result = factory.create_traefik_values(gcp_platform_config)
+        base_additional_arguments = result["additionalArguments"]
+
+        overrides: dict[str, Any] = {
+            "helmValues": {
+                "additionalArguments": ["extra"],
+            }
+        }
+
+        traefik = TraefikSpec.model_validate(overrides)
+
+        result = factory.create_traefik_values(
+            replace(
+                gcp_platform_config,
+                platform_spec=gcp_platform_config.platform_spec.model_copy(
+                    update={"traefik": traefik},
+                ),
+            )
+        )
+
+        assert result["additionalArguments"] == base_additional_arguments + ["extra"]
 
     def test_create_platform_storage_values__gcp(
         self, gcp_platform_config: PlatformConfig, factory: HelmValuesFactory
@@ -1781,7 +1709,6 @@ class TestHelmValuesFactory:
             "fullnameOverride": "platform-monitoring",
             "image": {"repository": "ghcr.io/neuro-inc/platformmonitoringapi"},
             "kubeletPort": 10250,
-            "nvidiaDCGMPort": 9400,
             "jobsNamespace": "platform-jobs",
             "nodeLabels": {
                 "nodePool": "platform.neuromation.io/nodepool",

@@ -20,7 +20,6 @@ from platform_operator.models import (
     ExternalSecretObjectsSpec,
     HelmChartVersions,
     HelmReleaseNames,
-    IngressServiceType,
     KubeClientAuthType,
     KubeConfig,
     LabelsConfig,
@@ -64,7 +63,6 @@ class TestConfig:
             "NP_PLATFORM_NAMESPACE": "platform",
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
             "NP_PLATFORM_LOCK_SECRET_NAME": "platform-operator-lock",
-            "NP_ACME_CA_STAGING_PATH": "/ca.pem",
             "NP_STANDALONE": "true",
         }
 
@@ -97,7 +95,6 @@ class TestConfig:
             platform_events_url=URL("http://platform-events:8080"),
             platform_namespace="platform",
             platform_lock_secret_name="platform-operator-lock",
-            acme_ca_staging_path="/ca.pem",
             is_standalone=True,
         )
 
@@ -122,7 +119,6 @@ class TestConfig:
             "NP_PLATFORM_NAMESPACE": "platform",
             "NP_PLATFORM_LOCK_SECRET_NAME": "platform-operator-lock",
             "NP_PLATFORM_JOBS_NAMESPACE": "platform-jobs",
-            "NP_ACME_CA_STAGING_PATH": "/ca.pem",
         }
         assert Config.load_from_env(env) == Config(
             log_level="INFO",
@@ -149,7 +145,6 @@ class TestConfig:
             platform_events_url=URL("http://platform-events:8080"),
             platform_namespace="platform",
             platform_lock_secret_name="platform-operator-lock",
-            acme_ca_staging_path="/ca.pem",
             is_standalone=False,
         )
 
@@ -288,113 +283,6 @@ class TestPlatformConfigFactory:
         result = factory.create(gcp_platform_body, cluster)
 
         assert result == replace(gcp_platform_config, standard_storage_class_name=None)
-
-    def test_gcp_platform_config_with_ingress_controller_disabled(
-        self,
-        factory: PlatformConfigFactory,
-        cluster: Cluster,
-        gcp_platform_body: kopf.Body,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        gcp_platform_body["spec"]["ingressController"] = {"enabled": False}
-        result = factory.create(gcp_platform_body, cluster)
-
-        assert result == replace(gcp_platform_config, ingress_controller_install=False)
-
-    def test_gcp_platform_config_with_custom_ingress_controller_replicas(
-        self,
-        factory: PlatformConfigFactory,
-        cluster: Cluster,
-        gcp_platform_body: kopf.Body,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        gcp_platform_body["spec"]["ingressController"] = {"replicas": 3}
-        result = factory.create(gcp_platform_body, cluster)
-
-        assert result == replace(gcp_platform_config, ingress_controller_replicas=3)
-
-    def test_gcp_platform_config_with_ingress_ssl_cert(
-        self,
-        factory: PlatformConfigFactory,
-        cluster: Cluster,
-        gcp_platform_body: kopf.Body,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        gcp_platform_body["spec"]["ingressController"] = {
-            "ssl": {
-                "certificateData": "cert-data",
-                "certificateKeyData": "cert-key-data",
-            }
-        }
-        result = factory.create(gcp_platform_body, cluster)
-
-        assert result == replace(
-            gcp_platform_config,
-            ingress_acme_enabled=False,
-            ingress_ssl_cert_data="cert-data",
-            ingress_ssl_cert_key_data="cert-key-data",
-        )
-
-    def test_gcp_platform_config_with_ingress_service_type_node_port(
-        self,
-        factory: PlatformConfigFactory,
-        cluster: Cluster,
-        gcp_platform_body: kopf.Body,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        gcp_platform_body["spec"]["ingressController"] = {
-            "serviceType": "NodePort",
-            "nodePorts": {
-                "http": 30080,
-                "https": 30443,
-            },
-            "hostPorts": {
-                "http": 80,
-                "https": 443,
-            },
-        }
-        result = factory.create(gcp_platform_body, cluster)
-
-        assert result == replace(
-            gcp_platform_config,
-            ingress_service_type=IngressServiceType.NODE_PORT,
-            ingress_node_port_http=30080,
-            ingress_node_port_https=30443,
-            ingress_host_port_http=80,
-            ingress_host_port_https=443,
-        )
-
-    def test_gcp_platform_config_with_ingress_service_annotations(
-        self,
-        factory: PlatformConfigFactory,
-        cluster: Cluster,
-        gcp_platform_body: kopf.Body,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        gcp_platform_body["spec"]["ingressController"] = {
-            "serviceAnnotations": {"key": "value"}
-        }
-        result = factory.create(gcp_platform_body, cluster)
-
-        assert result == replace(
-            gcp_platform_config, ingress_service_annotations={"key": "value"}
-        )
-
-    def test_gcp_platform_config_with_ingress_load_balancer_source_ranges(
-        self,
-        factory: PlatformConfigFactory,
-        cluster: Cluster,
-        gcp_platform_body: kopf.Body,
-        gcp_platform_config: PlatformConfig,
-    ) -> None:
-        gcp_platform_body["spec"]["ingressController"] = {
-            "loadBalancerSourceRanges": ["0.0.0.0/0"]
-        }
-        result = factory.create(gcp_platform_body, cluster)
-
-        assert result == replace(
-            gcp_platform_config, ingress_load_balancer_source_ranges=["0.0.0.0/0"]
-        )
 
     def test_gcp_platform_config_with_docker_config_secret_without_credentials(
         self,

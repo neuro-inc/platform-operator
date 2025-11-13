@@ -76,8 +76,6 @@ spec:
           value: {{ .Release.Namespace }}
         - name: NP_PLATFORM_LOCK_SECRET_NAME
           value: {{ include "platformOperator.fullname" . }}-lock
-        - name: NP_ACME_CA_STAGING_PATH
-          value: /etc/platform/ca_staging.pem
         {{- if .Values.platform.standalone }}
         - name: NP_STANDALONE
           value: "true"
