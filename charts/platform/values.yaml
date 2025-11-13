@@ -109,14 +109,10 @@ keda-add-ons-http:
 
   scaler:
     replicas: 1
-# spark
 
+# spark
 spark-operator:
   replicas: 1
-
-ssl:
-  cert: ""
-  key: ""
 
 federatedPrometheus:
   auth:
@@ -135,7 +131,6 @@ clusterSecretStore:
 externalSecretObjects: []
 
 traefikEnabled: true
-acmeEnabled: false
 dockerRegistryEnabled: false
 minioEnabled: false
 platformReportsEnabled: true

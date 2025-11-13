@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
-from ipaddress import IPv4Address, IPv4Network
+from ipaddress import IPv4Network
 from unittest import mock
 
 import kopf
@@ -53,7 +53,6 @@ from platform_operator.models import (
     HelmChartVersions,
     HelmReleaseNames,
     HelmRepo,
-    IngressServiceType,
     KubeClientAuthType,
     KubeConfig,
     LabelsConfig,
@@ -95,7 +94,6 @@ def config() -> Config:
         platform_events_url=URL("https://platform-events"),
         platform_namespace="platform",
         platform_lock_secret_name="platform-operator-lock",
-        acme_ca_staging_path="/ca.pem",
         is_standalone=False,
     )
 
@@ -472,7 +470,6 @@ def gcp_platform_config(
         standard_storage_class_name="platform-standard-topology-aware",
         kubernetes_tpu_network=IPv4Network("192.168.0.0/16"),
         kubelet_port=10250,
-        nvidia_dcgm_port=9400,
         node_labels=LabelsConfig(
             job="platform.neuromation.io/job",
             node_pool="platform.neuromation.io/nodepool",
@@ -492,32 +489,16 @@ def gcp_platform_config(
                 resources=Resources(cpu=1, memory=2**30),
             )
         ],
-        ingress_dns_name=f"{cluster_name}.org.neu.ro",
         ingress_url=URL(f"https://{cluster_name}.org.neu.ro"),
         ingress_auth_url=URL("https://platformingressauth"),
         ingress_registry_url=URL(f"https://registry.{cluster_name}.org.neu.ro"),
         ingress_grafana_url=URL(f"https://grafana.{cluster_name}.org.neu.ro"),
         ingress_metrics_url=URL(f"https://metrics.{cluster_name}.org.neu.ro"),
         ingress_prometheus_url=URL(f"https://prometheus.{cluster_name}.org.neu.ro"),
-        ingress_acme_enabled=True,
-        ingress_acme_environment=ACMEEnvironment.PRODUCTION,
-        ingress_controller_install=True,
-        ingress_controller_replicas=2,
-        ingress_public_ips=[],
         ingress_cors_origins=[
             "https://console.apolo.us",
             "https://custom.app",
         ],
-        ingress_service_type=IngressServiceType.LOAD_BALANCER,
-        ingress_service_name="traefik",
-        ingress_service_annotations={},
-        ingress_load_balancer_source_ranges=[],
-        ingress_node_port_http=None,
-        ingress_node_port_https=None,
-        ingress_host_port_http=None,
-        ingress_host_port_https=None,
-        ingress_ssl_cert_data="",
-        ingress_ssl_cert_key_data="",
         registry=RegistryConfig(provider=RegistryProvider.GCP, gcp_project="project"),
         buckets=BucketsConfig(
             provider=BucketsProvider.GCP,
@@ -694,7 +675,6 @@ def on_prem_platform_config(
         gcp_platform_config,
         gcp_service_account_key="",
         gcp_service_account_key_base64="",
-        ingress_public_ips=[IPv4Address("192.168.0.3")],
         standard_storage_class_name="standard",
         kubernetes_tpu_network=None,
         jobs_resource_pool_types=[resource_pool_type_factory()],

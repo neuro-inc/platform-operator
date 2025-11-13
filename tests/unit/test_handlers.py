@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from dataclasses import replace
 from typing import Any
 from unittest import mock
 
@@ -330,58 +329,6 @@ async def test_deploy(
         gcp_platform_config.cluster_name
     )
 
-    aws_s3_client.create_bucket.assert_awaited_once()
-
-
-async def test_deploy_with_ingress_controller_disabled(
-    aws_s3_client: mock.AsyncMock,
-    status_manager: mock.AsyncMock,
-    config_client: mock.AsyncMock,
-    helm_client: mock.AsyncMock,
-    is_platform_deploy_required: mock.AsyncMock,
-    logger: logging.Logger,
-    cluster: Cluster,
-    gcp_platform_body: kopf.Body,
-    gcp_platform_config: PlatformConfig,
-) -> None:
-    from platform_operator.handlers import deploy
-
-    gcp_platform_body["spec"]["ingressController"] = {"enabled": False}
-    gcp_platform_config = replace(gcp_platform_config, ingress_controller_install=False)
-
-    is_platform_deploy_required.return_value = True
-    config_client.get_cluster.return_value = cluster
-
-    await deploy(  # type: ignore
-        name=gcp_platform_config.cluster_name,
-        body=gcp_platform_body,
-        logger=logger,
-        retry=0,
-    )
-
-    config_client.get_cluster.assert_awaited_once_with(
-        gcp_platform_config.cluster_name,
-        token=gcp_platform_body["spec"]["token"],
-    )
-
-    helm_client.upgrade.assert_awaited_once_with(
-        "platform",
-        "https://ghcr.io/neuro-inc/helm-charts/platform",
-        values=mock.ANY,
-        version="1.0.0",
-        install=True,
-        wait=True,
-        timeout_s=600,
-        username=gcp_platform_config.helm_repo.username,
-        password=gcp_platform_config.helm_repo.password,
-    )
-
-    status_manager.start_deployment.assert_awaited_once_with(
-        gcp_platform_config.cluster_name, 0
-    )
-    status_manager.complete_deployment.assert_awaited_once_with(
-        gcp_platform_config.cluster_name
-    )
     aws_s3_client.create_bucket.assert_awaited_once()
 
 
