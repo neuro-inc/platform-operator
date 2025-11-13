@@ -882,6 +882,9 @@ class PlatformConfigFactory:
                 "externalSecretObjects": ExternalSecretObjectsSpec.model_validate(
                     platform_body["spec"].get("externalSecretObjects") or []
                 ),
+                "traefik": TraefikSpec.model_validate(
+                    platform_body["spec"].get("traefik", {})
+                ),
                 "platformStorage": PlatformStorageSpec.model_validate(
                     platform_body["spec"]["platformStorage"]
                 ),
