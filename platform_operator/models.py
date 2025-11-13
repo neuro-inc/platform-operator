@@ -8,13 +8,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from hashlib import sha256
-from ipaddress import IPv4Address, IPv4Network
+from ipaddress import IPv4Network
 from pathlib import Path
 from typing import Any, NoReturn
 
 import kopf
 from neuro_config_client import (
-    ACMEEnvironment,
     Cluster,
     DockerRegistryConfig,
     IdleJobConfig,
@@ -156,7 +155,6 @@ class Config:
     platform_events_url: URL
     platform_namespace: str
     platform_lock_secret_name: str
-    acme_ca_staging_path: str
     is_standalone: bool
 
     @classmethod
@@ -185,7 +183,6 @@ class Config:
             platform_events_url=URL(env["NP_PLATFORM_EVENTS_URL"]),
             platform_namespace=env["NP_PLATFORM_NAMESPACE"],
             platform_lock_secret_name=env["NP_PLATFORM_LOCK_SECRET_NAME"],
-            acme_ca_staging_path=env["NP_ACME_CA_STAGING_PATH"],
             is_standalone=env.get("NP_STANDALONE", "false").lower() == "true",
         )
 
@@ -454,65 +451,6 @@ class DisksSpec(dict[str, Any]):
         return self._spec["kubernetes"]["persistence"].get("storageClassName", "")
 
 
-class IngressControllerSpec(dict[str, Any]):
-    def __init__(self, spec: dict[str, Any]) -> None:
-        super().__init__(spec)
-
-        self._spec = defaultdict(_spec_default_factory, spec)
-
-    @property
-    def enabled(self) -> bool:
-        return self._spec.get("enabled", True)
-
-    @property
-    def replicas(self) -> int | None:
-        return self._spec.get("replicas")
-
-    @property
-    def namespaces(self) -> Sequence[str]:
-        return self._spec.get("namespaces", ())
-
-    @property
-    def service_type(self) -> str:
-        return self._spec.get("serviceType", "")
-
-    @property
-    def service_annotations(self) -> dict[str, str]:
-        return self._spec.get("serviceAnnotations", {})
-
-    @property
-    def load_balancer_source_ranges(self) -> list[str]:
-        return self._spec.get("loadBalancerSourceRanges", [])
-
-    @property
-    def public_ips(self) -> Sequence[IPv4Address]:
-        return [IPv4Address(ip) for ip in self._spec.get("publicIPs", [])]
-
-    @property
-    def node_port_http(self) -> int | None:
-        return self._spec["nodePorts"].get("http")
-
-    @property
-    def node_port_https(self) -> int | None:
-        return self._spec["nodePorts"].get("https")
-
-    @property
-    def host_port_http(self) -> int | None:
-        return self._spec["hostPorts"].get("http")
-
-    @property
-    def host_port_https(self) -> int | None:
-        return self._spec["hostPorts"].get("https")
-
-    @property
-    def ssl_cert_data(self) -> str:
-        return self._spec["ssl"].get("certificateData", "")
-
-    @property
-    def ssl_cert_key_data(self) -> str:
-        return self._spec["ssl"].get("certificateKeyData", "")
-
-
 class Spec(dict[str, Any]):
     def __init__(self, spec: dict[str, Any]) -> None:
         super().__init__(spec)
@@ -521,7 +459,6 @@ class Spec(dict[str, Any]):
         self._token = spec.get("token", "")
         self._iam = IamSpec(spec["iam"])
         self._kubernetes = KubernetesSpec(spec["kubernetes"])
-        self._ingress_controller = IngressControllerSpec(spec["ingressController"])
         self._registry = RegistrySpec(spec["registry"])
         self._blob_storage = BlobStorageSpec(spec["blobStorage"])
         self._disks = DisksSpec(spec["disks"])
@@ -538,10 +475,6 @@ class Spec(dict[str, Any]):
     @property
     def kubernetes(self) -> KubernetesSpec:
         return self._kubernetes
-
-    @property
-    def ingress_controller(self) -> IngressControllerSpec:
-        return self._ingress_controller
 
     @property
     def registry(self) -> RegistrySpec:
@@ -577,11 +510,6 @@ class DockerConfig:
     password: str = ""
     secret_name: str = ""
     create_secret: bool = False
-
-
-class IngressServiceType(str, Enum):
-    LOAD_BALANCER = "LoadBalancer"
-    NODE_PORT = "NodePort"
 
 
 class RegistryProvider(str, Enum):
@@ -798,6 +726,25 @@ class PlatformStorageSpec(BaseModel):
     helm_values: HelmValues
 
 
+class TraefikSpec(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_name=True,
+        validate_by_alias=True,
+    )
+
+    class HelmValues(BaseModel):
+        model_config = ConfigDict(
+            alias_generator=to_camel,
+            validate_by_name=True,
+            validate_by_alias=True,
+            extra="allow",
+        )
+
+    enabled: bool = True
+    helm_values: HelmValues = Field(default_factory=HelmValues)
+
+
 class PlatformSpec(BaseModel):
     model_config = ConfigDict(
         alias_generator=to_camel,
@@ -813,6 +760,7 @@ class PlatformSpec(BaseModel):
     external_secret_objects: ExternalSecretObjectsSpec = Field(
         default_factory=ExternalSecretObjectsSpec
     )
+    traefik: TraefikSpec = TraefikSpec()
     platform_storage: PlatformStorageSpec
 
 
@@ -837,30 +785,13 @@ class PlatformConfig:
     kubernetes_tpu_network: IPv4Network | None
     node_labels: LabelsConfig
     kubelet_port: int
-    nvidia_dcgm_port: int
     namespace: str
-    ingress_dns_name: str
     ingress_url: URL
     ingress_registry_url: URL
     ingress_metrics_url: URL
     ingress_grafana_url: URL
     ingress_prometheus_url: URL
-    ingress_acme_enabled: bool
-    ingress_acme_environment: ACMEEnvironment
-    ingress_controller_install: bool
-    ingress_controller_replicas: int
-    ingress_public_ips: Sequence[IPv4Address]
     ingress_cors_origins: Sequence[str]
-    ingress_node_port_http: int | None
-    ingress_node_port_https: int | None
-    ingress_host_port_http: int | None
-    ingress_host_port_https: int | None
-    ingress_service_type: IngressServiceType
-    ingress_service_name: str
-    ingress_service_annotations: dict[str, str]
-    ingress_load_balancer_source_ranges: list[str]
-    ingress_ssl_cert_data: str
-    ingress_ssl_cert_key_data: str
     disks_storage_limit_per_user: int
     disks_storage_class_name: str | None
     jobs_namespace: str
@@ -980,7 +911,6 @@ class PlatformConfigFactory:
             ),
             kubernetes_tpu_network=spec.kubernetes.tpu_network,
             kubelet_port=int(spec.kubernetes.kubelet_port or 10250),
-            nvidia_dcgm_port=9400,
             node_labels=LabelsConfig(
                 job=spec.kubernetes.node_label_job or LabelsConfig.job,
                 node_pool=(
@@ -993,40 +923,17 @@ class PlatformConfigFactory:
                     spec.kubernetes.node_label_preemptible or LabelsConfig.preemptible
                 ),
             ),
-            ingress_dns_name=cluster.dns.name,
             ingress_url=URL(f"https://{cluster.dns.name}"),
             ingress_registry_url=URL(f"https://registry.{cluster.dns.name}"),
             ingress_grafana_url=URL(f"https://grafana.{cluster.dns.name}"),
             ingress_metrics_url=URL(f"https://metrics.{cluster.dns.name}"),
             ingress_prometheus_url=URL(f"https://prometheus.{cluster.dns.name}"),
-            ingress_acme_enabled=(
-                not spec.ingress_controller.ssl_cert_data
-                or not spec.ingress_controller.ssl_cert_key_data
-            ),
-            ingress_acme_environment=cluster.ingress.acme_environment,
-            ingress_controller_install=spec.ingress_controller.enabled,
-            ingress_controller_replicas=spec.ingress_controller.replicas or 2,
-            ingress_public_ips=spec.ingress_controller.public_ips,
             ingress_cors_origins=sorted(
                 {
                     *cluster.ingress.default_cors_origins,
                     *cluster.ingress.additional_cors_origins,
                 }
             ),
-            ingress_service_type=IngressServiceType(
-                spec.ingress_controller.service_type or IngressServiceType.LOAD_BALANCER
-            ),
-            ingress_service_name="traefik",
-            ingress_service_annotations=spec.ingress_controller.service_annotations,
-            ingress_load_balancer_source_ranges=(
-                spec.ingress_controller.load_balancer_source_ranges
-            ),
-            ingress_node_port_http=spec.ingress_controller.node_port_http,
-            ingress_node_port_https=spec.ingress_controller.node_port_https,
-            ingress_host_port_http=spec.ingress_controller.host_port_http,
-            ingress_host_port_https=spec.ingress_controller.host_port_https,
-            ingress_ssl_cert_data=spec.ingress_controller.ssl_cert_data,
-            ingress_ssl_cert_key_data=spec.ingress_controller.ssl_cert_key_data,
             jobs_namespace=jobs_namespace,
             jobs_resource_pool_types=cluster.orchestrator.resource_pool_types,
             jobs_priority_class_name=f"{self._config.helm_release_names.platform}-job",

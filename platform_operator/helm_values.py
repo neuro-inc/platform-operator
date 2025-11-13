@@ -9,14 +9,13 @@ from hashlib import sha256
 from typing import Any
 
 import bcrypt
-from neuro_config_client import ACMEEnvironment, IdleJobConfig
+from neuro_config_client import IdleJobConfig
 from yarl import URL
 
 from .models import (
     BucketsProvider,
     DockerRegistryStorageDriver,
     HelmChartNames,
-    IngressServiceType,
     LabelsConfig,
     PlatformConfig,
     RegistryProvider,
@@ -29,6 +28,7 @@ NVIDIA_GPU_TAINT_KEY = "nvidia.com/gpu"
 AMD_GPU_TAINT_KEY = "amd.com/gpu"
 
 PLATFORM_APOLO_COMPONENT_LABEL_KEY = "platform.apolo.us/component"
+PLATFORM_APOLO_SCRAPE_METRICS_LABEL_KEY = "platform.apolo.us/scrape-metrics"
 
 
 def b64encode(value: str) -> str:
@@ -59,8 +59,7 @@ def _merge_mappings(
 class HelmValuesFactory:
     def create_platform_values(self, platform: PlatformConfig) -> dict[str, Any]:
         result: dict[str, Any] = {
-            "traefikEnabled": platform.ingress_controller_install,
-            "acmeEnabled": platform.ingress_acme_enabled,
+            "traefikEnabled": platform.platform_spec.traefik.enabled,
             "dockerRegistryEnabled": platform.registry.docker_registry_install,
             "appsPostgresOperatorEnabled": (
                 platform.apps_operator_config.postgres_operator_enabled
@@ -117,10 +116,6 @@ class HelmValuesFactory:
                     ]
                 },
             },
-            "ssl": {
-                "cert": platform.ingress_ssl_cert_data,
-                "key": platform.ingress_ssl_cert_key_data,
-            },
             "jobs": {
                 "namespace": {
                     "create": True,
@@ -167,8 +162,6 @@ class HelmValuesFactory:
                 platform
             ),
         }
-        if platform.ingress_acme_enabled:
-            result["acme"] = self.create_acme_values(platform)
         if platform.ingress_cors_origins:
             result["ingress"]["cors"]["originList"] = platform.ingress_cors_origins
         if platform.docker_config.create_secret:
@@ -289,42 +282,6 @@ class HelmValuesFactory:
         self, platform: PlatformConfig
     ) -> dict[str, Any]:
         return platform.platform_spec.external_secret_objects.model_dump(mode="json")
-
-    def create_acme_values(self, platform: PlatformConfig) -> dict[str, Any]:
-        return {
-            "nameOverride": "acme",
-            "fullnameOverride": "acme",
-            "bashImage": {"repository": platform.get_image("bash")},
-            "acme": {
-                "email": f"{platform.cluster_name}@neu.ro",
-                "dns": "neuro",
-                "server": (
-                    "letsencrypt"
-                    if platform.ingress_acme_environment == ACMEEnvironment.PRODUCTION
-                    else "letsencrypt_test"
-                ),
-                "domains": [
-                    platform.ingress_url.host,
-                    f"*.{platform.ingress_url.host}",
-                    f"*.jobs.{platform.ingress_url.host}",
-                    f"*.apps.{platform.ingress_url.host}",
-                ],
-                "sslCertSecretName": f"{platform.release_name}-ssl-cert",
-            },
-            "podLabels": {"service": "acme"},
-            "env": [
-                {"name": "NEURO_URL", "value": str(platform.auth_url)},
-                {"name": "NEURO_CLUSTER", "value": platform.cluster_name},
-                {
-                    "name": "NEURO_TOKEN",
-                    **self._create_value_from_secret(
-                        name=f"{platform.release_name}-token", key="token"
-                    ),
-                },
-            ],
-            "persistence": {"storageClassName": platform.standard_storage_class_name},
-            "priorityClassName": platform.services_priority_class_name,
-        }
 
     def _create_idle_job(self, job: IdleJobConfig) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -514,7 +471,6 @@ class HelmValuesFactory:
             "instanceLabelOverride": platform.release_name,
             "image": {"name": platform.get_image("traefik")},
             "deployment": {
-                "replicas": platform.ingress_controller_replicas,
                 "labels": {
                     "service": "traefik",
                     PLATFORM_APOLO_COMPONENT_LABEL_KEY: "ingress-gateway",
@@ -530,10 +486,6 @@ class HelmValuesFactory:
             "resources": {
                 "requests": {"cpu": "250m", "memory": "256Mi"},
                 "limits": {"cpu": "1000m", "memory": "1Gi"},
-            },
-            "service": {
-                "type": platform.ingress_service_type.value,
-                "annotations": {},
             },
             "ports": {
                 "web": {"redirectTo": {"port": "websecure"}},
@@ -559,13 +511,6 @@ class HelmValuesFactory:
                     "publishedService": {"enabled": False},
                 },
             },
-            "tlsStore": {
-                "default": {
-                    "defaultCertificate": {
-                        "secretName": f"{platform.release_name}-ssl-cert"
-                    },
-                }
-            },
             "ingressRoute": {"dashboard": {"enabled": False}},
             "logs": {"general": {"level": "ERROR"}},
             "priorityClassName": platform.services_priority_class_name,
@@ -575,30 +520,20 @@ class HelmValuesFactory:
                     "serviceMonitor": {
                         "jobLabel": "app.kubernetes.io/name",
                         "additionalLabels": {
-                            "platform.apolo.us/scrape-metrics": "true"
+                            PLATFORM_APOLO_SCRAPE_METRICS_LABEL_KEY: "true"
                         },
                     },
                 }
             },
             "ingressClass": {"enabled": True},
         }
-        if platform.ingress_load_balancer_source_ranges:
-            result["service"]["loadBalancerSourceRanges"] = (
-                platform.ingress_load_balancer_source_ranges
-            )
-        if platform.ingress_service_type == IngressServiceType.NODE_PORT:
-            ports = result["ports"]
-            if platform.ingress_node_port_http and platform.ingress_node_port_https:
-                ports["web"]["nodePort"] = platform.ingress_node_port_http
-                ports["websecure"]["nodePort"] = platform.ingress_node_port_https
-            if platform.ingress_host_port_http and platform.ingress_host_port_https:
-                result["updateStrategy"] = {
-                    "rollingUpdate": {"maxUnavailable": 1, "maxSurge": 0}
-                }
-                ports["web"]["hostPort"] = platform.ingress_host_port_http
-                ports["websecure"]["hostPort"] = platform.ingress_host_port_https
-        result["service"]["annotations"].update(platform.ingress_service_annotations)
-        return result
+        overrides = platform.platform_spec.traefik.helm_values.model_dump(
+            mode="json", by_alias=True
+        )
+        additional_arguments = overrides.pop("additionalArguments", None)
+        if additional_arguments:
+            result["additionalArguments"].extend(additional_arguments)
+        return _merge_mappings(result, overrides)
 
     def _create_platform_url_value(
         self, name: str, url: URL, path: str = ""
@@ -963,7 +898,6 @@ class HelmValuesFactory:
             },
             "jobsNamespace": platform.jobs_namespace,
             "kubeletPort": platform.kubelet_port,
-            "nvidiaDCGMPort": platform.nvidia_dcgm_port,
             "nodeLabels": {
                 "nodePool": platform.node_labels.node_pool,
             },
