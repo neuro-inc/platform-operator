@@ -17,6 +17,7 @@ from platform_operator.models import (
     ClusterSecretStoreSpec,
     Config,
     DockerRegistryStorageDriver,
+    DockerRegistryType,
     ExternalSecretObjectsSpec,
     HelmChartVersions,
     HelmReleaseNames,
@@ -705,3 +706,59 @@ class TestPlatformConfigFactory:
 
         assert not result.monitoring.loki_enabled
         assert result.monitoring.loki_endpoint == "http://custom-loki-gateway.platform"
+
+    def test_on_prem_platform_config_with_harbor_registry_filesystem(
+        self,
+        factory: PlatformConfigFactory,
+        cluster: Cluster,
+        on_prem_platform_body: kopf.Body,
+    ) -> None:
+        on_prem_platform_body["spec"]["registry"] = {
+            "kubernetes": {
+                "registry_type": "harbor",
+                "persistence": {
+                    "storageClassName": "registry-standard",
+                    "size": "100Gi",
+                },
+            }
+        }
+
+        result = factory.create(on_prem_platform_body, cluster)
+
+        assert result.registry == RegistryConfig(
+            provider=RegistryProvider.DOCKER,
+            docker_registry_install=True,
+            docker_registry_type=DockerRegistryType.HARBOR,
+            docker_registry_url=URL(f"https://harbor.apps.{cluster.name}.org.neu.ro"),
+            docker_registry_storage_driver=DockerRegistryStorageDriver.FILE_SYSTEM,
+            docker_registry_file_system_storage_class_name="registry-standard",
+            docker_registry_file_system_storage_size="100Gi",
+        )
+
+    def test_on_prem_platform_config_with_docker_registry_type_explicit(
+        self,
+        factory: PlatformConfigFactory,
+        cluster: Cluster,
+        on_prem_platform_body: kopf.Body,
+    ) -> None:
+        on_prem_platform_body["spec"]["registry"] = {
+            "kubernetes": {
+                "registry_type": "docker",
+                "persistence": {
+                    "storageClassName": "registry-standard",
+                    "size": "100Gi",
+                },
+            }
+        }
+
+        result = factory.create(on_prem_platform_body, cluster)
+
+        assert result.registry == RegistryConfig(
+            provider=RegistryProvider.DOCKER,
+            docker_registry_install=True,
+            docker_registry_type=DockerRegistryType.DOCKER,
+            docker_registry_url=URL("http://platform-docker-registry:5000"),
+            docker_registry_storage_driver=DockerRegistryStorageDriver.FILE_SYSTEM,
+            docker_registry_file_system_storage_class_name="registry-standard",
+            docker_registry_file_system_storage_size="100Gi",
+        )
