@@ -28,7 +28,7 @@ dependencies:
   version: 25.10.0
 - name: platform-reports
   repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 25.10.3
+  version: 25.11.0
 - name: platform-disks
   repository: oci://ghcr.io/neuro-inc/helm-charts
   version: 25.7.2
@@ -65,5 +65,5 @@ dependencies:
 - name: external-secrets
   repository: https://charts.external-secrets.io
   version: 0.20.3
-digest: sha256:cc9ff158e4537aa35fe454bf4275c53558e0aa5d78fb9dde2eb37df8dac5f2b6
-generated: "2025-11-20T14:50:25.738764+02:00"
+digest: sha256:9d6ab84abcc00141e798641833f593b750525ed26240607ad9b9f3e3469d0a65
+generated: "2025-11-21T11:40:45.072299+02:00"
