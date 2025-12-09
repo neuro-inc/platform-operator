@@ -12,6 +12,7 @@ setup: venv
 	python -m pre_commit install
 	helm plugin install https://github.com/helm-unittest/helm-unittest.git
 
+
 .PHONY: lint
 lint: format
 	helm lint charts/platform
@@ -25,6 +26,7 @@ else
 	. venv/bin/activate; \
 	python -m pre_commit run --all-files
 endif
+
 
 .PHONY: test_unit
 test_unit:
