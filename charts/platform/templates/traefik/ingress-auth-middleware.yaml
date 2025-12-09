@@ -1,3 +1,4 @@
+{{- $ingressAuthUrl := urlParse (get (include "platform.urls" . | fromYaml) "ingressAuthUrl") -}}
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -6,5 +7,5 @@ metadata:
     service: traefik
 spec:
   forwardAuth:
-    address: https://{{ .Values.ingress.ingressAuthHost }}/oauth/authorize
+    address: https://{{ $ingressAuthUrl.host }}/oauth/authorize
     trustForwardHeader: true

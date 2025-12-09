@@ -1,0 +1,59 @@
+should match snapshot:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: platform-registry
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: platform-registry
+        helm:
+          valuesObject:
+            image:
+              repository: ghcr.io/neuro-inc/registryapi
+            ingress:
+              enabled: true
+              hosts:
+                - null
+              ingressClassName: traefik
+            platform:
+              authUrl: https://api.apolo.us
+              clusterName: test-cluster
+              token:
+                valueFrom:
+                  secretKeyRef:
+                    key: token
+                    name: platform-token
+            priorityClassName: platform-service
+            securityContext:
+              enabled: true
+            sentry:
+              clusterName: test-cluster
+              dsn: https://sentry-dsn
+              sampleRate: 0.1
+            service:
+              annotations:
+                traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
+                traefik.ingress.kubernetes.io/service.sticky.cookie.name: NEURO_REGISTRYAPI_SESSION
+        repoURL: oci://ghcr.io/neuro-inc/helm-charts
+        targetRevision: '*'
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

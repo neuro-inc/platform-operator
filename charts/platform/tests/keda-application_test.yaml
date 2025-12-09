@@ -1,0 +1,12 @@
+suite: test keda application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - argocd-applications/keda-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}

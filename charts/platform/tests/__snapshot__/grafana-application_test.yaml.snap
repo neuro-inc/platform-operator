@@ -1,0 +1,105 @@
+should match snapshot:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: grafana
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: grafana
+        helm:
+          valuesObject:
+            dashboardProviders:
+              dashboardproviders.yaml:
+                apiVersion: 1
+                providers:
+                  - allowUiUpdates: true
+                    disableDeletion: false
+                    editable: true
+                    name: sidecarProvider
+                    options:
+                      foldersFromFilesStructure: true
+                      path: /etc/grafana/dashboards/platform
+                    orgId: 1
+                    type: file
+            datasources:
+              datasources.yaml:
+                apiVersion: 1
+                datasources:
+                  - access: proxy
+                    isDefault: true
+                    jsonData:
+                      httpMethod: GET
+                      keepCookies:
+                        - dat
+                        - sat
+                      manageAlerts: false
+                      prometheusType: Thanos
+                    name: Prometheus
+                    type: prometheus
+                    url: http://platform-prometheus-proxy:9090
+            grafana.ini:
+              analytics:
+                check_for_updates: false
+                reporting_enabled: false
+              auth.anonymous:
+                enabled: true
+              dashboards:
+                default_home_dashboard_path: /etc/grafana/dashboards/home.json
+              log:
+                level: error
+                mode: console
+              snapshots:
+                external_enabled: false
+              users:
+                default_theme: light
+            image:
+              registry: ghcr.io
+              repository: neuro-inc/grafana
+              tag: 10.2.2
+            ingress:
+              enabled: false
+            initChownData:
+              image:
+                registry: ghcr.io
+                repository: neuro-inc/busybox
+                tag: latest
+            persistence:
+              enabled: false
+            podLabels:
+              service: grafana
+            priorityClassName: platform-service
+            sidecar:
+              dashboards:
+                SCProvider: false
+                enabled: true
+                folder: /etc/grafana/dashboards
+                folderAnnotation: grafana_folder
+                label: grafana_dashboard
+                watchMethod: WATCH
+              image:
+                registry: ghcr.io
+                repository: neuro-inc/k8s-sidecar
+                tag: 1.25.2
+        repoURL: https://grafana.github.io/helm-charts
+        targetRevision: 7.0.11
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

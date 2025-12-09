@@ -1,0 +1,54 @@
+{{- define "platform.argocd.applications.platformStorage.values" -}}
+{{- $platformUrls := include "platform.urls" . | fromYaml -}}
+image:
+  repository: ghcr.io/neuro-inc/storageapi
+securityContext:
+  enabled: true
+service:
+  annotations:
+    traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.name: NEURO_STORAGEAPI_SESSION
+storageUsageCollector:
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "500Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+platform:
+  clusterName: {{ include "platform.clusterName" . }}
+  authUrl: {{ get $platformUrls "authUrl" }}
+  adminUrl: {{ get $platformUrls "adminUrl" }}
+  token:
+    {{- include "platform.token" . | nindent 4 }}
+{{- if .Values.storages }}
+storages:
+{{- range .Values.storages }}
+  - type: pvc
+    path: {{ .path | quote }}
+    claimName: {{ printf "%s-%s" $.Release.Name (include "platform.storage.claimNameSuffix" .path) | quote }}
+{{- end }}
+{{- end }}
+ingress:
+  enabled: true
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  hosts:
+  - {{ include "platform.clusterDnsName" . }}
+{{- with .Values.priorityClassName }}
+priorityClassName: {{ . }}
+{{- end }}
+{{- with .Values.sentry }}
+sentry:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{- if .Values.applications.platformStorage.enabled }}
+{{- $cfg := deepCopy .Values.applications.platformStorage -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.platformStorage.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

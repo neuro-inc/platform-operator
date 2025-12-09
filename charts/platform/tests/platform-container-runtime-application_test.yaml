@@ -1,0 +1,12 @@
+suite: test platform container runtime application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - argocd-applications/platform-container-runtime-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}

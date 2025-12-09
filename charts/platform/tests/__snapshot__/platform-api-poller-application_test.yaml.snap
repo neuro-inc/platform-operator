@@ -1,0 +1,72 @@
+should match snapshot:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: platform-api-poller
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: platform-api-poller
+        helm:
+          valuesObject:
+            image:
+              repository: ghcr.io/neuro-inc/platformapi
+            ingress:
+              enabled: true
+              hosts:
+                - test-cluster.org.apolo.us
+              ingressClassName: traefik
+            jobs:
+              ingressAuthMiddleware: platform-platform-ingress-auth@kubernetescrd
+              ingressClass: traefik
+              ingressErrorPageMiddleware: platform-platform-error-page@kubernetescrd
+              ingressOAuthAuthorizeUrl: https://api.apolo.us/oauth/authorize
+              namespace: platform-jobs
+            nodeLabels:
+              job: platform.neuromation.io/job
+              nodePool: platform.neuromation.io/nodepool
+              preemptible: platform.neuromation.io/preemptible
+            platform:
+              adminUrl: https://api.apolo.us/apis/admin/v1
+              apiUrl: https://api.apolo.us/api/v1
+              authUrl: https://api.apolo.us
+              clusterName: test-cluster
+              configUrl: https://api.apolo.us
+              eventsUrl: https://api.apolo.us
+              registryUrl: registry.test-cluster.org.apolo.us
+              token:
+                valueFrom:
+                  secretKeyRef:
+                    key: token
+                    name: platform-token
+            priorityClassName: platform-service
+            sentry:
+              clusterName: test-cluster
+              dsn: https://sentry-dsn
+              sampleRate: 0.1
+            storages:
+              - claimName: platform-storage-storage
+                path: /storage
+                type: pvc
+        repoURL: oci://ghcr.io/neuro-inc/helm-charts
+        targetRevision: '*'
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

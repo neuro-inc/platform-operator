@@ -18,18 +18,48 @@ nginxImage:
   repository: ghcr.io/neuro-inc/nginx
   tag: latest
 
-clusterName: ""
+platform:
+  apiUrl: https://api.apolo.us
+  authUrl: ""
+  ingressAuthUrl: ""
+  configUrl: ""
+  appsUrl: ""
+  adminUrl: ""
+  notificationsUrl: ""
+  eventsUrl: ""
+  fallbackHost: default.jobs-staging.neu.ro
+  clusterName: ""
+  clusterDnsName: ""
+  token: {}
 
-serviceToken: ""
+sentry: {}
+  # dsn: ""
+  # clusterName: ""
+  # sampleRate: 0.1
+
+argocd:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    managedNamespaceMetadata:
+      annotations:
+        argocd.argoproj.io/sync-options: Delete=false
 
 nodePools: []
 
 nodeLabels:
   nodePool: platform.neuromation.io/nodepool
   job: platform.neuromation.io/job
-
-alertmanager:
-  config: {}
+  accelerator: platform.neuromation.io/accelerator
+  preemptible: platform.neuromation.io/preemptible
 
 inotify:
   maxInstances: 65536
@@ -59,11 +89,7 @@ dockerHubConfigSecret:
   #   password: password
 
 ingress:
-  # host: default.org.neu.ro
-  # jobFallbackHost: default.jobs-dev.neu.ro
-  # registryHost: registry.default.org.neu.ro
-  # ingressAuthHost: staging.neu.ro
-  # minioHost: staging.neu.ro
+  # className: traefik
 
   cors:
     originList: []
@@ -72,71 +98,225 @@ ingress:
 jobs:
   namespace:
     create: true
-    name: ""
+    name: platform-jobs
   label: platform.neuromation.io/job
 
 idleJobs: []
 
 storages: []
-# - type: kubernetes # nfs, gcs, azureFile
-#   path:
-#   size: 10Gi
-
-#   storageClassName: ""
-
-#   nfs:
-#     server: nfs-server
-#     path: /path
-
-#   azureFile:
-#     storageAccountName: storage-account-name
-#     storageAccountKey: storage-account-key
-#     shareName: share
-
-#   gcs:
-#     bucketName: bucket
-
-# keda config
-keda:
-  operator:
-    replicaCount: 1
-
-keda-add-ons-http:
-  interceptor:
-    replicas:
-      min: 1
-      waitTimeout: 600s
-
-  scaler:
-    replicas: 1
-
-# spark
-spark-operator:
-  replicas: 1
 
 federatedPrometheus:
   auth:
+    # Should be kubernetes.io/basic-auth type with `username` and `password` keys
+    existingSecret: ""
+
     username: ""
     password: ""
 
+defaultStorageClassName: ""
+
+priorityClassName: ""
+
+imagePullSecrets: []
+
 clusterSecretStore:
-  # Vault server URL (e.g., "https://vault.apolo.us")
-  server: ""
-  # Vault KV secrets engine path (e.g., "imdc--kv-v2")
-  path: ""
-  # Vault KV secrets engine version ("v1" or "v2")
-  version: "v2"
-  auth: {}
+  vault: {}
+    # server: https://vault.apolo.us
+    # path: default--kv-v2
+    # version: "v2"
+    # auth:
+    #   role: default--platform
+    #   mountPath: default--jwt
 
-externalSecretObjects: []
+externalSecrets: []
 
-traefikEnabled: true
-dockerRegistryEnabled: false
-minioEnabled: false
-platformReportsEnabled: true
-appsPostgresOperatorEnabled: true
-appsKedaEnabled: true
-lokiEnabled: true
-alloyEnabled: true
-appsSparkOperatorEnabled: true
-externalSecretsEnabled: true
+applications:
+  externalSecrets:
+    enabled: true
+    repoURL: https://charts.external-secrets.io
+    chart: external-secrets
+    name: external-secrets
+    targetRevision: "0.20.3"
+    syncWave: -30
+    values: {}
+
+  minio:
+    enabled: true
+    repoURL: https://neuro-inc.github.io/helm-charts
+    chart: minio
+    name: minio
+    targetRevision: "1.0.0"
+    syncWave: -20
+    values: {}
+
+  thanos:
+    enabled: true
+    repoURL: https://neuro-inc.github.io/helm-charts
+    chart: thanos
+    name: thanos
+    targetRevision: "0.3.23"
+    syncWave: -10
+    values: {}
+
+  kubePrometheusStack:
+    enabled: true
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    name: prometheus
+    targetRevision: "54.2.2"
+    syncWave: -9
+    values: {}
+
+  traefik:
+    enabled: true
+    repoURL: https://helm.traefik.io/traefik
+    chart: traefik
+    name: traefik
+    targetRevision: "25.0.0"
+    syncWave: -5
+    values: {}
+
+  dockerRegistry:
+    enabled: true
+    repoURL: https://neuro-inc.github.io/helm-charts
+    chart: docker-registry
+    name: docker-registry
+    targetRevision: "1.0.0"
+    values: {}
+
+  loki:
+    enabled: true
+    repoURL: https://grafana.github.io/helm-charts
+    chart: loki
+    name: loki
+    targetRevision: "6.29.0"
+    values: {}
+
+  alloy:
+    enabled: true
+    repoURL: https://grafana.github.io/helm-charts
+    chart: alloy
+    name: alloy
+    targetRevision: "1.0.1"
+    values: {}
+
+  grafana:
+    enabled: true
+    repoURL: https://grafana.github.io/helm-charts
+    chart: grafana
+    name: grafana
+    targetRevision: "7.0.11"
+    values: {}
+
+  keda:
+    enabled: true
+    repoURL: https://kedacore.github.io/charts
+    chart: keda
+    name: keda
+    targetRevision: "2.16.1"
+    syncWave: -1
+    values: {}
+
+  kedaAddOnsHttp:
+    enabled: true
+    repoURL: https://kedacore.github.io/charts
+    chart: keda-add-ons-http
+    name: keda-add-ons-http
+    targetRevision: "0.10.0"
+    values: {}
+
+  sparkOperator:
+    enabled: true
+    repoURL: https://kubeflow.github.io/spark-operator
+    chart: spark-operator
+    name: spark-operator
+    targetRevision: "2.1.0"
+    values: {}
+
+  postgresOperator:
+    enabled: true
+    repoURL: oci://ghcr.io/neuro-inc/app-crunchy-postgres
+    chart: pgo
+    name: postgres-operator
+    targetRevision: "5.8.3"
+    values: {}
+
+  platformStorage:
+    enabled: true
+    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    chart: platform-storage
+    name: platform-storage
+    targetRevision: "*"
+    values: {}
+
+  platformRegistry:
+    enabled: true
+    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    chart: platform-registry
+    name: platform-registry
+    targetRevision: "*"
+    values: {}
+
+  platformMonitoring:
+    enabled: true
+    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    chart: platform-monitoring
+    name: platform-monitoring
+    targetRevision: "*"
+    values: {}
+
+  platformContainerRuntime:
+    enabled: true
+    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    chart: platform-container-runtime
+    name: platform-container-runtime
+    targetRevision: "*"
+    values: {}
+
+  platformSecrets:
+    enabled: true
+    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    chart: platform-secrets
+    name: platform-secrets
+    targetRevision: "*"
+    values: {}
+
+  platformReports:
+    enabled: true
+    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    chart: platform-reports
+    name: platform-reports
+    targetRevision: "*"
+    values: {}
+
+  platformDisks:
+    enabled: true
+    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    chart: platform-disks
+    name: platform-disks
+    targetRevision: "*"
+    values: {}
+
+  platformApiPoller:
+    enabled: true
+    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    chart: platform-api-poller
+    name: platform-api-poller
+    targetRevision: "*"
+    values: {}
+
+  platformBuckets:
+    enabled: true
+    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    name: platform-buckets
+    chart: platform-buckets
+    targetRevision: "*"
+    values: {}
+
+  platformMetadata:
+    enabled: true
+    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    chart: platform-metadata
+    name: platform-metadata
+    targetRevision: "*"
+    values: {}

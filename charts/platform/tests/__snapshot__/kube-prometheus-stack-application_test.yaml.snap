@@ -1,0 +1,216 @@
+should match snapshot:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      annotations:
+        argocd.argoproj.io/sync-wave: "-9"
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: prometheus
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: kube-prometheus-stack
+        helm:
+          valuesObject:
+            alertmanager:
+              alertmanagerSpec:
+                configSecret: platform-alertmanager-config
+                image:
+                  registry: ghcr.io
+                  repository: neuro-inc/alertmanager
+                  tag: v0.26.0
+                podMetadata:
+                  labels:
+                    service: alert-manager
+                secrets:
+                  - platform-token
+              serviceMonitor:
+                additionalLabels:
+                  platform.apolo.us/scrape-metrics: "true"
+            coreDns:
+              enabled: false
+            defaultRules:
+              create: false
+            global:
+              imageRegistry: ghcr.io
+            grafana:
+              enabled: false
+            kube-state-metrics:
+              collectors:
+                - nodes
+                - pods
+                - deployments
+                - statefulsets
+                - daemonsets
+                - horizontalpodautoscalers
+              customLabels:
+                service: kube-state-metrics
+              fullnameOverride: kube-state-metrics
+              image:
+                registry: ghcr.io
+                repository: neuro-inc/kube-state-metrics
+                tag: v2.10.1
+              metricLabelsAllowlist:
+                - nodes=[platform.neuromation.io/nodepool,platform.neuromation.io/job,platform.neuromation.io/accelerator]
+                - pods=[service,platform.neuromation.io/user,platform.neuromation.io/job,platform.apolo.us/org,platform.apolo.us/project,platform.apolo.us/preset,platform.apolo.us/app-instance-name,platform.apolo.us/user]
+              nameOverride: kube-state-metrics
+              priorityClassName: platform-service
+              prometheus:
+                monitor:
+                  additionalLabels:
+                    platform.apolo.us/scrape-metrics: "true"
+                  metricRelabelings:
+                    - sourceLabels:
+                        - label_beta_kubernetes_io_instance_type
+                      targetLabel: label_node_kubernetes_io_instance_type
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 200Mi
+              selectorOverride:
+                app.kubernetes.io/name: kube-state-metrics
+            kubeApiServer:
+              enabled: true
+              serviceMonitor:
+                additionalLabels:
+                  platform.apolo.us/scrape-metrics: "true"
+            kubeControllerManager:
+              enabled: false
+            kubeDns:
+              enabled: false
+            kubeEtcd:
+              enabled: false
+            kubeProxy:
+              enabled: false
+            kubeScheduler:
+              enabled: false
+            kubeStateMetrics:
+              enabled: true
+            kubelet:
+              enabled: true
+              namespace: platform
+              serviceMonitor:
+                additionalLabels:
+                  platform.apolo.us/scrape-metrics: "true"
+            nodeExporter:
+              enabled: true
+            prometheus:
+              ingress:
+                annotations:
+                  traefik.ingress.kubernetes.io/router.middlewares: platform-platform-federated-prometheus-auth@kubernetescrd
+                  traefik.ingress.kubernetes.io/router.priority: "1000"
+                enabled: true
+                hosts:
+                  - prometheus.test-cluster.org.apolo.us
+                ingressClassName: traefik
+                paths:
+                  - /federate
+              prometheusSpec:
+                evaluationInterval: 15s
+                externalLabels:
+                  cluster: test-cluster
+                image:
+                  registry: ghcr.io
+                  repository: neuro-inc/prometheus
+                  tag: v2.48.0
+                podMetadata:
+                  labels:
+                    service: prometheus
+                priorityClassName: platform-service
+                replicas: 1
+                resources:
+                  requests:
+                    cpu: 500m
+                    memory: 1Gi
+                retention: 12h
+                scrapeConfigSelector:
+                  matchLabels:
+                    platform.apolo.us/scrape-metrics: "true"
+                scrapeInterval: 15s
+                serviceMonitorSelector:
+                  matchLabels:
+                    platform.apolo.us/scrape-metrics: "true"
+                storageSpec:
+                  volumeClaimTemplate:
+                    metadata:
+                      name: prometheus
+                    spec:
+                      accessModes:
+                        - ReadWriteOnce
+                      resources:
+                        requests:
+                          storage: 10Gi
+                      storageClassName: standard
+              serviceMonitor:
+                additionalLabels:
+                  platform.apolo.us/scrape-metrics: "true"
+            prometheus-node-exporter:
+              fullnameOverride: prometheus-node-exporter
+              image:
+                registry: ghcr.io
+                repository: neuro-inc/node-exporter
+                tag: v1.7.0
+              nameOverride: prometheus-node-exporter
+              podLabels:
+                service: prometheus-node-exporter
+              prometheus:
+                monitor:
+                  additionalLabels:
+                    platform.apolo.us/scrape-metrics: "true"
+              resources:
+                requests:
+                  cpu: 15m
+                  memory: 50Mi
+              updateStrategy:
+                rollingUpdate:
+                  maxUnavailable: 100%
+                type: RollingUpdate
+            prometheusOperator:
+              admissionWebhooks:
+                patch:
+                  image:
+                    registry: ghcr.io
+                    repository: neuro-inc/kube-webhook-certgen
+                    tag: v20221220-controller-v1.5.1-58-g787ea74b6
+              image:
+                registry: ghcr.io
+                repository: neuro-inc/prometheus-operator
+                tag: v0.69.1
+              kubeletService:
+                namespace: platform
+              podLabels:
+                service: prometheus-operator
+              priorityClassName: platform-service
+              prometheusConfigReloader:
+                image:
+                  registry: ghcr.io
+                  repository: neuro-inc/prometheus-config-reloader
+                  tag: v0.69.1
+              serviceMonitor:
+                additionalLabels:
+                  platform.apolo.us/scrape-metrics: "true"
+              thanosImage:
+                registry: ghcr.io
+                repository: neuro-inc/thanos
+                tag: v0.24.0
+        repoURL: https://prometheus-community.github.io/helm-charts
+        targetRevision: 54.2.2
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

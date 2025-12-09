@@ -1,0 +1,91 @@
+should match snapshot:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      annotations:
+        argocd.argoproj.io/sync-wave: "-5"
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: traefik
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: traefik
+        helm:
+          valuesObject:
+            additionalArguments:
+              - --entryPoints.websecure.proxyProtocol.insecure=true
+              - --entryPoints.websecure.forwardedHeaders.insecure=true
+              - --entryPoints.websecure.http.middlewares=platform-platform-cors@kubernetescrd
+              - --providers.kubernetesingress.ingressendpoint.ip=1.2.3.4
+            deployment:
+              labels:
+                platform.apolo.us/component: ingress-gateway
+                service: traefik
+              podLabels:
+                platform.apolo.us/component: ingress-gateway
+                service: traefik
+            image:
+              name: ghcr.io/neuro-inc/traefik
+            ingressClass:
+              enabled: true
+            ingressRoute:
+              dashboard:
+                enabled: false
+            instanceLabelOverride: platform
+            logs:
+              general:
+                level: ERROR
+            metrics:
+              prometheus:
+                service:
+                  enabled: true
+                serviceMonitor:
+                  additionalLabels:
+                    platform.apolo.us/scrape-metrics: "true"
+                  jobLabel: app.kubernetes.io/name
+            ports:
+              web:
+                redirectTo:
+                  port: websecure
+              websecure:
+                tls:
+                  enabled: true
+            priorityClassName: platform-service
+            providers:
+              kubernetesCRD:
+                allowCrossNamespace: true
+                allowExternalNameServices: true
+                enabled: true
+              kubernetesIngress:
+                allowExternalNameServices: true
+                enabled: true
+                publishedService:
+                  enabled: false
+            resources:
+              limits:
+                cpu: 1000m
+                memory: 512Mi
+              requests:
+                cpu: 250m
+                memory: 256Mi
+        repoURL: https://helm.traefik.io/traefik
+        targetRevision: 25.0.0
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

@@ -1,0 +1,12 @@
+suite: test platform buckets application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - argocd-applications/platform-buckets-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}

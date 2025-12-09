@@ -1,0 +1,39 @@
+should match snapshot:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: keda-add-ons-http
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: keda-add-ons-http
+        helm:
+          valuesObject:
+            interceptor:
+              replicas:
+                min: 1
+                waitTimeout: 600s
+            scaler:
+              replicas: 1
+        repoURL: https://kedacore.github.io/charts
+        targetRevision: 0.10.0
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

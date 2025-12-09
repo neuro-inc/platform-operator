@@ -1,0 +1,38 @@
+{{- define "platform.argocd.applications.platformRegistry.values" -}}
+{{- $platformUrls := include "platform.urls" . | fromYaml -}}
+{{- $registryUrl := include "platform.registryUrl" . | urlParse -}}
+image:
+  repository: ghcr.io/neuro-inc/registryapi
+securityContext:
+  enabled: true
+service:
+  annotations:
+    traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.name: NEURO_REGISTRYAPI_SESSION
+platform:
+  clusterName: {{ include "platform.clusterName" . }}
+  authUrl: {{ get $platformUrls "authUrl" }}
+  token:
+    {{- include "platform.token" . | nindent 4 }}
+ingress:
+  enabled: true
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  hosts:
+  - {{ $registryUrl.host }}
+{{- with .Values.priorityClassName }}
+priorityClassName: {{ . }}
+{{- end }}
+{{- with .Values.sentry }}
+sentry:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{- if .Values.applications.platformRegistry.enabled }}
+{{- $cfg := deepCopy .Values.applications.platformRegistry -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.platformRegistry.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

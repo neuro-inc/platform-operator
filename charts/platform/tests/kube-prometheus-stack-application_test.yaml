@@ -1,0 +1,12 @@
+suite: test kube-prometheus-stack application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - argocd-applications/kube-prometheus-stack-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}

@@ -1,0 +1,56 @@
+{{- define "platform.argocd.applications.platformApiPoller.values" -}}
+{{- $platformUrls := include "platform.urls" . | fromYaml -}}
+image:
+  repository: ghcr.io/neuro-inc/platformapi
+platform:
+  clusterName: {{ include "platform.clusterName" . }}
+  authUrl: {{ get $platformUrls "authUrl" }}
+  configUrl: {{ get $platformUrls "configUrl" }}
+  adminUrl: {{ printf "%s/apis/admin/v1" (get $platformUrls "adminUrl") }}
+  apiUrl: {{ printf "%s/api/v1" (get $platformUrls "apiUrl") }}
+  eventsUrl: {{ get $platformUrls "eventsUrl" }}
+  registryUrl: {{ include "platform.registryUrl" . }}
+  token:
+    {{- include "platform.token" . | nindent 4 }}
+jobs:
+  namespace: {{ include "platform.jobs.namespace.name" . }}
+  ingressClass: {{ .Values.ingress.className }}
+  ingressAuthMiddleware: {{ printf "%s-%s-ingress-auth@kubernetescrd" .Release.Namespace .Release.Name }}
+  ingressErrorPageMiddleware: {{ printf "%s-%s-error-page@kubernetescrd" .Release.Namespace .Release.Name }}
+  ingressOAuthAuthorizeUrl: {{ printf "%s/oauth/authorize" (get $platformUrls "ingressAuthUrl") }}
+nodeLabels:
+  job: {{ .Values.jobs.label | default .Values.nodeLabels.job }}
+  nodePool: {{ .Values.nodeLabels.nodePool }}
+  {{- with .Values.nodeLabels.preemptible }}
+  preemptible: {{ . }}
+  {{- end }}
+{{- if .Values.storages }}
+storages:
+{{- range .Values.storages }}
+  - type: pvc
+    path: {{ .path | quote }}
+    claimName: {{ printf "%s-%s" $.Release.Name (include "platform.storage.claimNameSuffix" .path) | quote }}
+{{- end }}
+{{- end }}
+ingress:
+  enabled: true
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  hosts:
+  - {{ include "platform.clusterDnsName" . }}
+{{- with .Values.priorityClassName }}
+priorityClassName: {{ . }}
+{{- end }}
+{{- with .Values.sentry }}
+sentry:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{- if .Values.applications.platformApiPoller.enabled }}
+{{- $cfg := deepCopy .Values.applications.platformApiPoller -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.platformApiPoller.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

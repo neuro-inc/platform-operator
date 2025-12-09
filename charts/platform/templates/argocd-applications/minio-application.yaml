@@ -1,0 +1,44 @@
+{{- define "platform.argocd.applications.minio.values" -}}
+nameOverride: platform-minio
+fullnameOverride: platform-minio
+image:
+  repository: ghcr.io/neuro-inc/minio
+  tag: RELEASE.2022-03-08T22-28-51Z
+DeploymentUpdate:
+  type: RollingUpdate
+  maxUnavailable: 1
+  maxSurge: 0
+resources:
+  requests:
+    cpu: "1"
+    memory: "2Gi"
+podLabels:
+  service: minio
+mode: standalone
+persistence:
+  enabled: true
+  {{- with .Values.defaultStorageClassName }}
+  storageClass: {{ . }}
+  {{- end }}
+{{- with .Values.imagePullSecrets }}
+imagePullSecrets:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.priorityClassName }}
+priorityClassName: {{ . }}
+{{- end }}
+ingress:
+  enabled: true
+  {{- with .Values.ingress.className }}
+  className: {{ . }}
+  {{- end }}
+  hosts:
+    - blob.{{ include "platform.clusterDnsName" . }}
+{{- end }}
+
+{{- if .Values.applications.minio.enabled }}
+{{- $cfg := deepCopy .Values.applications.minio -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.minio.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

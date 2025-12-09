@@ -5,7 +5,7 @@ metadata:
   labels: {{ include "platform.labels.standard" . | nindent 4 }}
 spec:
   type: ExternalName
-  externalName: {{ .Values.ingress.jobFallbackHost }}
+  externalName: {{ required "platform.fallbackHost is required" .Values.platform.fallbackHost }}
   ports:
   - name: https
     port: 443

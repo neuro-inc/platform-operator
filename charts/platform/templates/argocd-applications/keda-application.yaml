@@ -1,0 +1,11 @@
+{{- define "platform.argocd.applications.keda.values" -}}
+operator:
+  replicaCount: 1
+{{- end -}}
+
+{{- if .Values.applications.keda.enabled }}
+{{- $cfg := deepCopy .Values.applications.keda -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.keda.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

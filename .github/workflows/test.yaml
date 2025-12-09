@@ -3,8 +3,8 @@ on:
 
 jobs:
 
-  lint:
-    name: Lint
+  test:
+    name: Test
     runs-on: ubuntu-latest
     steps:
     - name: Checkout commit
@@ -13,162 +13,23 @@ jobs:
       uses: actions/setup-python@v6
       with:
         python-version-file: .python-version
-    - name: Install pipx
-      run: python3 -m pip install --user pipx && python3 -m pipx ensurepath
-    - name: Install Poetry with pipx
-      run: |
-        pipx install poetry
-    - name: Setup Python dependencies cache
-      uses: actions/cache@v4
+    - name: Install Helm
+      uses: azure/setup-helm@v4
       with:
-        path: ~/.cache/pypoetry
-        key: poetry-${{ hashFiles('**/poetry.lock') }}
-        restore-keys: |
-          poetry-
+        version: v3.14.0
     - name: Install dependencies
       run: make setup
     - name: Lint
       run: |
         echo "::add-matcher::.github/actionlint-matcher.json"
         make lint
-
-  unit:
-    name: Unit tests
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout commit
-      uses: actions/checkout@v5
-    - name: Install python
-      uses: actions/setup-python@v6
-      with:
-        python-version-file: .python-version
-    - name: Install pipx
-      run: python3 -m pip install --user pipx && python3 -m pipx ensurepath
-    - name: Install Poetry with pipx
-      run: |
-        pipx install poetry
-    - name: Setup Python dependencies cache
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pypoetry
-        key: poetry-${{ hashFiles('**/poetry.lock') }}
-        restore-keys: |
-          poetry-
-    - name: Install dependencies
-      run: make setup
     - name: Run unit tests
       run: make test_unit
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        files: .coverage.unit.xml
-        flags: unit
-        name: codecov-unit
-
-  integration:
-    name: Integration tests
-    runs-on: ubuntu-latest
-    env:
-      MINIKUBE_DRIVER: none
-    steps:
-    - name: Checkout commit
-      uses: actions/checkout@v5
-    - name: Install python
-      uses: actions/setup-python@v6
-      with:
-        python-version-file: .python-version
-    - name: Install pipx
-      run: python3 -m pip install --user pipx && python3 -m pipx ensurepath
-    - name: Install Poetry with pipx
-      run: |
-        pipx install poetry
-    - name: Setup Python dependencies cache
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pypoetry
-        key: poetry-${{ hashFiles('**/poetry.lock') }}
-        restore-keys: |
-          poetry-
-    - name: Install dependencies
-      run: make setup
-    - name: Login to ghcr.io
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ github.token }}
-    - name: Start minikube
-      run: |
-        curl -LO https://storage.googleapis.com/minikube/releases/v1.25.2/minikube-linux-amd64
-        sudo apt-get update
-        sudo apt-get install -y conntrack
-        sudo install minikube-linux-amd64 /usr/local/bin/minikube
-
-        sudo modprobe bridge
-        sudo modprobe br_netfilter
-        sudo sysctl -w net.bridge.bridge-nf-call-iptables=1
-
-        minikube start --driver="none" --wait=true
-
-        sudo chown -R $USER $HOME/.kube /root/.minikube
-        sudo chmod -R a+r $HOME/.kube /root/.minikube
-        sudo find /root/.minikube -name id_rsa -exec chmod 600 {} \;
-    - name: Run integration tests
-      run: make test_integration
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        files: .coverage.integration.xml
-        flags: integration
-        name: codecov-integration
-
-  image-upload:
-    name: Upload image artifact
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout commit
-      uses: actions/checkout@v5
-    - name: Install python
-      uses: actions/setup-python@v6
-      with:
-        python-version-file: .python-version
-    - name: Install pipx
-      run: python3 -m pip install --user pipx && python3 -m pipx ensurepath
-    - name: Install Poetry with pipx
-      run: |
-        pipx install poetry
-    - name: Setup Python dependencies cache
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pypoetry
-        key: poetry-${{ hashFiles('**/poetry.lock') }}
-        restore-keys: |
-          poetry-
-    - name: Install dependencies
-      run: make setup
-    - name: Login to ghcr.io
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ github.token }}
-    - name: Build Docker image
-      run: make docker_build
-    - name: Upload image artifact
-      uses: neuro-inc/upload-image-action@v24.4.0
-      with:
-        image: platform-operator-controller
-        token: ${{ github.token }}
 
   check:
     name: Check
     needs:
-    - lint
-    - unit
-    - integration
-    - image-upload
+    - test
     runs-on: ubuntu-latest
     if: always()
     steps:

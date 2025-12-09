@@ -1,0 +1,12 @@
+suite: test keda addons http application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - argocd-applications/keda-add-ons-http-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}

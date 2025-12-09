@@ -1,0 +1,21 @@
+platform:
+  apiUrl: https://api.apolo.us
+  clusterName: test-cluster
+  clusterDnsName: test-cluster.org.apolo.us
+  token:
+    valueFrom:
+      secretKeyRef:
+        name: platform-token
+        key: token
+
+ingress:
+  className: traefik
+
+priorityClassName: platform-service
+
+defaultStorageClassName: standard
+
+sentry:
+  dsn: https://sentry-dsn
+  clusterName: test-cluster
+  sampleRate: 0.1

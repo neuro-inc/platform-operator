@@ -1,0 +1,12 @@
+suite: test platform disks application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - argocd-applications/platform-disks-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}

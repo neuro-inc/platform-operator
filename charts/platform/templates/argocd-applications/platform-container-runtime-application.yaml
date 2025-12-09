@@ -1,0 +1,25 @@
+{{- define "platform.argocd.applications.platformContainerRuntime.values" -}}
+image:
+  repository: ghcr.io/neuro-inc/platformcontainerruntime
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: {{ .Values.nodeLabels.job | default .Values.jobs.label }}
+          operator: Exists
+{{- with .Values.priorityClassName }}
+priorityClassName: {{ . }}
+{{- end }}
+{{- with .Values.sentry }}
+sentry:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{- if .Values.applications.platformContainerRuntime.enabled }}
+{{- $cfg := deepCopy .Values.applications.platformContainerRuntime -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.platformContainerRuntime.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

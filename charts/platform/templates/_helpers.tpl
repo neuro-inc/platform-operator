@@ -90,3 +90,86 @@ release: {{ .Release.Name | quote }}
   }
 }
 {{- end -}}
+
+{{- define "platform.apiUrl" -}}
+{{- required "platform.apiUrl is required" .Values.platform.apiUrl -}}
+{{- end -}}
+
+{{- define "platform.clusterName" -}}
+{{- required "platform.clusterName is required" .Values.platform.clusterName -}}
+{{- end -}}
+
+{{- define "platform.clusterDnsName" -}}
+{{- required "platform.clusterDnsName is required" .Values.platform.clusterDnsName -}}
+{{- end -}}
+
+{{- define "platform.token" -}}
+{{- if eq (len .Values.platform.token) 0 -}}
+{{- fail "platform.token is required" -}}
+{{- end -}}
+{{- toYaml .Values.platform.token -}}
+{{- end -}}
+
+{{- define "platform.urls" -}}
+{{- $apiUrl := include "platform.apiUrl" . -}}
+{{- range $key, $value := .Values.platform -}}
+{{- if hasSuffix "Url" $key }}
+{{ $key }}: {{ default $apiUrl $value }}
+{{- end }}
+{{- end -}}
+{{- end -}}
+
+{{- define "platform.registryUrl" -}}
+{{ printf "registry.%s" (include "platform.clusterDnsName" .) }}
+{{- end -}}
+
+{{- define "platform.argocd.application" -}}
+{{- $root := .root -}}
+{{- $project := default "default" $root.Values.argocd.project -}}
+{{- $destNs := $root.Release.Namespace -}}
+{{- $destServer := default "https://kubernetes.default.svc" $root.Values.argocd.destination.server -}}
+{{- $syncWave := default 0 .syncWave | int -}}
+{{- $labels := default dict .labels -}}
+{{- $annotations := default dict .annotations -}}
+{{- $helmDefaultValues := default dict .defaultValues -}}
+{{- $helmValues := deepCopy (default dict .values) -}}
+{{- $_ := merge $helmValues $helmDefaultValues -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .name | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "platform.labels.standard" $root | nindent 4 }}
+    {{- if gt (len $labels) 0 }}
+    {{- range $k, $v := $labels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+    {{- end }}
+  {{- if or (ne $syncWave 0) (gt (len $annotations) 0) }}
+  annotations:
+    {{- if ne $syncWave 0 }}
+    argocd.argoproj.io/sync-wave: {{ $syncWave | quote }}
+    {{- end }}
+    {{- range $k, $v := $annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- end }}
+spec:
+  project: {{ $project }}
+  destination:
+    server: {{ $destServer }}
+    namespace: {{ $destNs }}
+  source:
+    repoURL: {{ required (printf "repoURL for %s application is required" .name) .repoURL }}
+    chart: {{ required (printf "chart for %s application is required" .name) .chart }}
+    targetRevision: {{ default "latest" .targetRevision | quote }}
+    helm:
+      {{- with $helmValues }}
+      valuesObject:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- with $root.Values.argocd.syncPolicy }}
+  syncPolicy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end -}}
