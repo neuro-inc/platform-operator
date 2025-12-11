@@ -8,9 +8,7 @@ affinity:
       - matchExpressions:
         - key: {{ .Values.nodeLabels.job | default .Values.jobs.label }}
           operator: Exists
-{{- with .Values.priorityClassName }}
-priorityClassName: {{ . }}
-{{- end }}
+priorityClassName: {{ include "platform.priorityClassName" . }}
 {{- with .Values.sentry }}
 sentry:
   {{- toYaml . | nindent 2 }}

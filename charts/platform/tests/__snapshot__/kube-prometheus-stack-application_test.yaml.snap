@@ -62,7 +62,7 @@ should match snapshot:
                 - nodes=[platform.neuromation.io/nodepool,platform.neuromation.io/job,platform.neuromation.io/accelerator]
                 - pods=[service,platform.neuromation.io/user,platform.neuromation.io/job,platform.apolo.us/org,platform.apolo.us/project,platform.apolo.us/preset,platform.apolo.us/app-instance-name,platform.apolo.us/user]
               nameOverride: kube-state-metrics
-              priorityClassName: platform-service
+              priorityClassName: platform-services
               prometheus:
                 monitor:
                   additionalLabels:
@@ -124,7 +124,7 @@ should match snapshot:
                 podMetadata:
                   labels:
                     service: prometheus
-                priorityClassName: platform-service
+                priorityClassName: platform-services
                 replicas: 1
                 resources:
                   requests:
@@ -188,7 +188,7 @@ should match snapshot:
                 namespace: platform
               podLabels:
                 service: prometheus-operator
-              priorityClassName: platform-service
+              priorityClassName: platform-services
               prometheusConfigReloader:
                 image:
                   registry: ghcr.io

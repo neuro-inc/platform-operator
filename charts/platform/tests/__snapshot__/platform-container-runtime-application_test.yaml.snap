@@ -27,7 +27,7 @@ should match snapshot:
                           operator: Exists
             image:
               repository: ghcr.io/neuro-inc/platformcontainerruntime
-            priorityClassName: platform-service
+            priorityClassName: platform-services
             sentry:
               clusterName: test-cluster
               dsn: https://sentry-dsn

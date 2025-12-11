@@ -64,9 +64,7 @@ sidecar:
   selector:
     app: null
     app.kubernetes.io/name: prometheus
-{{- with .Values.priorityClassName }}
-priorityClassName: {{ . }}
-{{- end }}
+priorityClassName: {{ include "platform.priorityClassName" . }}
 {{- end }}
 
 {{- if .Values.applications.thanos.enabled }}

@@ -44,9 +44,7 @@ grafanaProxy:
     - {{ printf "metrics.%s" (include "platform.clusterDnsName" .) }}
     annotations:
       traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-ingress-auth@kubernetescrd" .Release.Namespace .Release.Name }}
-{{- with .Values.priorityClassName }}
-priorityClassName: {{ . }}
-{{- end }}
+priorityClassName: {{ include "platform.priorityClassName" . }}
 {{- with .Values.sentry }}
 sentry:
   {{- toYaml . | nindent 2 }}

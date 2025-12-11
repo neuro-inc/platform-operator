@@ -24,9 +24,7 @@ persistence:
 imagePullSecrets:
   {{- toYaml . | nindent 2 }}
 {{- end }}
-{{- with .Values.priorityClassName }}
-priorityClassName: {{ . }}
-{{- end }}
+priorityClassName: {{ include "platform.priorityClassName" . }}
 ingress:
   enabled: true
   {{- with .Values.ingress.className }}

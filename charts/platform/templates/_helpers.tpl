@@ -123,6 +123,10 @@ release: {{ .Release.Name | quote }}
 {{ printf "registry.%s" (include "platform.clusterDnsName" .) }}
 {{- end -}}
 
+{{- define "platform.priorityClassName" -}}
+{{- default (printf "%s-services" .Release.Namespace) .Values.priorityClassName -}}
+{{- end -}}
+
 {{- define "platform.argocd.application" -}}
 {{- $root := .root -}}
 {{- $project := default "default" $root.Values.argocd.project -}}

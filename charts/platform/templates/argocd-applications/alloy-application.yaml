@@ -173,9 +173,7 @@ controller:
     - key: amd.com/gpu
       effect: NoSchedule
       operator: Exists
-  {{- with .Values.priorityClassName }}
-  priorityClassName: {{ . }}
-  {{- end }}
+  priorityClassName: {{ include "platform.priorityClassName" . }}
 configReloader:
   securityContext:
     runAsUser: 65534

@@ -71,9 +71,7 @@ kube-state-metrics:
           targetLabel: label_node_kubernetes_io_instance_type
       additionalLabels:
         platform.apolo.us/scrape-metrics: "true"
-  {{- with .Values.priorityClassName }}
-  priorityClassName: {{ . }}
-  {{- end }}
+  priorityClassName: {{ include "platform.priorityClassName" . }}
 nodeExporter:
   enabled: true
 prometheus-node-exporter:
@@ -129,9 +127,7 @@ prometheusOperator:
       platform.apolo.us/scrape-metrics: "true"
   kubeletService:
     namespace: {{ .Release.Namespace }}
-  {{- with .Values.priorityClassName }}
-  priorityClassName: {{ . }}
-  {{- end }}
+  priorityClassName: {{ include "platform.priorityClassName" . }}
 prometheus:
   prometheusSpec:
     image:
@@ -169,9 +165,7 @@ prometheus:
         platform.apolo.us/scrape-metrics: "true"
     externalLabels:
       cluster: {{ include "platform.clusterName" . }}
-    {{- with .Values.priorityClassName }}
-    priorityClassName: {{ . }}
-    {{- end }}
+    priorityClassName: {{ include "platform.priorityClassName" . }}
   serviceMonitor:
     additionalLabels:
       platform.apolo.us/scrape-metrics: "true"

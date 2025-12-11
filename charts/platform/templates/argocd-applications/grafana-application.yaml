@@ -82,9 +82,7 @@ grafana.ini:
   log:
     mode: console
     level: error
-{{- with .Values.priorityClassName }}
-priorityClassName: {{ . }}
-{{- end }}
+priorityClassName: {{ include "platform.priorityClassName" . }}
 {{- end }}
 
 {{- if .Values.applications.grafana.enabled }}

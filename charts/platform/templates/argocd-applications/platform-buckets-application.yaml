@@ -21,9 +21,7 @@ ingress:
   {{- end }}
   hosts:
   - {{ include "platform.clusterDnsName" . }}
-{{- with .Values.priorityClassName }}
-priorityClassName: {{ . }}
-{{- end }}
+priorityClassName: {{ include "platform.priorityClassName" . }}
 {{- with .Values.sentry }}
 sentry:
   {{- toYaml . | nindent 2 }}

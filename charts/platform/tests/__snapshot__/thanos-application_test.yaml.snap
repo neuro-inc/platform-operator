@@ -52,7 +52,7 @@ should match snapshot:
             image:
               repository: ghcr.io/neuro-inc/thanos
               tag: v0.24.0
-            priorityClassName: platform-service
+            priorityClassName: platform-services
             query:
               labels:
                 service: thanos-query

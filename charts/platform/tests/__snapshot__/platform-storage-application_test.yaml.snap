@@ -34,7 +34,7 @@ should match snapshot:
                   secretKeyRef:
                     key: token
                     name: platform-token
-            priorityClassName: platform-service
+            priorityClassName: platform-services
             securityContext:
               enabled: true
             sentry:

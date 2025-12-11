@@ -59,9 +59,7 @@ metrics:
         platform.apolo.us/scrape-metrics: "true"
 ingressClass:
   enabled: true
-{{- with .Values.priorityClassName }}
-priorityClassName: {{ . }}
-{{- end }}
+priorityClassName: {{ include "platform.priorityClassName" . }}
 {{- end }}
 
 {{- if .Values.applications.traefik.enabled }}

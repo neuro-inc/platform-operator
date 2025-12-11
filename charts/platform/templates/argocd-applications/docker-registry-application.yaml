@@ -13,9 +13,7 @@ podLabels:
   service: docker-registry
 secrets:
   haSharedSecret: {{ sha256sum (include "platform.clusterName" .) }}
-{{- with .Values.priorityClassName }}
-priorityClassName: {{ . }}
-{{- end }}
+priorityClassName: {{ include "platform.priorityClassName" . }}
 {{- end }}
 
 {{- if .Values.applications.dockerRegistry.enabled }}

@@ -11,8 +11,6 @@ platform:
 ingress:
   className: traefik
 
-priorityClassName: platform-service
-
 defaultStorageClassName: standard
 
 sentry:

@@ -23,9 +23,7 @@ ingress:
   {{- end }}
   hosts:
   - {{ include "platform.clusterDnsName" . }}
-{{- with .Values.priorityClassName }}
-priorityClassName: {{ . }}
-{{- end }}
+priorityClassName: {{ include "platform.priorityClassName" . }}
 {{- end -}}
 
 {{- if .Values.applications.platformDisks.enabled }}
