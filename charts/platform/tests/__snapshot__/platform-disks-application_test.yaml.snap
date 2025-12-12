@@ -18,6 +18,8 @@ should match snapshot:
         chart: platform-disks
         helm:
           valuesObject:
+            disks:
+              storageClassName: standard
             ingress:
               enabled: true
               hosts:

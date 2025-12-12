@@ -12,6 +12,10 @@ platform:
   clusterName: {{ $clusterName }}
   token:
     {{- include "platform.token" . | nindent 4 }}
+disks:
+  {{- with .Values.defaultStorageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
 {{- with .Values.sentry }}
 sentry:
   {{- toYaml . | nindent 2 }}

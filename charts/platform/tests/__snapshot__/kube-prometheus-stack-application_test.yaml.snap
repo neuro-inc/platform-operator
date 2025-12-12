@@ -91,7 +91,7 @@ should match snapshot:
             kubeProxy:
               enabled: false
             kubeScheduler:
-              enabled: false
+              enabled: true
             kubeStateMetrics:
               enabled: true
             kubelet:

@@ -19,11 +19,9 @@ jobs:
   ingressErrorPageMiddleware: {{ printf "%s-%s-error-page@kubernetescrd" .Release.Namespace .Release.Name }}
   ingressOAuthAuthorizeUrl: {{ printf "%s/oauth/authorize" (get $platformUrls "ingressAuthUrl") }}
 nodeLabels:
-  job: {{ .Values.jobs.label | default .Values.nodeLabels.job }}
+  job: {{ .Values.nodeLabels.job }}
   nodePool: {{ .Values.nodeLabels.nodePool }}
-  {{- with .Values.nodeLabels.preemptible }}
-  preemptible: {{ . }}
-  {{- end }}
+  preemptible: {{ .Values.nodeLabels.preemptible }}
 {{- if .Values.storages }}
 storages:
 {{- range .Values.storages }}

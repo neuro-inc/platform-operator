@@ -6,7 +6,7 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: {{ .Values.nodeLabels.job | default .Values.jobs.label }}
+        - key: {{ .Values.nodeLabels.job }}
           operator: Exists
 priorityClassName: {{ include "platform.priorityClassName" . }}
 {{- with .Values.sentry }}
