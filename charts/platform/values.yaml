@@ -235,7 +235,7 @@ applications:
 
   postgresOperator:
     enabled: true
-    repoURL: oci://ghcr.io/neuro-inc/app-crunchy-postgres
+    repoURL: ghcr.io/neuro-inc/app-crunchy-postgres
     chart: pgo
     name: postgres-operator
     targetRevision: "5.8.3"
@@ -243,7 +243,7 @@ applications:
 
   platformStorage:
     enabled: true
-    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts
     chart: platform-storage
     name: platform-storage
     targetRevision: "*"
@@ -251,7 +251,7 @@ applications:
 
   platformRegistry:
     enabled: true
-    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts
     chart: platform-registry
     name: platform-registry
     targetRevision: "*"
@@ -259,7 +259,7 @@ applications:
 
   platformMonitoring:
     enabled: true
-    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts
     chart: platform-monitoring
     name: platform-monitoring
     targetRevision: "*"
@@ -267,7 +267,7 @@ applications:
 
   platformContainerRuntime:
     enabled: true
-    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts
     chart: platform-container-runtime
     name: platform-container-runtime
     targetRevision: "*"
@@ -275,7 +275,7 @@ applications:
 
   platformSecrets:
     enabled: true
-    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts
     chart: platform-secrets
     name: platform-secrets
     targetRevision: "*"
@@ -283,7 +283,7 @@ applications:
 
   platformReports:
     enabled: true
-    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts
     chart: platform-reports
     name: platform-reports
     targetRevision: "*"
@@ -291,7 +291,7 @@ applications:
 
   platformDisks:
     enabled: true
-    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts
     chart: platform-disks
     name: platform-disks
     targetRevision: "*"
@@ -299,7 +299,7 @@ applications:
 
   platformApiPoller:
     enabled: true
-    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts
     chart: platform-api-poller
     name: platform-api-poller
     targetRevision: "*"
@@ -307,7 +307,7 @@ applications:
 
   platformBuckets:
     enabled: true
-    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts
     name: platform-buckets
     chart: platform-buckets
     targetRevision: "*"
@@ -315,7 +315,7 @@ applications:
 
   platformMetadata:
     enabled: true
-    repoURL: oci://ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts
     chart: platform-metadata
     name: platform-metadata
     targetRevision: "*"
