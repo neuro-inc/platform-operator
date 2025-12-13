@@ -57,7 +57,7 @@ should match snapshot:
               - claimName: platform-storage-storage
                 path: /storage
                 type: pvc
-        repoURL: oci://ghcr.io/neuro-inc/helm-charts
+        repoURL: ghcr.io/neuro-inc/helm-charts
         targetRevision: '*'
       syncPolicy:
         automated:
