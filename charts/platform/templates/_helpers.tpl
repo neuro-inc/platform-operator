@@ -105,7 +105,7 @@ spec:
   source:
     repoURL: {{ required (printf "repoURL for %s application is required" .name) .repoURL }}
     chart: {{ required (printf "chart for %s application is required" .name) .chart }}
-    targetRevision: {{ default "latest" .targetRevision | quote }}
+    targetRevision: {{ .targetRevision | default "latest" | quote }}
     helm:
       {{- with .releaseName }}
       releaseName: {{ . }}
