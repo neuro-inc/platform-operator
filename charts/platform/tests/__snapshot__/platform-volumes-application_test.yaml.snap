@@ -20,7 +20,7 @@ renders argocd application for platform-volumes chart:
         chart: platform-volumes
         helm:
           releaseName: platform
-        repoURL: ghcr.io/neuro-inc/helm-charts
+        repoURL: ghcr.io/neuro-inc/helm-charts/platform-compute
         targetRevision: 1.0.0
       syncPolicy:
         automated:

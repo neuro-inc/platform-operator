@@ -22,7 +22,7 @@ renders argocd application for platform-ingress chart:
             defaultClassName: traefik
             fallbackHost: default.jobs-staging.neu.ro
             ingressAuthHost: api.apolo.us
-        repoURL: ghcr.io/neuro-inc/helm-charts
+        repoURL: ghcr.io/neuro-inc/helm-charts/platform-compute
         targetRevision: 1.0.0
       syncPolicy:
         automated:
