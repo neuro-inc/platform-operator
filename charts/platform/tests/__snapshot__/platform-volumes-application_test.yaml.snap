@@ -6,8 +6,8 @@ renders argocd application for platform-volumes chart:
       annotations:
         argocd.argoproj.io/sync-wave: "-1"
       labels:
-        app: platform-argocd-applications
-        chart: platform-argocd-applications-1.0.0
+        app: platform
+        chart: platform-1.0.0
         heritage: Helm
         release: platform
       name: platform-volumes

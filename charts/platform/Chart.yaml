@@ -1,5 +1,5 @@
 apiVersion: v2
-name: platform-argocd-applications
+name: platform
 description: Apolo platform ArgoCD applications
 version: 1.0.0
 appVersion: 1.0.0

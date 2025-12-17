@@ -4,8 +4,8 @@ should match snapshot:
     kind: Application
     metadata:
       labels:
-        app: platform-argocd-applications
-        chart: platform-argocd-applications-1.0.0
+        app: platform
+        chart: platform-1.0.0
         heritage: Helm
         release: platform
       name: platform-disks
