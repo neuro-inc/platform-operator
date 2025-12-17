@@ -69,8 +69,9 @@ release: {{ .Release.Name | quote }}
 {{- define "platform.argocd.application" -}}
 {{- $root := .root -}}
 {{- $clusterName := include "platform.clusterName" $root -}}
-{{- $defaultName := printf "%s--%s" $clusterName .name -}}
-{{- $name := ternary .name $defaultName (contains $clusterName .name) -}}
+{{- $namePrefix := printf "%s--" $clusterName -}}
+{{- $nameWithPrefix := printf "%s%s" $namePrefix .name -}}
+{{- $name := ternary .name $nameWithPrefix (hasPrefix $namePrefix .name) -}}
 {{- $project := default "default" $root.Values.argocd.project -}}
 {{- $destServer := default "https://kubernetes.default.svc" $root.Values.argocd.destination.server -}}
 {{- $destNs := default $root.Release.Namespace $root.Values.argocd.destination.namespace -}}
