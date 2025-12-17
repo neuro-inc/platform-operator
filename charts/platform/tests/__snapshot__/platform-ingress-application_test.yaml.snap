@@ -8,7 +8,7 @@ renders argocd application for platform-ingress chart:
         chart: platform-1.0.0
         heritage: Helm
         release: platform
-      name: platform-ingress
+      name: test-cluster--platform-ingress
     spec:
       destination:
         namespace: platform

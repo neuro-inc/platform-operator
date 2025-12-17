@@ -30,6 +30,8 @@ route:
 
 {{- define "platform.argocd.applications.kubePrometheusStack.values" -}}
 {{- $platformTokenSecretName := dig "valueFrom" "secretKeyRef" "name" "" (include "platform.token" . | fromYaml) -}}
+nameOverride: prometheus
+fullnameOverride: prometheus
 global:
   imageRegistry: ghcr.io
   {{- with .Values.imagePullSecrets }}

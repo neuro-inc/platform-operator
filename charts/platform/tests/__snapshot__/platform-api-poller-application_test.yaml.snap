@@ -8,7 +8,7 @@ should match snapshot:
         chart: platform-1.0.0
         heritage: Helm
         release: platform
-      name: platform-api-poller
+      name: test-cluster--platform-api-poller
     spec:
       destination:
         namespace: platform
@@ -17,6 +17,7 @@ should match snapshot:
       source:
         chart: platform-api-poller
         helm:
+          releaseName: platform-api-poller
           valuesObject:
             image:
               repository: ghcr.io/neuro-inc/platformapi

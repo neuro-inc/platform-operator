@@ -8,7 +8,7 @@ should match snapshot:
         chart: platform-1.0.0
         heritage: Helm
         release: platform
-      name: platform-buckets
+      name: test-cluster--platform-buckets
     spec:
       destination:
         namespace: platform
@@ -17,6 +17,7 @@ should match snapshot:
       source:
         chart: platform-buckets
         helm:
+          releaseName: platform-buckets
           valuesObject:
             disableCreation: false
             image:

@@ -10,7 +10,7 @@ renders argocd application for platform-volumes chart:
         chart: platform-1.0.0
         heritage: Helm
         release: platform
-      name: platform-volumes
+      name: test-cluster--platform-volumes
     spec:
       destination:
         namespace: platform

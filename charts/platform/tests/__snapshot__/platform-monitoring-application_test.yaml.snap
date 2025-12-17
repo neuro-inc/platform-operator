@@ -8,7 +8,7 @@ should match snapshot:
         chart: platform-1.0.0
         heritage: Helm
         release: platform
-      name: platform-monitoring
+      name: test-cluster--platform-monitoring
     spec:
       destination:
         namespace: platform
@@ -17,6 +17,7 @@ should match snapshot:
       source:
         chart: platform-monitoring
         helm:
+          releaseName: platform-monitoring
           valuesObject:
             fullnameOverride: platform-monitoring
             image:

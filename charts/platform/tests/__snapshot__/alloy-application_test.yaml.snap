@@ -8,7 +8,7 @@ should match snapshot:
         chart: platform-1.0.0
         heritage: Helm
         release: platform
-      name: alloy
+      name: test-cluster--alloy
     spec:
       destination:
         namespace: platform
@@ -17,6 +17,7 @@ should match snapshot:
       source:
         chart: alloy
         helm:
+          releaseName: alloy
           valuesObject:
             alloy:
               configMap:

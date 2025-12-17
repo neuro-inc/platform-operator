@@ -68,6 +68,9 @@ release: {{ .Release.Name | quote }}
 
 {{- define "platform.argocd.application" -}}
 {{- $root := .root -}}
+{{- $clusterName := include "platform.clusterName" $root -}}
+{{- $defaultName := printf "%s--%s" $clusterName .name -}}
+{{- $name := ternary .name $defaultName (contains $clusterName .name) -}}
 {{- $project := default "default" $root.Values.argocd.project -}}
 {{- $destServer := default "https://kubernetes.default.svc" $root.Values.argocd.destination.server -}}
 {{- $destNs := default $root.Release.Namespace $root.Values.argocd.destination.namespace -}}
@@ -80,7 +83,7 @@ release: {{ .Release.Name | quote }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ .name | trunc 63 | trimSuffix "-" }}
+  name: {{ $name | trunc 63 | trimSuffix "-" }}
   labels:
     {{- include "platform.labels.common" $root | nindent 4 }}
     {{- if gt (len $labels) 0 }}
@@ -107,8 +110,10 @@ spec:
     chart: {{ required (printf "chart for %s application is required" .name) .chart }}
     targetRevision: {{ .targetRevision | default "latest" | quote }}
     helm:
-      {{- with .releaseName }}
-      releaseName: {{ . }}
+      {{- if .releaseName }}
+      releaseName: {{ .releaseName }}
+      {{- else }}
+      releaseName: {{ .name }}
       {{- end }}
       {{- with $helmValues }}
       valuesObject:

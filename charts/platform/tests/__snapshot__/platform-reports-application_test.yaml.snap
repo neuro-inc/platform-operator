@@ -8,7 +8,7 @@ should match snapshot:
         chart: platform-1.0.0
         heritage: Helm
         release: platform
-      name: platform-reports
+      name: test-cluster--platform-reports
     spec:
       destination:
         namespace: platform
@@ -17,6 +17,7 @@ should match snapshot:
       source:
         chart: platform-reports
         helm:
+          releaseName: platform-reports
           valuesObject:
             grafanaEnabled: false
             grafanaProxy:

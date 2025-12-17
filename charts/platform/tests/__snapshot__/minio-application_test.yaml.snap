@@ -10,7 +10,7 @@ should match snapshot:
         chart: platform-1.0.0
         heritage: Helm
         release: platform
-      name: minio
+      name: test-cluster--minio
     spec:
       destination:
         namespace: platform
@@ -19,6 +19,7 @@ should match snapshot:
       source:
         chart: minio
         helm:
+          releaseName: minio
           valuesObject:
             DeploymentUpdate:
               maxSurge: 0

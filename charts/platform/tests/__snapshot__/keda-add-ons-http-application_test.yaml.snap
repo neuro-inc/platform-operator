@@ -8,7 +8,7 @@ should match snapshot:
         chart: platform-1.0.0
         heritage: Helm
         release: platform
-      name: keda-add-ons-http
+      name: test-cluster--keda-add-ons-http
     spec:
       destination:
         namespace: platform
@@ -17,6 +17,7 @@ should match snapshot:
       source:
         chart: keda-add-ons-http
         helm:
+          releaseName: keda-add-ons-http
           valuesObject:
             interceptor:
               replicas:

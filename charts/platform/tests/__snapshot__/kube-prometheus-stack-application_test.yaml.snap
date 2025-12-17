@@ -10,7 +10,7 @@ should match snapshot:
         chart: platform-1.0.0
         heritage: Helm
         release: platform
-      name: prometheus
+      name: test-cluster--prometheus
     spec:
       destination:
         namespace: platform
@@ -19,6 +19,7 @@ should match snapshot:
       source:
         chart: kube-prometheus-stack
         helm:
+          releaseName: prometheus
           valuesObject:
             alertmanager:
               alertmanagerSpec:
@@ -61,6 +62,7 @@ should match snapshot:
               enabled: false
             defaultRules:
               create: false
+            fullnameOverride: prometheus
             global:
               imageRegistry: ghcr.io
             grafana:
@@ -122,6 +124,7 @@ should match snapshot:
               serviceMonitor:
                 additionalLabels:
                   platform.apolo.us/scrape-metrics: "true"
+            nameOverride: prometheus
             nodeExporter:
               enabled: true
             prometheus:
