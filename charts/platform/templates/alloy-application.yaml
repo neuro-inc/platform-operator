@@ -1,4 +1,5 @@
 {{- define "platform.argocd.applications.alloy.values" -}}
+{{- $platformNamespace := include "platform.argocd.destination.namespace" . -}}
 global:
   podSecurityContext:
     runAsUser: 473
@@ -13,7 +14,7 @@ alloy:
     content: |
       loki.write "default" {
         endpoint {
-          url = "http://loki-gateway.{{ .Release.Namespace }}.svc.cluster.local/loki/api/v1/push"
+          url = "http://loki-gateway.{{ $platformNamespace }}.svc.cluster.local/loki/api/v1/push"
         }
       }
 

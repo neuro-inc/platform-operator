@@ -1,5 +1,6 @@
 {{- define "platform.argocd.applications.platformApiPoller.values" -}}
 {{- $platformUrls := include "platform.urls" . | fromYaml -}}
+{{- $platformNamespace := include "platform.argocd.destination.namespace" . -}}
 image:
   repository: ghcr.io/neuro-inc/platformapi
 platform:
@@ -15,8 +16,8 @@ platform:
 jobs:
   namespace: platform-jobs
   ingressClass: {{ .Values.defaultIngressClassName }}
-  ingressAuthMiddleware: {{ printf "%s-%s-ingress-auth@kubernetescrd" .Release.Namespace .Release.Name }}
-  ingressErrorPageMiddleware: {{ printf "%s-%s-error-page@kubernetescrd" .Release.Namespace .Release.Name }}
+  ingressAuthMiddleware: {{ printf "%s-%s-ingress-auth@kubernetescrd" $platformNamespace .Release.Name }}
+  ingressErrorPageMiddleware: {{ printf "%s-%s-error-page@kubernetescrd" $platformNamespace .Release.Name }}
   ingressOAuthAuthorizeUrl: {{ printf "%s/oauth/authorize" (get $platformUrls "ingressAuthUrl") }}
 nodeLabels:
   job: {{ .Values.nodeLabels.job }}

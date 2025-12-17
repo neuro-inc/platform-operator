@@ -63,7 +63,13 @@ release: {{ .Release.Name | quote }}
 {{- end -}}
 
 {{- define "platform.priorityClassName" -}}
-{{- default (printf "%s-services" .Release.Namespace) .Values.defaultPriorityClassName -}}
+{{- $namespace := include "platform.argocd.destination.namespace" . -}}
+{{- $priorityClassName := printf "%s-services" $namespace -}}
+{{- default $priorityClassName .Values.defaultPriorityClassName -}}
+{{- end -}}
+
+{{- define "platform.argocd.destination.namespace" -}}
+{{- required "argocd.destination.namespace is required" .Values.argocd.destination.namespace -}}
 {{- end -}}
 
 {{- define "platform.argocd.application" -}}

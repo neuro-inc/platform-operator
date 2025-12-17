@@ -11,7 +11,7 @@ should match snapshot:
       name: test-cluster--platform-registry
     spec:
       destination:
-        namespace: argocd
+        namespace: platform
         server: https://kubernetes.default.svc
       project: default
       source:

@@ -1,4 +1,5 @@
 {{- define "platform.argocd.applications.traefik.values" -}}
+{{- $platformNamespace := include "platform.argocd.destination.namespace" . -}}
 image:
   name: ghcr.io/neuro-inc/traefik
 deployment:
@@ -15,7 +16,7 @@ deployment:
 additionalArguments:
   - --entryPoints.websecure.proxyProtocol.insecure=true
   - --entryPoints.websecure.forwardedHeaders.insecure=true
-  - --entryPoints.websecure.http.middlewares={{ printf "%s-%s-cors@kubernetescrd" .Release.Namespace .Release.Name }}
+  - --entryPoints.websecure.http.middlewares={{ printf "%s-%s-cors@kubernetescrd" $platformNamespace .Release.Name }}
   - --providers.kubernetesingress.ingressendpoint.ip=1.2.3.4
 instanceLabelOverride: {{ .Release.Name }}
 resources:

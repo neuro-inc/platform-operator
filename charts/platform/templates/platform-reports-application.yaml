@@ -1,5 +1,6 @@
 {{- define "platform.argocd.applications.platformReports.values" -}}
 {{- $platformUrls := include "platform.urls" . | fromYaml -}}
+{{- $platformNamespace := include "platform.argocd.destination.namespace" . -}}
 image:
   repository: ghcr.io/neuro-inc/platform-reports
 securityContext:
@@ -43,7 +44,7 @@ grafanaProxy:
     - {{ printf "grafana.%s" (include "platform.clusterDnsName" .) }}
     - {{ printf "metrics.%s" (include "platform.clusterDnsName" .) }}
     annotations:
-      traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-ingress-auth@kubernetescrd" .Release.Namespace .Release.Name }}
+      traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-ingress-auth@kubernetescrd" $platformNamespace .Release.Name }}
 priorityClassName: {{ include "platform.priorityClassName" . }}
 {{- with .Values.sentry }}
 sentry:

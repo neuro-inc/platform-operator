@@ -1,5 +1,6 @@
 {{- define "platform.argocd.applications.platformMonitoring.values" -}}
 {{- $platformUrls := include "platform.urls" . | fromYaml -}}
+{{- $platformNamespace := include "platform.argocd.destination.namespace" . -}}
 nameOverride: {{ printf "%s-monitoring" .Release.Name }}
 fullnameOverride: {{ printf "%s-monitoring" .Release.Name }}
 image:
@@ -28,7 +29,7 @@ logs:
   persistence:
     type: loki
     loki:
-      endpoint: {{ printf "http://loki-read.%s:3100" .Release.Namespace }}
+      endpoint: {{ printf "http://loki-read.%s:3100" $platformNamespace }}
       archiveDelay: 5
       retentionPeriodS: 2592000  # 30 days
 service:
