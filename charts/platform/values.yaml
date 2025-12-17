@@ -7,7 +7,6 @@ platform:
   adminUrl: ""
   notificationsUrl: ""
   eventsUrl: ""
-  fallbackHost: default.jobs-staging.neu.ro
   clusterName: ""
   clusterDnsName: ""
   token: {}

@@ -1,6 +1,6 @@
 # defaultClassName: traefik
 
-ingressAuthHost: https://api.apolo.us
+ingressAuthHost: api.apolo.us
 fallbackHost: default.jobs.apolo.us
 
 cors:
