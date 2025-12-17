@@ -75,7 +75,7 @@ release: {{ .Release.Name | quote }}
 {{- define "platform.argocd.application" -}}
 {{- $root := .root -}}
 {{- $clusterName := include "platform.clusterName" $root -}}
-{{- $namePrefix := printf "%s--" $clusterName -}}
+{{- $namePrefix := ternary "" (printf "%s--" $clusterName) (empty $clusterName) -}}
 {{- $nameWithPrefix := printf "%s%s" $namePrefix .name -}}
 {{- $name := ternary .name $nameWithPrefix (hasPrefix $namePrefix .name) -}}
 {{- $project := default "default" $root.Values.argocd.project -}}

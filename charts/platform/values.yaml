@@ -34,9 +34,7 @@ imagePullSecrets: []
 
 argocd:
   project: default
-  # destination:
-  #   name:
-  #   namespace:
+  destination: {}
   syncPolicy:
     automated:
       enabled: true
