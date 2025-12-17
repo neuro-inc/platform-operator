@@ -1,0 +1,93 @@
+{{- define "platform.argocd.applications.grafana.values" -}}
+image:
+  registry: ghcr.io
+  repository: neuro-inc/grafana
+  tag: 10.2.2
+  {{- with .Values.imagePullSecrets }}
+  pullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+podLabels:
+  service: grafana
+ingress:
+  enabled: false
+initChownData:
+  image:
+    registry: ghcr.io
+    repository: neuro-inc/busybox
+    tag: latest
+    {{- with .Values.imagePullSecrets }}
+    pullSecrets:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+sidecar:
+  image:
+    registry: ghcr.io
+    repository: neuro-inc/k8s-sidecar
+    tag: 1.25.2
+    {{- with .Values.imagePullSecrets }}
+    pullSecrets:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  dashboards:
+    enabled: true
+    SCProvider: false
+    watchMethod: WATCH
+    label: grafana_dashboard
+    folderAnnotation: grafana_folder
+    folder: /etc/grafana/dashboards
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: sidecarProvider
+        orgId: 1
+        type: file
+        disableDeletion: false
+        allowUiUpdates: true
+        editable: true
+        options:
+          path: /etc/grafana/dashboards/platform
+          foldersFromFilesStructure: true
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://platform-prometheus-proxy:9090
+        access: proxy
+        isDefault: true
+        jsonData:
+          httpMethod: GET
+          manageAlerts: false
+          keepCookies:
+            - dat
+            - sat
+          prometheusType: Thanos
+persistence:
+  enabled: false
+grafana.ini:
+  auth.anonymous:
+    enabled: true
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+  users:
+    default_theme: light
+  snapshots:
+    external_enabled: false
+  dashboards:
+    default_home_dashboard_path: /etc/grafana/dashboards/home.json
+  log:
+    mode: console
+    level: error
+priorityClassName: {{ include "platform.priorityClassName" . }}
+{{- end }}
+
+{{- if .Values.argocdApplications.grafana.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.grafana -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.grafana.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

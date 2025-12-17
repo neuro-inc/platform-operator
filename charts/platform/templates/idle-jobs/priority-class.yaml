@@ -1,7 +1,0 @@
-apiVersion: scheduling.k8s.io/v1
-kind: PriorityClass
-metadata:
-  name: {{ .Release.Name }}-idle-job
-  labels: {{ include "platform.labels.standard" . | nindent 4 }}
-value: -1
-globalDefault: false

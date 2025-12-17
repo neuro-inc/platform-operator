@@ -3,7 +3,7 @@ release:
   name: platform
   namespace: platform
 templates:
-  - argocd-applications/keda-add-ons-http-application.yaml
+  - keda-add-ons-http-application.yaml
 values:
   - common-values.yaml
 tests:

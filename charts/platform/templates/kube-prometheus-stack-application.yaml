@@ -1,0 +1,241 @@
+{{- define "platform.alertmanager.config" -}}
+{{- $platformUrls := include "platform.urls" . | fromYaml -}}
+{{- $notificationsUrl := get $platformUrls "notificationsUrl" -}}
+{{- $secretName := dig "valueFrom" "secretKeyRef" "name" "" (include "platform.token" . | fromYaml) -}}
+{{- if not $secretName -}}
+{{- fail "platform token secret is required" -}}
+{{- end -}}
+receivers:
+- name: ignore
+- name: platform-notifications
+  webhook_configs:
+  - http_config:
+      authorization:
+        credentials_file: /etc/alertmanager/secrets/{{ $secretName }}/token
+        type: Bearer
+    url: {{ $notificationsUrl }}/api/v1/notifications/alert-manager-notification
+route:
+  group_by:
+  - alertname
+  group_interval: 5m
+  group_wait: 30s
+  receiver: platform-notifications
+  repeat_interval: 4h
+  routes:
+  - continue: false
+    matchers:
+    - exported_service="default-backend@kubernetes"
+    receiver: ignore
+{{- end -}}
+
+{{- define "platform.argocd.applications.kubePrometheusStack.values" -}}
+{{- $platformTokenSecretName := dig "valueFrom" "secretKeyRef" "name" "" (include "platform.token" . | fromYaml) -}}
+global:
+  imageRegistry: ghcr.io
+  {{- with .Values.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+defaultRules:
+  create: false
+kubeApiServer:
+  enabled: true
+  serviceMonitor:
+    additionalLabels:
+      platform.apolo.us/scrape-metrics: "true"
+kubelet:
+  enabled: true
+  namespace: {{ .Release.Namespace }}
+  serviceMonitor:
+    additionalLabels:
+      platform.apolo.us/scrape-metrics: "true"
+kubeControllerManager:
+  enabled: false
+coreDns:
+  enabled: false
+kubeDns:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeScheduler:
+  enabled: true
+kubeProxy:
+  enabled: false
+kubeStateMetrics:
+  enabled: true
+kube-state-metrics:
+  nameOverride: kube-state-metrics
+  fullnameOverride: kube-state-metrics
+  image:
+    registry: ghcr.io
+    repository: neuro-inc/kube-state-metrics
+    tag: v2.10.1
+  {{- with .Values.imagePullSecrets }}
+  serviceAccount:
+    imagePullSecrets:
+      {{- toYaml . | nindent 6 }}
+  {{- end }}
+  customLabels:
+    service: kube-state-metrics
+  selectorOverride:
+    app.kubernetes.io/name: kube-state-metrics
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  collectors:
+    - nodes
+    - pods
+    - deployments
+    - statefulsets
+    - daemonsets
+    - horizontalpodautoscalers
+  metricLabelsAllowlist:
+    - nodes=[platform.neuromation.io/nodepool,platform.neuromation.io/job,platform.neuromation.io/accelerator]
+    - pods=[service,platform.neuromation.io/user,platform.neuromation.io/job,platform.apolo.us/org,platform.apolo.us/project,platform.apolo.us/preset,platform.apolo.us/app-instance-name,platform.apolo.us/user]
+  prometheus:
+    monitor:
+      metricRelabelings:
+        - sourceLabels:
+            - label_beta_kubernetes_io_instance_type
+          targetLabel: label_node_kubernetes_io_instance_type
+      additionalLabels:
+        platform.apolo.us/scrape-metrics: "true"
+  priorityClassName: {{ include "platform.priorityClassName" . }}
+nodeExporter:
+  enabled: true
+prometheus-node-exporter:
+  nameOverride: prometheus-node-exporter
+  fullnameOverride: prometheus-node-exporter
+  image:
+    registry: ghcr.io
+    repository: neuro-inc/node-exporter
+    tag: v1.7.0
+  {{- with .Values.imagePullSecrets }}
+  serviceAccount:
+    imagePullSecrets:
+      {{- toYaml . | nindent 6 }}
+  {{- end }}
+  podLabels:
+    service: prometheus-node-exporter
+  resources:
+    requests:
+      cpu: 15m
+      memory: 50Mi
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 100%
+  prometheus:
+    monitor:
+      additionalLabels:
+        platform.apolo.us/scrape-metrics: "true"
+prometheusOperator:
+  image:
+    registry: ghcr.io
+    repository: neuro-inc/prometheus-operator
+    tag: v0.69.1
+  podLabels:
+    service: prometheus-operator
+  prometheusConfigReloader:
+    image:
+      registry: ghcr.io
+      repository: neuro-inc/prometheus-config-reloader
+      tag: v0.69.1
+  thanosImage:
+    registry: ghcr.io
+    repository: neuro-inc/thanos
+    tag: v0.24.0
+  admissionWebhooks:
+    patch:
+      image:
+        registry: ghcr.io
+        repository: neuro-inc/kube-webhook-certgen
+        tag: v20221220-controller-v1.5.1-58-g787ea74b6
+  serviceMonitor:
+    additionalLabels:
+      platform.apolo.us/scrape-metrics: "true"
+  kubeletService:
+    namespace: {{ .Release.Namespace }}
+  priorityClassName: {{ include "platform.priorityClassName" . }}
+prometheus:
+  prometheusSpec:
+    image:
+      registry: ghcr.io
+      repository: neuro-inc/prometheus
+      tag: v2.48.0
+    podMetadata:
+      labels:
+        service: prometheus
+    replicas: 1
+    retention: 12h
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+    storageSpec:
+      volumeClaimTemplate:
+        metadata:
+          name: prometheus
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+          {{- with .Values.defaultStorageClassName }}
+          storageClassName: {{ . | quote }}
+          {{- end }}
+    serviceMonitorSelector:
+      matchLabels:
+        platform.apolo.us/scrape-metrics: "true"
+    scrapeConfigSelector:
+      matchLabels:
+        platform.apolo.us/scrape-metrics: "true"
+    externalLabels:
+      cluster: {{ include "platform.clusterName" . }}
+    priorityClassName: {{ include "platform.priorityClassName" . }}
+  serviceMonitor:
+    additionalLabels:
+      platform.apolo.us/scrape-metrics: "true"
+  ingress:
+    enabled: true
+    {{- with .Values.defaultIngressClassName }}
+    ingressClassName: {{ . }}
+    {{- end }}
+    annotations:
+      traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-{{ .Release.Name }}-federated-prometheus-auth@kubernetescrd
+      traefik.ingress.kubernetes.io/router.priority: "1000"
+    hosts:
+    - prometheus.{{ include "platform.clusterDnsName" . }}
+    paths:
+    - /federate
+alertmanager:
+  config:
+    {{- include "platform.alertmanager.config" . | nindent 4 }}
+
+  alertmanagerSpec:
+    image:
+      registry: ghcr.io
+      repository: neuro-inc/alertmanager
+      tag: v0.26.0
+    podMetadata:
+      labels:
+        service: alert-manager
+    configSecret: alertmanager-prometheus-alertmanager
+    secrets:
+    - {{ $platformTokenSecretName }}
+  serviceMonitor:
+    additionalLabels:
+      platform.apolo.us/scrape-metrics: "true"
+grafana:
+  enabled: false
+{{- end }}
+
+{{- if .Values.argocdApplications.kubePrometheusStack.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.kubePrometheusStack -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.kubePrometheusStack.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

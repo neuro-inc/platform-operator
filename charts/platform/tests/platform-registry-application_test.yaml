@@ -3,7 +3,7 @@ release:
   name: platform
   namespace: platform
 templates:
-  - argocd-applications/platform-registry-application.yaml
+  - platform-registry-application.yaml
 values:
   - common-values.yaml
 tests:

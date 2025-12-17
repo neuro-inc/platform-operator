@@ -1,0 +1,51 @@
+{{- define "platform.argocd.applications.platformMonitoring.values" -}}
+{{- $platformUrls := include "platform.urls" . | fromYaml -}}
+nameOverride: {{ printf "%s-monitoring" .Release.Name }}
+fullnameOverride: {{ printf "%s-monitoring" .Release.Name }}
+image:
+  repository: ghcr.io/neuro-inc/monitoringapi
+securityContext:
+  enabled: true
+nodeLabels:
+  nodePool: {{ .Values.nodeLabels.nodePool }}
+platform:
+  clusterName: {{ include "platform.clusterName" . }}
+  authUrl: {{ get $platformUrls "authUrl" }}
+  configUrl: {{ get $platformUrls "configUrl" }}
+  apiUrl: {{ get $platformUrls "apiUrl" }}
+  appsUrl: {{ get $platformUrls "appsUrl" }}
+  registryUrl: {{ include "platform.registryUrl" . }}
+  token:
+    {{- include "platform.token" . | nindent 4 }}
+ingress:
+  enabled: true
+  {{- with .Values.defaultIngressClassName }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  hosts:
+  - {{ include "platform.clusterDnsName" . }}
+logs:
+  persistence:
+    type: loki
+    loki:
+      endpoint: {{ printf "http://loki-read.%s:3100" .Release.Namespace }}
+      archiveDelay: 5
+      retentionPeriodS: 2592000  # 30 days
+service:
+  annotations:
+    traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.name: NEURO_MONITORINGAPI_SESSION
+kubeletPort: 10250
+priorityClassName: {{ include "platform.priorityClassName" . }}
+{{- with .Values.sentry }}
+sentry:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{- if .Values.argocdApplications.platformMonitoring.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.platformMonitoring -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.platformMonitoring.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

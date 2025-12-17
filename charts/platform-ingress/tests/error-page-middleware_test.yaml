@@ -1,0 +1,9 @@
+suite: platform-ingress error-page-middleware
+templates:
+  - templates/error-page-middleware.yaml
+tests:
+  - it: configures error handling to fallback service
+    release:
+      name: ingress
+    asserts:
+      - matchSnapshot: {}

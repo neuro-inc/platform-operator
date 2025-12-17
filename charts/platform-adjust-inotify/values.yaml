@@ -1,0 +1,11 @@
+pauseImage:
+  repository: ghcr.io/neuro-inc/pause
+  tag: "3.0"
+
+alpineImage:
+  repository: ghcr.io/neuro-inc/alpine
+  tag: latest
+
+inotify:
+  maxInstances: 65536
+  maxWatchers: 65536

@@ -1,0 +1,20 @@
+configures error handling to fallback service:
+  1: |
+    apiVersion: traefik.io/v1alpha1
+    kind: Middleware
+    metadata:
+      labels:
+        app: platform-ingress
+        chart: platform-ingress-1.0.0
+        heritage: Helm
+        release: ingress
+        service: traefik
+      name: ingress-error-page
+    spec:
+      errors:
+        query: /
+        service:
+          name: ingress-fallback
+          port: https
+        status:
+          - 500-599

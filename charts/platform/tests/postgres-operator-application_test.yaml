@@ -3,7 +3,7 @@ release:
   name: platform
   namespace: platform
 templates:
-  - argocd-applications/postgres-operator-application.yaml
+  - postgres-operator-application.yaml
 values:
   - common-values.yaml
 tests:

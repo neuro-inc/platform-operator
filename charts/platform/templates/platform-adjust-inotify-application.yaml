@@ -1,0 +1,7 @@
+{{- if .Values.argocdApplications.platformAdjustInotify.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.platformAdjustInotify -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "targetRevision" .Chart.Version -}}
+{{- $_ := set $cfg "defaultValues" dict -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

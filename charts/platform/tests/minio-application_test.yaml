@@ -3,7 +3,7 @@ release:
   name: platform
   namespace: platform
 templates:
-  - argocd-applications/minio-application.yaml
+  - minio-application.yaml
 values:
   - common-values.yaml
 tests:

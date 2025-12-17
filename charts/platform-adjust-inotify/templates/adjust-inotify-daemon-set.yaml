@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Release.Name }}-adjust-inotify
+  labels: {{ include "platform.labels.common" . | nindent 4 }}
+    service: platform-adjust-inotify
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "platform.name" . }}
+      release: {{ .Release.Name }}
+      service: platform-adjust-inotify
+  template:
+    metadata:
+      labels:
+        app: {{ include "platform.name" . }}
+        release: {{ .Release.Name }}
+        service: platform-adjust-inotify
+    spec:
+      initContainers:
+      - name: adjust-inotify
+        image: {{ .Values.alpineImage.repository }}:{{ .Values.alpineImage.tag }}
+        command: [/bin/sh]
+        args:
+        - -c
+        - |
+          echo "inotify status BEFORE changes:\n"
+          sysctl -a | grep inotify
+          echo
+          sysctl -w fs.inotify.max_user_instances={{ .Values.inotify.maxInstances }}
+          sysctl -w fs.inotify.max_user_watches={{ .Values.inotify.maxWatchers }}
+          echo
+          echo "inotify status AFTER changes:\n"
+          sysctl -a | grep inotify
+        securityContext:
+          privileged: true
+      containers:
+      - name: pause
+        image: {{ .Values.pauseImage.repository }}:{{ .Values.pauseImage.tag }}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1

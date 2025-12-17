@@ -1,0 +1,9 @@
+suite: platform-ingress fallback-middleware
+templates:
+  - templates/fallback-middleware.yaml
+tests:
+  - it: sets cache control headers for fallback responses
+    release:
+      name: ingress
+    asserts:
+      - matchSnapshot: {}

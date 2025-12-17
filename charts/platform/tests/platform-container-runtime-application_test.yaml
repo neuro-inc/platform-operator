@@ -3,7 +3,7 @@ release:
   name: platform
   namespace: platform
 templates:
-  - argocd-applications/platform-container-runtime-application.yaml
+  - platform-container-runtime-application.yaml
 values:
   - common-values.yaml
 tests:

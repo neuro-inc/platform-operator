@@ -1,0 +1,14 @@
+renders services priority class for release:
+  1: |
+    apiVersion: scheduling.k8s.io/v1
+    globalDefault: false
+    kind: PriorityClass
+    metadata:
+      labels:
+        app: platform-common
+        chart: platform-common-1.0.0
+        heritage: Helm
+        release: platform
+      name: platform-services
+    preemptionPolicy: Never
+    value: 1000

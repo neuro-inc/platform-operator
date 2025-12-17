@@ -1,0 +1,5 @@
+apiVersion: v2
+name: platform-external-secrets
+description: Apolo platform external secrets
+version: 1.0.0
+appVersion: 1.0.0

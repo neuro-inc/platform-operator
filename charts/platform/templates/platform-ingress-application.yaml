@@ -1,0 +1,19 @@
+{{- define "platform.argocd.applications.platformIngress.values" -}}
+{{- $platformUrls := include "platform.urls" . | fromYaml -}}
+{{- $ingressAuthUrl := urlParse (get $platformUrls "ingressAuthUrl") -}}
+{{- $ingressAuthHost := $ingressAuthUrl.host -}}
+{{- $fallbackHost := required "platform.fallbackHost is required" .Values.platform.fallbackHost -}}
+{{- with .Values.defaultIngressClassName }}
+defaultClassName: {{ . }}
+{{- end }}
+ingressAuthHost: {{ $ingressAuthHost }}
+fallbackHost: {{ $fallbackHost }}
+{{- end }}
+
+{{- if .Values.argocdApplications.platformIngress.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.platformIngress -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "targetRevision" .Chart.Version -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.platformIngress.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

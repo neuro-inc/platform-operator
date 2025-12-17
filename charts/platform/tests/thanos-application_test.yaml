@@ -3,7 +3,7 @@ release:
   name: platform
   namespace: platform
 templates:
-  - argocd-applications/thanos-application.yaml
+  - thanos-application.yaml
 values:
   - common-values.yaml
 tests:

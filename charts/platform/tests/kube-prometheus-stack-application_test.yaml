@@ -3,7 +3,7 @@ release:
   name: platform
   namespace: platform
 templates:
-  - argocd-applications/kube-prometheus-stack-application.yaml
+  - kube-prometheus-stack-application.yaml
 values:
   - common-values.yaml
 tests:

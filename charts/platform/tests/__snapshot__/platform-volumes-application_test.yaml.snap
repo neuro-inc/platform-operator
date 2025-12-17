@@ -1,0 +1,36 @@
+renders argocd application for platform-volumes chart:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      annotations:
+        argocd.argoproj.io/sync-wave: "-1"
+      labels:
+        app: platform-argocd-applications
+        chart: platform-argocd-applications-1.0.0
+        heritage: Helm
+        release: platform
+      name: platform-volumes
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: platform-volumes
+        helm:
+          valuesObject:
+            storages: []
+        repoURL: ghcr.io/neuro-inc/helm-charts
+        targetRevision: '*'
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

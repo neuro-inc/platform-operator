@@ -15,59 +15,11 @@
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" -}}
 {{- end -}}
 
-{{- define "platform.labels.standard" -}}
+{{- define "platform.labels.common" -}}
 app: {{ include "platform.name" . }}
 chart: {{ include "platform.chart" . }}
 heritage: {{ .Release.Service | quote }}
 release: {{ .Release.Name | quote }}
-{{- end -}}
-
-{{- define "platform.jobs.namespace.name" -}}
-{{- if .Values.jobs.namespace.name -}}
-{{- .Values.jobs.namespace.name | quote -}}
-{{- else -}}
-{{- printf "%s-jobs" .Release.Namespace | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-{{- end -}}
-
-{{- define "platform.smb.volumeHandle" -}}
-{{- if .path -}}
-{{- printf "smb-%s%s" .smb.server .path | replace "." "-" -}}
-{{- else -}}
-{{- printf "smb-%s" .smb.server | replace "." "-" -}}
-{{- end -}}
-{{- end -}}
-
-{{- define "platform.smb.secretNameSuffix" -}}
-{{- if .path -}}
-{{- printf "smb-%s%s" .smb.server .path | replace "." "-" -}}
-{{- else -}}
-{{- printf "smb-%s" .smb.server | replace "." "-" -}}
-{{- end -}}
-{{- end -}}
-
-{{- define "platform.azure.storageAccount.secretNameSuffix" -}}
-{{- if . -}}
-{{- printf "azure-storage-account%s" . | replace "/" "-" -}}
-{{- else -}}
-{{- printf "azure-storage-account" -}}
-{{- end -}}
-{{- end -}}
-
-{{- define "platform.storage.platformVolumeNameSuffix" -}}
-{{- if . -}}
-{{- printf "storage%s" . | replace "/" "-" -}}
-{{- else -}}
-{{- printf "storage" -}}
-{{- end -}}
-{{- end -}}
-
-{{- define "platform.storage.jobsVolumeNameSuffix" -}}
-{{- if . -}}
-{{- printf "jobs-storage%s" . | replace "/" "-" -}}
-{{- else -}}
-{{- printf "jobs-storage" -}}
-{{- end -}}
 {{- end -}}
 
 {{- define "platform.storage.claimNameSuffix" -}}
@@ -76,19 +28,6 @@ release: {{ .Release.Name | quote }}
 {{- else -}}
 {{- printf "storage" -}}
 {{- end -}}
-{{- end -}}
-
-{{- define "platform.dockerConfigJson" -}}
-{
-  "auths": {
-    {{ .url | quote }}: {
-        "username": {{ .username | quote }},
-        "password": {{ .password | quote }},
-        "email": {{ .email | quote }},
-        "auth": {{ printf "%s:%s" .username .password | b64enc | quote }}
-    }
-  }
-}
 {{- end -}}
 
 {{- define "platform.apiUrl" -}}
@@ -124,14 +63,14 @@ release: {{ .Release.Name | quote }}
 {{- end -}}
 
 {{- define "platform.priorityClassName" -}}
-{{- default (printf "%s-services" .Release.Namespace) .Values.priorityClassName -}}
+{{- default (printf "%s-services" .Release.Namespace) .Values.defaultPriorityClassName -}}
 {{- end -}}
 
 {{- define "platform.argocd.application" -}}
 {{- $root := .root -}}
 {{- $project := default "default" $root.Values.argocd.project -}}
-{{- $destNs := $root.Release.Namespace -}}
 {{- $destServer := default "https://kubernetes.default.svc" $root.Values.argocd.destination.server -}}
+{{- $destNs := default $root.Release.Namespace $root.Values.argocd.destination.namespace -}}
 {{- $syncWave := default 0 .syncWave | int -}}
 {{- $labels := default dict .labels -}}
 {{- $annotations := default dict .annotations -}}
@@ -143,7 +82,7 @@ kind: Application
 metadata:
   name: {{ .name | trunc 63 | trimSuffix "-" }}
   labels:
-    {{- include "platform.labels.standard" $root | nindent 4 }}
+    {{- include "platform.labels.common" $root | nindent 4 }}
     {{- if gt (len $labels) 0 }}
     {{- range $k, $v := $labels }}
     {{ $k }}: {{ $v | quote }}
@@ -168,6 +107,9 @@ spec:
     chart: {{ required (printf "chart for %s application is required" .name) .chart }}
     targetRevision: {{ default "latest" .targetRevision | quote }}
     helm:
+      {{- with .releaseName }}
+      releaseName: {{ . }}
+      {{- end }}
       {{- with $helmValues }}
       valuesObject:
         {{- toYaml . | nindent 8 }}

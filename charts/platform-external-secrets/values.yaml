@@ -1,0 +1,10 @@
+clusterSecretStore:
+  vault: {}
+    # server: https://vault.apolo.us
+    # path: default--kv-v2
+    # version: "v2"
+    # auth:
+    #   role: default--platform
+    #   mountPath: default--jwt
+
+externalSecrets: []

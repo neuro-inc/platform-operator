@@ -1,0 +1,50 @@
+renders daemonset with configured images and labels:
+  1: |
+    apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      labels:
+        app: platform-adjust-inotify
+        chart: platform-adjust-inotify-1.0.0
+        heritage: Helm
+        release: platform
+        service: platform-adjust-inotify
+      name: platform-adjust-inotify
+    spec:
+      selector:
+        matchLabels:
+          app: platform-adjust-inotify
+          release: platform
+          service: platform-adjust-inotify
+      template:
+        metadata:
+          labels:
+            app: platform-adjust-inotify
+            release: platform
+            service: platform-adjust-inotify
+        spec:
+          containers:
+            - image: example/pause:v1
+              name: pause
+          initContainers:
+            - args:
+                - -c
+                - |
+                  echo "inotify status BEFORE changes:\n"
+                  sysctl -a | grep inotify
+                  echo
+                  sysctl -w fs.inotify.max_user_instances=128
+                  sysctl -w fs.inotify.max_user_watches=256
+                  echo
+                  echo "inotify status AFTER changes:\n"
+                  sysctl -a | grep inotify
+              command:
+                - /bin/sh
+              image: example/alpine:3.19
+              name: adjust-inotify
+              securityContext:
+                privileged: true
+      updateStrategy:
+        rollingUpdate:
+          maxUnavailable: 1
+        type: RollingUpdate

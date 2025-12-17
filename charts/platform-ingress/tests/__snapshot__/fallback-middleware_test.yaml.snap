@@ -1,0 +1,15 @@
+sets cache control headers for fallback responses:
+  1: |
+    apiVersion: traefik.io/v1alpha1
+    kind: Middleware
+    metadata:
+      labels:
+        app: platform-ingress
+        chart: platform-ingress-1.0.0
+        heritage: Helm
+        release: ingress
+      name: ingress-fallback
+    spec:
+      headers:
+        customResponseHeaders:
+          Cache-Control: no-store

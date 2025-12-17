@@ -3,7 +3,7 @@ release:
   name: platform
   namespace: platform
 templates:
-  - argocd-applications/platform-disks-application.yaml
+  - platform-disks-application.yaml
 values:
   - common-values.yaml
 tests:

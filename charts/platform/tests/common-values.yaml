@@ -8,8 +8,7 @@ platform:
         name: platform-token
         key: token
 
-ingress:
-  className: traefik
+defaultIngressClassName: traefik
 
 defaultStorageClassName: standard
 

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: platform-common
+description: Apolo platform common resources
+version: 1.0.0
+appVersion: 1.0.0

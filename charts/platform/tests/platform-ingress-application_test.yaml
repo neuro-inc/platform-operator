@@ -1,0 +1,12 @@
+suite: test platform ingress application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - platform-ingress-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: renders argocd application for platform-ingress chart
+    asserts:
+      - matchSnapshot: {}

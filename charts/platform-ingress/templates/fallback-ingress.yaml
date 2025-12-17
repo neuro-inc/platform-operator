@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-fallback
+  labels: {{ include "platform.labels.common" . | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.priority: "1"
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-{{ .Release.Name }}-fallback@kubernetescrd
+spec:
+  {{- with .Values.defaultClassName }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  defaultBackend:
+    service:
+      name: {{ .Release.Name }}-fallback
+      port:
+        name: https

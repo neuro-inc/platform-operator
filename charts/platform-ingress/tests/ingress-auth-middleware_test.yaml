@@ -1,0 +1,11 @@
+suite: platform-ingress ingress-auth
+templates:
+  - templates/ingress-auth-middleware.yaml
+tests:
+  - it: forwards auth to configured host
+    release:
+      name: ingress
+    set:
+      ingressAuthHost: api.example.com
+    asserts:
+      - matchSnapshot: {}

@@ -1,0 +1,24 @@
+{{- define "platform.argocd.applications.dockerRegistry.values" -}}
+nameOverride: platform-docker-registry
+fullnameOverride: platform-docker-registry
+image:
+  repository: ghcr.io/neuro-inc/registry
+ingress:
+  enabled: false
+configData:
+  storage:
+    delete:
+      enabled: true
+podLabels:
+  service: docker-registry
+secrets:
+  haSharedSecret: {{ sha256sum (include "platform.clusterName" .) }}
+priorityClassName: {{ include "platform.priorityClassName" . }}
+{{- end }}
+
+{{- if .Values.argocdApplications.dockerRegistry.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.dockerRegistry -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.dockerRegistry.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

@@ -3,7 +3,7 @@ release:
   name: platform
   namespace: platform
 templates:
-  - argocd-applications/grafana-application.yaml
+  - grafana-application.yaml
 values:
   - common-values.yaml
 tests:

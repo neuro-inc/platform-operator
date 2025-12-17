@@ -6,8 +6,8 @@ should match snapshot:
       annotations:
         argocd.argoproj.io/sync-wave: "-9"
       labels:
-        app: platform
-        chart: platform-1.0.0
+        app: platform-argocd-applications
+        chart: platform-argocd-applications-1.0.0
         heritage: Helm
         release: platform
       name: prometheus
@@ -22,7 +22,7 @@ should match snapshot:
           valuesObject:
             alertmanager:
               alertmanagerSpec:
-                configSecret: platform-alertmanager-config
+                configSecret: alertmanager-prometheus-alertmanager
                 image:
                   registry: ghcr.io
                   repository: neuro-inc/alertmanager
@@ -32,6 +32,28 @@ should match snapshot:
                     service: alert-manager
                 secrets:
                   - platform-token
+              config:
+                receivers:
+                  - name: ignore
+                  - name: platform-notifications
+                    webhook_configs:
+                      - http_config:
+                          authorization:
+                            credentials_file: /etc/alertmanager/secrets/platform-token/token
+                            type: Bearer
+                        url: https://api.apolo.us/api/v1/notifications/alert-manager-notification
+                route:
+                  group_by:
+                    - alertname
+                  group_interval: 5m
+                  group_wait: 30s
+                  receiver: platform-notifications
+                  repeat_interval: 4h
+                  routes:
+                    - continue: false
+                      matchers:
+                        - exported_service="default-backend@kubernetes"
+                      receiver: ignore
               serviceMonitor:
                 additionalLabels:
                   platform.apolo.us/scrape-metrics: "true"

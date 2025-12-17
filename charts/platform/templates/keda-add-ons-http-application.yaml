@@ -1,0 +1,15 @@
+{{- define "platform.argocd.applications.kedaAddOnsHttp.values" -}}
+interceptor:
+  replicas:
+    min: 1
+    waitTimeout: 600s
+scaler:
+  replicas: 1
+{{- end -}}
+
+{{- if .Values.argocdApplications.kedaAddOnsHttp.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.kedaAddOnsHttp -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.kedaAddOnsHttp.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

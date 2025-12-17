@@ -1,0 +1,36 @@
+renders argocd application for platform-ingress chart:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      labels:
+        app: platform-argocd-applications
+        chart: platform-argocd-applications-1.0.0
+        heritage: Helm
+        release: platform
+      name: platform-ingress
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: platform-ingress
+        helm:
+          valuesObject:
+            defaultClassName: traefik
+            fallbackHost: default.jobs-staging.neu.ro
+            ingressAuthHost: api.apolo.us
+        repoURL: ghcr.io/neuro-inc/helm-charts
+        targetRevision: '*'
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

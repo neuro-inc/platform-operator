@@ -15,7 +15,9 @@ setup: venv
 
 .PHONY: lint
 lint: format
-	helm lint charts/platform
+	@for chart in charts/*; do \
+		helm lint $$chart || exit $$?; \
+	done
 
 .PHONY: format
 format:
@@ -30,4 +32,4 @@ endif
 
 .PHONY: test_unit
 test_unit:
-	helm unittest charts/platform
+	helm unittest charts/*

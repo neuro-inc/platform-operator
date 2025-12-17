@@ -3,7 +3,7 @@ release:
   name: platform
   namespace: platform
 templates:
-  - argocd-applications/loki-application.yaml
+  - loki-application.yaml
 values:
   - common-values.yaml
 tests:
