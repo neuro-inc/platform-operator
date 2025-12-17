@@ -13,7 +13,6 @@ renders argocd application for platform-volumes chart:
       name: test-cluster--platform-volumes
     spec:
       destination:
-        namespace: platform
         server: https://kubernetes.default.svc
       project: default
       source:

@@ -13,7 +13,6 @@ should match snapshot:
       name: test-cluster--traefik
     spec:
       destination:
-        namespace: platform
         server: https://kubernetes.default.svc
       project: default
       source:

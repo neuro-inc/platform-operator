@@ -11,7 +11,6 @@ renders argocd application for platform-ingress chart:
       name: test-cluster--platform-ingress
     spec:
       destination:
-        namespace: platform
         server: https://kubernetes.default.svc
       project: default
       source:
