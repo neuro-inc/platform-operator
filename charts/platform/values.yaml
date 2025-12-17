@@ -162,7 +162,7 @@ argocdApplications:
 
   platformCommon:
     enabled: true
-    repoURL: ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts/platform-compute
     chart: platform-common
     name: platform-common
     releaseName: platform
@@ -171,7 +171,7 @@ argocdApplications:
 
   platformVolumes:
     enabled: true
-    repoURL: ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts/platform-compute
     chart: platform-volumes
     name: platform-volumes
     releaseName: platform
@@ -180,7 +180,7 @@ argocdApplications:
 
   platformAdjustInotify:
     enabled: true
-    repoURL: ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts/platform-compute
     chart: platform-adjust-inotify
     name: platform-adjust-inotify
     releaseName: platform
@@ -188,7 +188,7 @@ argocdApplications:
 
   platformExternalSecrets:
     enabled: true
-    repoURL: ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts/platform-compute
     chart: platform-external-secrets
     name: platform-external-secrets
     releaseName: platform
@@ -197,7 +197,7 @@ argocdApplications:
 
   platformIngress:
     enabled: true
-    repoURL: ghcr.io/neuro-inc/helm-charts
+    repoURL: ghcr.io/neuro-inc/helm-charts/platform-compute
     chart: platform-ingress
     name: platform-ingress
     releaseName: platform
