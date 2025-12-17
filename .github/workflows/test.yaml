@@ -16,7 +16,7 @@ jobs:
     - name: Install Helm
       uses: azure/setup-helm@v4
       with:
-        version: v3.14.0
+        version: v3.19.4
     - name: Install dependencies
       run: make setup
     - name: Lint
