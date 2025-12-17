@@ -34,8 +34,9 @@ imagePullSecrets: []
 
 argocd:
   project: default
-  destination:
-    server: https://kubernetes.default.svc
+  # destination:
+  #   name:
+  #   namespace:
   syncPolicy:
     automated:
       enabled: true

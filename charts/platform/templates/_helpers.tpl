@@ -73,8 +73,6 @@ release: {{ .Release.Name | quote }}
 {{- $nameWithPrefix := printf "%s%s" $namePrefix .name -}}
 {{- $name := ternary .name $nameWithPrefix (hasPrefix $namePrefix .name) -}}
 {{- $project := default "default" $root.Values.argocd.project -}}
-{{- $destServer := default "https://kubernetes.default.svc" $root.Values.argocd.destination.server -}}
-{{- $destNs := default $root.Release.Namespace $root.Values.argocd.destination.namespace -}}
 {{- $syncWave := default 0 .syncWave | int -}}
 {{- $labels := default dict .labels -}}
 {{- $annotations := default dict .annotations -}}
