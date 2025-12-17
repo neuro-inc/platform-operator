@@ -11,6 +11,7 @@ should match snapshot:
       name: test-cluster--platform-monitoring
     spec:
       destination:
+        namespace: argocd
         server: https://kubernetes.default.svc
       project: default
       source:

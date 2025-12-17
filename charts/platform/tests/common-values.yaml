@@ -1,3 +1,7 @@
+defaultIngressClassName: traefik
+
+defaultStorageClassName: standard
+
 platform:
   apiUrl: https://api.apolo.us
   clusterName: test-cluster
@@ -8,11 +12,12 @@ platform:
         name: platform-token
         key: token
 
-defaultIngressClassName: traefik
-
-defaultStorageClassName: standard
-
 sentry:
   dsn: https://sentry-dsn
   clusterName: test-cluster
   sampleRate: 0.1
+
+argocd:
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
