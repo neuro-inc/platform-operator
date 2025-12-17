@@ -67,7 +67,7 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v25.12.1
     with:
-      helm_chart_repo_prefix: platform-compute/
+      helm_chart_repo_prefix: /platform-compute
       helm_charts: ${{ needs.discover-charts.outputs.helm_charts }}
 
   deploy:
