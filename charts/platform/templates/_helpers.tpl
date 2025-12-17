@@ -104,8 +104,7 @@ metadata:
 spec:
   project: {{ $project }}
   destination:
-    server: {{ $destServer }}
-    namespace: {{ $destNs }}
+    {{- toYaml $root.Values.argocd.destination | nindent 4 }}
   source:
     repoURL: {{ required (printf "repoURL for %s application is required" .name) .repoURL }}
     chart: {{ required (printf "chart for %s application is required" .name) .chart }}
