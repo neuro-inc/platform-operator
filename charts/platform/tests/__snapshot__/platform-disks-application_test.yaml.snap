@@ -20,6 +20,7 @@ should match snapshot:
           releaseName: platform-disks
           valuesObject:
             disks:
+              namespace: platform-jobs
               storageClassName: standard
             ingress:
               enabled: true

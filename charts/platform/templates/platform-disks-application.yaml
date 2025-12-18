@@ -13,6 +13,7 @@ platform:
   token:
     {{- include "platform.token" . | nindent 4 }}
 disks:
+  namespace: platform-jobs
   {{- with .Values.defaultStorageClassName }}
   storageClassName: {{ . | quote }}
   {{- end }}
