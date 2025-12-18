@@ -2,7 +2,7 @@
 {{- $platformUrls := include "platform.urls" . | fromYaml -}}
 {{- $platformNamespace := include "platform.argocd.destination.namespace" . -}}
 image:
-  repository: ghcr.io/neuro-inc/monitoringapi
+  repository: ghcr.io/neuro-inc/platformmonitoringapi
 securityContext:
   enabled: true
 nodeLabels:

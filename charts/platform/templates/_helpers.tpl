@@ -3,11 +3,15 @@
 {{- end -}}
 
 {{- define "platform.fullname" -}}
+{{- if .Values.fullnameOverride -}}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
 {{- $name := default .Chart.Name .Values.nameOverride -}}
 {{- if contains $name .Release.Name -}}
 {{- .Release.Name | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
 {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 
@@ -59,7 +63,7 @@ release: {{ .Release.Name | quote }}
 {{- end -}}
 
 {{- define "platform.registryUrl" -}}
-{{ printf "registry.%s" (include "platform.clusterDnsName" .) }}
+{{ printf "https://registry.%s" (include "platform.clusterDnsName" .) }}
 {{- end -}}
 
 {{- define "platform.priorityClassName" -}}

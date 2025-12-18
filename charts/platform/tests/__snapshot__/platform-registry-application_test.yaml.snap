@@ -24,7 +24,7 @@ should match snapshot:
             ingress:
               enabled: true
               hosts:
-                - null
+                - registry.test-cluster.org.apolo.us
               ingressClassName: traefik
             platform:
               authUrl: https://api.apolo.us
