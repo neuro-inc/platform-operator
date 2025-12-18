@@ -1,7 +1,7 @@
 {{- define "platform.argocd.applications.platformStorage.values" -}}
 {{- $platformUrls := include "platform.urls" . | fromYaml -}}
 image:
-  repository: ghcr.io/neuro-inc/storageapi
+  repository: ghcr.io/neuro-inc/platformstorageapi
 securityContext:
   enabled: true
 service:

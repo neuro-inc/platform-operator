@@ -2,7 +2,7 @@
 {{- $platformUrls := include "platform.urls" . | fromYaml -}}
 {{- $registryUrl := include "platform.registryUrl" . | urlParse -}}
 image:
-  repository: ghcr.io/neuro-inc/registryapi
+  repository: ghcr.io/neuro-inc/platformregistryapi
 securityContext:
   enabled: true
 service:
