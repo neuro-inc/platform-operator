@@ -29,7 +29,7 @@ logs:
     loki:
       endpoint: {{ printf "http://loki-read.%s:3100" $platformNamespace }}
       archiveDelay: 5
-      retentionPeriodS: 2592000  # 30 days
+      retentionPeriodS: "2592000"  # 30 days
 service:
   annotations:
     traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
