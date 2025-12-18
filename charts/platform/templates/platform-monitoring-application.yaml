@@ -1,8 +1,6 @@
 {{- define "platform.argocd.applications.platformMonitoring.values" -}}
 {{- $platformUrls := include "platform.urls" . | fromYaml -}}
 {{- $platformNamespace := include "platform.argocd.destination.namespace" . -}}
-nameOverride: {{ printf "%s-monitoring" .Release.Name }}
-fullnameOverride: {{ printf "%s-monitoring" .Release.Name }}
 image:
   repository: ghcr.io/neuro-inc/monitoringapi
 securityContext:

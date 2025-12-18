@@ -19,7 +19,6 @@ should match snapshot:
         helm:
           releaseName: platform-monitoring
           valuesObject:
-            fullnameOverride: platform-monitoring
             image:
               repository: ghcr.io/neuro-inc/monitoringapi
             ingress:
@@ -35,7 +34,6 @@ should match snapshot:
                   endpoint: http://loki-read.platform:3100
                   retentionPeriodS: 2592000
                 type: loki
-            nameOverride: platform-monitoring
             nodeLabels:
               nodePool: platform.neuromation.io/nodepool
             platform:
