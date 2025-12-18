@@ -100,7 +100,7 @@ should match snapshot:
                   cpu: "1"
                   memory: 2Gi
         repoURL: https://grafana.github.io/helm-charts
-        targetRevision: 6.29.0
+        targetRevision: 6.30.1
       syncPolicy:
         automated:
           enabled: true

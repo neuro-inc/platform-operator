@@ -106,7 +106,7 @@ argocdApplications:
     repoURL: https://grafana.github.io/helm-charts
     chart: loki
     name: loki
-    targetRevision: "6.29.0"
+    targetRevision: "6.30.1"
     values: {}
 
   alloy:
