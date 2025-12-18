@@ -1,6 +1,3 @@
-nameOverride: platform
-fullnameOverride: platform
-
 platform:
   apiUrl: https://api.apolo.us
   authUrl: ""
