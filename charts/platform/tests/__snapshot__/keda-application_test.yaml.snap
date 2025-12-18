@@ -21,6 +21,9 @@ should match snapshot:
         helm:
           releaseName: keda
           valuesObject:
+            crds:
+              additionalAnnotations:
+                argocd.argoproj.io/sync-options: ServerSideApply=true
             operator:
               replicaCount: 1
         repoURL: https://kedacore.github.io/charts

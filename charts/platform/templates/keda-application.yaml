@@ -1,4 +1,7 @@
 {{- define "platform.argocd.applications.keda.values" -}}
+crds:
+  additionalAnnotations:
+    argocd.argoproj.io/sync-options: ServerSideApply=true
 operator:
   replicaCount: 1
 {{- end -}}
