@@ -62,7 +62,7 @@ argocdApplications:
     repoURL: https://neuro-inc.github.io/helm-charts
     chart: minio
     name: minio
-    targetRevision: "1.0.0"
+    targetRevision: "1.0.1"
     syncWave: -20
     values: {}
 
