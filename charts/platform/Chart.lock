@@ -34,7 +34,7 @@ dependencies:
   version: 25.7.2
 - name: platform-api-poller
   repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 25.11.0
+  version: 25.12.0
 - name: platform-buckets
   repository: oci://ghcr.io/neuro-inc/helm-charts
   version: 25.7.2
@@ -65,5 +65,5 @@ dependencies:
 - name: external-secrets
   repository: https://charts.external-secrets.io
   version: 0.20.3
-digest: sha256:9d6ab84abcc00141e798641833f593b750525ed26240607ad9b9f3e3469d0a65
-generated: "2025-11-21T11:40:45.072299+02:00"
+digest: sha256:dfe511da702b812ba6c0433627216ca90cea8fdd9a3775abd62bb62d68319585
+generated: "2025-12-19T10:42:12.574571154+01:00"
