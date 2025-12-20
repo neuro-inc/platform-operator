@@ -1,0 +1,60 @@
+{{- define "platform.argocd.applications.platformReports.values" -}}
+{{- $platformUrls := include "platform.urls" . | fromYaml -}}
+{{- $platformNamespace := include "platform.argocd.destination.namespace" . -}}
+image:
+  repository: ghcr.io/neuro-inc/platform-reports
+securityContext:
+  enabled: true
+prometheus:
+  url: http://thanos-query-http:10902
+kubePrometheusStackEnabled: false
+thanosEnabled: false
+grafanaEnabled: false
+platform:
+  clusterName: {{ include "platform.clusterName" . }}
+  authUrl: {{ get $platformUrls "authUrl" }}
+  ingressAuthUrl: {{ get $platformUrls "ingressAuthUrl" }}
+  configUrl: {{ get $platformUrls "configUrl" }}
+  apiUrl: {{ get $platformUrls "apiUrl" }}
+  appsUrl: {{ get $platformUrls "appsUrl" }}
+  token:
+    {{- include "platform.token" . | nindent 4 }}
+nodePoolLabels:
+  job: {{ .Values.nodeLabels.job }}
+  gpu: {{ .Values.nodeLabels.accelerator }}
+  nodePool: {{ .Values.nodeLabels.nodePool }}
+  preemptible: {{ .Values.nodeLabels.preemptible }}
+platformJobs:
+  namespace: platform-jobs
+metricsApi:
+  ingress:
+    enabled: true
+    {{- with .Values.defaultIngressClassName }}
+    ingressClassName: {{ . }}
+    {{- end }}
+    hosts:
+    - {{ include "platform.clusterDnsName" . }}
+grafanaProxy:
+  ingress:
+    enabled: true
+    {{- with .Values.defaultIngressClassName }}
+    ingressClassName: {{ . }}
+    {{- end }}
+    hosts:
+    - {{ printf "grafana.%s" (include "platform.clusterDnsName" .) }}
+    - {{ printf "metrics.%s" (include "platform.clusterDnsName" .) }}
+    annotations:
+      traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-ingress-auth@kubernetescrd" $platformNamespace .Release.Name }}
+priorityClassName: {{ include "platform.priorityClassName" . }}
+{{- with .Values.sentry }}
+sentry:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{- if .Values.argocdApplications.platformReports.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.platformReports -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.platformReports.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

@@ -1,0 +1,9 @@
+suite: platform-ingress strip-headers-middleware
+templates:
+  - templates/strip-headers-middleware.yaml
+tests:
+  - it: strips authorization and cookie headers
+    release:
+      name: ingress
+    asserts:
+      - matchSnapshot: {}

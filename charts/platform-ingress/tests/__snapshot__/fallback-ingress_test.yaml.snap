@@ -1,0 +1,21 @@
+renders fallback ingress with middleware annotation and class name:
+  1: |
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      annotations:
+        traefik.ingress.kubernetes.io/router.middlewares: platform-ingress-fallback@kubernetescrd
+        traefik.ingress.kubernetes.io/router.priority: "1"
+      labels:
+        app: platform-ingress
+        chart: platform-ingress-1.0.0
+        heritage: Helm
+        release: ingress
+      name: ingress-fallback
+    spec:
+      defaultBackend:
+        service:
+          name: ingress-fallback
+          port:
+            name: https
+      ingressClassName: traefik

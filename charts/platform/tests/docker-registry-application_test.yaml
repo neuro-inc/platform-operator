@@ -1,0 +1,12 @@
+suite: test docker registry application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - docker-registry-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}

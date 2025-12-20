@@ -1,0 +1,31 @@
+suite: platform-volumes pv
+templates:
+  - templates/pv.yaml
+tests:
+  - it: renders persistent volumes for nfs, smb, and azure storage
+    release:
+      name: platform
+    set:
+      storages:
+        - path: /data
+          size: 100Gi
+          nfs:
+            server: nfs.example.com
+            path: /export/data
+        - path: /smb
+          size: 200Gi
+          storageClassName: smb-sc
+          smb:
+            server: smb.example.com
+            shareName: team-share
+            secretName: smb-secret
+            secretNamespace: storage
+        - path: /azure
+          size: 50Gi
+          storageClassName: azure-files
+          azureFile:
+            secretName: azure-secret
+            secretNamespace: azure-ns
+            shareName: azure-share
+    asserts:
+      - matchSnapshot: {}

@@ -1,0 +1,12 @@
+suite: test thanos application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - thanos-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}

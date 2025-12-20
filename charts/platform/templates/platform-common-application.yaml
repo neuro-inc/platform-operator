@@ -1,0 +1,7 @@
+{{- if .Values.argocdApplications.platformCommon.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.platformCommon -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "targetRevision" .Chart.Version -}}
+{{- $_ := set $cfg "defaultValues" dict -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

@@ -1,0 +1,11 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-strip-headers
+  labels: {{ include "platform.labels.common" . | nindent 4 }}
+    service: traefik
+spec:
+  headers:
+    customRequestHeaders:
+      Authorization: ''
+      Cookie: ''

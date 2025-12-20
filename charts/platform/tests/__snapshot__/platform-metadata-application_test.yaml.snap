@@ -1,0 +1,50 @@
+should match snapshot:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: test-cluster--platform-metadata
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: platform-metadata
+        helm:
+          releaseName: platform-metadata
+          valuesObject:
+            image:
+              repository: ghcr.io/neuro-inc/platform-metadata
+            platform:
+              appsUrl: https://api.apolo.us
+              token:
+                valueFrom:
+                  secretKeyRef:
+                    key: token
+                    name: platform-token
+            priorityClassName: platform-services
+            securityContext:
+              enabled: true
+            sentry:
+              clusterName: test-cluster
+              dsn: https://sentry-dsn
+              sampleRate: 0.1
+        repoURL: ghcr.io/neuro-inc/helm-charts
+        targetRevision: '*'
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

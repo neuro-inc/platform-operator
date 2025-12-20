@@ -1,0 +1,32 @@
+suite: platform-volumes pvc
+templates:
+  - templates/pvc.yaml
+tests:
+  - it: renders matching persistent volume claims
+    release:
+      name: platform
+      namespace: storage
+    set:
+      storages:
+        - path: /data
+          size: 100Gi
+          nfs:
+            server: nfs.example.com
+            path: /export/data
+        - path: /smb
+          size: 200Gi
+          storageClassName: smb-sc
+          smb:
+            server: smb.example.com
+            shareName: team-share
+            secretName: smb-secret
+            secretNamespace: storage
+        - path: /azure
+          size: 50Gi
+          storageClassName: azure-files
+          azureFile:
+            secretName: azure-secret
+            secretNamespace: azure-ns
+            shareName: azure-share
+    asserts:
+      - matchSnapshot: {}

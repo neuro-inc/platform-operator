@@ -1,0 +1,14 @@
+{{- define "platform.argocd.applications.platformVolumes.values" -}}
+{{- with .Values.storages }}
+storages:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{- if .Values.argocdApplications.platformVolumes.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.platformVolumes -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "targetRevision" .Chart.Version -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.platformVolumes.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

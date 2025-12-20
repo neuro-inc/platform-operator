@@ -1,0 +1,16 @@
+suite: test platform storage application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - platform-storage-application.yaml
+values:
+  - common-values.yaml
+set:
+  storages:
+    - path: /storage
+      size: 10Gi
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}

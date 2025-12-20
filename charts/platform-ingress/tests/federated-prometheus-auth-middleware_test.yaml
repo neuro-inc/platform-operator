@@ -1,0 +1,24 @@
+suite: platform-ingress federated-prometheus-auth
+templates:
+  - templates/federated-prometheus-auth-middleware.yaml
+tests:
+  - it: creates basic auth secret when credentials are provided
+    release:
+      name: ingress
+    set:
+      federatedPrometheus:
+        auth:
+          username: metrics
+          password: verysecret
+    asserts:
+      - matchSnapshot: {}
+
+  - it: reuses existing basic auth secret when provided
+    release:
+      name: ingress
+    set:
+      federatedPrometheus:
+        auth:
+          existingSecret: custom-secret
+    asserts:
+      - matchSnapshot: {}

@@ -1,0 +1,76 @@
+renders persistent volumes for nfs, smb, and azure storage:
+  1: |
+    apiVersion: v1
+    kind: PersistentVolume
+    metadata:
+      labels:
+        app: platform-volumes
+        chart: platform-volumes-1.0.0
+        heritage: Helm
+        release: platform
+      name: platform-storage-data
+    spec:
+      accessModes:
+        - ReadWriteMany
+      capacity:
+        storage: 100Gi
+      nfs:
+        path: /export/data
+        readOnly: false
+        server: nfs.example.com
+      persistentVolumeReclaimPolicy: Retain
+      volumeMode: Filesystem
+  2: |
+    apiVersion: v1
+    kind: PersistentVolume
+    metadata:
+      labels:
+        app: platform-volumes
+        chart: platform-volumes-1.0.0
+        heritage: Helm
+        release: platform
+      name: platform-storage-smb
+    spec:
+      accessModes:
+        - ReadWriteMany
+      capacity:
+        storage: 200Gi
+      csi:
+        driver: smb.csi.k8s.io
+        nodeStageSecretRef:
+          name: smb-secret
+          namespace: storage
+        readOnly: false
+        volumeAttributes:
+          source: //smb.example.com/team-share
+        volumeHandle: smb-smb-example-com/smb
+      mountOptions:
+        - dir_mode=0777
+        - file_mode=0777
+        - vers=3.0
+      persistentVolumeReclaimPolicy: Retain
+      volumeMode: Filesystem
+  3: |
+    apiVersion: v1
+    kind: PersistentVolume
+    metadata:
+      labels:
+        app: platform-volumes
+        chart: platform-volumes-1.0.0
+        heritage: Helm
+        release: platform
+      name: platform-storage-azure
+    spec:
+      accessModes:
+        - ReadWriteMany
+      azureFile:
+        readOnly: false
+        secretName: azure-secret
+        secretNamespace: azure-ns
+        shareName: azure-share
+      capacity:
+        storage: 50Gi
+      mountOptions:
+        - mfsymlinks
+      persistentVolumeReclaimPolicy: Retain
+      volumeMode: Filesystem

@@ -1,0 +1,9 @@
+suite: platform-common priority-class
+templates:
+  - templates/services-priority-class.yaml
+tests:
+  - it: renders services priority class for release
+    release:
+      name: platform
+    asserts:
+      - matchSnapshot: {}

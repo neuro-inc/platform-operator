@@ -1,0 +1,15 @@
+suite: platform-ingress cors-middleware
+templates:
+  - templates/cors-middleware.yaml
+tests:
+  - it: exposes configured CORS origins
+    release:
+      name: ingress
+    set:
+      cors:
+        originList:
+          - https://example.com
+        originListRegex:
+          - https://.*\\.example\\.com
+    asserts:
+      - matchSnapshot: {}

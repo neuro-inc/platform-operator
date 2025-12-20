@@ -1,0 +1,10 @@
+suite: platform-common namespace
+templates:
+  - templates/jobs-namespace.yaml
+tests:
+  - it: renders platform-jobs namespace with common labels
+    release:
+      name: platform
+      namespace: platform-system
+    asserts:
+      - matchSnapshot: {}

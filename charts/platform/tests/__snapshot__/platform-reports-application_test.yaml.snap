@@ -1,0 +1,82 @@
+should match snapshot:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: test-cluster--platform-reports
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: platform-reports
+        helm:
+          releaseName: platform-reports
+          valuesObject:
+            grafanaEnabled: false
+            grafanaProxy:
+              ingress:
+                annotations:
+                  traefik.ingress.kubernetes.io/router.middlewares: platform-platform-ingress-auth@kubernetescrd
+                enabled: true
+                hosts:
+                  - grafana.test-cluster.org.apolo.us
+                  - metrics.test-cluster.org.apolo.us
+                ingressClassName: traefik
+            image:
+              repository: ghcr.io/neuro-inc/platform-reports
+            kubePrometheusStackEnabled: false
+            metricsApi:
+              ingress:
+                enabled: true
+                hosts:
+                  - test-cluster.org.apolo.us
+                ingressClassName: traefik
+            nodePoolLabels:
+              gpu: platform.neuromation.io/accelerator
+              job: platform.neuromation.io/job
+              nodePool: platform.neuromation.io/nodepool
+              preemptible: platform.neuromation.io/preemptible
+            platform:
+              apiUrl: https://api.apolo.us
+              appsUrl: https://api.apolo.us
+              authUrl: https://api.apolo.us
+              clusterName: test-cluster
+              configUrl: https://api.apolo.us
+              ingressAuthUrl: https://api.apolo.us
+              token:
+                valueFrom:
+                  secretKeyRef:
+                    key: token
+                    name: platform-token
+            platformJobs:
+              namespace: platform-jobs
+            priorityClassName: platform-services
+            prometheus:
+              url: http://thanos-query-http:10902
+            securityContext:
+              enabled: true
+            sentry:
+              clusterName: test-cluster
+              dsn: https://sentry-dsn
+              sampleRate: 0.1
+            thanosEnabled: false
+        repoURL: ghcr.io/neuro-inc/helm-charts
+        targetRevision: '*'
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

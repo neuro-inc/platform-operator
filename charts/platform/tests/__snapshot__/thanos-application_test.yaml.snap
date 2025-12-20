@@ -1,0 +1,100 @@
+should match snapshot:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      annotations:
+        argocd.argoproj.io/sync-wave: "-10"
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: test-cluster--thanos
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: thanos
+        helm:
+          releaseName: thanos
+          valuesObject:
+            bucket:
+              labels:
+                service: thanos-bucket
+            compact:
+              dataVolume:
+                backend:
+                  persistentVolumeClaim:
+                    claimName: thanos-compact
+              extraArgs:
+                - --wait-interval=24h
+              labels:
+                service: thanos-compact
+              persistentVolumeClaim:
+                name: thanos-compact
+                spec:
+                  accessModes:
+                    - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: 15Gi
+                  storageClassName: standard
+              retentionResolution1h: 0d
+              retentionResolution5m: 0d
+              retentionResolutionRaw: 0d
+              strategy:
+                rollingUpdate:
+                  maxSurge: 0
+                  maxUnavailable: 1
+                type: RollingUpdate
+            image:
+              repository: ghcr.io/neuro-inc/thanos
+              tag: v0.24.0
+            priorityClassName: platform-services
+            query:
+              labels:
+                service: thanos-query
+            rule:
+              enabled: false
+            sidecar:
+              enabled: true
+              selector:
+                app: null
+                app.kubernetes.io/name: prometheus
+            store:
+              dataVolume:
+                backend:
+                  persistentVolumeClaim:
+                    claimName: thanos-store
+              labels:
+                service: thanos-store
+              persistentVolumeClaim:
+                name: thanos-store
+                spec:
+                  accessModes:
+                    - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: 10Gi
+                  storageClassName: standard
+              strategy:
+                rollingUpdate:
+                  maxSurge: 0
+                  maxUnavailable: 1
+                type: RollingUpdate
+        repoURL: https://neuro-inc.github.io/helm-charts
+        targetRevision: 0.3.23
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

@@ -1,0 +1,12 @@
+suite: platform-ingress fallback-ingress
+templates:
+  - templates/fallback-ingress.yaml
+tests:
+  - it: renders fallback ingress with middleware annotation and class name
+    release:
+      name: ingress
+      namespace: platform
+    set:
+      defaultClassName: traefik
+    asserts:
+      - matchSnapshot: {}

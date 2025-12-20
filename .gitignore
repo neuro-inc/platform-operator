@@ -135,3 +135,6 @@ dmypy.json
 .cr-release-packages
 
 requirements.txt
+
+# Debug data of helm unittest plugin
+.debug/

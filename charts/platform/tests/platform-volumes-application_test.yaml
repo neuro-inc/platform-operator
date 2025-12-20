@@ -1,0 +1,12 @@
+suite: test platform volumes application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - platform-volumes-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: renders argocd application for platform-volumes chart
+    asserts:
+      - matchSnapshot: {}

@@ -1,0 +1,61 @@
+should match snapshot:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: test-cluster--platform-buckets
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: platform-buckets
+        helm:
+          releaseName: platform-buckets
+          valuesObject:
+            disableCreation: false
+            image:
+              repository: ghcr.io/neuro-inc/platformbucketsapi
+            ingress:
+              enabled: true
+              hosts:
+                - test-cluster.org.apolo.us
+              ingressClassName: traefik
+            platform:
+              authUrl: https://api.apolo.us
+              clusterName: test-cluster
+              token:
+                valueFrom:
+                  secretKeyRef:
+                    key: token
+                    name: platform-token
+            priorityClassName: platform-services
+            securityContext:
+              enabled: true
+            sentry:
+              clusterName: test-cluster
+              dsn: https://sentry-dsn
+              sampleRate: 0.1
+            service:
+              annotations:
+                traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
+                traefik.ingress.kubernetes.io/service.sticky.cookie.name: NEURO_BUCKETS_API_SESSION
+        repoURL: ghcr.io/neuro-inc/helm-charts
+        targetRevision: '*'
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

@@ -1,0 +1,39 @@
+{{- define "platform.argocd.applications.platformDisks.values" -}}
+{{- $platformUrls := include "platform.urls" . | fromYaml -}}
+{{- $clusterName := include "platform.clusterName" . -}}
+securityContext:
+  enabled: true
+service:
+  annotations:
+    traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.name: NEURO_DISK_API_SESSION
+platform:
+  authUrl: {{ get $platformUrls "authUrl" }}
+  clusterName: {{ $clusterName }}
+  token:
+    {{- include "platform.token" . | nindent 4 }}
+disks:
+  namespace: platform-jobs
+  {{- with .Values.defaultStorageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- with .Values.sentry }}
+sentry:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+ingress:
+  enabled: true
+  {{- with .Values.defaultIngressClassName }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  hosts:
+  - {{ include "platform.clusterDnsName" . }}
+priorityClassName: {{ include "platform.priorityClassName" . }}
+{{- end -}}
+
+{{- if .Values.argocdApplications.platformDisks.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.platformDisks -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.platformDisks.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

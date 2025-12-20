@@ -1,0 +1,12 @@
+suite: test platform metadata application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - platform-metadata-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}

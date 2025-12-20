@@ -1,0 +1,42 @@
+creates basic auth secret when credentials are provided:
+  1: |
+    apiVersion: v1
+    data:
+      password: dmVyeXNlY3JldA==
+      username: bWV0cmljcw==
+    kind: Secret
+    metadata:
+      labels:
+        app: platform-ingress
+        chart: platform-ingress-1.0.0
+        heritage: Helm
+        release: ingress
+      name: ingress-federated-prometheus-auth
+    type: kubernetes.io/basic-auth
+  2: |
+    apiVersion: traefik.io/v1alpha1
+    kind: Middleware
+    metadata:
+      labels:
+        app: platform-ingress
+        chart: platform-ingress-1.0.0
+        heritage: Helm
+        release: ingress
+      name: ingress-federated-prometheus-auth
+    spec:
+      basicAuth:
+        secret: ingress-federated-prometheus-auth
+reuses existing basic auth secret when provided:
+  1: |
+    apiVersion: traefik.io/v1alpha1
+    kind: Middleware
+    metadata:
+      labels:
+        app: platform-ingress
+        chart: platform-ingress-1.0.0
+        heritage: Helm
+        release: ingress
+      name: ingress-federated-prometheus-auth
+    spec:
+      basicAuth:
+        secret: custom-secret

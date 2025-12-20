@@ -1,0 +1,11 @@
+renders platform-jobs namespace with common labels:
+  1: |
+    apiVersion: v1
+    kind: Namespace
+    metadata:
+      labels:
+        app: platform-common
+        chart: platform-common-1.0.0
+        heritage: Helm
+        release: platform
+      name: platform-jobs

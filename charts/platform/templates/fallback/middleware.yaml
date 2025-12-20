@@ -1,9 +1,0 @@
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
-metadata:
-  name: {{ .Release.Name }}-fallback
-  labels: {{ include "platform.labels.standard" . | nindent 4 }}
-spec:
-  headers:
-    customResponseHeaders:
-      Cache-Control: no-store

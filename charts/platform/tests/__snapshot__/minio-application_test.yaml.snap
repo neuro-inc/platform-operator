@@ -1,0 +1,61 @@
+should match snapshot:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      annotations:
+        argocd.argoproj.io/sync-wave: "-20"
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: test-cluster--minio
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: minio
+        helm:
+          releaseName: minio
+          valuesObject:
+            DeploymentUpdate:
+              maxSurge: 0
+              maxUnavailable: 1
+              type: RollingUpdate
+            fullnameOverride: platform-minio
+            image:
+              repository: ghcr.io/neuro-inc/minio
+              tag: RELEASE.2022-03-08T22-28-51Z
+            ingress:
+              className: traefik
+              enabled: true
+              hosts:
+                - blob.test-cluster.org.apolo.us
+            mode: standalone
+            nameOverride: platform-minio
+            persistence:
+              enabled: true
+              storageClass: standard
+            podLabels:
+              service: minio
+            priorityClassName: platform-services
+            resources:
+              requests:
+                cpu: "1"
+                memory: 2Gi
+        repoURL: https://neuro-inc.github.io/helm-charts
+        targetRevision: 1.0.1
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

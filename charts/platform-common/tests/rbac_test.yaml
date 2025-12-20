@@ -1,0 +1,9 @@
+suite: platform-common rbac
+templates:
+  - templates/rbac.yaml
+tests:
+  - it: creates cluster role with node access
+    release:
+      name: platform
+    asserts:
+      - matchSnapshot: {}

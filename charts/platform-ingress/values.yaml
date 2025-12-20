@@ -1,0 +1,16 @@
+# defaultClassName: traefik
+
+ingressAuthHost: api.apolo.us
+fallbackHost: default.jobs.apolo.us
+
+cors:
+  originList: []
+  originListRegex: []
+
+federatedPrometheus:
+  auth:
+    # Should be kubernetes.io/basic-auth type with `username` and `password` keys
+    existingSecret: ""
+
+    username: ""
+    password: ""

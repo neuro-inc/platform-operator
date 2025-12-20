@@ -1,0 +1,12 @@
+suite: platform-ingress fallback-svc
+templates:
+  - templates/fallback-svc.yaml
+tests:
+  - it: renders fallback service using provided external host
+    release:
+      name: ingress
+      namespace: platform-ingress
+    set:
+      fallbackHost: default.jobs.example.com
+    asserts:
+      - matchSnapshot: {}

@@ -1,0 +1,19 @@
+suite: platform-adjust-inotify
+templates:
+  - templates/adjust-inotify-daemon-set.yaml
+tests:
+  - it: renders daemonset with configured images and labels
+    release:
+      name: platform
+    set:
+      alpineImage:
+        repository: example/alpine
+        tag: "3.19"
+      pauseImage:
+        repository: example/pause
+        tag: "v1"
+      inotify:
+        maxInstances: 128
+        maxWatchers: 256
+    asserts:
+      - matchSnapshot: {}

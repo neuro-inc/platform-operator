@@ -1,0 +1,14 @@
+{{- define "platform.argocd.applications.keda.values" -}}
+crds:
+  additionalAnnotations:
+    argocd.argoproj.io/sync-options: ServerSideApply=true
+operator:
+  replicaCount: 1
+{{- end -}}
+
+{{- if .Values.argocdApplications.keda.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.keda -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.keda.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

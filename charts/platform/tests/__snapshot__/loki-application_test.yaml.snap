@@ -1,0 +1,114 @@
+should match snapshot:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: test-cluster--loki
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: loki
+        helm:
+          releaseName: loki
+          valuesObject:
+            backend:
+              podLabels:
+                service: loki-backend
+              replicas: 1
+              resources:
+                limits:
+                  cpu: "1"
+                  memory: 2Gi
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+            chunksCache:
+              allocatedMemory: 2048
+            deploymentMode: SimpleScalable
+            extraObjects: []
+            gateway:
+              podLabels:
+                service: loki-gateway
+              replicas: 1
+              resources:
+                limits:
+                  cpu: 100m
+                  memory: 200Mi
+                requests:
+                  cpu: 100m
+                  memory: 200Mi
+            global:
+              dnsService: kube-dns
+            loki:
+              auth_enabled: false
+              commonConfig:
+                replication_factor: 1
+              frontend:
+                log_queries_longer_than: 5s
+              ingester:
+                chunk_encoding: snappy
+              limits_config:
+                allow_structured_metadata: true
+                retention_period: 90d
+                split_queries_by_interval: 1h
+                volume_enabled: true
+              pattern_ingester:
+                enabled: true
+              querier:
+                max_concurrent: 8
+              query_range:
+                align_queries_with_step: true
+            lokiCanary:
+              enabled: false
+            minio:
+              enabled: false
+            read:
+              podLabels:
+                service: loki-read
+              replicas: 1
+              resources:
+                limits:
+                  cpu: "1"
+                  memory: 2Gi
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+            resultsCache:
+              allocatedMemory: 512
+            tableManager:
+              retention_deletes_enabled: true
+              retention_period: 2160h
+            test:
+              enabled: false
+            write:
+              podLabels:
+                service: loki-write
+              replicas: 1
+              resources:
+                limits:
+                  cpu: "1"
+                  memory: 2Gi
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+        repoURL: https://grafana.github.io/helm-charts
+        targetRevision: 6.30.1
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

@@ -1,0 +1,49 @@
+should match snapshot:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: test-cluster--docker-registry
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: docker-registry
+        helm:
+          releaseName: docker-registry
+          valuesObject:
+            configData:
+              storage:
+                delete:
+                  enabled: true
+            fullnameOverride: platform-docker-registry
+            image:
+              repository: ghcr.io/neuro-inc/registry
+            ingress:
+              enabled: false
+            nameOverride: platform-docker-registry
+            podLabels:
+              service: docker-registry
+            priorityClassName: platform-services
+            secrets:
+              haSharedSecret: f069097ced1b3fc738e80c852c5a26267ef4504b7658044bb9fd1636ff545dcd
+        repoURL: https://neuro-inc.github.io/helm-charts
+        targetRevision: 1.0.0
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

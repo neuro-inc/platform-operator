@@ -1,0 +1,13 @@
+{{- define "platform.argocd.applications.postgresOperator.values" -}}
+instances:
+  - name: pgo
+    replicas: 1
+disableAutofail: false
+{{- end -}}
+
+{{- if .Values.argocdApplications.postgresOperator.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.postgresOperator -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.postgresOperator.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

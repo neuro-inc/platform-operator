@@ -1,0 +1,12 @@
+suite: test alloy application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - alloy-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}
