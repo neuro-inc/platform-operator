@@ -55,7 +55,7 @@ datasources:
     datasources:
       - name: Prometheus
         type: prometheus
-        url: http://platform-prometheus-proxy:9090
+        url: http://platform-reports-prometheus-proxy:9090
         access: proxy
         isDefault: true
         jsonData:
