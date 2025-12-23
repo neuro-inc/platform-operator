@@ -6,6 +6,7 @@ tests:
     release:
       name: ingress
     set:
+      clusterDnsName: test-cluster.org.apolo.us
       cors:
         originList:
           - https://example.com

@@ -25,3 +25,7 @@ chart: {{ include "platform.chart" . }}
 heritage: {{ .Release.Service | quote }}
 release: {{ .Release.Name | quote }}
 {{- end -}}
+
+{{- define "platform.clusterDnsName" -}}
+{{- required "clusterDnsName is required" .Values.clusterDnsName -}}
+{{- end -}}

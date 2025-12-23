@@ -1,5 +1,6 @@
 # defaultClassName: traefik
 
+clusterDnsName: ""
 ingressAuthHost: api.apolo.us
 fallbackHost: default.jobs.apolo.us
 
