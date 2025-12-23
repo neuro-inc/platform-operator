@@ -45,8 +45,8 @@ spec:
     accessControlAllowOriginListRegex:
       - https:\/\/[a-zA-Z0-9_-]+\.jobs\.{{ include "platform.clusterDnsName" . | regexQuoteMeta }}
       - https:\/\/[a-zA-Z0-9_-]+\.apps\.{{ include "platform.clusterDnsName" . | regexQuoteMeta }}
-    {{- with .Values.cors.originListRegex }}
+      {{- with .Values.cors.originListRegex }}
       {{- toYaml . | nindent 6 }}
-    {{- end }}
+      {{- end }}
     accessControlMaxAge: 100
     addVaryHeader: true
