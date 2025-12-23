@@ -1,10 +1,12 @@
 {{- define "platform.argocd.applications.platformIngress.values" -}}
+{{- $clusterDnsName := include "platform.clusterDnsName" . -}}
 {{- $platformUrls := include "platform.urls" . | fromYaml -}}
 {{- $ingressAuthUrl := urlParse (get $platformUrls "ingressAuthUrl") -}}
 {{- $ingressAuthHost := $ingressAuthUrl.host -}}
 {{- with .Values.defaultIngressClassName }}
 defaultClassName: {{ . }}
 {{- end }}
+clusterDnsName: {{ $clusterDnsName }}
 ingressAuthHost: {{ $ingressAuthHost }}
 {{- end }}
 

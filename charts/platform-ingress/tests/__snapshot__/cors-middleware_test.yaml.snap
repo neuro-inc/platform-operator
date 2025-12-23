@@ -46,6 +46,8 @@ exposes configured CORS origins:
         accessControlAllowOriginList:
           - https://example.com
         accessControlAllowOriginListRegex:
+          - https:\/\/[a-zA-Z0-9_-]+\.jobs\.test-cluster\.org\.apolo\.us
+          - https:\/\/[a-zA-Z0-9_-]+\.apps\.test-cluster\.org\.apolo\.us
           - https://.*\\.example\\.com
         accessControlMaxAge: 100
         addVaryHeader: true

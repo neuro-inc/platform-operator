@@ -19,6 +19,7 @@ renders argocd application for platform-ingress chart:
         helm:
           releaseName: platform
           valuesObject:
+            clusterDnsName: test-cluster.org.apolo.us
             defaultClassName: traefik
             ingressAuthHost: api.apolo.us
         repoURL: ghcr.io/neuro-inc/helm-charts/platform-compute
