@@ -37,7 +37,6 @@ argocd:
   destination: {}
   syncPolicy:
     automated:
-      enabled: true
       prune: false
       selfHeal: false
     syncOptions:

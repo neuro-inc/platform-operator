@@ -103,7 +103,6 @@ should match snapshot:
         targetRevision: 6.30.1
       syncPolicy:
         automated:
-          enabled: true
           prune: false
           selfHeal: false
         managedNamespaceMetadata:
