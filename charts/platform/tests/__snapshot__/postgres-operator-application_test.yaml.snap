@@ -27,7 +27,6 @@ should match snapshot:
         targetRevision: 5.8.3
       syncPolicy:
         automated:
-          enabled: true
           prune: false
           selfHeal: false
         managedNamespaceMetadata:

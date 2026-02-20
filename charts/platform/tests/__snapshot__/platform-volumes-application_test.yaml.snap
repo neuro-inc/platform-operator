@@ -24,7 +24,6 @@ renders argocd application for platform-volumes chart:
         targetRevision: 1.0.0
       syncPolicy:
         automated:
-          enabled: true
           prune: false
           selfHeal: false
         managedNamespaceMetadata:
