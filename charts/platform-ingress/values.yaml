@@ -3,6 +3,8 @@
 clusterDnsName: ""
 ingressAuthHost: api.apolo.us
 fallbackHost: default.jobs.apolo.us
+fallbackIngress:
+  annotations: {}
 
 cors:
   originList: []
