@@ -4,9 +4,9 @@ renders fallback ingress with middleware annotation, custom annotations and clas
     kind: Ingress
     metadata:
       annotations:
+        argocd.argoproj.io/ignore-healthcheck: "true"
         traefik.ingress.kubernetes.io/router.middlewares: platform-ingress-fallback@kubernetescrd
         traefik.ingress.kubernetes.io/router.priority: "1"
-        argocd.argoproj.io/ignore-healthcheck: "true"
       labels:
         app: platform-ingress
         chart: platform-ingress-1.0.0
