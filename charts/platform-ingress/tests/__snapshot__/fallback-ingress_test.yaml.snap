@@ -1,9 +1,10 @@
-renders fallback ingress with middleware annotation and class name:
+renders fallback ingress with middleware annotation, custom annotations and class name:
   1: |
     apiVersion: networking.k8s.io/v1
     kind: Ingress
     metadata:
       annotations:
+        argocd.argoproj.io/ignore-healthcheck: "true"
         traefik.ingress.kubernetes.io/router.middlewares: platform-ingress-fallback@kubernetescrd
         traefik.ingress.kubernetes.io/router.priority: "1"
       labels:

@@ -2,11 +2,13 @@ suite: platform-ingress fallback-ingress
 templates:
   - templates/fallback-ingress.yaml
 tests:
-  - it: renders fallback ingress with middleware annotation and class name
+  - it: renders fallback ingress with middleware annotation, custom annotations and class name
     release:
       name: ingress
       namespace: platform
     set:
       defaultClassName: traefik
+      fallbackIngress.annotations:
+        argocd.argoproj.io/ignore-healthcheck: "true"
     asserts:
       - matchSnapshot: {}
