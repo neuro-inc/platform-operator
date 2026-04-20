@@ -65,7 +65,7 @@ jobs:
     - test
     - discover-charts
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-    uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v25.12.1
+    uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v26.4.0
     with:
       helm_chart_repo_prefix: /platform-compute
       helm_charts: ${{ needs.discover-charts.outputs.helm_charts }}
