@@ -19,6 +19,10 @@ should match snapshot:
         helm:
           releaseName: keda-add-ons-http
           valuesObject:
+            images:
+              kubeRbacProxy:
+                repository: registry.k8s.io/kube-rbac-proxy/kube-rbac-proxy
+                tag: v0.15.0
             interceptor:
               replicas:
                 min: 1
@@ -26,7 +30,7 @@ should match snapshot:
             scaler:
               replicas: 1
         repoURL: https://kedacore.github.io/charts
-        targetRevision: 0.10.0
+        targetRevision: 0.14.0
       syncPolicy:
         automated:
           prune: false

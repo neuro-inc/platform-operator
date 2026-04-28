@@ -129,7 +129,7 @@ argocdApplications:
     repoURL: https://kedacore.github.io/charts
     chart: keda
     name: keda
-    targetRevision: "2.16.1"
+    targetRevision: "2.19.0"
     syncWave: -1
     values: {}
 
@@ -138,8 +138,12 @@ argocdApplications:
     repoURL: https://kedacore.github.io/charts
     chart: keda-add-ons-http
     name: keda-add-ons-http
-    targetRevision: "0.10.0"
-    values: {}
+    targetRevision: "0.14.0"
+    values:
+      images:
+        kubeRbacProxy:
+          repository: registry.k8s.io/kube-rbac-proxy/kube-rbac-proxy
+          tag: v0.15.0
 
   sparkOperator:
     enabled: true
