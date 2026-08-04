@@ -27,8 +27,10 @@ should match snapshot:
                 - registry.test-cluster.org.apolo.us
               ingressClassName: traefik
             platform:
+              adminUrl: https://api.apolo.us/apis/admin/v1
               authUrl: https://api.apolo.us
               clusterName: test-cluster
+              eventsUrl: https://api.apolo.us/apis/events
               token:
                 valueFrom:
                   secretKeyRef:

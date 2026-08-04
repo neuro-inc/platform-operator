@@ -12,6 +12,8 @@ service:
 platform:
   clusterName: {{ include "platform.clusterName" . }}
   authUrl: {{ get $platformUrls "authUrl" }}
+  adminUrl: {{ printf "%s/apis/admin/v1" (get $platformUrls "adminUrl") }}
+  eventsUrl: {{ printf "%s/apis/events" (get $platformUrls "eventsUrl") }}
   token:
     {{- include "platform.token" . | nindent 4 }}
 ingress:
