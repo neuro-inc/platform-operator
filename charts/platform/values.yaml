@@ -158,7 +158,7 @@ argocdApplications:
     repoURL: ghcr.io/neuro-inc/app-crunchy-postgres
     chart: pgo
     name: postgres-operator
-    targetRevision: "5.8.3"
+    targetRevision: "5.8.5"
     values: {}
 
   platformCommon:

@@ -24,7 +24,7 @@ should match snapshot:
               - name: pgo
                 replicas: 1
         repoURL: ghcr.io/neuro-inc/app-crunchy-postgres
-        targetRevision: 5.8.3
+        targetRevision: 5.8.5
       syncPolicy:
         automated:
           prune: false
