@@ -65,6 +65,18 @@ argocdApplications:
     syncWave: -20
     values: {}
 
+  seaweedfs:
+    enabled: false
+    repoURL: https://seaweedfs.github.io/seaweedfs/helm
+    chart: seaweedfs
+    name: seaweedfs
+    targetRevision: "4.41.0"
+    syncWave: -20
+    masterDataSize: 10Gi
+    volumeDataSize: 100Gi
+    filerDataSize: 20Gi
+    values: {}
+
   thanos:
     enabled: true
     repoURL: https://neuro-inc.github.io/helm-charts

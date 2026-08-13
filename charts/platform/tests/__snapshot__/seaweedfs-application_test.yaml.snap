@@ -1,0 +1,79 @@
+should match snapshot:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      annotations:
+        argocd.argoproj.io/sync-wave: "-20"
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: test-cluster--seaweedfs
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: seaweedfs
+        helm:
+          releaseName: seaweedfs
+          valuesObject:
+            filer:
+              data:
+                size: 20Gi
+                storageClass: standard
+                type: persistentVolumeClaim
+              logs:
+                type: emptyDir
+              priorityClassName: platform-services
+            master:
+              data:
+                size: 10Gi
+                storageClass: standard
+                type: persistentVolumeClaim
+              logs:
+                type: emptyDir
+              priorityClassName: platform-services
+            s3:
+              enableAuth: true
+              enabled: true
+              existingConfigSecret: seaweedfs-s3-secret
+              extraArgs:
+                - -iam.readOnly=false
+              extraEnvironmentVars:
+                WEED_JWT_FILER_SIGNING_KEY:
+                  secretKeyRef:
+                    key: signing_key
+                    name: seaweedfs-s3-secret
+              ingress:
+                className: traefik
+                enabled: true
+                host: blob.test-cluster.org.apolo.us
+              internalTrafficPolicy: Cluster
+              logs:
+                type: emptyDir
+              port: 9000
+              priorityClassName: platform-services
+            volume:
+              dataDirs:
+                - maxVolumes: 0
+                  name: data
+                  size: 100Gi
+                  storageClass: standard
+                  type: persistentVolumeClaim
+              priorityClassName: platform-services
+        repoURL: https://seaweedfs.github.io/seaweedfs/helm
+        targetRevision: 4.41.0
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: false
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground
