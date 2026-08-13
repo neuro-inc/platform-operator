@@ -16,3 +16,19 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+  - it: should honour overridden sizes
+    set:
+      argocdApplications.seaweedfs.enabled: true
+      argocdApplications.seaweedfs.masterDataSize: 50Gi
+      argocdApplications.seaweedfs.volumeDataSize: 10Ti
+      argocdApplications.seaweedfs.filerDataSize: 100Gi
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.master.data.size
+          value: 50Gi
+      - equal:
+          path: spec.source.helm.valuesObject.volume.dataDirs[0].size
+          value: 10Ti
+      - equal:
+          path: spec.source.helm.valuesObject.filer.data.size
+          value: 100Gi

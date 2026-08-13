@@ -72,6 +72,9 @@ argocdApplications:
     name: seaweedfs
     targetRevision: "4.41.0"
     syncWave: -20
+    masterDataSize: 10Gi
+    volumeDataSize: 100Gi
+    filerDataSize: 20Gi
     values: {}
 
   thanos:

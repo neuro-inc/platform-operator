@@ -2,7 +2,7 @@
 master:
   data:
     type: persistentVolumeClaim
-    size: 10Gi
+    size: {{ .Values.argocdApplications.seaweedfs.masterDataSize }}
     {{- with .Values.defaultStorageClassName }}
     storageClass: {{ . }}
     {{- end }}
@@ -13,7 +13,7 @@ volume:
   dataDirs:
   - name: data
     type: persistentVolumeClaim
-    size: 100Gi
+    size: {{ .Values.argocdApplications.seaweedfs.volumeDataSize }}
     {{- with .Values.defaultStorageClassName }}
     storageClass: {{ . }}
     {{- end }}
@@ -22,7 +22,7 @@ volume:
 filer:
   data:
     type: persistentVolumeClaim
-    size: 20Gi
+    size: {{ .Values.argocdApplications.seaweedfs.filerDataSize }}
     {{- with .Values.defaultStorageClassName }}
     storageClass: {{ . }}
     {{- end }}
