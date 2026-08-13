@@ -13,6 +13,8 @@ tests:
     asserts:
       - matchSnapshot: {}
   - it: should render nothing when disabled
+    set:
+      argocdApplications.seaweedfs.enabled: false
     asserts:
       - hasDocuments:
           count: 0

@@ -8,5 +8,13 @@ values:
   - common-values.yaml
 tests:
   - it: should match snapshot
+    set:
+      argocdApplications.minio.enabled: true
     asserts:
       - matchSnapshot: {}
+  - it: should render nothing when disabled
+    set:
+      argocdApplications.minio.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

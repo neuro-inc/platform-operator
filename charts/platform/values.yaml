@@ -57,7 +57,7 @@ argocdApplications:
     values: {}
 
   minio:
-    enabled: true
+    enabled: false
     repoURL: https://neuro-inc.github.io/helm-charts
     chart: minio
     name: minio
@@ -66,7 +66,7 @@ argocdApplications:
     values: {}
 
   seaweedfs:
-    enabled: false
+    enabled: true
     repoURL: https://seaweedfs.github.io/seaweedfs/helm
     chart: seaweedfs
     name: seaweedfs
