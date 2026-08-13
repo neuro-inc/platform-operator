@@ -1,0 +1,61 @@
+{{- define "platform.argocd.applications.seaweedfs.values" -}}
+master:
+  data:
+    type: persistentVolumeClaim
+    size: 10Gi
+    {{- with .Values.defaultStorageClassName }}
+    storageClass: {{ . }}
+    {{- end }}
+  logs:
+    type: emptyDir
+  priorityClassName: {{ include "platform.priorityClassName" . }}
+volume:
+  dataDirs:
+  - name: data
+    type: persistentVolumeClaim
+    size: 100Gi
+    {{- with .Values.defaultStorageClassName }}
+    storageClass: {{ . }}
+    {{- end }}
+    maxVolumes: 0
+  priorityClassName: {{ include "platform.priorityClassName" . }}
+filer:
+  data:
+    type: persistentVolumeClaim
+    size: 20Gi
+    {{- with .Values.defaultStorageClassName }}
+    storageClass: {{ . }}
+    {{- end }}
+  logs:
+    type: emptyDir
+  priorityClassName: {{ include "platform.priorityClassName" . }}
+s3:
+  enabled: true
+  port: 9000
+  enableAuth: true
+  existingConfigSecret: seaweedfs-s3-secret
+  extraArgs:
+  - -iam.readOnly=false
+  extraEnvironmentVars:
+    WEED_JWT_FILER_SIGNING_KEY:
+      secretKeyRef:
+        name: seaweedfs-s3-secret
+        key: signing_key
+  logs:
+    type: emptyDir
+  internalTrafficPolicy: Cluster
+  priorityClassName: {{ include "platform.priorityClassName" . }}
+  ingress:
+    enabled: true
+    {{- with .Values.defaultIngressClassName }}
+    className: {{ . }}
+    {{- end }}
+    host: blob.{{ include "platform.clusterDnsName" . }}
+{{- end }}
+
+{{- if .Values.argocdApplications.seaweedfs.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.seaweedfs -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.seaweedfs.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

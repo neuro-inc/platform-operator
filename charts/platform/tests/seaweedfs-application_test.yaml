@@ -1,0 +1,18 @@
+suite: test seaweedfs application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - seaweedfs-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: should match snapshot
+    set:
+      argocdApplications.seaweedfs.enabled: true
+    asserts:
+      - matchSnapshot: {}
+  - it: should render nothing when disabled
+    asserts:
+      - hasDocuments:
+          count: 0
