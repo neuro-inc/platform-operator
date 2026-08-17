@@ -34,3 +34,15 @@ tests:
           value:
             - CreateNamespace=true
             - PrunePropagationPolicy=foreground
+  - it: should not repeat an option the cluster already set globally
+    set:
+      argocd.syncPolicy.syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+    asserts:
+      - equal:
+          path: spec.syncPolicy.syncOptions
+          value:
+            - CreateNamespace=true
+            - ServerSideApply=true
+

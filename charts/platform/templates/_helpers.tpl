@@ -92,7 +92,7 @@ release: {{ .Release.Name | quote }}
 {{- $syncPolicy := deepCopy (default dict $root.Values.argocd.syncPolicy) -}}
 {{- $extraSyncOptions := default list .extraSyncOptions -}}
 {{- if $extraSyncOptions -}}
-{{- $_ := set $syncPolicy "syncOptions" (concat (default list (get $syncPolicy "syncOptions")) $extraSyncOptions) -}}
+{{- $_ := set $syncPolicy "syncOptions" (concat (default list (get $syncPolicy "syncOptions")) $extraSyncOptions | uniq) -}}
 {{- end -}}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
