@@ -10,3 +10,10 @@ tests:
   - it: should match snapshot
     asserts:
       - matchSnapshot: {}
+  - it: should carry only the global sync options
+    asserts:
+      - equal:
+          path: spec.syncPolicy.syncOptions
+          value:
+            - CreateNamespace=true
+            - PrunePropagationPolicy=foreground

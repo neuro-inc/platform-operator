@@ -172,6 +172,8 @@ argocdApplications:
     name: postgres-operator
     targetRevision: "5.8.5"
     values: {}
+    extraSyncOptions:
+    - ServerSideApply=true
 
   platformCommon:
     enabled: true

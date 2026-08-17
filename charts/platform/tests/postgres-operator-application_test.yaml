@@ -10,3 +10,27 @@ tests:
   - it: should match snapshot
     asserts:
       - matchSnapshot: {}
+  - it: should add ServerSideApply without dropping the global sync options
+    asserts:
+      - equal:
+          path: spec.syncPolicy.syncOptions
+          value:
+            - CreateNamespace=true
+            - PrunePropagationPolicy=foreground
+            - ServerSideApply=true
+  - it: should keep the global sync policy otherwise untouched
+    asserts:
+      - equal:
+          path: spec.syncPolicy.automated
+          value:
+            prune: false
+            selfHeal: false
+  - it: should fall back to the global sync options when none are added
+    set:
+      argocdApplications.postgresOperator.extraSyncOptions: []
+    asserts:
+      - equal:
+          path: spec.syncPolicy.syncOptions
+          value:
+            - CreateNamespace=true
+            - PrunePropagationPolicy=foreground
