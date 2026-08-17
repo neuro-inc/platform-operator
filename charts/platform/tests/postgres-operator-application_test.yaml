@@ -45,4 +45,3 @@ tests:
           value:
             - CreateNamespace=true
             - ServerSideApply=true
-
