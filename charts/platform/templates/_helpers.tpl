@@ -89,6 +89,11 @@ release: {{ .Release.Name | quote }}
 {{- $helmDefaultValues := default dict .defaultValues -}}
 {{- $helmValues := deepCopy (default dict .values) -}}
 {{- $_ := merge $helmValues $helmDefaultValues -}}
+{{- $syncPolicy := deepCopy (default dict $root.Values.argocd.syncPolicy) -}}
+{{- $extraSyncOptions := default list .extraSyncOptions -}}
+{{- if $extraSyncOptions -}}
+{{- $_ := set $syncPolicy "syncOptions" (concat (default list (get $syncPolicy "syncOptions")) $extraSyncOptions | uniq) -}}
+{{- end -}}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -127,7 +132,7 @@ spec:
       valuesObject:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-  {{- with $root.Values.argocd.syncPolicy }}
+  {{- with $syncPolicy }}
   syncPolicy:
     {{- toYaml . | nindent 4 }}
   {{- end }}
