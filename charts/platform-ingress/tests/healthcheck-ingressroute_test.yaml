@@ -1,0 +1,9 @@
+suite: platform-ingress healthcheck-ingressroute
+templates:
+  - templates/healthcheck-ingressroute.yaml
+tests:
+  - it: answers host-less OPTIONS health checks locally above the fallback priority
+    release:
+      name: ingress
+    asserts:
+      - matchSnapshot: {}
