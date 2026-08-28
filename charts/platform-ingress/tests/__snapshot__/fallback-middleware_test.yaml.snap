@@ -11,5 +11,7 @@ sets cache control headers for fallback responses:
       name: ingress-fallback
     spec:
       headers:
+        customRequestHeaders:
+          Host: default.jobs.apolo.us
         customResponseHeaders:
           Cache-Control: no-store
