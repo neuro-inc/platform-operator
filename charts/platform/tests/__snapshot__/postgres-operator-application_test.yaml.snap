@@ -19,11 +19,21 @@ should match snapshot:
         helm:
           releaseName: postgres-operator
           valuesObject:
+            debug: false
             disableAutofail: false
             instances:
               - name: pgo
                 replicas: 1
-        repoURL: ghcr.io/neuro-inc/app-crunchy-postgres
+            relatedImages:
+              pgbackrest:
+                image: registry.developers.crunchydata.com/crunchydata/crunchy-pgbackrest:ubi9-2.56.0-2547
+              pgbouncer:
+                image: registry.developers.crunchydata.com/crunchydata/crunchy-pgbouncer:ubi9-1.24-2547
+              pgexporter:
+                image: registry.developers.crunchydata.com/crunchydata/crunchy-postgres-exporter:ubi9-0.18.1-2547
+              postgres_16:
+                image: registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi9-16.11-2547
+        repoURL: registry.developers.crunchydata.com/crunchydata
         targetRevision: 5.8.5
       syncPolicy:
         automated:
