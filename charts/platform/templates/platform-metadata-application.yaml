@@ -6,6 +6,7 @@ securityContext:
   enabled: true
 platform:
   appsUrl: {{ get $platformUrls "appsUrl" }}
+  eventsUrl: {{ printf "%s/apis/events" (get $platformUrls "eventsUrl") }}
   token:
     {{- include "platform.token" . | nindent 4 }}
 priorityClassName: {{ include "platform.priorityClassName" . }}
