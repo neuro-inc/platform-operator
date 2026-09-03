@@ -51,6 +51,9 @@ should match snapshot:
               auth_enabled: false
               commonConfig:
                 replication_factor: 1
+              compactor:
+                delete_request_store: s3
+                retention_enabled: true
               frontend:
                 log_queries_longer_than: 5s
               ingester:
@@ -83,9 +86,6 @@ should match snapshot:
                   memory: 2Gi
             resultsCache:
               allocatedMemory: 512
-            tableManager:
-              retention_deletes_enabled: true
-              retention_period: 2160h
             test:
               enabled: false
             write:
