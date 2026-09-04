@@ -25,9 +25,9 @@ store:
   labels:
     service: thanos-store
 compact:
-  retentionResolutionRaw: 0d
-  retentionResolution5m: 0d
-  retentionResolution1h: 0d
+  retentionResolutionRaw: 60d
+  retentionResolution5m: 365d
+  retentionResolution1h: 2y
   extraArgs:
     - --wait-interval=24h
   strategy:

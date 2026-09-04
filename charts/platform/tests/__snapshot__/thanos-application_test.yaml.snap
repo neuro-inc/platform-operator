@@ -42,9 +42,9 @@ should match snapshot:
                     requests:
                       storage: 15Gi
                   storageClassName: standard
-              retentionResolution1h: 0d
-              retentionResolution5m: 0d
-              retentionResolutionRaw: 0d
+              retentionResolution1h: 2y
+              retentionResolution5m: 365d
+              retentionResolutionRaw: 60d
               strategy:
                 rollingUpdate:
                   maxSurge: 0
