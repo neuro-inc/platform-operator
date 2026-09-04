@@ -23,6 +23,7 @@ should match snapshot:
               repository: ghcr.io/neuro-inc/platform-metadata
             platform:
               appsUrl: https://api.apolo.us
+              eventsUrl: https://api.apolo.us/apis/events
               token:
                 valueFrom:
                   secretKeyRef:
