@@ -47,6 +47,7 @@ gateway:
     service: loki-gateway
   affinity:
     podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution: []
       preferredDuringSchedulingIgnoredDuringExecution:
         - weight: 100
           podAffinityTerm:
