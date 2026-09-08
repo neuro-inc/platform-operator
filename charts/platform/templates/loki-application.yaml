@@ -45,6 +45,17 @@ gateway:
       cpu: 100m
   podLabels:
     service: loki-gateway
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: gateway
+                app.kubernetes.io/name: loki
+                app.kubernetes.io/instance: loki
+            topologyKey: kubernetes.io/hostname
 write:
   replicas: 1
   resources:

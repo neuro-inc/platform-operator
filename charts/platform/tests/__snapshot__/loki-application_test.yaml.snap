@@ -35,6 +35,17 @@ should match snapshot:
             deploymentMode: SimpleScalable
             extraObjects: []
             gateway:
+              affinity:
+                podAntiAffinity:
+                  preferredDuringSchedulingIgnoredDuringExecution:
+                    - podAffinityTerm:
+                        labelSelector:
+                          matchLabels:
+                            app.kubernetes.io/component: gateway
+                            app.kubernetes.io/instance: loki
+                            app.kubernetes.io/name: loki
+                        topologyKey: kubernetes.io/hostname
+                      weight: 100
               podLabels:
                 service: loki-gateway
               replicas: 1
