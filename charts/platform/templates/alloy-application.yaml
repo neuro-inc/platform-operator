@@ -165,6 +165,10 @@ alloy:
         targets    = discovery.relabel.kubernetes_pods.output
         forward_to = [loki.process.kubernetes_pods.receiver]
       }
+serviceMonitor:
+  enabled: true
+  additionalLabels:
+    platform.apolo.us/scrape-metrics: "true"
 controller:
   tolerations:
     - key: platform.apolo.us/worker

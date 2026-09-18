@@ -203,6 +203,10 @@ should match snapshot:
                 runAsGroup: 473
                 runAsNonRoot: true
                 runAsUser: 473
+            serviceMonitor:
+              additionalLabels:
+                platform.apolo.us/scrape-metrics: "true"
+              enabled: true
         repoURL: https://grafana.github.io/helm-charts
         targetRevision: 1.0.1
       syncPolicy:
