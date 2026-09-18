@@ -5,6 +5,7 @@ image:
 securityContext:
   enabled: true
 platform:
+  clusterName: {{ include "platform.clusterName" . }}
   appsUrl: {{ get $platformUrls "appsUrl" }}
   eventsUrl: {{ printf "%s/apis/events" (get $platformUrls "eventsUrl") }}
   token:
