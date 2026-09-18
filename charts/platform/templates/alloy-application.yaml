@@ -146,11 +146,6 @@ alloy:
           }
         }
 
-        // Loki rejects an entry older than reject_old_samples_max_age (168h by
-        // default) and such an entry can never become acceptable, so the write
-        // client retries it forever and the whole stream stops shipping until
-        // the collector is restarted by hand (IT-205). Drop these slightly
-        // before Loki would refuse them.
         stage.drop {
           older_than          = "{{ .Values.argocdApplications.alloy.maxLogAge }}"
           drop_counter_reason = "line_too_old"

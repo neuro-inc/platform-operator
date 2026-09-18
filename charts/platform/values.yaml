@@ -126,9 +126,6 @@ argocdApplications:
     chart: alloy
     name: alloy
     targetRevision: "1.0.1"
-    # Entries older than this are dropped before they are sent. Must stay below
-    # Loki's reject_old_samples_max_age (168h by default): an entry Loki refuses
-    # can never become acceptable, and retrying it forever wedges the stream.
     maxLogAge: 167h
     values: {}
 
