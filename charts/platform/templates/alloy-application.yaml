@@ -146,6 +146,11 @@ alloy:
           }
         }
 
+        stage.drop {
+          older_than          = "{{ .Values.argocdApplications.alloy.maxLogAge }}"
+          drop_counter_reason = "line_too_old"
+        }
+
         stage.pack {
           labels           = ["stream", "level", "logger", "context", "pod", "component"]
           ingest_timestamp = false
@@ -160,6 +165,10 @@ alloy:
         targets    = discovery.relabel.kubernetes_pods.output
         forward_to = [loki.process.kubernetes_pods.receiver]
       }
+serviceMonitor:
+  enabled: true
+  additionalLabels:
+    platform.apolo.us/scrape-metrics: "true"
 controller:
   tolerations:
     - key: platform.apolo.us/worker
