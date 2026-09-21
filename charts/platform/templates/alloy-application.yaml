@@ -165,8 +165,8 @@ alloy:
 
           stage.metrics {
             metric.counter {
-              name              = "log_lines"
-              description       = "Log lines shipped, per stream"
+              name              = "log_entries_total"
+              description       = "Log entries shipped, per stream"
               match_all         = true
               action            = "inc"
               max_idle_duration = "24h"
