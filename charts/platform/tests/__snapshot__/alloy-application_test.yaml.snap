@@ -169,6 +169,20 @@ should match snapshot:
                     stage.label_keep {
                       values = ["app", "namespace", "container", "apolo_org_name", "apolo_project_name", "apolo_app_instance_name"]
                     }
+
+                    stage.match {
+                      selector = "{namespace=~\"platform|openebs|kube-system\"}"
+
+                      stage.metrics {
+                        metric.counter {
+                          name              = "log_lines"
+                          description       = "Log lines shipped, per stream"
+                          match_all         = true
+                          action            = "inc"
+                          max_idle_duration = "24h"
+                        }
+                      }
+                    }
                   }
 
                   loki.source.kubernetes "kubernetes_pods" {
