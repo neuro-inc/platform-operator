@@ -127,6 +127,7 @@ argocdApplications:
     name: alloy
     targetRevision: "1.0.1"
     maxLogAge: 167h
+    streamMetricNamespaces: platform|openebs|kube-system
     values: {}
 
   grafana:
