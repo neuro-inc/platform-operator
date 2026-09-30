@@ -42,9 +42,6 @@ argocd:
     syncOptions:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
-    managedNamespaceMetadata:
-      annotations:
-        argocd.argoproj.io/sync-options: Delete=false
 
 argocdApplications:
   externalSecrets:
