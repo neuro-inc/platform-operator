@@ -40,8 +40,8 @@ argocd:
       prune: false
       selfHeal: false
     syncOptions:
-    - CreateNamespace=true
-    - PrunePropagationPolicy=foreground
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
     managedNamespaceMetadata:
       annotations:
         argocd.argoproj.io/sync-options: Delete=false
@@ -166,6 +166,8 @@ argocdApplications:
     name: spark-operator
     targetRevision: "2.1.0"
     values: {}
+    extraSyncOptions:
+      - ServerSideApply=true
 
   postgresOperator:
     enabled: true
@@ -185,7 +187,7 @@ argocdApplications:
         pgexporter:
           image: registry.developers.crunchydata.com/crunchydata/crunchy-postgres-exporter:ubi9-0.18.1-2547
     extraSyncOptions:
-    - ServerSideApply=true
+      - ServerSideApply=true
 
   platformCommon:
     enabled: true
