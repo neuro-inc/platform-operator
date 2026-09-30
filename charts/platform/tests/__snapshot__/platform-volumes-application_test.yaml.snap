@@ -26,9 +26,6 @@ renders argocd application for platform-volumes chart:
         automated:
           prune: false
           selfHeal: false
-        managedNamespaceMetadata:
-          annotations:
-            argocd.argoproj.io/sync-options: Delete=false
         syncOptions:
           - CreateNamespace=true
           - PrunePropagationPolicy=foreground
