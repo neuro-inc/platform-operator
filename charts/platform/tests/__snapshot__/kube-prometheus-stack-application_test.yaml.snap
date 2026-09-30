@@ -75,6 +75,8 @@ should match snapshot:
                 - statefulsets
                 - daemonsets
                 - horizontalpodautoscalers
+                - jobs
+                - cronjobs
               customLabels:
                 service: kube-state-metrics
               fullnameOverride: kube-state-metrics
