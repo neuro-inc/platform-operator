@@ -237,3 +237,4 @@ should match snapshot:
         syncOptions:
           - CreateNamespace=true
           - PrunePropagationPolicy=foreground
+          - ServerSideApply=true
