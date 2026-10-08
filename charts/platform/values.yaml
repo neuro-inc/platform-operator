@@ -91,6 +91,8 @@ argocdApplications:
     targetRevision: "54.2.2"
     syncWave: -9
     values: {}
+    extraSyncOptions:
+      - ServerSideApply=true
 
   traefik:
     enabled: true
