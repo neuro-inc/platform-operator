@@ -1,0 +1,27 @@
+suite: test bucket usage application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - bucket-usage-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: should render nothing by default
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: should match snapshot when enabled
+    set:
+      argocdApplications.bucketUsage.enabled: true
+      argocdApplications.bucketUsage.values:
+        endpoint: https://s3.example.com
+        region: r1
+        buckets:
+          - name: job-images
+            secret:
+              name: s3-images
+              accessKeyKey: s3-images-access-key
+              secretKeyKey: s3-images-secret-key
+    asserts:
+      - matchSnapshot: {}

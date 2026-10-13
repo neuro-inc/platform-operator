@@ -1,0 +1,14 @@
+{{- define "platform.argocd.applications.bucketUsage.values" -}}
+fullnameOverride: bucket-usage
+priorityClassName: {{ include "platform.priorityClassName" . }}
+serviceMonitor:
+  labels:
+    platform.apolo.us/scrape-metrics: "true"
+{{- end }}
+
+{{- if .Values.argocdApplications.bucketUsage.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.bucketUsage -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.bucketUsage.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}
