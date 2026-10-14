@@ -1,0 +1,43 @@
+should match snapshot when enabled:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: test-cluster--bucket-usage
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: bucket-usage
+        helm:
+          releaseName: bucket-usage
+          valuesObject:
+            buckets:
+              - name: job-images
+                secret:
+                  accessKeyKey: s3-images-access-key
+                  name: s3-images
+                  secretKeyKey: s3-images-secret-key
+            endpoint: https://s3.example.com
+            fullnameOverride: bucket-usage
+            priorityClassName: platform-services
+            region: r1
+            serviceMonitor:
+              labels:
+                platform.apolo.us/scrape-metrics: "true"
+        repoURL: https://neuro-inc.github.io/helm-charts
+        targetRevision: 0.1.0
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

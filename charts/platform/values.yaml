@@ -111,6 +111,14 @@ argocdApplications:
     targetRevision: "1.0.0"
     values: {}
 
+  bucketUsage:
+    enabled: false
+    repoURL: https://neuro-inc.github.io/helm-charts
+    chart: bucket-usage
+    name: bucket-usage
+    targetRevision: "0.1.0"
+    values: {}
+
   loki:
     enabled: true
     repoURL: https://grafana.github.io/helm-charts
