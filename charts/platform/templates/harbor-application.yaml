@@ -1,19 +1,10 @@
 {{- define "platform.argocd.applications.harbor.values" -}}
 {{- $cfg := .Values.argocdApplications.harbor -}}
-{{- $host := printf "harbor.%s" (include "platform.clusterDnsName" .) -}}
 {{- $priorityClassName := include "platform.priorityClassName" . -}}
 bootstrap:
   project: {{ $cfg.project }}
   priorityClassName: {{ $priorityClassName }}
 harbor:
-  externalURL: https://{{ $host }}
-  expose:
-    ingress:
-      {{- with .Values.defaultIngressClassName }}
-      className: {{ . }}
-      {{- end }}
-      hosts:
-        core: {{ $host }}
   persistence:
     {{- with .Values.defaultStorageClassName }}
     persistentVolumeClaim:
@@ -32,6 +23,8 @@ harbor:
   jobservice:
     priorityClassName: {{ $priorityClassName }}
   registry:
+    priorityClassName: {{ $priorityClassName }}
+  nginx:
     priorityClassName: {{ $priorityClassName }}
   portal:
     priorityClassName: {{ $priorityClassName }}

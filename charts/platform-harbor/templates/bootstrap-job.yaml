@@ -38,7 +38,7 @@ spec:
         - name: PYTHONDONTWRITEBYTECODE
           value: "1"
         - name: HARBOR_URL
-          value: http://{{ .Values.harbor.fullnameOverride }}-core
+          value: http://{{ required "harbor.fullnameOverride is required" .Values.harbor.fullnameOverride }}-core
         - name: HARBOR_ADMIN_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -46,10 +46,8 @@ spec:
               key: {{ .Values.harbor.existingSecretAdminPasswordKey }}
         - name: HARBOR_PROJECT
           value: {{ required "bootstrap.project is required" .Values.bootstrap.project | quote }}
-        - name: HARBOR_USERNAME
-          value: {{ .Values.bootstrap.user.name | quote }}
-        - name: HARBOR_USER_EMAIL
-          value: {{ .Values.bootstrap.user.email | quote }}
+        - name: HARBOR_ROBOT
+          value: {{ .Values.bootstrap.robot | quote }}
         - name: SECRET_NAME
           value: {{ .Values.bootstrap.secretName | quote }}
         - name: WAIT_SECONDS

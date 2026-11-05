@@ -10,15 +10,28 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-HARBOR_URL = os.environ["HARBOR_URL"].rstrip("/") + "/api/v2.0"
+HARBOR_URL = os.environ["HARBOR_URL"].rstrip("/")
+API_URL = f"{HARBOR_URL}/api/v2.0"
 ADMIN = ("admin", os.environ["HARBOR_ADMIN_PASSWORD"])
 PROJECT = os.environ["HARBOR_PROJECT"]
-USERNAME = os.environ["HARBOR_USERNAME"]
-EMAIL = os.environ["HARBOR_USER_EMAIL"]
+ROBOT = os.environ["HARBOR_ROBOT"]
 SECRET_NAME = os.environ["SECRET_NAME"]
 WAIT_SECONDS = int(os.environ.get("WAIT_SECONDS", "900"))
 SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount"
 K8S_URL = "https://kubernetes.default.svc"
+PERMISSIONS = [
+    {"kind": "system", "namespace": "/", "access": [{"resource": "catalog", "action": "read"}]},
+    {
+        "kind": "project",
+        "namespace": PROJECT,
+        "access": [
+            {"resource": "repository", "action": action}
+            for action in ("list", "pull", "push", "delete")
+        ]
+        + [{"resource": "artifact", "action": action} for action in ("read", "list", "delete")]
+        + [{"resource": "tag", "action": action} for action in ("list", "create", "delete")],
+    },
+]
 
 
 def log(message):
@@ -46,9 +59,12 @@ def call(url, method="GET", body=None, headers=None, context=None):
         return status, payload.decode(errors="replace")
 
 
-def harbor(method, path, body=None, auth=ADMIN):
-    token = base64.b64encode(f"{auth[0]}:{auth[1]}".encode()).decode()
-    return call(f"{HARBOR_URL}{path}", method, body, {"Authorization": f"Basic {token}"})
+def basic(username, password):
+    return {"Authorization": "Basic " + base64.b64encode(f"{username}:{password}".encode()).decode()}
+
+
+def harbor(method, path, body=None):
+    return call(f"{API_URL}{path}", method, body, basic(*ADMIN))
 
 
 def kube(method, path, body=None):
@@ -74,6 +90,18 @@ def wait_for_harbor():
         time.sleep(10)
 
 
+def ensure_configuration():
+    status, body = harbor("GET", "/configurations")
+    if status != 200:
+        fail(f"reading configurations failed: {status} {body}")
+    if body["project_creation_restriction"]["value"] != "adminonly":
+        status, response = harbor("PUT", "/configurations", {"project_creation_restriction": "adminonly"})
+        if status != 200:
+            fail(f"restricting project creation failed: {status} {response}")
+        log("project creation restricted to admins")
+    return body["robot_name_prefix"]["value"]
+
+
 def ensure_project():
     status, _ = harbor("HEAD", f"/projects?project_name={urllib.parse.quote(PROJECT)}")
     if status == 200:
@@ -95,13 +123,13 @@ def new_password():
             return password
 
 
-def ensure_secret():
+def ensure_secret(username):
     with open(f"{SA_DIR}/namespace") as f:
         path = f"/api/v1/namespaces/{f.read().strip()}/secrets"
     status, body = kube("GET", f"{path}/{SECRET_NAME}")
     if status == 200:
         data = body.get("data") or {}
-        if data.get("password") and base64.b64decode(data.get("username", "")).decode() == USERNAME:
+        if data.get("password") and base64.b64decode(data.get("username", "")).decode() == username:
             log(f"secret {SECRET_NAME} exists")
             return base64.b64decode(data["password"]).decode()
     elif status != 404:
@@ -112,7 +140,7 @@ def ensure_secret():
         "kind": "Secret",
         "metadata": {"name": SECRET_NAME},
         "type": "Opaque",
-        "stringData": {"username": USERNAME, "password": password},
+        "stringData": {"username": username, "password": password},
     }
     if status == 200:
         status, body = kube("PUT", f"{path}/{SECRET_NAME}", secret)
@@ -124,47 +152,64 @@ def ensure_secret():
     return password
 
 
-def find_user():
-    status, body = harbor("GET", f"/users/search?username={urllib.parse.quote(USERNAME)}&page_size=100")
+def normalized(permissions):
+    return sorted(
+        (p["kind"], p["namespace"], sorted((a["resource"], a["action"]) for a in p["access"])) for p in permissions
+    )
+
+
+def find_robot(username):
+    status, body = harbor("GET", f"/robots?q={urllib.parse.quote(f'name={ROBOT}')}&page_size=100")
     if status != 200:
-        fail(f"searching user {USERNAME} failed: {status} {body}")
-    return next((u["user_id"] for u in body if u["username"] == USERNAME), None)
+        fail(f"listing robots failed: {status} {body}")
+    return next((r for r in body if r["name"] == username and r["level"] == "system"), None)
 
 
-def ensure_user(password):
-    user_id = find_user()
-    if user_id is None:
+def ensure_robot(username, password):
+    robot = find_robot(username)
+    if robot is None:
         status, body = harbor(
             "POST",
-            "/users",
-            {"username": USERNAME, "email": EMAIL, "realname": USERNAME, "password": password},
+            "/robots",
+            {
+                "name": ROBOT,
+                "description": "platform-registry upstream",
+                "level": "system",
+                "duration": -1,
+                "disable": False,
+                "permissions": PERMISSIONS,
+            },
         )
         if status != 201:
-            fail(f"creating user {USERNAME} failed: {status} {body}")
-        user_id = find_user()
-        log(f"user {USERNAME} created")
-    elif harbor("GET", "/users/current", auth=(USERNAME, password))[0] == 200:
-        log(f"user {USERNAME} exists")
-    else:
-        status, body = harbor("PUT", f"/users/{user_id}/password", {"new_password": password})
+            fail(f"creating robot {username} failed: {status} {body}")
+        robot = find_robot(username)
+        log(f"robot {username} created")
+    elif normalized(robot["permissions"]) != normalized(PERMISSIONS):
+        status, body = harbor("PUT", f"/robots/{robot['id']}", {**robot, "permissions": PERMISSIONS})
         if status != 200:
-            fail(f"resetting password of {USERNAME} failed: {status} {body}")
-        log(f"user {USERNAME} password reset")
-    status, body = harbor("GET", f"/users/{user_id}")
-    if status != 200:
-        fail(f"reading user {USERNAME} failed: {status} {body}")
-    if body.get("sysadmin_flag"):
+            fail(f"updating permissions of {username} failed: {status} {body}")
+        log(f"robot {username} permissions updated")
+    else:
+        log(f"robot {username} exists")
+    status, body = call(f"{HARBOR_URL}/v2/", headers=basic(username, password))
+    if status == 200:
         return
-    status, body = harbor("PUT", f"/users/{user_id}/sysadmin", {"sysadmin_flag": True})
+    if status != 401:
+        fail(f"checking credentials of {username} failed: {status} {body}")
+    status, body = harbor("PATCH", f"/robots/{robot['id']}", {"secret": password})
     if status != 200:
-        fail(f"granting sysadmin to {USERNAME} failed: {status} {body}")
-    log(f"user {USERNAME} granted sysadmin")
+        fail(f"setting secret of {username} failed: {status} {body}")
+    status, body = call(f"{HARBOR_URL}/v2/", headers=basic(username, password))
+    if status != 200:
+        fail(f"credentials of {username} still rejected: {status} {body}")
+    log(f"robot {username} secret set")
 
 
 def main():
     wait_for_harbor()
+    username = ensure_configuration() + ROBOT
     ensure_project()
-    ensure_user(ensure_secret())
+    ensure_robot(username, ensure_secret(username))
     log("bootstrap finished")
 
 

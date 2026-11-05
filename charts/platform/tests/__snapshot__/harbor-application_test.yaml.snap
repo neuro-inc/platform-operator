@@ -28,13 +28,9 @@ should match snapshot when enabled:
               database:
                 internal:
                   priorityClassName: platform-services
-              expose:
-                ingress:
-                  className: traefik
-                  hosts:
-                    core: harbor.test-cluster.org.apolo.us
-              externalURL: https://harbor.test-cluster.org.apolo.us
               jobservice:
+                priorityClassName: platform-services
+              nginx:
                 priorityClassName: platform-services
               persistence:
                 imageChartStorage:

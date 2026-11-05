@@ -40,3 +40,11 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: bootstrap.project is required
+  - it: should fail without the harbor name
+    set:
+      bootstrap.project: neuro
+      harbor.fullnameOverride: ""
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: harbor.fullnameOverride is required

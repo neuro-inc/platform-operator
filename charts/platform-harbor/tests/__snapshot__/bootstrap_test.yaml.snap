@@ -74,7 +74,7 @@ should match snapshot:
       template:
         metadata:
           annotations:
-            checksum/script: bc6924b87312423aea12f86cc65533bfba263783cd3db5bb2409a2f29c294895
+            checksum/script: 527d07c69bc10a99f539f0115304f76bfb1a27b811efe9b580afd88034b8b0c2
           labels:
             app: platform-harbor
             chart: platform-harbor-1.0.0
@@ -99,10 +99,8 @@ should match snapshot:
                       name: harbor-secrets
                 - name: HARBOR_PROJECT
                   value: neuro
-                - name: HARBOR_USERNAME
+                - name: HARBOR_ROBOT
                   value: platform-registry
-                - name: HARBOR_USER_EMAIL
-                  value: platform-registry@apolo.us
                 - name: SECRET_NAME
                   value: harbor-platform-registry
                 - name: WAIT_SECONDS

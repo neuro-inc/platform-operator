@@ -41,3 +41,56 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: argocdApplications.harbor.enabled is required for the harbor upstream
+  - it: should let harbor win over an upstream set in values
+    set:
+      argocdApplications.platformRegistry.upstream: harbor
+      argocdApplications.harbor.enabled: true
+      argocdApplications.platformRegistry.values:
+        upstreamRegistry:
+          type: basic
+          url: http://platform-docker-registry:5000
+          project: neuro
+          maxCatalogEntries: 10000
+          basicUsername:
+            valueFrom:
+              secretKeyRef:
+                name: platform-registry-upstream
+                key: username
+          basicPassword:
+            valueFrom:
+              secretKeyRef:
+                name: platform-registry-upstream
+                key: password
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.upstreamRegistry
+          value:
+            type: basic
+            url: http://harbor-core
+            project: neuro
+            maxCatalogEntries: 10000
+            basicUsername:
+              valueFrom:
+                secretKeyRef:
+                  name: harbor-platform-registry
+                  key: username
+            basicPassword:
+              valueFrom:
+                secretKeyRef:
+                  name: harbor-platform-registry
+                  key: password
+  - it: should keep an upstream set in values for docker registry
+    set:
+      argocdApplications.platformRegistry.values:
+        upstreamRegistry:
+          url: http://platform-docker-registry:5000
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.upstreamRegistry.url
+          value: http://platform-docker-registry:5000
+  - it: should fail on an unknown upstream
+    set:
+      argocdApplications.platformRegistry.upstream: other
+    asserts:
+      - failedTemplate:
+          errorMessage: argocdApplications.platformRegistry.upstream must be dockerRegistry or harbor
