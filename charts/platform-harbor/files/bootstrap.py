@@ -24,14 +24,10 @@ PERMISSIONS = [
     {
         "kind": "project",
         "namespace": PROJECT,
-        "access": [
-            {"resource": "repository", "action": action}
-            for action in ("list", "pull", "push", "delete")
-        ]
-        + [{"resource": "artifact", "action": action} for action in ("read", "list", "delete")]
-        + [{"resource": "tag", "action": action} for action in ("list", "create", "delete")],
+        "access": [{"resource": "repository", "action": action} for action in ("pull", "push", "delete")],
     },
 ]
+DESIRED = {"disable": False, "duration": -1}
 
 
 def log(message):
@@ -175,20 +171,21 @@ def ensure_robot(username, password):
                 "name": ROBOT,
                 "description": "platform-registry upstream",
                 "level": "system",
-                "duration": -1,
-                "disable": False,
                 "permissions": PERMISSIONS,
+                **DESIRED,
             },
         )
         if status != 201:
             fail(f"creating robot {username} failed: {status} {body}")
-        robot = find_robot(username)
+        robot = {"id": body["id"]}
         log(f"robot {username} created")
-    elif normalized(robot["permissions"]) != normalized(PERMISSIONS):
-        status, body = harbor("PUT", f"/robots/{robot['id']}", {**robot, "permissions": PERMISSIONS})
+    elif normalized(robot["permissions"]) != normalized(PERMISSIONS) or any(
+        robot.get(k) != v for k, v in DESIRED.items()
+    ):
+        status, body = harbor("PUT", f"/robots/{robot['id']}", {**robot, "permissions": PERMISSIONS, **DESIRED})
         if status != 200:
-            fail(f"updating permissions of {username} failed: {status} {body}")
-        log(f"robot {username} permissions updated")
+            fail(f"updating robot {username} failed: {status} {body}")
+        log(f"robot {username} permissions, disable and duration reconciled")
     else:
         log(f"robot {username} exists")
     status, body = call(f"{HARBOR_URL}/v2/", headers=basic(username, password))
@@ -201,7 +198,9 @@ def ensure_robot(username, password):
         fail(f"setting secret of {username} failed: {status} {body}")
     status, body = call(f"{HARBOR_URL}/v2/", headers=basic(username, password))
     if status != 200:
-        fail(f"credentials of {username} still rejected: {status} {body}")
+        _, current = harbor("GET", f"/robots/{robot['id']}")
+        state = {k: current.get(k) for k in ("disable", "duration", "expires_at")} if isinstance(current, dict) else current
+        fail(f"credentials of {username} still rejected: {status} {body} {state}")
     log(f"robot {username} secret set")
 
 

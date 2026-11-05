@@ -74,7 +74,7 @@ should match snapshot:
       template:
         metadata:
           annotations:
-            checksum/script: 527d07c69bc10a99f539f0115304f76bfb1a27b811efe9b580afd88034b8b0c2
+            checksum/script: 4c4849012f2f91f4f3b2df0d55c1c093ba122308fe3d29f22291dcbc383a83ff
           labels:
             app: platform-harbor
             chart: platform-harbor-1.0.0
