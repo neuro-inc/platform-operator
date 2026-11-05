@@ -12,3 +12,4 @@ spec:
     service:
       name: {{ .Release.Name }}-fallback
       port: https
+      passHostHeader: false
