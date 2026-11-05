@@ -38,6 +38,8 @@ harbor:
       s3:
         existingSecret: harbor-s3
   core:
+    image:
+      tag: v2.13.6
     existingSecret: harbor-secrets
     secretName: harbor-secrets
     existingXsrfSecret: harbor-secrets
@@ -54,6 +56,8 @@ harbor:
       limits:
         memory: 1Gi
   jobservice:
+    image:
+      tag: v2.13.6
     existingSecret: harbor-secrets
     jobLoggers:
       - stdout
@@ -68,6 +72,8 @@ harbor:
     credentials:
       existingSecret: harbor-secrets
     registry:
+      image:
+        tag: v2.13.6
       resources:
         requests:
           cpu: 100m
@@ -75,6 +81,8 @@ harbor:
         limits:
           memory: 2Gi
     controller:
+      image:
+        tag: v2.13.6
       resources:
         requests:
           cpu: 10m
@@ -82,6 +90,8 @@ harbor:
         limits:
           memory: 256Mi
   nginx:
+    image:
+      tag: v2.13.6
     resources:
       requests:
         cpu: 10m
@@ -89,6 +99,8 @@ harbor:
       limits:
         memory: 128Mi
   portal:
+    image:
+      tag: v2.13.6
     resources:
       requests:
         cpu: 10m
@@ -99,6 +111,8 @@ harbor:
     enabled: false
   database:
     internal:
+      image:
+        tag: v2.13.6
       extraEnvVars:
         - name: POSTGRES_PASSWORD
           valueFrom:
@@ -113,6 +127,8 @@ harbor:
           memory: 1Gi
   redis:
     internal:
+      image:
+        tag: v2.13.6
       resources:
         requests:
           cpu: 50m
