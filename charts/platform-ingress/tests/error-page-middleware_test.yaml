@@ -6,4 +6,7 @@ tests:
     release:
       name: ingress
     asserts:
+      - equal:
+          path: spec.errors.service.passHostHeader
+          value: false
       - matchSnapshot: {}

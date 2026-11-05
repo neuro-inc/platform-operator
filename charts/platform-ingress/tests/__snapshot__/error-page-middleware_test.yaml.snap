@@ -15,6 +15,7 @@ configures error handling to fallback service:
         query: /
         service:
           name: ingress-fallback
+          passHostHeader: false
           port: https
         status:
           - 500-599
