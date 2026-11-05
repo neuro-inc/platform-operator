@@ -1,0 +1,65 @@
+should match snapshot when enabled:
+  1: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      labels:
+        app: platform
+        chart: platform-1.0.0
+        heritage: Helm
+        release: platform
+      name: test-cluster--harbor
+    spec:
+      destination:
+        namespace: platform
+        server: https://kubernetes.default.svc
+      project: default
+      source:
+        chart: platform-harbor
+        helm:
+          releaseName: harbor
+          valuesObject:
+            bootstrap:
+              priorityClassName: platform-services
+              project: neuro
+            harbor:
+              core:
+                priorityClassName: platform-services
+              database:
+                internal:
+                  priorityClassName: platform-services
+              expose:
+                ingress:
+                  className: traefik
+                  hosts:
+                    core: harbor.test-cluster.org.apolo.us
+              externalURL: https://harbor.test-cluster.org.apolo.us
+              jobservice:
+                priorityClassName: platform-services
+              persistence:
+                imageChartStorage:
+                  s3:
+                    bucket: harbor-images
+                    region: r1
+                    regionendpoint: https://s3.example.com
+                persistentVolumeClaim:
+                  database:
+                    storageClass: standard
+                  redis:
+                    storageClass: standard
+              portal:
+                priorityClassName: platform-services
+              redis:
+                internal:
+                  priorityClassName: platform-services
+              registry:
+                priorityClassName: platform-services
+        repoURL: ghcr.io/neuro-inc/helm-charts/platform-compute
+        targetRevision: 1.0.0
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground

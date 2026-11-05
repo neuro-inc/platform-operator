@@ -24,6 +24,25 @@ ingress:
   hosts:
   - {{ $registryUrl.host }}
 priorityClassName: {{ include "platform.priorityClassName" . }}
+{{- if eq .Values.argocdApplications.platformRegistry.upstream "harbor" }}
+{{- if not .Values.argocdApplications.harbor.enabled }}
+{{- fail "argocdApplications.harbor.enabled is required for the harbor upstream" }}
+{{- end }}
+upstreamRegistry:
+  type: basic
+  url: http://harbor-core
+  project: {{ .Values.argocdApplications.harbor.project }}
+  basicUsername:
+    valueFrom:
+      secretKeyRef:
+        name: harbor-platform-registry
+        key: username
+  basicPassword:
+    valueFrom:
+      secretKeyRef:
+        name: harbor-platform-registry
+        key: password
+{{- end }}
 {{- with .Values.sentry }}
 sentry:
   {{- toYaml . | nindent 2 }}

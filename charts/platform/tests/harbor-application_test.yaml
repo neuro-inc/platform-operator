@@ -1,0 +1,54 @@
+suite: test harbor application
+release:
+  name: platform
+  namespace: platform
+templates:
+  - harbor-application.yaml
+values:
+  - common-values.yaml
+tests:
+  - it: should render nothing by default
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: should match snapshot when enabled
+    set:
+      argocdApplications.harbor.enabled: true
+      argocdApplications.harbor.s3:
+        endpoint: https://s3.example.com
+        region: r1
+        bucket: harbor-images
+    asserts:
+      - matchSnapshot: {}
+  - it: should fail without s3 bucket
+    set:
+      argocdApplications.harbor.enabled: true
+      argocdApplications.harbor.s3:
+        endpoint: https://s3.example.com
+        region: r1
+    asserts:
+      - failedTemplate:
+          errorMessage: argocdApplications.harbor.s3.bucket is required
+  - it: should let values override defaults
+    set:
+      argocdApplications.harbor.enabled: true
+      argocdApplications.harbor.project: other
+      argocdApplications.harbor.s3:
+        endpoint: https://s3.example.com
+        region: r1
+        bucket: harbor-images
+      argocdApplications.harbor.values:
+        harbor:
+          persistence:
+            persistentVolumeClaim:
+              database:
+                size: 20Gi
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.bootstrap.project
+          value: other
+      - equal:
+          path: spec.source.helm.valuesObject.harbor.persistence.persistentVolumeClaim.database
+          value:
+            size: 20Gi
+            storageClass: standard

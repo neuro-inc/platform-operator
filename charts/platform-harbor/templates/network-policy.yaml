@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-internal
+  labels: {{ include "platform.labels.common" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: harbor
+      release: {{ .Release.Name }}
+    matchExpressions:
+    - key: component
+      operator: In
+      values:
+      - database
+      - redis
+      - registry
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: harbor
+          release: {{ .Release.Name }}

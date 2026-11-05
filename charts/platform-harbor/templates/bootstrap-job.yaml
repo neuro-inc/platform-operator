@@ -1,0 +1,71 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-bootstrap
+  labels: {{ include "platform.labels.common" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: {{ .Values.bootstrap.backoffLimit }}
+  template:
+    metadata:
+      labels: {{ include "platform.labels.common" . | nindent 8 }}
+        service: {{ .Release.Name }}-bootstrap
+      annotations:
+        checksum/script: {{ .Files.Get "files/bootstrap.py" | sha256sum }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}-bootstrap
+      automountServiceAccountToken: true
+      restartPolicy: Never
+      {{- with .Values.bootstrap.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: bootstrap
+        image: "{{ .Values.bootstrap.image.repository }}:{{ .Values.bootstrap.image.tag }}"
+        imagePullPolicy: {{ .Values.bootstrap.image.pullPolicy }}
+        command: ["python", "/app/bootstrap.py"]
+        env:
+        - name: PYTHONDONTWRITEBYTECODE
+          value: "1"
+        - name: HARBOR_URL
+          value: http://{{ .Values.harbor.fullnameOverride }}-core
+        - name: HARBOR_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.harbor.existingSecretAdminPassword }}
+              key: {{ .Values.harbor.existingSecretAdminPasswordKey }}
+        - name: HARBOR_PROJECT
+          value: {{ required "bootstrap.project is required" .Values.bootstrap.project | quote }}
+        - name: HARBOR_USERNAME
+          value: {{ .Values.bootstrap.user.name | quote }}
+        - name: HARBOR_USER_EMAIL
+          value: {{ .Values.bootstrap.user.email | quote }}
+        - name: SECRET_NAME
+          value: {{ .Values.bootstrap.secretName | quote }}
+        - name: WAIT_SECONDS
+          value: {{ .Values.bootstrap.waitSeconds | quote }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        resources:
+          {{- toYaml .Values.bootstrap.resources | nindent 10 }}
+        volumeMounts:
+        - name: script
+          mountPath: /app
+          readOnly: true
+      volumes:
+      - name: script
+        configMap:
+          name: {{ .Release.Name }}-bootstrap

@@ -1,0 +1,10 @@
+suite: platform-harbor network policy
+release:
+  name: harbor
+  namespace: platform
+templates:
+  - templates/network-policy.yaml
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: {}

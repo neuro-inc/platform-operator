@@ -1,0 +1,104 @@
+bootstrap:
+  image:
+    repository: python
+    tag: 3.13-alpine@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a
+    pullPolicy: IfNotPresent
+  project: ""
+  user:
+    name: platform-registry
+    email: platform-registry@apolo.us
+  secretName: harbor-platform-registry
+  waitSeconds: 900
+  backoffLimit: 3
+  priorityClassName: ""
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+harbor:
+  fullnameOverride: harbor
+  existingSecretAdminPassword: harbor-secrets
+  existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+  existingSecretSecretKey: harbor-secrets
+  updateStrategy:
+    type: Recreate
+  expose:
+    tls:
+      enabled: false
+  persistence:
+    persistentVolumeClaim:
+      database:
+        size: 5Gi
+      redis:
+        size: 1Gi
+    imageChartStorage:
+      type: s3
+      disableredirect: true
+      s3:
+        existingSecret: harbor-s3
+  core:
+    existingSecret: harbor-secrets
+    secretName: harbor-secrets
+    existingXsrfSecret: harbor-secrets
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
+  jobservice:
+    existingSecret: harbor-secrets
+    jobLoggers:
+      - database
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+  registry:
+    existingSecret: harbor-secrets
+    credentials:
+      existingSecret: harbor-secrets
+    registry:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 2Gi
+    controller:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
+  portal:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 128Mi
+  trivy:
+    enabled: false
+  database:
+    internal:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 1Gi
+  redis:
+    internal:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 512Mi

@@ -10,3 +10,34 @@ tests:
   - it: should match snapshot
     asserts:
       - matchSnapshot: {}
+  - it: should leave the upstream to values by default
+    asserts:
+      - notExists:
+          path: spec.source.helm.valuesObject.upstreamRegistry
+  - it: should use harbor as the upstream
+    set:
+      argocdApplications.platformRegistry.upstream: harbor
+      argocdApplications.harbor.enabled: true
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.upstreamRegistry
+          value:
+            type: basic
+            url: http://harbor-core
+            project: neuro
+            basicUsername:
+              valueFrom:
+                secretKeyRef:
+                  name: harbor-platform-registry
+                  key: username
+            basicPassword:
+              valueFrom:
+                secretKeyRef:
+                  name: harbor-platform-registry
+                  key: password
+  - it: should fail on the harbor upstream without harbor
+    set:
+      argocdApplications.platformRegistry.upstream: harbor
+    asserts:
+      - failedTemplate:
+          errorMessage: argocdApplications.harbor.enabled is required for the harbor upstream

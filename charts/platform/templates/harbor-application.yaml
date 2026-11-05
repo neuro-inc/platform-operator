@@ -1,0 +1,52 @@
+{{- define "platform.argocd.applications.harbor.values" -}}
+{{- $cfg := .Values.argocdApplications.harbor -}}
+{{- $host := printf "harbor.%s" (include "platform.clusterDnsName" .) -}}
+{{- $priorityClassName := include "platform.priorityClassName" . -}}
+bootstrap:
+  project: {{ $cfg.project }}
+  priorityClassName: {{ $priorityClassName }}
+harbor:
+  externalURL: https://{{ $host }}
+  expose:
+    ingress:
+      {{- with .Values.defaultIngressClassName }}
+      className: {{ . }}
+      {{- end }}
+      hosts:
+        core: {{ $host }}
+  persistence:
+    {{- with .Values.defaultStorageClassName }}
+    persistentVolumeClaim:
+      database:
+        storageClass: {{ . }}
+      redis:
+        storageClass: {{ . }}
+    {{- end }}
+    imageChartStorage:
+      s3:
+        regionendpoint: {{ required "argocdApplications.harbor.s3.endpoint is required" $cfg.s3.endpoint }}
+        region: {{ required "argocdApplications.harbor.s3.region is required" $cfg.s3.region }}
+        bucket: {{ required "argocdApplications.harbor.s3.bucket is required" $cfg.s3.bucket }}
+  core:
+    priorityClassName: {{ $priorityClassName }}
+  jobservice:
+    priorityClassName: {{ $priorityClassName }}
+  registry:
+    priorityClassName: {{ $priorityClassName }}
+  portal:
+    priorityClassName: {{ $priorityClassName }}
+  database:
+    internal:
+      priorityClassName: {{ $priorityClassName }}
+  redis:
+    internal:
+      priorityClassName: {{ $priorityClassName }}
+{{- end }}
+
+{{- if .Values.argocdApplications.harbor.enabled }}
+{{- $cfg := deepCopy .Values.argocdApplications.harbor -}}
+{{- $_ := set $cfg "root" . -}}
+{{- $_ := set $cfg "targetRevision" .Chart.Version -}}
+{{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.harbor.values" . | fromYaml) -}}
+{{- include "platform.argocd.application" $cfg }}
+{{- end }}

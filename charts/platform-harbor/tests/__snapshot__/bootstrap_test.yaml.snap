@@ -1,0 +1,141 @@
+should match snapshot:
+  1: |
+    apiVersion: v1
+    automountServiceAccountToken: false
+    kind: ServiceAccount
+    metadata:
+      labels:
+        app: platform-harbor
+        chart: platform-harbor-1.0.0
+        heritage: Helm
+        release: harbor
+      name: harbor-bootstrap
+  2: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      labels:
+        app: platform-harbor
+        chart: platform-harbor-1.0.0
+        heritage: Helm
+        release: harbor
+      name: harbor-bootstrap
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - secrets
+        verbs:
+          - create
+      - apiGroups:
+          - ""
+        resourceNames:
+          - harbor-platform-registry
+        resources:
+          - secrets
+        verbs:
+          - get
+          - update
+  3: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      labels:
+        app: platform-harbor
+        chart: platform-harbor-1.0.0
+        heritage: Helm
+        release: harbor
+      name: harbor-bootstrap
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: Role
+      name: harbor-bootstrap
+    subjects:
+      - kind: ServiceAccount
+        name: harbor-bootstrap
+        namespace: platform
+  4: |
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      annotations:
+        argocd.argoproj.io/hook: PostSync
+        argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+        helm.sh/hook: post-install,post-upgrade
+        helm.sh/hook-delete-policy: before-hook-creation
+      labels:
+        app: platform-harbor
+        chart: platform-harbor-1.0.0
+        heritage: Helm
+        release: harbor
+      name: harbor-bootstrap
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          annotations:
+            checksum/script: bc6924b87312423aea12f86cc65533bfba263783cd3db5bb2409a2f29c294895
+          labels:
+            app: platform-harbor
+            chart: platform-harbor-1.0.0
+            heritage: Helm
+            release: harbor
+            service: harbor-bootstrap
+        spec:
+          automountServiceAccountToken: true
+          containers:
+            - command:
+                - python
+                - /app/bootstrap.py
+              env:
+                - name: PYTHONDONTWRITEBYTECODE
+                  value: "1"
+                - name: HARBOR_URL
+                  value: http://harbor-core
+                - name: HARBOR_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      key: HARBOR_ADMIN_PASSWORD
+                      name: harbor-secrets
+                - name: HARBOR_PROJECT
+                  value: neuro
+                - name: HARBOR_USERNAME
+                  value: platform-registry
+                - name: HARBOR_USER_EMAIL
+                  value: platform-registry@apolo.us
+                - name: SECRET_NAME
+                  value: harbor-platform-registry
+                - name: WAIT_SECONDS
+                  value: "900"
+              image: python:3.13-alpine@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a
+              imagePullPolicy: IfNotPresent
+              name: bootstrap
+              resources:
+                limits:
+                  memory: 128Mi
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - mountPath: /app
+                  name: script
+                  readOnly: true
+          priorityClassName: platform-services
+          restartPolicy: Never
+          securityContext:
+            runAsGroup: 65534
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          serviceAccountName: harbor-bootstrap
+          volumes:
+            - configMap:
+                name: harbor-bootstrap
+              name: script
