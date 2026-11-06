@@ -62,3 +62,24 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: harbor.persistence.imageChartStorage.s3.existingSecret is required
+  - it: should read the robot credentials from harbor-platform-registry
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ROBOT_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: harbor-platform-registry
+                key: username
+                optional: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ROBOT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: harbor-platform-registry
+                key: password
+                optional: true

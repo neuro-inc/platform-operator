@@ -94,3 +94,14 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: argocdApplications.platformRegistry.upstream must be dockerRegistry or harbor
+  - it: should read the harbor robot credentials from harbor-platform-registry
+    set:
+      argocdApplications.platformRegistry.upstream: harbor
+      argocdApplications.harbor.enabled: true
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.upstreamRegistry.basicUsername.valueFrom.secretKeyRef.name
+          value: harbor-platform-registry
+      - equal:
+          path: spec.source.helm.valuesObject.upstreamRegistry.basicPassword.valueFrom.secretKeyRef.name
+          value: harbor-platform-registry

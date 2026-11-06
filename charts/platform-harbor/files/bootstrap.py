@@ -14,6 +14,7 @@ PROJECT = os.environ["HARBOR_PROJECT"]
 CREDENTIALS_SECRET = os.environ["CREDENTIALS_SECRET"]
 S3_SECRET = os.environ["S3_SECRET"]
 WAIT_SECONDS = int(os.environ.get("WAIT_SECONDS", "900"))
+ROBOT_PREFIX = "robot$"
 REQUIRED = {
     "ROBOT_USERNAME": (CREDENTIALS_SECRET, "username"),
     "ROBOT_SECRET": (CREDENTIALS_SECRET, "password"),
@@ -68,7 +69,14 @@ def check_secrets():
     missing = [f"{secret}/{key}" for env, (secret, key) in REQUIRED.items() if not os.environ.get(env)]
     if missing:
         fail(f"missing or empty secret keys: {', '.join(missing)}")
+    username = os.environ["ROBOT_USERNAME"]
+    if not username.startswith(ROBOT_PREFIX) or username == ROBOT_PREFIX:
+        fail(f"{CREDENTIALS_SECRET}/username must be a robot name starting with {ROBOT_PREFIX}, got {username}")
+    secret = os.environ["ROBOT_SECRET"]
+    if not (8 <= len(secret) <= 128 and any(c.islower() for c in secret) and any(c.isupper() for c in secret) and any(c.isdigit() for c in secret)):
+        fail(f"{CREDENTIALS_SECRET}/password must be 8-128 characters with an upper case letter, a lower case letter and a digit")
     log(f"secrets {CREDENTIALS_SECRET} and {S3_SECRET} have the required keys")
+    return username[len(ROBOT_PREFIX) :], username, secret
 
 
 def wait_for_harbor():
@@ -91,12 +99,13 @@ def ensure_configuration():
     status, body = harbor("GET", "/configurations")
     if status != 200:
         fail(f"reading configurations failed: {status} {body}")
+    if body["robot_name_prefix"]["value"] != ROBOT_PREFIX:
+        fail(f"harbor robot_name_prefix is {body['robot_name_prefix']['value']}, expected {ROBOT_PREFIX}")
     if body["project_creation_restriction"]["value"] != "adminonly":
         status, response = harbor("PUT", "/configurations", {"project_creation_restriction": "adminonly"})
         if status != 200:
             fail(f"restricting project creation failed: {status} {response}")
         log("project creation restricted to admins")
-    return body["robot_name_prefix"]["value"]
 
 
 def ensure_project():
@@ -125,10 +134,7 @@ def find_robot(name, username):
     return next((r for r in body if r["name"] == username and r["level"] == "system"), None)
 
 
-def ensure_robot(prefix, username, password):
-    if not username.startswith(prefix) or username == prefix:
-        fail(f"{CREDENTIALS_SECRET}/username must be a robot name starting with {prefix}, got {username}")
-    name = username[len(prefix) :]
+def ensure_robot(name, username, password):
     robot = find_robot(name, username)
     if robot is None:
         status, body = harbor(
@@ -172,11 +178,11 @@ def ensure_robot(prefix, username, password):
 
 
 def main():
-    check_secrets()
+    robot = check_secrets()
     wait_for_harbor()
-    prefix = ensure_configuration()
+    ensure_configuration()
     ensure_project()
-    ensure_robot(prefix, os.environ["ROBOT_USERNAME"], os.environ["ROBOT_SECRET"])
+    ensure_robot(*robot)
     log("bootstrap finished")
 
 

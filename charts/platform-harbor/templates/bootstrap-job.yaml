@@ -46,17 +46,17 @@ spec:
         - name: HARBOR_PROJECT
           value: {{ required "bootstrap.project is required" .Values.bootstrap.project | quote }}
         - name: CREDENTIALS_SECRET
-          value: {{ .Values.bootstrap.credentialsSecret | quote }}
+          value: harbor-platform-registry
         - name: ROBOT_USERNAME
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.bootstrap.credentialsSecret }}
+              name: harbor-platform-registry
               key: username
               optional: true
         - name: ROBOT_SECRET
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.bootstrap.credentialsSecret }}
+              name: harbor-platform-registry
               key: password
               optional: true
         {{- with required "harbor.persistence.imageChartStorage.s3.existingSecret is required" .Values.harbor.persistence.imageChartStorage.s3.existingSecret }}
