@@ -25,3 +25,8 @@ chart: {{ include "platform.chart" . }}
 heritage: {{ .Release.Service | quote }}
 release: {{ .Release.Name | quote }}
 {{- end -}}
+
+{{- define "platform.harbor.matchLabels" -}}
+release: {{ .Release.Name }}
+app: {{ default "harbor" .Values.harbor.nameOverride | quote }}
+{{- end -}}

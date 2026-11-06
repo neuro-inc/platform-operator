@@ -5,15 +5,12 @@ release:
 templates:
   - templates/bootstrap-configmap.yaml
   - templates/bootstrap-job.yaml
-  - templates/bootstrap-rbac.yaml
 tests:
   - it: should match snapshot
     set:
       bootstrap.project: neuro
       bootstrap.priorityClassName: platform-services
     asserts:
-      - matchSnapshot: {}
-        template: templates/bootstrap-rbac.yaml
       - matchSnapshot: {}
         template: templates/bootstrap-job.yaml
   - it: should run after sync
@@ -35,7 +32,17 @@ tests:
       - matchRegex:
           path: data["bootstrap.py"]
           pattern: def ensure_project
+  - it: should default to the neuro project
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_PROJECT
+            value: neuro
   - it: should fail without project
+    set:
+      bootstrap.project: ""
     template: templates/bootstrap-job.yaml
     asserts:
       - failedTemplate:
@@ -48,3 +55,10 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: harbor.fullnameOverride is required
+  - it: should fail without the s3 secret
+    set:
+      harbor.persistence.imageChartStorage.s3.existingSecret: ""
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: harbor.persistence.imageChartStorage.s3.existingSecret is required

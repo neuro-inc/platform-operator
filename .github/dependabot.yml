@@ -13,3 +13,18 @@ updates:
     interval: daily
     time: "03:00"
   open-pull-requests-limit: 10
+- package-ecosystem: helm
+  directory: "/charts/platform-harbor"
+  schedule:
+    interval: weekly
+  open-pull-requests-limit: 10
+  groups:
+    harbor:
+      patterns:
+      - "harbor"
+      - "goharbor/*"
+  ignore:
+  - dependency-name: "harbor"
+    update-types: ["version-update:semver-major", "version-update:semver-minor"]
+  - dependency-name: "goharbor/*"
+    update-types: ["version-update:semver-major", "version-update:semver-minor"]

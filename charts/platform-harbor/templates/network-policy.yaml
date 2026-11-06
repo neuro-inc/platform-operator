@@ -5,9 +5,7 @@ metadata:
   labels: {{ include "platform.labels.common" . | nindent 4 }}
 spec:
   podSelector:
-    matchLabels:
-      app: harbor
-      release: {{ .Release.Name }}
+    matchLabels: {{ include "platform.harbor.matchLabels" . | nindent 6 }}
     matchExpressions:
     - key: component
       operator: In
@@ -20,6 +18,27 @@ spec:
   ingress:
   - from:
     - podSelector:
+        matchLabels: {{ include "platform.harbor.matchLabels" . | nindent 10 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-core
+  labels: {{ include "platform.labels.common" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{ include "platform.harbor.matchLabels" . | nindent 6 }}
+      component: core
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels: {{ include "platform.harbor.matchLabels" . | nindent 10 }}
+    - podSelector:
         matchLabels:
-          app: harbor
-          release: {{ .Release.Name }}
+          service: {{ .Release.Name }}-bootstrap
+    {{- range .Values.networkPolicy.coreClients }}
+    - podSelector:
+        matchLabels: {{ toYaml . | nindent 10 }}
+    {{- end }}

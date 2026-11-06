@@ -8,3 +8,16 @@ tests:
   - it: should match snapshot
     asserts:
       - matchSnapshot: {}
+  - it: should allow the configured core clients
+    set:
+      networkPolicy.coreClients:
+        - service: platform-registry
+        - app: other
+    documentIndex: 1
+    asserts:
+      - contains:
+          path: spec.ingress[0].from
+          content:
+            podSelector:
+              matchLabels:
+                app: other

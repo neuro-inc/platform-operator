@@ -1,60 +1,5 @@
 should match snapshot:
   1: |
-    apiVersion: v1
-    automountServiceAccountToken: false
-    kind: ServiceAccount
-    metadata:
-      labels:
-        app: platform-harbor
-        chart: platform-harbor-1.0.0
-        heritage: Helm
-        release: harbor
-      name: harbor-bootstrap
-  2: |
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: Role
-    metadata:
-      labels:
-        app: platform-harbor
-        chart: platform-harbor-1.0.0
-        heritage: Helm
-        release: harbor
-      name: harbor-bootstrap
-    rules:
-      - apiGroups:
-          - ""
-        resources:
-          - secrets
-        verbs:
-          - create
-      - apiGroups:
-          - ""
-        resourceNames:
-          - harbor-platform-registry
-        resources:
-          - secrets
-        verbs:
-          - get
-          - update
-  3: |
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: RoleBinding
-    metadata:
-      labels:
-        app: platform-harbor
-        chart: platform-harbor-1.0.0
-        heritage: Helm
-        release: harbor
-      name: harbor-bootstrap
-    roleRef:
-      apiGroup: rbac.authorization.k8s.io
-      kind: Role
-      name: harbor-bootstrap
-    subjects:
-      - kind: ServiceAccount
-        name: harbor-bootstrap
-        namespace: platform
-  4: |
     apiVersion: batch/v1
     kind: Job
     metadata:
@@ -74,7 +19,7 @@ should match snapshot:
       template:
         metadata:
           annotations:
-            checksum/script: 4c4849012f2f91f4f3b2df0d55c1c093ba122308fe3d29f22291dcbc383a83ff
+            checksum/script: 5d0054d75c20cfbc820fc0f86ce466117b1a45ca948a5a8b83fef6637940ca21
           labels:
             app: platform-harbor
             chart: platform-harbor-1.0.0
@@ -82,7 +27,7 @@ should match snapshot:
             release: harbor
             service: harbor-bootstrap
         spec:
-          automountServiceAccountToken: true
+          automountServiceAccountToken: false
           containers:
             - command:
                 - python
@@ -99,10 +44,34 @@ should match snapshot:
                       name: harbor-secrets
                 - name: HARBOR_PROJECT
                   value: neuro
-                - name: HARBOR_ROBOT
-                  value: platform-registry
-                - name: SECRET_NAME
+                - name: CREDENTIALS_SECRET
                   value: harbor-platform-registry
+                - name: ROBOT_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      key: username
+                      name: harbor-platform-registry
+                      optional: true
+                - name: ROBOT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      key: password
+                      name: harbor-platform-registry
+                      optional: true
+                - name: S3_SECRET
+                  value: harbor-s3
+                - name: S3_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      key: REGISTRY_STORAGE_S3_ACCESSKEY
+                      name: harbor-s3
+                      optional: true
+                - name: S3_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      key: REGISTRY_STORAGE_S3_SECRETKEY
+                      name: harbor-s3
+                      optional: true
                 - name: WAIT_SECONDS
                   value: "900"
               image: python:3.13-alpine@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a
@@ -110,6 +79,7 @@ should match snapshot:
               name: bootstrap
               resources:
                 limits:
+                  cpu: 500m
                   memory: 128Mi
                 requests:
                   cpu: 10m
@@ -132,7 +102,6 @@ should match snapshot:
             runAsUser: 65534
             seccompProfile:
               type: RuntimeDefault
-          serviceAccountName: harbor-bootstrap
           volumes:
             - configMap:
                 name: harbor-bootstrap

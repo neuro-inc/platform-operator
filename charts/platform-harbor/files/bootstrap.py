@@ -1,9 +1,6 @@
 import base64
 import json
 import os
-import secrets
-import ssl
-import string
 import sys
 import time
 import urllib.error
@@ -14,11 +11,15 @@ HARBOR_URL = os.environ["HARBOR_URL"].rstrip("/")
 API_URL = f"{HARBOR_URL}/api/v2.0"
 ADMIN = ("admin", os.environ["HARBOR_ADMIN_PASSWORD"])
 PROJECT = os.environ["HARBOR_PROJECT"]
-ROBOT = os.environ["HARBOR_ROBOT"]
-SECRET_NAME = os.environ["SECRET_NAME"]
+CREDENTIALS_SECRET = os.environ["CREDENTIALS_SECRET"]
+S3_SECRET = os.environ["S3_SECRET"]
 WAIT_SECONDS = int(os.environ.get("WAIT_SECONDS", "900"))
-SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount"
-K8S_URL = "https://kubernetes.default.svc"
+REQUIRED = {
+    "ROBOT_USERNAME": (CREDENTIALS_SECRET, "username"),
+    "ROBOT_SECRET": (CREDENTIALS_SECRET, "password"),
+    "S3_ACCESS_KEY": (S3_SECRET, "REGISTRY_STORAGE_S3_ACCESSKEY"),
+    "S3_SECRET_KEY": (S3_SECRET, "REGISTRY_STORAGE_S3_SECRETKEY"),
+}
 PERMISSIONS = [
     {"kind": "system", "namespace": "/", "access": [{"resource": "catalog", "action": "read"}]},
     {
@@ -39,13 +40,13 @@ def fail(message):
     sys.exit(1)
 
 
-def call(url, method="GET", body=None, headers=None, context=None):
+def call(url, method="GET", body=None, headers=None):
     data = None if body is None else json.dumps(body).encode()
     request = urllib.request.Request(
         url, data=data, method=method, headers={"Content-Type": "application/json", **(headers or {})}
     )
     try:
-        with urllib.request.urlopen(request, timeout=30, context=context) as response:
+        with urllib.request.urlopen(request, timeout=30) as response:
             status, payload = response.status, response.read()
     except urllib.error.HTTPError as error:
         status, payload = error.code, error.read()
@@ -63,11 +64,11 @@ def harbor(method, path, body=None):
     return call(f"{API_URL}{path}", method, body, basic(*ADMIN))
 
 
-def kube(method, path, body=None):
-    with open(f"{SA_DIR}/token") as f:
-        token = f.read().strip()
-    context = ssl.create_default_context(cafile=f"{SA_DIR}/ca.crt")
-    return call(f"{K8S_URL}{path}", method, body, {"Authorization": f"Bearer {token}"}, context)
+def check_secrets():
+    missing = [f"{secret}/{key}" for env, (secret, key) in REQUIRED.items() if not os.environ.get(env)]
+    if missing:
+        fail(f"missing or empty secret keys: {', '.join(missing)}")
+    log(f"secrets {CREDENTIALS_SECRET} and {S3_SECRET} have the required keys")
 
 
 def wait_for_harbor():
@@ -111,64 +112,30 @@ def ensure_project():
     log(f"project {PROJECT} created")
 
 
-def new_password():
-    alphabet = string.ascii_letters + string.digits
-    while True:
-        password = "".join(secrets.choice(alphabet) for _ in range(32))
-        if any(c.islower() for c in password) and any(c.isupper() for c in password) and any(c.isdigit() for c in password):
-            return password
-
-
-def ensure_secret(username):
-    with open(f"{SA_DIR}/namespace") as f:
-        path = f"/api/v1/namespaces/{f.read().strip()}/secrets"
-    status, body = kube("GET", f"{path}/{SECRET_NAME}")
-    if status == 200:
-        data = body.get("data") or {}
-        if data.get("password") and base64.b64decode(data.get("username", "")).decode() == username:
-            log(f"secret {SECRET_NAME} exists")
-            return base64.b64decode(data["password"]).decode()
-    elif status != 404:
-        fail(f"reading secret {SECRET_NAME} failed: {status} {body}")
-    password = new_password()
-    secret = {
-        "apiVersion": "v1",
-        "kind": "Secret",
-        "metadata": {"name": SECRET_NAME},
-        "type": "Opaque",
-        "stringData": {"username": username, "password": password},
-    }
-    if status == 200:
-        status, body = kube("PUT", f"{path}/{SECRET_NAME}", secret)
-    else:
-        status, body = kube("POST", path, secret)
-    if status not in (200, 201):
-        fail(f"writing secret {SECRET_NAME} failed: {status} {body}")
-    log(f"secret {SECRET_NAME} written")
-    return password
-
-
 def normalized(permissions):
     return sorted(
         (p["kind"], p["namespace"], sorted((a["resource"], a["action"]) for a in p["access"])) for p in permissions
     )
 
 
-def find_robot(username):
-    status, body = harbor("GET", f"/robots?q={urllib.parse.quote(f'name={ROBOT}')}&page_size=100")
+def find_robot(name, username):
+    status, body = harbor("GET", f"/robots?q={urllib.parse.quote(f'name={name}')}&page_size=100")
     if status != 200:
         fail(f"listing robots failed: {status} {body}")
     return next((r for r in body if r["name"] == username and r["level"] == "system"), None)
 
 
-def ensure_robot(username, password):
-    robot = find_robot(username)
+def ensure_robot(prefix, username, password):
+    if not username.startswith(prefix) or username == prefix:
+        fail(f"{CREDENTIALS_SECRET}/username must be a robot name starting with {prefix}, got {username}")
+    name = username[len(prefix) :]
+    robot = find_robot(name, username)
     if robot is None:
         status, body = harbor(
             "POST",
             "/robots",
             {
-                "name": ROBOT,
+                "name": name,
                 "description": "platform-registry upstream",
                 "level": "system",
                 "permissions": PERMISSIONS,
@@ -205,10 +172,11 @@ def ensure_robot(username, password):
 
 
 def main():
+    check_secrets()
     wait_for_harbor()
-    username = ensure_configuration() + ROBOT
+    prefix = ensure_configuration()
     ensure_project()
-    ensure_robot(username, ensure_secret(username))
+    ensure_robot(prefix, os.environ["ROBOT_USERNAME"], os.environ["ROBOT_SECRET"])
     log("bootstrap finished")
 
 
