@@ -7,6 +7,12 @@ templates:
 values:
   - common-values.yaml
 tests:
+  - it: should render nothing by default
+    asserts:
+      - hasDocuments:
+          count: 0
   - it: should match snapshot
+    set:
+      argocdApplications.dockerRegistry.enabled: true
     asserts:
       - matchSnapshot: {}

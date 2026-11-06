@@ -1,0 +1,61 @@
+should match snapshot:
+  1: |
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      labels:
+        app: platform-harbor
+        chart: platform-harbor-1.0.0
+        heritage: Helm
+        release: harbor
+      name: harbor-internal
+    spec:
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  app: harbor
+                  release: harbor
+      podSelector:
+        matchExpressions:
+          - key: component
+            operator: In
+            values:
+              - database
+              - redis
+              - registry
+        matchLabels:
+          app: harbor
+          release: harbor
+      policyTypes:
+        - Ingress
+  2: |
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      labels:
+        app: platform-harbor
+        chart: platform-harbor-1.0.0
+        heritage: Helm
+        release: harbor
+      name: harbor-core
+    spec:
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  app: harbor
+                  release: harbor
+            - podSelector:
+                matchLabels:
+                  service: harbor-bootstrap
+            - podSelector:
+                matchLabels:
+                  service: platform-registry
+      podSelector:
+        matchLabels:
+          app: harbor
+          component: core
+          release: harbor
+      policyTypes:
+        - Ingress
