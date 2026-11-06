@@ -33,6 +33,7 @@ upstreamRegistry:
   type: basic
   url: http://harbor-core
   project: {{ .Values.argocdApplications.harbor.project }}
+  maxCatalogEntries: 10000
   basicUsername:
     valueFrom:
       secretKeyRef:

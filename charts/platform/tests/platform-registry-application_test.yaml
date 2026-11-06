@@ -18,6 +18,7 @@ tests:
             type: basic
             url: http://harbor-core
             project: neuro
+            maxCatalogEntries: 10000
             basicUsername:
               valueFrom:
                 secretKeyRef:
@@ -51,7 +52,7 @@ tests:
     set:
       argocdApplications.platformRegistry.values:
         upstreamRegistry:
-          maxCatalogEntries: 10000
+          maxCatalogEntries: 500
     asserts:
       - equal:
           path: spec.source.helm.valuesObject.upstreamRegistry
@@ -59,7 +60,7 @@ tests:
             type: basic
             url: http://harbor-core
             project: neuro
-            maxCatalogEntries: 10000
+            maxCatalogEntries: 500
             basicUsername:
               valueFrom:
                 secretKeyRef:
