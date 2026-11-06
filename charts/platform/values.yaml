@@ -104,7 +104,7 @@ argocdApplications:
     values: {}
 
   dockerRegistry:
-    enabled: true
+    enabled: false
     repoURL: https://neuro-inc.github.io/helm-charts
     chart: docker-registry
     name: docker-registry
@@ -112,7 +112,7 @@ argocdApplications:
     values: {}
 
   harbor:
-    enabled: false
+    enabled: true
     repoURL: ghcr.io/neuro-inc/helm-charts/platform-compute
     chart: platform-harbor
     name: harbor
@@ -256,7 +256,7 @@ argocdApplications:
     chart: platform-registry
     name: platform-registry
     targetRevision: "*"
-    upstream: dockerRegistry
+    upstream: harbor
     values: {}
 
   platformMonitoring:

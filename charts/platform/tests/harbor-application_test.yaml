@@ -7,7 +7,13 @@ templates:
 values:
   - common-values.yaml
 tests:
-  - it: should render nothing by default
+  - it: should require s3 by default
+    asserts:
+      - failedTemplate:
+          errorMessage: argocdApplications.harbor.s3.endpoint is required
+  - it: should render nothing when disabled
+    set:
+      argocdApplications.harbor.enabled: false
     asserts:
       - hasDocuments:
           count: 0

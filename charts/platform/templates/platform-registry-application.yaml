@@ -28,22 +28,22 @@ priorityClassName: {{ include "platform.priorityClassName" . }}
 sentry:
   {{- toYaml . | nindent 2 }}
 {{- end }}
+{{- if eq .Values.argocdApplications.platformRegistry.upstream "harbor" }}
+upstreamRegistry:
+  type: basic
+  url: http://harbor-core
+  project: {{ .Values.argocdApplications.harbor.project }}
+  basicUsername:
+    valueFrom:
+      secretKeyRef:
+        name: harbor-platform-registry
+        key: username
+  basicPassword:
+    valueFrom:
+      secretKeyRef:
+        name: harbor-platform-registry
+        key: password
 {{- end }}
-
-{{- define "platform.argocd.applications.platformRegistry.harborUpstream" -}}
-type: basic
-url: http://harbor-core
-project: {{ .Values.argocdApplications.harbor.project }}
-basicUsername:
-  valueFrom:
-    secretKeyRef:
-      name: harbor-platform-registry
-      key: username
-basicPassword:
-  valueFrom:
-    secretKeyRef:
-      name: harbor-platform-registry
-      key: password
 {{- end }}
 
 {{- if .Values.argocdApplications.platformRegistry.enabled }}
@@ -51,17 +51,8 @@ basicPassword:
 {{- if not (has $cfg.upstream (list "dockerRegistry" "harbor")) }}
 {{- fail "argocdApplications.platformRegistry.upstream must be dockerRegistry or harbor" }}
 {{- end }}
-{{- if eq $cfg.upstream "harbor" }}
-{{- if not .Values.argocdApplications.harbor.enabled }}
+{{- if and (eq $cfg.upstream "harbor") (not .Values.argocdApplications.harbor.enabled) }}
 {{- fail "argocdApplications.harbor.enabled is required for the harbor upstream" }}
-{{- end }}
-{{- $values := default dict $cfg.values -}}
-{{- $upstream := default dict $values.upstreamRegistry -}}
-{{- range $k, $v := include "platform.argocd.applications.platformRegistry.harborUpstream" . | fromYaml }}
-{{- $_ := set $upstream $k $v -}}
-{{- end }}
-{{- $_ := set $values "upstreamRegistry" $upstream -}}
-{{- $_ := set $cfg "values" $values -}}
 {{- end }}
 {{- $_ := set $cfg "root" . -}}
 {{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.platformRegistry.values" . | fromYaml) -}}

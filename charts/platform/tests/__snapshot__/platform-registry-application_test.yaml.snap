@@ -47,6 +47,20 @@ should match snapshot:
               annotations:
                 traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
                 traefik.ingress.kubernetes.io/service.sticky.cookie.name: NEURO_REGISTRYAPI_SESSION
+            upstreamRegistry:
+              basicPassword:
+                valueFrom:
+                  secretKeyRef:
+                    key: password
+                    name: harbor-platform-registry
+              basicUsername:
+                valueFrom:
+                  secretKeyRef:
+                    key: username
+                    name: harbor-platform-registry
+              project: neuro
+              type: basic
+              url: http://harbor-core
         repoURL: ghcr.io/neuro-inc/helm-charts
         targetRevision: '*'
       syncPolicy:
