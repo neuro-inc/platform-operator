@@ -1,0 +1,108 @@
+should match snapshot:
+  1: |
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      annotations:
+        argocd.argoproj.io/hook: PostSync
+        argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+        helm.sh/hook: post-install,post-upgrade
+        helm.sh/hook-delete-policy: before-hook-creation
+      labels:
+        app: platform-harbor
+        chart: platform-harbor-1.0.0
+        heritage: Helm
+        release: harbor
+      name: harbor-bootstrap
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          annotations:
+            checksum/script: 94acd655a166e9b1a70f89b72622fb733e5ca0ce7cd23e51072e745af5d45109
+          labels:
+            app: platform-harbor
+            chart: platform-harbor-1.0.0
+            heritage: Helm
+            release: harbor
+            service: harbor-bootstrap
+        spec:
+          automountServiceAccountToken: false
+          containers:
+            - command:
+                - python
+                - /app/bootstrap.py
+              env:
+                - name: PYTHONDONTWRITEBYTECODE
+                  value: "1"
+                - name: HARBOR_URL
+                  value: http://harbor-core
+                - name: HARBOR_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      key: HARBOR_ADMIN_PASSWORD
+                      name: harbor-secrets
+                - name: HARBOR_PROJECT
+                  value: neuro
+                - name: CREDENTIALS_SECRET
+                  value: harbor-platform-registry
+                - name: ROBOT_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      key: username
+                      name: harbor-platform-registry
+                      optional: true
+                - name: ROBOT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      key: password
+                      name: harbor-platform-registry
+                      optional: true
+                - name: S3_SECRET
+                  value: harbor-s3
+                - name: S3_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      key: REGISTRY_STORAGE_S3_ACCESSKEY
+                      name: harbor-s3
+                      optional: true
+                - name: S3_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      key: REGISTRY_STORAGE_S3_SECRETKEY
+                      name: harbor-s3
+                      optional: true
+                - name: WAIT_SECONDS
+                  value: "900"
+              image: python:3.13-alpine@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a
+              imagePullPolicy: IfNotPresent
+              name: bootstrap
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 128Mi
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - mountPath: /app
+                  name: script
+                  readOnly: true
+          priorityClassName: platform-services
+          restartPolicy: Never
+          securityContext:
+            runAsGroup: 65534
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          volumes:
+            - configMap:
+                name: harbor-bootstrap
+              name: script

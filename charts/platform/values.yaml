@@ -104,11 +104,23 @@ argocdApplications:
     values: {}
 
   dockerRegistry:
-    enabled: true
+    enabled: false
     repoURL: https://neuro-inc.github.io/helm-charts
     chart: docker-registry
     name: docker-registry
     targetRevision: "1.0.0"
+    values: {}
+
+  harbor:
+    enabled: true
+    repoURL: ghcr.io/neuro-inc/helm-charts/platform-compute
+    chart: platform-harbor
+    name: harbor
+    project: neuro
+    s3:
+      endpoint: ""
+      region: ""
+      bucket: ""
     values: {}
 
   bucketUsage:
@@ -244,6 +256,7 @@ argocdApplications:
     chart: platform-registry
     name: platform-registry
     targetRevision: "*"
+    upstream: harbor
     values: {}
 
   platformMonitoring:

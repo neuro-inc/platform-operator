@@ -1,0 +1,85 @@
+suite: platform-harbor bootstrap
+release:
+  name: harbor
+  namespace: platform
+templates:
+  - templates/bootstrap-configmap.yaml
+  - templates/bootstrap-job.yaml
+tests:
+  - it: should match snapshot
+    set:
+      bootstrap.project: neuro
+      bootstrap.priorityClassName: platform-services
+    asserts:
+      - matchSnapshot: {}
+        template: templates/bootstrap-job.yaml
+  - it: should run after sync
+    set:
+      bootstrap.project: neuro
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: PostSync
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-install,post-upgrade
+  - it: should ship the script
+    set:
+      bootstrap.project: neuro
+    template: templates/bootstrap-configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["bootstrap.py"]
+          pattern: def ensure_project
+  - it: should default to the neuro project
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_PROJECT
+            value: neuro
+  - it: should fail without project
+    set:
+      bootstrap.project: ""
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: bootstrap.project is required
+  - it: should fail without the harbor name
+    set:
+      bootstrap.project: neuro
+      harbor.fullnameOverride: ""
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: harbor.fullnameOverride is required
+  - it: should fail without the s3 secret
+    set:
+      harbor.persistence.imageChartStorage.s3.existingSecret: ""
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: harbor.persistence.imageChartStorage.s3.existingSecret is required
+  - it: should read the robot credentials from harbor-platform-registry
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ROBOT_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: harbor-platform-registry
+                key: username
+                optional: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ROBOT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: harbor-platform-registry
+                key: password
+                optional: true

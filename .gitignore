@@ -138,3 +138,4 @@ requirements.txt
 
 # Debug data of helm unittest plugin
 .debug/
+charts/*/charts/

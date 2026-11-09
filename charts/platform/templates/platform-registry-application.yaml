@@ -28,10 +28,33 @@ priorityClassName: {{ include "platform.priorityClassName" . }}
 sentry:
   {{- toYaml . | nindent 2 }}
 {{- end }}
+{{- if eq .Values.argocdApplications.platformRegistry.upstream "harbor" }}
+upstreamRegistry:
+  type: basic
+  url: http://harbor-core
+  project: {{ .Values.argocdApplications.harbor.project }}
+  maxCatalogEntries: 10000
+  basicUsername:
+    valueFrom:
+      secretKeyRef:
+        name: harbor-platform-registry
+        key: username
+  basicPassword:
+    valueFrom:
+      secretKeyRef:
+        name: harbor-platform-registry
+        key: password
+{{- end }}
 {{- end }}
 
 {{- if .Values.argocdApplications.platformRegistry.enabled }}
 {{- $cfg := deepCopy .Values.argocdApplications.platformRegistry -}}
+{{- if not (has $cfg.upstream (list "dockerRegistry" "harbor")) }}
+{{- fail "argocdApplications.platformRegistry.upstream must be dockerRegistry or harbor" }}
+{{- end }}
+{{- if and (eq $cfg.upstream "harbor") (not .Values.argocdApplications.harbor.enabled) }}
+{{- fail "argocdApplications.harbor.enabled is required for the harbor upstream" }}
+{{- end }}
 {{- $_ := set $cfg "root" . -}}
 {{- $_ := set $cfg "defaultValues" (include "platform.argocd.applications.platformRegistry.values" . | fromYaml) -}}
 {{- include "platform.argocd.application" $cfg }}

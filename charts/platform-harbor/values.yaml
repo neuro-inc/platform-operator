@@ -1,0 +1,171 @@
+bootstrap:
+  image:
+    repository: python
+    tag: 3.13-alpine@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a
+    pullPolicy: IfNotPresent
+  project: neuro
+  waitSeconds: 900
+  backoffLimit: 3
+  priorityClassName: ""
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 500m
+      memory: 128Mi
+
+networkPolicy:
+  coreClients:
+    - service: platform-registry
+
+harbor:
+  fullnameOverride: harbor
+  externalURL: http://harbor-core
+  existingSecretAdminPassword: harbor-secrets
+  existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+  existingSecretSecretKey: harbor-secrets
+  expose:
+    type: clusterIP
+    tls:
+      enabled: false
+  persistence:
+    persistentVolumeClaim:
+      database:
+        size: 5Gi
+      redis:
+        size: 1Gi
+    imageChartStorage:
+      type: s3
+      disableredirect: true
+      s3:
+        existingSecret: harbor-s3
+  core:
+    replicas: 2
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+    image:
+      repository: goharbor/harbor-core
+      tag: v2.14.6
+    existingSecret: harbor-secrets
+    secretName: harbor-secrets
+    existingXsrfSecret: harbor-secrets
+    extraEnvVars:
+      - name: POSTGRESQL_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: harbor-secrets
+            key: DATABASE_PASSWORD
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 2
+        memory: 1Gi
+  jobservice:
+    replicas: 2
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+    image:
+      repository: goharbor/harbor-jobservice
+      tag: v2.14.6
+    existingSecret: harbor-secrets
+    jobLoggers:
+      - stdout
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 1
+        memory: 512Mi
+  registry:
+    replicas: 2
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+    existingSecret: harbor-secrets
+    credentials:
+      existingSecret: harbor-secrets
+    registry:
+      image:
+        repository: goharbor/registry-photon
+        tag: v2.14.6
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 2
+          memory: 2Gi
+    controller:
+      image:
+        repository: goharbor/harbor-registryctl
+        tag: v2.14.6
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
+  nginx:
+    image:
+      repository: goharbor/nginx-photon
+      tag: v2.14.6
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 500m
+        memory: 128Mi
+  portal:
+    image:
+      repository: goharbor/harbor-portal
+      tag: v2.14.6
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 250m
+        memory: 128Mi
+  trivy:
+    enabled: false
+  database:
+    internal:
+      image:
+        repository: goharbor/harbor-db
+        tag: v2.14.6
+      extraEnvVars:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: harbor-secrets
+              key: DATABASE_PASSWORD
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 1
+          memory: 1Gi
+  redis:
+    internal:
+      image:
+        repository: goharbor/redis-photon
+        tag: v2.14.6
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi

@@ -1,0 +1,9 @@
+apiVersion: v2
+name: platform-harbor
+description: Apolo platform Harbor registry
+version: 1.0.0
+appVersion: 1.0.0
+dependencies:
+  - name: harbor
+    version: "1.18.4"
+    repository: https://helm.goharbor.io
