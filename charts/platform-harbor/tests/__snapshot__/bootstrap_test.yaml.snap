@@ -19,7 +19,7 @@ should match snapshot:
       template:
         metadata:
           annotations:
-            checksum/script: 94acd655a166e9b1a70f89b72622fb733e5ca0ce7cd23e51072e745af5d45109
+            checksum/script: 2be183a482121fdd32924c757be749b5a4640379b64c8cfd1d7e56922f8790f6
           labels:
             app: platform-harbor
             chart: platform-harbor-1.0.0
@@ -74,6 +74,10 @@ should match snapshot:
                       optional: true
                 - name: WAIT_SECONDS
                   value: "900"
+                - name: RETENTION
+                  value: '{"enabled":false,"rules":[],"schedule":"0 0 1 * * 6"}'
+                - name: GC
+                  value: '{"deleteUntagged":true,"enabled":false,"schedule":"0 0 3 * * 0","workers":1}'
               image: python:3.13-alpine@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a
               imagePullPolicy: IfNotPresent
               name: bootstrap

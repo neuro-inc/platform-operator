@@ -77,6 +77,25 @@ spec:
         {{- end }}
         - name: WAIT_SECONDS
           value: {{ .Values.bootstrap.waitSeconds | quote }}
+        {{- if and .Values.bootstrap.retention.enabled (empty .Values.bootstrap.retention.rules) }}
+        {{- fail "bootstrap.retention.rules is required when retention is enabled" }}
+        {{- end }}
+        {{- range $i, $rule := .Values.bootstrap.retention.rules }}
+        {{- $value := toString $rule.value }}
+        {{- if eq $rule.template "always" }}
+        {{- if hasKey $rule "value" }}
+        {{- fail (printf "bootstrap.retention.rules[%d]: template always takes no value" $i) }}
+        {{- end }}
+        {{- else if or (kindIs "string" $rule.value) (kindIs "bool" $rule.value) (not (regexMatch "^[1-9][0-9]*$" $value)) }}
+        {{- fail (printf "bootstrap.retention.rules[%d]: value must be a positive integer, got %v" $i $rule.value) }}
+        {{- else if and (hasPrefix "nDays" (toString $rule.template)) (gt (int64 $rule.value) 36500) }}
+        {{- fail (printf "bootstrap.retention.rules[%d]: %s allows at most 36500 days, got %v" $i $rule.template $rule.value) }}
+        {{- end }}
+        {{- end }}
+        - name: RETENTION
+          value: {{ .Values.bootstrap.retention | toJson | quote }}
+        - name: GC
+          value: {{ .Values.bootstrap.gc | toJson | quote }}
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true

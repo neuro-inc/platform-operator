@@ -83,3 +83,139 @@ tests:
                 name: harbor-platform-registry
                 key: password
                 optional: true
+  - it: should leave retention and gc unmanaged by default
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: RETENTION
+            value: '{"enabled":false,"rules":[],"schedule":"0 0 1 * * 6"}'
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GC
+            value: '{"deleteUntagged":true,"enabled":false,"schedule":"0 0 3 * * 0","workers":1}'
+  - it: should pass retention rules to the script
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: latestPushedK
+            value: 10
+            repositories:
+              decoration: repoExcludes
+              pattern: "**/layer-cache/cache"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: RETENTION
+            value: '{"enabled":true,"rules":[{"repositories":{"decoration":"repoExcludes","pattern":"**/layer-cache/cache"},"template":"latestPushedK","value":10}],"schedule":"0 0 1 * * 6"}'
+  - it: should fail when retention is enabled without rules
+    set:
+      bootstrap.retention.enabled: true
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: bootstrap.retention.rules is required when retention is enabled
+  - it: should fail when a rule value is a string
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: latestPushedK
+            value: "10"
+            repositories:
+              pattern: "**"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "bootstrap.retention.rules[0]: value must be a positive integer, got 10"
+  - it: should fail when a rule value is missing
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: nDaysSinceLastPull
+            repositories:
+              pattern: "**"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "bootstrap.retention.rules[0]: value must be a positive integer, got <nil>"
+  - it: should fail when a rule value is not a whole number
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: latestPushedK
+            value: 2.5
+            repositories:
+              pattern: "**"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "bootstrap.retention.rules[0]: value must be a positive integer, got 2.5"
+  - it: should fail when always has a value
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: always
+            value: 1
+            repositories:
+              pattern: "**"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "bootstrap.retention.rules[0]: template always takes no value"
+  - it: should accept integer values and always without a value
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: latestPushedK
+            value: 10
+            repositories:
+              pattern: "**"
+          - template: always
+            repositories:
+              pattern: "**/base"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: RETENTION
+            value: '{"enabled":true,"rules":[{"repositories":{"pattern":"**"},"template":"latestPushedK","value":10},{"repositories":{"pattern":"**/base"},"template":"always"}],"schedule":"0 0 1 * * 6"}'
+  - it: should fail when a day count is above 36500
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: nDaysSinceLastPull
+            value: 106752
+            repositories:
+              pattern: "**"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "bootstrap.retention.rules[0]: nDaysSinceLastPull allows at most 36500 days, got 106752"
+  - it: should accept 36500 days and larger counts
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: nDaysSinceLastPush
+            value: 36500
+            repositories:
+              pattern: "**"
+          - template: latestPushedK
+            value: 100000
+            repositories:
+              pattern: "**"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - notFailedTemplate: {}
