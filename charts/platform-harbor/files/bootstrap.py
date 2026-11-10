@@ -32,6 +32,7 @@ PERMISSIONS = [
     },
 ]
 DESIRED = {"disable": False, "duration": -1}
+RESCHEDULE_CRON = "0 0 0 1 1 *"
 
 
 def log(message):
@@ -206,9 +207,10 @@ def retention_rule(rule):
 
 
 def retention_state(policy):
+    trigger = policy.get("trigger") or {}
     return {
         "algorithm": policy.get("algorithm"),
-        "cron": (policy.get("trigger") or {}).get("settings", {}).get("cron", ""),
+        "trigger": (trigger.get("kind"), (trigger.get("settings") or {}).get("cron", "")),
         "rules": [
             (
                 r["template"],
@@ -223,49 +225,121 @@ def retention_state(policy):
     }
 
 
+def check_retention_rules(rules):
+    status, metadata = harbor("GET", "/retentions/metadatas")
+    if status != 200:
+        fail(f"reading retention metadata failed: {status} {metadata}")
+    templates = {t["rule_template"]: t.get("params") or [] for t in metadata["templates"]}
+    decorations = {d for s in metadata["scope_selectors"] for d in s["decorations"]}
+    for n, rule in enumerate(rules):
+        if rule.get("template") not in templates:
+            fail(f"retention rule {n}: template {rule.get('template')} is not one of {', '.join(sorted(templates))}")
+        if not (rule.get("repositories") or {}).get("pattern"):
+            fail(f"retention rule {n}: repositories.pattern is required")
+        decoration = rule["repositories"].get("decoration", "repoMatches")
+        if decoration not in decorations:
+            fail(f"retention rule {n}: decoration {decoration} is not one of {', '.join(sorted(decorations))}")
+        value = rule.get("value")
+        if templates[rule["template"]] and not (isinstance(value, int) and not isinstance(value, bool) and value > 0):
+            fail(f"retention rule {n}: template {rule['template']} needs a positive integer value, got {value!r}")
+        if not templates[rule["template"]] and value is not None:
+            fail(f"retention rule {n}: template {rule['template']} takes no value, got {value!r}")
+
+
+def retention_schedules():
+    schedules, page = {}, 1
+    while True:
+        status, body = harbor("GET", f"/schedules?page={page}&page_size=100")
+        if status != 200:
+            fail(f"listing schedules failed: {status} {body}")
+        for schedule in body:
+            if schedule.get("vendor_type") == "RETENTION":
+                schedules.setdefault(schedule["vendor_id"], []).append(schedule["cron"])
+        if len(body) < 100:
+            return schedules
+        page += 1
+
+
+def put_retention(policy_id, desired, kind, cron):
+    policy = {**desired, "id": policy_id, "trigger": {**desired["trigger"], "kind": kind, "settings": {"cron": cron}}}
+    status, body = harbor("PUT", f"/retentions/{policy_id}", policy)
+    if status != 200:
+        fail(f"updating retention policy {policy_id} failed: {status} {body}")
+
+
+def write_retention(policy_id, desired, cron):
+    put_retention(policy_id, desired, "", cron)
+    if not cron:
+        put_retention(policy_id, desired, "Schedule", RESCHEDULE_CRON)
+    put_retention(policy_id, desired, "Schedule", cron)
+
+
+def remove_unlinked_retentions(project_id, policy_id):
+    unlinked = []
+    for vendor_id in retention_schedules():
+        if vendor_id == policy_id:
+            continue
+        status, policy = harbor("GET", f"/retentions/{vendor_id}")
+        if status == 200 and (policy.get("scope") or {}).get("ref") == project_id:
+            unlinked.append(vendor_id)
+    if not unlinked:
+        return policy_id
+    for vendor_id in unlinked + ([policy_id] if policy_id else []):
+        status, body = harbor("DELETE", f"/retentions/{vendor_id}")
+        if status != 200:
+            fail(f"deleting retention policy {vendor_id} failed: {status} {body}")
+    log(f"scheduled retention policies {unlinked} not linked to {PROJECT} deleted, the policy for {PROJECT} is recreated")
+    return None
+
+
 def ensure_retention():
     if not RETENTION.get("enabled"):
         log("retention is not managed")
         return
     if not RETENTION.get("rules"):
         fail("retention is enabled without rules")
-    status, metadata = harbor("GET", "/retentions/metadatas")
-    if status != 200:
-        fail(f"reading retention metadata failed: {status} {metadata}")
-    supported = {t["rule_template"] for t in metadata["templates"]} | {
-        d for s in metadata["scope_selectors"] for d in s["decorations"]
-    }
-    rules = [retention_rule(r) for r in RETENTION["rules"]]
-    used = {r["template"] for r in rules} | {s["decoration"] for r in rules for s in r["scope_selectors"]["repository"]}
-    unknown = sorted(used - supported)
-    if unknown:
-        fail(f"unsupported retention templates or decorations: {', '.join(unknown)}")
+    check_retention_rules(RETENTION["rules"])
     status, project = harbor("GET", f"/projects/{urllib.parse.quote(PROJECT)}")
     if status != 200:
         fail(f"reading project {PROJECT} failed: {status} {project}")
+    cron = RETENTION.get("schedule") or ""
     desired = {
         "algorithm": "or",
-        "rules": rules,
-        "trigger": {"kind": "Schedule", "settings": {"cron": RETENTION.get("schedule", "")}, "references": {}},
+        "rules": [retention_rule(r) for r in RETENTION["rules"]],
+        "trigger": {"kind": "Schedule", "settings": {"cron": cron}, "references": {}},
         "scope": {"level": "project", "ref": project["project_id"]},
     }
     policy_id = (project.get("metadata") or {}).get("retention_id")
-    if not policy_id:
+    policy_id = remove_unlinked_retentions(project["project_id"], int(policy_id) if policy_id else None)
+    if policy_id is None:
         status, body = harbor("POST", "/retentions", desired)
         if status != 201:
             fail(f"creating retention policy for {PROJECT} failed: {status} {body}")
-        log(f"retention policy for {PROJECT} created")
-        return
+        status, project = harbor("GET", f"/projects/{urllib.parse.quote(PROJECT)}")
+        policy_id = int((project.get("metadata") or {}).get("retention_id") or 0) if status == 200 else 0
+        if not policy_id:
+            fail(f"retention policy for {PROJECT} created but not linked to the project: {status} {project}")
+        log(f"retention policy {policy_id} for {PROJECT} created")
+    else:
+        status, current = harbor("GET", f"/retentions/{policy_id}")
+        if status != 200:
+            fail(f"reading retention policy {policy_id} failed: {status} {current}")
+        if retention_state(current) == retention_state(desired):
+            log(f"retention policy {policy_id} is up to date")
+        else:
+            write_retention(policy_id, desired, cron)
+            log(f"retention policy {policy_id} updated")
     status, current = harbor("GET", f"/retentions/{policy_id}")
-    if status != 200:
-        fail(f"reading retention policy {policy_id} failed: {status} {current}")
-    if retention_state(current) == retention_state(desired):
-        log(f"retention policy {policy_id} is up to date")
+    if status != 200 or retention_state(current) != retention_state(desired):
+        fail(f"retention policy {policy_id} does not match the values after writing: {status} {current}")
+    expected = [cron] if cron else []
+    if sorted(retention_schedules().get(policy_id, [])) == expected:
         return
-    status, body = harbor("PUT", f"/retentions/{policy_id}", {**desired, "id": int(policy_id)})
-    if status != 200:
-        fail(f"updating retention policy {policy_id} failed: {status} {body}")
-    log(f"retention policy {policy_id} updated")
+    write_retention(policy_id, desired, cron)
+    actual = sorted(retention_schedules().get(policy_id, []))
+    if actual != expected:
+        fail(f"retention policy {policy_id} is scheduled at {actual}, expected {expected}")
+    log(f"retention policy {policy_id} schedule repaired")
 
 
 def gc_state(schedule):
@@ -279,20 +353,24 @@ def gc_state(schedule):
     }
 
 
+def read_gc():
+    status, current = harbor("GET", "/system/gc/schedule")
+    if status != 200:
+        fail(f"reading garbage collection schedule failed: {status} {current}")
+    return gc_state(current)
+
+
 def ensure_gc():
     if not GC.get("enabled"):
         log("garbage collection is not managed")
         return
-    status, current = harbor("GET", "/system/gc/schedule")
-    if status != 200:
-        fail(f"reading garbage collection schedule failed: {status} {current}")
-    current = gc_state(current)
+    current = read_gc()
     if not GC.get("schedule"):
         if current is None:
             log("garbage collection is not scheduled")
             return
         status, body = harbor("PUT", "/system/gc/schedule", {"schedule": {"type": "None"}})
-        if status != 200:
+        if status != 200 or read_gc() is not None:
             fail(f"removing garbage collection schedule failed: {status} {body}")
         log("garbage collection schedule removed")
         return
@@ -303,7 +381,7 @@ def ensure_gc():
         return
     method, expected = ("POST", 201) if current is None else ("PUT", 200)
     status, body = harbor(method, "/system/gc/schedule", desired)
-    if status != expected:
+    if status != expected or read_gc() != {"type": "Custom", "cron": GC["schedule"], **parameters}:
         fail(f"scheduling garbage collection failed: {status} {body}")
     log(f"garbage collection scheduled at {GC['schedule']}")
 

@@ -95,7 +95,7 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: GC
-            value: '{"deleteUntagged":true,"enabled":false,"schedule":"0 0 3 * * 6","workers":1}'
+            value: '{"deleteUntagged":true,"enabled":false,"schedule":"0 0 3 * * 0","workers":1}'
   - it: should pass retention rules to the script
     set:
       bootstrap.retention:
@@ -120,3 +120,73 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: bootstrap.retention.rules is required when retention is enabled
+  - it: should fail when a rule value is a string
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: latestPushedK
+            value: "10"
+            repositories:
+              pattern: "**"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "bootstrap.retention.rules[0]: value must be a positive integer, got 10"
+  - it: should fail when a rule value is missing
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: nDaysSinceLastPull
+            repositories:
+              pattern: "**"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "bootstrap.retention.rules[0]: value must be a positive integer, got <nil>"
+  - it: should fail when a rule value is not a whole number
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: latestPushedK
+            value: 2.5
+            repositories:
+              pattern: "**"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "bootstrap.retention.rules[0]: value must be a positive integer, got 2.5"
+  - it: should fail when always has a value
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: always
+            value: 1
+            repositories:
+              pattern: "**"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "bootstrap.retention.rules[0]: template always takes no value"
+  - it: should accept integer values and always without a value
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: latestPushedK
+            value: 10
+            repositories:
+              pattern: "**"
+          - template: always
+            repositories:
+              pattern: "**/base"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: RETENTION
+            value: '{"enabled":true,"rules":[{"repositories":{"pattern":"**"},"template":"latestPushedK","value":10},{"repositories":{"pattern":"**/base"},"template":"always"}],"schedule":"0 0 1 * * 6"}'

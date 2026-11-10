@@ -11,7 +11,7 @@ bootstrap:
     rules: []
   gc:
     enabled: false
-    schedule: "0 0 3 * * 6"
+    schedule: "0 0 3 * * 0"
     deleteUntagged: true
     workers: 1
   backoffLimit: 3
