@@ -190,3 +190,32 @@ tests:
           content:
             name: RETENTION
             value: '{"enabled":true,"rules":[{"repositories":{"pattern":"**"},"template":"latestPushedK","value":10},{"repositories":{"pattern":"**/base"},"template":"always"}],"schedule":"0 0 1 * * 6"}'
+  - it: should fail when a day count is above 36500
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: nDaysSinceLastPull
+            value: 106752
+            repositories:
+              pattern: "**"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "bootstrap.retention.rules[0]: nDaysSinceLastPull allows at most 36500 days, got 106752"
+  - it: should accept 36500 days and larger counts
+    set:
+      bootstrap.retention:
+        enabled: true
+        rules:
+          - template: nDaysSinceLastPush
+            value: 36500
+            repositories:
+              pattern: "**"
+          - template: latestPushedK
+            value: 100000
+            repositories:
+              pattern: "**"
+    template: templates/bootstrap-job.yaml
+    asserts:
+      - notFailedTemplate: {}

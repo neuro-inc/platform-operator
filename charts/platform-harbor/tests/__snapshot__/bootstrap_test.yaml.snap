@@ -19,7 +19,7 @@ should match snapshot:
       template:
         metadata:
           annotations:
-            checksum/script: 1786834ac2ca8cdefa1f97e8dfa4a68c1c91b9cd7fdb8eac9fe8a19214737c5d
+            checksum/script: d60c2ed6bfa78ef7da7fc70afbfeb5397db61dfc3df8ee9837918bf678e6bd08
           labels:
             app: platform-harbor
             chart: platform-harbor-1.0.0
