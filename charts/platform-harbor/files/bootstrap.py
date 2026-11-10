@@ -326,6 +326,8 @@ def ensure_retention():
         "scope": {"level": "project", "ref": project["project_id"]},
     }
     policy_id = int((project.get("metadata") or {}).get("retention_id") or 0) or None
+    if policy_id and not scoped_to(policy_id, project["project_id"]):
+        fail(f"project {PROJECT} links retention policy {policy_id}, which is missing or belongs to another project")
     schedules = retention_schedules()
     unlinked = [v for v in schedules if v != policy_id and scoped_to(v, project["project_id"])]
     current = read_retention(policy_id) if policy_id else None
