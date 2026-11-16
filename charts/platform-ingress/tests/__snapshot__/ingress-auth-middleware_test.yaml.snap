@@ -13,4 +13,4 @@ forwards auth to configured host:
     spec:
       forwardAuth:
         address: https://api.example.com/oauth/authorize
-        trustForwardHeader: true
+        trustForwardHeader: false
