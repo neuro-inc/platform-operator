@@ -46,6 +46,14 @@ release: {{ .Release.Name | quote }}
 {{- required "platform.clusterDnsName is required" .Values.platform.clusterDnsName -}}
 {{- end -}}
 
+{{- define "platform.accessTokenCookieName" -}}
+{{- $name := required "platform.accessTokenCookieName is required" .Values.platform.accessTokenCookieName -}}
+{{- if contains "," $name -}}
+{{- fail "platform.accessTokenCookieName must be a single cookie name" -}}
+{{- end -}}
+{{- $name -}}
+{{- end -}}
+
 {{- define "platform.token" -}}
 {{- if eq (len .Values.platform.token) 0 -}}
 {{- fail "platform.token is required" -}}

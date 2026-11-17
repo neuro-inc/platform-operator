@@ -10,3 +10,27 @@ tests:
   - it: should match snapshot
     asserts:
       - matchSnapshot: {}
+  - it: should pass the sat access token cookie by default
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.platform.accessTokenCookieNames
+          value: sat
+  - it: should pass the configured access token cookie
+    set:
+      platform.accessTokenCookieName: dat
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.platform.accessTokenCookieNames
+          value: dat
+  - it: should fail on more than one access token cookie
+    set:
+      platform.accessTokenCookieName: sat,dat
+    asserts:
+      - failedTemplate:
+          errorMessage: platform.accessTokenCookieName must be a single cookie name
+  - it: should fail on an empty access token cookie
+    set:
+      platform.accessTokenCookieName: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: platform.accessTokenCookieName is required

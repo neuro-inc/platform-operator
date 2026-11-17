@@ -10,3 +10,17 @@ tests:
   - it: should match snapshot
     asserts:
       - matchSnapshot: {}
+  - it: should keep only the sat access token cookie by default
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.datasources["datasources.yaml"].datasources[0].jsonData.keepCookies
+          value:
+            - sat
+  - it: should keep only the configured access token cookie
+    set:
+      platform.accessTokenCookieName: dat
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.datasources["datasources.yaml"].datasources[0].jsonData.keepCookies
+          value:
+            - dat

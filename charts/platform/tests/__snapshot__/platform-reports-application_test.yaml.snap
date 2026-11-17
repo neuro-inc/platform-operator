@@ -44,6 +44,7 @@ should match snapshot:
               nodePool: platform.neuromation.io/nodepool
               preemptible: platform.neuromation.io/preemptible
             platform:
+              accessTokenCookieNames: sat
               apiUrl: https://api.apolo.us
               appsUrl: https://api.apolo.us
               authUrl: https://api.apolo.us
