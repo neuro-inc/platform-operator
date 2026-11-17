@@ -7,4 +7,4 @@ metadata:
 spec:
   forwardAuth:
     address: https://{{ .Values.ingressAuthHost }}/oauth/authorize
-    trustForwardHeader: true
+    trustForwardHeader: false

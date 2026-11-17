@@ -9,3 +9,6 @@ tests:
       ingressAuthHost: api.example.com
     asserts:
       - matchSnapshot: {}
+      - equal:
+          path: spec.forwardAuth.trustForwardHeader
+          value: false
