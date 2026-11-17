@@ -17,6 +17,7 @@ platform:
   configUrl: {{ get $platformUrls "configUrl" }}
   apiUrl: {{ get $platformUrls "apiUrl" }}
   appsUrl: {{ get $platformUrls "appsUrl" }}
+  accessTokenCookieNames: {{ include "platform.accessTokenCookieName" . }}
   token:
     {{- include "platform.token" . | nindent 4 }}
 nodePoolLabels:

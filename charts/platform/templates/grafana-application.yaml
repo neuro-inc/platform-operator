@@ -62,8 +62,7 @@ datasources:
           httpMethod: GET
           manageAlerts: false
           keepCookies:
-            - dat
-            - sat
+            - {{ include "platform.accessTokenCookieName" . }}
           prometheusType: Thanos
 persistence:
   enabled: false

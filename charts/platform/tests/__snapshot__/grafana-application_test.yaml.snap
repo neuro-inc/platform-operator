@@ -41,7 +41,6 @@ should match snapshot:
                     jsonData:
                       httpMethod: GET
                       keepCookies:
-                        - dat
                         - sat
                       manageAlerts: false
                       prometheusType: Thanos
