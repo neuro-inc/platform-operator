@@ -14,3 +14,16 @@ tests:
           - https://.*\\.example\\.com
     asserts:
       - matchSnapshot: {}
+  - it: anchors the job and app origin patterns to the cluster domain
+    release:
+      name: ingress
+    set:
+      clusterDnsName: test-cluster.org.apolo.us
+    asserts:
+      - equal:
+          path: spec.headers.accessControlAllowOriginListRegex
+          value:
+            - ^https:\/\/[a-zA-Z0-9_-]+\.jobs\.test-cluster\.org\.apolo\.us$
+            - ^https:\/\/[a-zA-Z0-9_-]+\.apps\.test-cluster\.org\.apolo\.us$
+      - notExists:
+          path: spec.headers.accessControlAllowOriginList
