@@ -1,0 +1,9 @@
+displayName: Token filter
+type: middleware
+import: github.com/neuro-inc/tokenfilter
+summary: Removes platform credentials from requests to backends
+testData:
+  cookies:
+    - sat
+  bearerClaims:
+    - https://platform.neuromation.io/user

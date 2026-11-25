@@ -1,0 +1,19 @@
+suite: platform-ingress ingress-auth-forward
+templates:
+  - templates/ingress-auth-forward-middleware.yaml
+tests:
+  - it: forwards auth to configured host
+    release:
+      name: ingress
+    set:
+      ingressAuthHost: api.example.com
+    asserts:
+      - matchSnapshot: {}
+      - equal:
+          path: metadata.name
+          value: ingress-ingress-auth-forward
+      - equal:
+          path: spec.forwardAuth
+          value:
+            address: https://api.example.com/oauth/authorize
+            trustForwardHeader: false

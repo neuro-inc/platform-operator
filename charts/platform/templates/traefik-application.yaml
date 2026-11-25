@@ -1,5 +1,6 @@
 {{- define "platform.argocd.applications.traefik.values" -}}
 {{- $platformNamespace := include "platform.argocd.destination.namespace" . -}}
+{{- $tokenFilter := dict ".traefik.yml" (.Files.Get "files/tokenfilter/.traefik.yml") "go.mod" (.Files.Get "files/tokenfilter/go.mod") "tokenfilter.go" (.Files.Get "files/tokenfilter/tokenfilter.go") -}}
 image:
   name: ghcr.io/neuro-inc/traefik
 deployment:
@@ -13,11 +14,23 @@ deployment:
   podLabels:
     service: traefik
     platform.apolo.us/component: ingress-gateway
+  podAnnotations:
+    checksum/tokenfilter: {{ $tokenFilter | toJson | sha256sum }}
+  additionalVolumes:
+    - name: tokenfilter
+      configMap:
+        name: traefik-tokenfilter
+        optional: true
+additionalVolumeMounts:
+  - name: tokenfilter
+    mountPath: /plugins-local/src/github.com/neuro-inc/tokenfilter
+    readOnly: true
 additionalArguments:
   - --entryPoints.websecure.proxyProtocol.insecure=true
   - --entryPoints.websecure.forwardedHeaders.insecure=true
   - --entryPoints.websecure.http.middlewares={{ printf "%s-%s-cors@kubernetescrd" $platformNamespace .Release.Name }}
   - --providers.kubernetesingress.ingressendpoint.ip=1.2.3.4
+  - --experimental.localPlugins.tokenfilter.moduleName=github.com/neuro-inc/tokenfilter
 instanceLabelOverride: {{ .Release.Name }}
 resources:
   requests:
@@ -61,6 +74,15 @@ metrics:
 ingressClass:
   enabled: true
 priorityClassName: {{ include "platform.priorityClassName" . }}
+extraObjects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: traefik-tokenfilter
+      labels:
+        service: traefik
+    data:
+      {{- $tokenFilter | toYaml | nindent 6 }}
 {{- end }}
 
 {{- if .Values.argocdApplications.traefik.enabled }}

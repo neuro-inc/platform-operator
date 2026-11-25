@@ -10,6 +10,11 @@ tests:
   - it: should match snapshot
     asserts:
       - matchSnapshot: {}
+  - it: should route grafana and metrics through the plain forward auth middleware
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.grafanaProxy.ingress.annotations["traefik.ingress.kubernetes.io/router.middlewares"]
+          value: platform-platform-ingress-auth-forward@kubernetescrd
   - it: should pass the sat access token cookie by default
     asserts:
       - equal:
