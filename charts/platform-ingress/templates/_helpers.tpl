@@ -29,3 +29,9 @@ release: {{ .Release.Name | quote }}
 {{- define "platform.clusterDnsName" -}}
 {{- required "clusterDnsName is required" .Values.clusterDnsName -}}
 {{- end -}}
+
+{{- define "platform.ingressAuth.forwardAuth" -}}
+forwardAuth:
+  address: https://{{ .Values.ingressAuthHost }}/oauth/authorize
+  trustForwardHeader: false
+{{- end -}}

@@ -21,3 +21,4 @@
 *.tmproj
 
 tests/
+*_test.go

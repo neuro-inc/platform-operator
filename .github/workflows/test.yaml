@@ -25,6 +25,13 @@ jobs:
         make lint
     - name: Run unit tests
       run: make test_unit
+    - name: Install Go
+      uses: actions/setup-go@v7
+      with:
+        go-version-file: charts/platform/files/tokenfilter/go.mod
+        cache: false
+    - name: Run plugin tests
+      run: make test_plugin
 
   check:
     name: Check

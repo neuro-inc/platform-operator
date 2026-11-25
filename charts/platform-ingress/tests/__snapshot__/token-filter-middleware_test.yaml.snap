@@ -1,0 +1,28 @@
+removes platform credentials by default:
+  1: |
+    apiVersion: traefik.io/v1alpha1
+    kind: Middleware
+    metadata:
+      labels:
+        app: platform-ingress
+        chart: platform-ingress-1.0.0
+        heritage: Helm
+        release: ingress
+        service: traefik
+      name: ingress-token-filter
+    spec:
+      plugin:
+        tokenfilter:
+          bearerClaims:
+            - https://platform.neuromation.io/user
+          cookiePatterns:
+            - ^launchpad-[0-9a-f]+-token$
+          cookies:
+            - sat
+            - srt
+            - dat
+            - drt
+            - launchpad-token
+          maxAuthorizationValues: 8
+          maxCookieParts: 300
+          maxTokenLength: 16384

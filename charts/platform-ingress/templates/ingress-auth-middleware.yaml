@@ -5,6 +5,4 @@ metadata:
   labels: {{ include "platform.labels.common" . | nindent 4 }}
     service: traefik
 spec:
-  forwardAuth:
-    address: https://{{ .Values.ingressAuthHost }}/oauth/authorize
-    trustForwardHeader: false
+  {{- include "platform.ingressAuth.forwardAuth" . | nindent 2 }}

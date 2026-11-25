@@ -1,0 +1,40 @@
+suite: platform-ingress token-filter-middleware
+templates:
+  - templates/token-filter-middleware.yaml
+tests:
+  - it: removes platform credentials by default
+    release:
+      name: ingress
+    asserts:
+      - matchSnapshot: {}
+      - equal:
+          path: metadata.name
+          value: ingress-token-filter
+      - equal:
+          path: spec.plugin.tokenfilter
+          value:
+            cookies:
+              - sat
+              - srt
+              - dat
+              - drt
+              - launchpad-token
+            cookiePatterns:
+              - ^launchpad-[0-9a-f]+-token$
+            bearerClaims:
+              - https://platform.neuromation.io/user
+            maxCookieParts: 300
+            maxTokenLength: 16384
+            maxAuthorizationValues: 8
+  - it: uses the configured cookie list
+    release:
+      name: ingress
+    set:
+      tokenFilter:
+        cookies:
+          - dat
+    asserts:
+      - equal:
+          path: spec.plugin.tokenfilter.cookies
+          value:
+            - dat

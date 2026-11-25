@@ -1,0 +1,226 @@
+package tokenfilter
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"regexp"
+	"strings"
+)
+
+type Config struct {
+	Cookies                []string `json:"cookies,omitempty"`
+	CookiePatterns         []string `json:"cookiePatterns,omitempty"`
+	BearerClaims           []string `json:"bearerClaims,omitempty"`
+	MaxCookieParts         int      `json:"maxCookieParts,omitempty"`
+	MaxTokenLength         int      `json:"maxTokenLength,omitempty"`
+	MaxAuthorizationValues int      `json:"maxAuthorizationValues,omitempty"`
+}
+
+const (
+	defaultMaxCookieParts         = 300
+	defaultMaxTokenLength         = 16384
+	defaultMaxAuthorizationValues = 8
+)
+
+func CreateConfig() *Config {
+	return &Config{
+		MaxCookieParts:         defaultMaxCookieParts,
+		MaxTokenLength:         defaultMaxTokenLength,
+		MaxAuthorizationValues: defaultMaxAuthorizationValues,
+	}
+}
+
+type TokenFilter struct {
+	next                   http.Handler
+	cookies                map[string]bool
+	cookiePatterns         []*regexp.Regexp
+	bearerClaims           []string
+	maxCookieParts         int
+	maxTokenLength         int
+	maxAuthorizationValues int
+}
+
+func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
+	if len(config.Cookies) == 0 && len(config.CookiePatterns) == 0 && len(config.BearerClaims) == 0 {
+		return nil, fmt.Errorf("%s: no cookies, cookie patterns or bearer claims configured", name)
+	}
+	cookies := make(map[string]bool, len(config.Cookies))
+	for _, cookie := range config.Cookies {
+		cookies[cookie] = true
+	}
+	patterns := make([]*regexp.Regexp, 0, len(config.CookiePatterns))
+	for _, pattern := range config.CookiePatterns {
+		re, err := regexp.Compile("^(?:" + pattern + ")$")
+		if err != nil {
+			return nil, fmt.Errorf("invalid cookie pattern %q: %w", pattern, err)
+		}
+		patterns = append(patterns, re)
+	}
+	maxCookieParts := config.MaxCookieParts
+	if maxCookieParts <= 0 {
+		maxCookieParts = defaultMaxCookieParts
+	}
+	maxTokenLength := config.MaxTokenLength
+	if maxTokenLength <= 0 {
+		maxTokenLength = defaultMaxTokenLength
+	}
+	maxAuthorizationValues := config.MaxAuthorizationValues
+	if maxAuthorizationValues <= 0 {
+		maxAuthorizationValues = defaultMaxAuthorizationValues
+	}
+	return &TokenFilter{
+		next:                   next,
+		cookies:                cookies,
+		cookiePatterns:         patterns,
+		bearerClaims:           config.BearerClaims,
+		maxCookieParts:         maxCookieParts,
+		maxTokenLength:         maxTokenLength,
+		maxAuthorizationValues: maxAuthorizationValues,
+	}, nil
+}
+
+func (f *TokenFilter) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	f.filterCookies(req.Header)
+	f.filterAuthorization(req.Header)
+	f.next.ServeHTTP(rw, req)
+}
+
+func (f *TokenFilter) filterCookies(header http.Header) {
+	values := header.Values("Cookie")
+	if len(values) == 0 {
+		return
+	}
+	if len(values) > f.maxCookieParts {
+		header.Del("Cookie")
+		return
+	}
+	changed := false
+	count := 0
+	kept := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == "" {
+			count++
+			if count > f.maxCookieParts {
+				header.Del("Cookie")
+				return
+			}
+			continue
+		}
+		var b strings.Builder
+		rest := value
+		for rest != "" {
+			var part string
+			part, rest, _ = strings.Cut(rest, ";")
+			count++
+			if count > f.maxCookieParts {
+				header.Del("Cookie")
+				return
+			}
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			name, _, _ := strings.Cut(part, "=")
+			if f.isFilteredCookie(strings.TrimSpace(name)) {
+				changed = true
+				continue
+			}
+			if b.Len() > 0 {
+				b.WriteString("; ")
+			}
+			b.WriteString(part)
+		}
+		if b.Len() > 0 {
+			kept = append(kept, b.String())
+		}
+	}
+	if !changed {
+		return
+	}
+	header.Del("Cookie")
+	if len(kept) > 0 {
+		header.Set("Cookie", strings.Join(kept, "; "))
+	}
+}
+
+func (f *TokenFilter) isFilteredCookie(name string) bool {
+	if f.cookies[name] {
+		return true
+	}
+	for _, re := range f.cookiePatterns {
+		if re.MatchString(name) {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *TokenFilter) filterAuthorization(header http.Header) {
+	values := header.Values("Authorization")
+	if len(values) == 0 {
+		return
+	}
+	if len(values) > f.maxAuthorizationValues {
+		header.Del("Authorization")
+		return
+	}
+	changed := false
+	kept := make([]string, 0, len(values))
+	for _, value := range values {
+		if f.isFilteredAuthorization(value) {
+			changed = true
+			continue
+		}
+		kept = append(kept, value)
+	}
+	if !changed {
+		return
+	}
+	header.Del("Authorization")
+	for _, value := range kept {
+		header.Add("Authorization", value)
+	}
+}
+
+func (f *TokenFilter) isFilteredAuthorization(value string) bool {
+	if len(f.bearerClaims) == 0 {
+		return false
+	}
+	value = strings.TrimSpace(value)
+	if len(value) < 7 || !strings.EqualFold(value[:7], "bearer ") {
+		return false
+	}
+	token := strings.TrimSpace(value[7:])
+	if len(token) > f.maxTokenLength {
+		return false
+	}
+	claims := jwtClaims(token)
+	if claims == nil {
+		return false
+	}
+	for _, claim := range f.bearerClaims {
+		if _, ok := claims[claim]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func jwtClaims(token string) map[string]interface{} {
+	parts := strings.SplitN(token, ".", 4)
+	if len(parts) != 3 {
+		return nil
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(parts[1], "="))
+	if err != nil {
+		return nil
+	}
+	var claims map[string]interface{}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil
+	}
+	return claims
+}

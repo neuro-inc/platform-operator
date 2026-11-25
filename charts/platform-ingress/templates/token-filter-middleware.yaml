@@ -1,0 +1,10 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-token-filter
+  labels: {{ include "platform.labels.common" . | nindent 4 }}
+    service: traefik
+spec:
+  plugin:
+    tokenfilter:
+      {{- toYaml .Values.tokenFilter | nindent 6 }}

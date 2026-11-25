@@ -17,3 +17,57 @@ tests:
           value:
             - CreateNamespace=true
             - PrunePropagationPolicy=foreground
+  - it: should load the token filter plugin
+    asserts:
+      - contains:
+          path: spec.source.helm.valuesObject.additionalArguments
+          content: --experimental.localPlugins.tokenfilter.moduleName=github.com/neuro-inc/tokenfilter
+      - equal:
+          path: spec.source.helm.valuesObject.additionalVolumeMounts
+          value:
+            - name: tokenfilter
+              mountPath: /plugins-local/src/github.com/neuro-inc/tokenfilter
+              readOnly: true
+      - equal:
+          path: spec.source.helm.valuesObject.deployment.additionalVolumes
+          value:
+            - name: tokenfilter
+              configMap:
+                name: traefik-tokenfilter
+                optional: true
+      - equal:
+          path: spec.source.helm.valuesObject.extraObjects[0].metadata.name
+          value: traefik-tokenfilter
+      - matchRegex:
+          path: spec.source.helm.valuesObject.extraObjects[0].data["tokenfilter.go"]
+          pattern: ^package tokenfilter\n
+      - matchRegex:
+          path: spec.source.helm.valuesObject.extraObjects[0].data[".traefik.yml"]
+          pattern: "import: github.com/neuro-inc/tokenfilter"
+      - matchRegex:
+          path: spec.source.helm.valuesObject.extraObjects[0].data["go.mod"]
+          pattern: ^module github.com/neuro-inc/tokenfilter\n
+      - notMatchRegex:
+          path: spec.source.helm.valuesObject.extraObjects[0].data["tokenfilter.go"]
+          pattern: "[{][{]"
+      - notMatchRegex:
+          path: spec.source.helm.valuesObject.extraObjects[0].data[".traefik.yml"]
+          pattern: "[{][{]"
+      - notMatchRegex:
+          path: spec.source.helm.valuesObject.extraObjects[0].data["go.mod"]
+          pattern: "[{][{]"
+      - matchRegex:
+          path: spec.source.helm.valuesObject.deployment.podAnnotations["checksum/tokenfilter"]
+          pattern: ^[0-9a-f]{64}$
+  - it: should keep the plugin when cluster values set the replica count
+    set:
+      argocdApplications.traefik.values:
+        deployment:
+          replicas: 1
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.deployment.replicas
+          value: 1
+      - equal:
+          path: spec.source.helm.valuesObject.deployment.additionalVolumes[0].name
+          value: tokenfilter

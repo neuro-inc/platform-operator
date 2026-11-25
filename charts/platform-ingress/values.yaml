@@ -6,6 +6,21 @@ fallbackHost: default.jobs.apolo.us
 fallbackIngress:
   annotations: {}
 
+tokenFilter:
+  cookies:
+    - sat
+    - srt
+    - dat
+    - drt
+    - launchpad-token
+  cookiePatterns:
+    - ^launchpad-[0-9a-f]+-token$
+  bearerClaims:
+    - https://platform.neuromation.io/user
+  maxCookieParts: 300
+  maxTokenLength: 16384
+  maxAuthorizationValues: 8
+
 cors:
   originList: []
   originListRegex: []

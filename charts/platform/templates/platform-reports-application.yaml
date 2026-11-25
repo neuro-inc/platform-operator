@@ -45,7 +45,7 @@ grafanaProxy:
     - {{ printf "grafana.%s" (include "platform.clusterDnsName" .) }}
     - {{ printf "metrics.%s" (include "platform.clusterDnsName" .) }}
     annotations:
-      traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-ingress-auth@kubernetescrd" $platformNamespace .Release.Name }}
+      traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-ingress-auth-forward@kubernetescrd" $platformNamespace .Release.Name }}
 priorityClassName: {{ include "platform.priorityClassName" . }}
 {{- with .Values.sentry }}
 sentry:
