@@ -18,6 +18,7 @@ jobs:
   ingressClass: {{ .Values.defaultIngressClassName }}
   ingressAuthMiddleware: {{ printf "%s-%s-ingress-auth@kubernetescrd" $platformNamespace .Release.Name }}
   ingressErrorPageMiddleware: {{ printf "%s-%s-error-page@kubernetescrd" $platformNamespace .Release.Name }}
+  ingressTokenFilterMiddleware: {{ printf "%s-%s-token-filter@kubernetescrd" $platformNamespace .Release.Name }}
   ingressOAuthAuthorizeUrl: {{ printf "%s/oauth/authorize" (get $platformUrls "ingressAuthUrl") }}
 nodeLabels:
   job: {{ .Values.nodeLabels.job }}
