@@ -31,6 +31,7 @@ should match snapshot:
               ingressClass: traefik
               ingressErrorPageMiddleware: platform-platform-error-page@kubernetescrd
               ingressOAuthAuthorizeUrl: https://api.apolo.us/oauth/authorize
+              ingressTokenFilterMiddleware: platform-platform-token-filter@kubernetescrd
               namespace: platform-jobs
             nodeLabels:
               job: platform.neuromation.io/job

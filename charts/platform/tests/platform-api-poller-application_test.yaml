@@ -14,3 +14,20 @@ tests:
   - it: should match snapshot
     asserts:
       - matchSnapshot: {}
+  - it: should add the token filter middleware to job ingresses
+    asserts:
+      - equal:
+          path: spec.source.helm.valuesObject.jobs.ingressTokenFilterMiddleware
+          value: platform-platform-token-filter@kubernetescrd
+  - it: should not add the token filter middleware without the chart Traefik
+    set:
+      argocdApplications.traefik.enabled: false
+    asserts:
+      - notExists:
+          path: spec.source.helm.valuesObject.jobs.ingressTokenFilterMiddleware
+  - it: should not add the token filter middleware for another ingress class
+    set:
+      defaultIngressClassName: nginx
+    asserts:
+      - notExists:
+          path: spec.source.helm.valuesObject.jobs.ingressTokenFilterMiddleware
